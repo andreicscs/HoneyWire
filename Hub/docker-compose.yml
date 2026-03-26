@@ -12,6 +12,8 @@ services:
     environment:
       - API_SECRET=${API_SECRET}
       - NTFY_URL=${NTFY_URL}
-
+      - GOTIFY_URL=${GOTIFY_URL}
+      - GOTIFY_TOKEN=${GOTIFY_TOKEN}
+      
 volumes:
   honeywire_data:

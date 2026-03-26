@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 # --- Configuration ---
 API_SECRET = os.getenv("API_SECRET", "super_secret_key_123")
 NTFY_URL = os.getenv("NTFY_URL", "")
+# Add the Gotify Environment Variables
+GOTIFY_URL = os.getenv("GOTIFY_URL", "")
+GOTIFY_TOKEN = os.getenv("GOTIFY_TOKEN", "")
 
 app = FastAPI(title="HoneyWire Hub")
 templates = Jinja2Templates(directory="templates")
@@ -140,12 +143,30 @@ async def receive_event(event: Event, x_api_key: str = Header(None)):
     conn.commit()
     conn.close()
 
-    if NTFY_URL and is_armed:
+    if is_armed:
         msg = f"🚨 HoneyWire [{event.sensor_id}]: IP {event.attacker_ip} hit Port {event.target_port}"
-        try:
-            requests.post(NTFY_URL, data=msg.encode('utf-8'))
-        except:
-            pass 
+        
+        # --- NTFY Notification ---
+        if NTFY_URL:
+            try:
+                requests.post(NTFY_URL, data=msg.encode('utf-8'))
+            except:
+                pass 
+                
+        # --- GOTIFY Notification ---
+        if GOTIFY_URL and GOTIFY_TOKEN:
+            try:
+                requests.post(
+                    GOTIFY_URL,
+                    headers={"X-Gotify-Key": GOTIFY_TOKEN},
+                    json={
+                        "title": "HoneyWire Alert",
+                        "message": msg,
+                        "priority": 5 # Priority 5 triggers a push notification with sound in the app
+                    }
+                )
+            except:
+                pass
 
     return {"status": "success"}
 
