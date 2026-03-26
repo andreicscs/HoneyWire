@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  hub:
+    build: .
+    container_name: honeywire-hub
+    restart: unless-stopped
+    ports:
+      - "${HUB_PORT}:8080"
+    volumes:
+      - honeywire_data:/app
+    environment:
+      - API_SECRET=${API_SECRET}
+      - NTFY_URL=${NTFY_URL}
+
+volumes:
+  honeywire_data:

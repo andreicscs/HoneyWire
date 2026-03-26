@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  agent:
+    build: .
+    container_name: honeywire-agent
+    restart: unless-stopped
+    # Binds directly to the host machine's network to catch real port scans
+    network_mode: "host" 
+    environment:
+      - HUB_URL=${HUB_URL}
+      - API_SECRET=${API_SECRET}
+      - SENSOR_ID=${SENSOR_ID}
+      - SENSOR_IP=${SENSOR_IP}
+      - DECOY_PORTS=${DECOY_PORTS}

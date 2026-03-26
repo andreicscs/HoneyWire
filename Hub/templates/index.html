@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoneyWire Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        @keyframes shimmer {
+            0%   { background-position: -1000px 0; }
+            100% { background-position:  1000px 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #1e293b 25%, #2d3f55 50%, #1e293b 75%);
+            background-size: 1000px 100%;
+            animation: shimmer 1.8s infinite linear;
+            border-radius: 4px;
+        }
+
+        @keyframes toastIn  { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+        @keyframes toastOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(6px) scale(0.97); } }
+        .toast-enter { animation: toastIn  0.2s ease forwards; }
+        .toast-exit  { animation: toastOut 0.2s ease forwards; }
+
+        @keyframes popIn { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+        .pop-in { animation: popIn 0.22s ease forwards; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 p-8 min-h-screen selection:bg-emerald-500/30">
+
+    <!-- Toast container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 items-end pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto" x-data="trapDashboard()">
+
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <span class="text-emerald-400">🕸️ HoneyWire</span> Hub
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">Distributed Micro-Honeypot Command Center</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button x-show="unreadCount > 0" @click="markAsRead()"
+                        class="flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-rose-500/20 transition-all shadow-lg shadow-rose-500/10">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span x-text="unreadCount + ' New Alerts'"></span>
+                </button>
+
+                <button @click="clearLogs()"
+                        class="text-sm font-semibold text-slate-400 hover:text-rose-400 px-4 py-2 rounded-lg border border-slate-800 bg-slate-900/50 hover:bg-slate-800 transition-all">
+                    Clear Logs
+                </button>
+
+                 <button @click="toggleArmed()" 
+                        class="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border transition-all duration-300"
+                        :class="isArmed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-slate-800/80 text-red-400 border-red-500/50 hover:bg-slate-700'">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span x-show="isArmed" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 transition-colors duration-300" 
+                              :class="isArmed ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-red-500'"></span>
+                    </span>
+                    <span x-text="isArmed ? 'System Armed' : 'System Disarmed'"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Unified Sensor Bar: Filter + Health -->
+        <div class="mb-8 flex flex-wrap items-center gap-2 bg-slate-900/50 p-3 rounded-xl border border-slate-800/60 backdrop-blur-sm">
+            <span class="text-xs text-slate-500 font-bold uppercase tracking-widest mr-2">Sensors:</span>
+
+            <button @click="setFilter('ALL')"
+                    :class="selectedFilter === 'ALL' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'"
+                    class="px-4 py-1.5 rounded-lg border text-sm font-medium transition-colors">
+                All Sensors
+            </button>
+
+            <template x-for="sensor in fleet" :key="sensor.sensor_id">
+                <div class="relative group">
+                    <button @click="setFilter(sensor.sensor_id)"
+                            :class="[
+                                'px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors flex items-center gap-2',
+                                selectedFilter === sensor.sensor_id 
+                                    ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50' 
+                                    : sensor.status === 'online' 
+                                        ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-slate-200'
+                                        : 'bg-slate-900 text-slate-500 border-rose-500/50 hover:bg-slate-800 hover:text-slate-400 cursor-help'
+                            ]">
+                        <!-- Health indicator -->
+                        <span class="relative flex h-2.5 w-2.5">
+                            <span x-show="sensor.status === 'online'" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5"
+                                  :class="sensor.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                        </span>
+                        <span x-text="sensor.sensor_id"></span>
+                    </button>
+                    
+                    <div x-show="sensor.status === 'offline' && sensor.last_seen"
+                        class="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 border border-rose-500/30 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                        <div class="text-xs text-center">
+                            <div class="text-rose-400 font-bold mb-1 tracking-wide">📡 OFFLINE</div>
+                            <div class="text-slate-300 font-mono text-[11px]" x-text="formatTimestamp(sensor.last_seen)"></div>
+                            <div class="text-slate-500 text-[10px] mt-1 font-medium" x-text="getTimeAgo(sensor.last_seen)"></div>
+                        </div>
+                        <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800"></div>
+                    </div>
+                    
+                    <div class="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-800 border border-emerald-500/30 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap"
+                         :class="sensor.status === 'online' ? 'block' : 'hidden'">
+                        <span class="text-[11px] font-bold tracking-wide text-emerald-400">● ONLINE</span>
+                        <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-slate-800"></div>
+                    </div>
+                </div>
+            </template>
+
+            <span x-show="fleet.length === 0" class="text-sm text-slate-600 italic">No sensors registered.</span>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid gap-6 mb-8 transition-all duration-300" :class="selectedFilter === 'ALL' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'">
+
+            <div class="bg-slate-900 border border-slate-800/60 rounded-2xl p-6 shadow-xl flex flex-col h-72 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none"></div>
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-4 z-10 flex justify-between">
+                    <span>Top Targeted Ports</span>
+                    <span x-show="selectedFilter !== 'ALL'" class="text-indigo-400" x-text="'Targeting: ' + selectedFilter"></span>
+                </p>
+                <div class="relative flex-1 w-full z-10"><canvas id="portChart"></canvas></div>
+            </div>
+
+            <div x-show="selectedFilter === 'ALL'" class="bg-slate-900 border border-slate-800/60 rounded-2xl p-6 shadow-xl flex flex-col h-72 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-bl from-rose-500/5 to-transparent pointer-events-none"></div>
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider mb-4 z-10">Top Tripped Sensors</p>
+                <div class="relative flex-1 w-full z-10"><canvas id="sensorChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Intrusion log table -->
+        <div class="bg-slate-900 rounded-2xl border border-slate-800/60 overflow-hidden shadow-2xl">
+            <div class="px-6 py-4 border-b border-slate-800/60 bg-slate-800/20 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-200">
+                    Intrusion Logs
+                    <span class="text-slate-500 font-normal ml-1">
+                        <template x-if="filteredEvents.length > 100">
+                            <span>(Showing 100 of <span x-text="filteredEvents.length"></span>)</span>
+                        </template>
+                        <template x-if="filteredEvents.length <= 100">
+                            <span>(<span x-text="filteredEvents.length"></span> Total)</span>
+                        </template>
+                    </span>
+                </h2>
+                <div class="flex items-center gap-1.5 text-xs text-red-600 select-none">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                    Live
+                </div>
+            </div>
+
+            <div class="max-h-[500px] overflow-y-auto">
+                <table class="w-full text-left text-sm whitespace-nowrap">
+                    <thead class="bg-slate-900/90 text-slate-400 sticky top-0 backdrop-blur-md z-10 shadow-sm">
+                            <th class="px-6 py-4 font-medium tracking-wide">Timestamp</th>
+                            <th class="px-6 py-4 font-medium tracking-wide">Sensor</th>
+                            <th class="px-6 py-4 font-medium tracking-wide">Attacker IP</th>
+                            <th class="px-6 py-4 font-medium tracking-wide">Target</th>
+                            <th class="px-6 py-4 font-medium tracking-wide">Action</th>
+                            <th class="px-6 py-4 font-medium tracking-wide">Payload Data</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+
+                        <!-- Skeleton rows while loading -->
+                        <template x-if="isLoading">
+                            <template x-for="i in 6" :key="i">
+                                <tr>
+                                    <td class="px-6 py-4"><div class="skeleton h-3.5 w-32"></div></td>
+                                    <td class="px-6 py-4">
+                                        <div class="skeleton h-3.5 w-24 mb-2"></div>
+                                        <div class="skeleton h-3 w-20"></div>
+                                    </td>
+                                    <td class="px-6 py-4"><div class="skeleton h-3.5 w-28"></div></td>
+                                    <td class="px-6 py-4"><div class="skeleton h-3.5 w-16"></div></td>
+                                    <td class="px-6 py-4"><div class="skeleton h-5 w-20 rounded-md"></div></td>
+                                    <td class="px-6 py-4"><div class="skeleton h-3.5 w-40"></div></td>
+                                </tr>
+                            </template>
+                        </template>
+
+                        <!-- Real event rows -->
+                        <template x-if="!isLoading">
+                            <template x-for="event in filteredEvents.slice(0, 100)" :key="event.id">
+                                <tr class="transition-colors group"
+                                    :class="event.is_read === 0 ? 'bg-rose-950/10 hover:bg-rose-950/20' : 'hover:bg-slate-800/40'">
+                                    <td class="px-6 py-4 text-slate-400" x-text="event.timestamp"></td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-col">
+                                            <span class="font-medium text-slate-200" x-text="event.sensor_id"></span>
+                                            <span class="text-xs text-slate-500 font-mono" x-text="event.sensor_ip"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 font-mono text-rose-400 font-medium group-hover:text-rose-300 transition-colors" x-text="event.attacker_ip"></td>
+                                    <td class="px-6 py-4 font-mono text-emerald-400" x-text="event.target_port + '/' + event.protocol"></td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wide uppercase"
+                                              :class="event.action === 'tarpitted' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'"
+                                              x-text="event.action">
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <span x-show="event.raw_payload" class="text-xs font-mono text-slate-500 truncate max-w-[150px]" x-text="getPayloadPreview(event.raw_payload)"></span>
+                                            <button x-show="event.raw_payload" @click="openPayload(event)"
+                                                    class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-3 py-1.5 rounded-md border border-indigo-500/20 transition-all">
+                                                Inspect
+                                            </button>
+                                            <span x-show="!event.raw_payload" class="text-xs text-slate-600 italic">None</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
+
+                        <!-- Empty state -->
+                        <tr x-show="!isLoading && filteredEvents.length === 0">
+                            <td colspan="6" class="px-6 py-16 text-center text-slate-500">
+                                <div class="flex flex-col items-center justify-center gap-2">
+                                    <div class="text-4xl opacity-40">🛡️</div>
+                                    <p>No intrusions detected for this filter. The network is secure.</p>
+                                </div>
+                            </td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer note when results are capped -->
+            <div x-show="!isLoading && filteredEvents.length > 100"
+                 class="px-6 py-3 border-t border-slate-800/60 bg-slate-800/10 text-center text-xs text-slate-500">
+                Displaying the 100 most recent events —
+                <span x-text="filteredEvents.length - 100"></span>
+                older <span x-text="filteredEvents.length - 100 === 1 ? 'entry' : 'entries'"></span> not shown.
+            </div>
+        </div>
+
+        <!-- Payload Inspector Modal -->
+        <div x-show="isModalOpen" style="display:none;" class="relative z-50" role="dialog" aria-modal="true">
+            <div x-show="isModalOpen"
+                 x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                 class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+
+            <div class="fixed inset-0 z-10 overflow-y-auto">
+                <div class="flex min-h-full items-end justify-center p-4 sm:items-center sm:p-0">
+                    <div x-show="isModalOpen" @click.away="closePayload()"
+                         x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                         x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:scale-95"
+                         class="relative transform overflow-hidden rounded-2xl bg-slate-900 border border-slate-700 text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+
+                        <div class="bg-slate-800/40 px-6 py-4 border-b border-slate-700/60 flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                                <span class="text-indigo-400">🔬</span> Payload Inspector
+                                <span x-show="selectedEvent"
+                                      class="text-[10px] bg-slate-700/50 text-slate-300 px-2.5 py-1 rounded-full uppercase tracking-widest ml-2 border border-slate-600/50"
+                                      x-text="'ID: ' + selectedEvent?.id"></span>
+                            </h3>
+                            <button @click="closePayload()" class="text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
+                        <div class="px-6 py-5">
+                            <div class="flex gap-6 mb-6 text-sm bg-slate-950/50 p-4 rounded-xl border border-slate-800/60 flex-wrap">
+                                <div><span class="text-slate-500 text-xs uppercase tracking-wider block mb-1">Attacker</span>  <span class="text-rose-400 font-mono"    x-text="selectedEvent?.attacker_ip"></span></div>
+                                <div><span class="text-slate-500 text-xs uppercase tracking-wider block mb-1">Target</span>    <span class="text-emerald-400 font-mono"  x-text="selectedEvent?.target_port + '/' + selectedEvent?.protocol"></span></div>
+                                <div><span class="text-slate-500 text-xs uppercase tracking-wider block mb-1">Duration</span>  <span class="text-amber-400 font-mono"    x-text="selectedEvent?.duration_sec + 's'"></span></div>
+                                <div><span class="text-slate-500 text-xs uppercase tracking-wider block mb-1">Sensor</span>    <span class="text-indigo-400 font-medium" x-text="selectedEvent?.sensor_id"></span></div>
+                            </div>
+
+                            <div class="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                                <template x-for="(part, idx) in parsePayload(selectedEvent?.raw_payload)" :key="idx">
+                                    <div class="bg-[#0d1117] rounded-xl border border-slate-700/50 overflow-hidden shadow-inner">
+                                        <div class="bg-slate-800/30 px-4 py-2.5 border-b border-slate-700/50 flex justify-between items-center">
+                                            <span class="text-[11px] text-slate-400 font-mono uppercase tracking-widest">
+                                                Payload Sequence <span class="text-slate-200 ml-1">#<span x-text="idx + 1"></span></span>
+                                            </span>
+
+                                            <!-- Copy button with reactive feedback -->
+                                            <button @click="copyPayload(part, idx)"
+                                                    class="text-xs transition-colors flex items-center gap-1 min-w-[58px] justify-end"
+                                                    :class="copiedMap[idx] ? 'text-emerald-400' : 'text-slate-400 hover:text-emerald-400'">
+                                                <template x-if="!copiedMap[idx]">
+                                                    <span class="flex items-center gap-1">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                                        Copy
+                                                    </span>
+                                                </template>
+                                                <template x-if="copiedMap[idx]">
+                                                    <span class="flex items-center gap-1 pop-in">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                        Copied!
+                                                    </span>
+                                                </template>
+                                            </button>
+                                        </div>
+                                        <div class="p-4 overflow-x-auto">
+                                            <pre class="text-emerald-400/90 font-mono text-sm whitespace-pre-wrap break-all leading-relaxed" x-text="part"></pre>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /x-data -->
+
+    <script>
+        Chart.defaults.color = '#64748b';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        let portChart   = null;
+        let sensorChart = null;
+
+        // ── Toast helper ──────────────────────────────────────────────────────
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const styles = {
+                success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+                error:   'bg-rose-500/10 border-rose-500/30 text-rose-300',
+                info:    'bg-slate-800 border-slate-700 text-slate-300',
+            };
+            const icons = { success: '✓', error: '✕', info: 'ℹ' };
+
+            const el = document.createElement('div');
+            el.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium shadow-xl backdrop-blur-sm toast-enter ${styles[type]}`;
+            el.innerHTML = `<span class="text-base leading-none font-bold">${icons[type]}</span><span>${message}</span>`;
+            container.appendChild(el);
+
+            setTimeout(() => {
+                el.classList.replace('toast-enter', 'toast-exit');
+                setTimeout(() => el.remove(), 220);
+            }, 3000);
+        }
+
+        // ── Alpine component ──────────────────────────────────────────────────
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('trapDashboard', () => ({
+                events:         [],
+                fleet:          [],          // from /api/v1/sensors (heartbeat)
+                unreadCount:    0,
+                selectedFilter: 'ALL',
+                isModalOpen:    false,
+                selectedEvent:  null,
+                isLoading:      true,
+                copiedMap:      {},
+                isArmed:        true,
+
+                init() {
+                    this.initCharts();
+                    this.fetchData();
+                    this.fetchSystemState();
+                    setInterval(() => this.fetchData(), 3000);
+                },
+
+                get uniqueSensors() {
+                    return [...new Set(this.events.map(e => e.sensor_id))].sort();
+                },
+
+                get filteredEvents() {
+                    if (this.selectedFilter === 'ALL') return this.events;
+                    return this.events.filter(e => e.sensor_id === this.selectedFilter);
+                },
+
+                setFilter(filterName) {
+                    this.selectedFilter = filterName;
+                    setTimeout(() => this.updateCharts(), 50);
+                },
+
+                parsePayload(payload) {
+                    if (!payload) return [];
+                    try {
+                        const parsed = JSON.parse(payload);
+                        if (Array.isArray(parsed)) return parsed;
+                        return [payload];
+                    } catch { return [payload]; }
+                },
+
+                getPayloadPreview(payload) {
+                    const parsed = this.parsePayload(payload);
+                    if (parsed.length > 1) return `[ ${parsed.length} Payloads Captured ]`;
+                    const s = parsed[0] || '';
+                    return s.length > 50 ? s.substring(0, 50) + '...' : s;
+                },
+
+                copyPayload(text, idx) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.copiedMap = { ...this.copiedMap, [idx]: true };
+                        showToast('Payload copied to clipboard', 'success');
+                        setTimeout(() => {
+                            const m = { ...this.copiedMap };
+                            delete m[idx];
+                            this.copiedMap = m;
+                        }, 2000);
+                    });
+                },
+
+                openPayload(event) {
+                    this.copiedMap     = {};
+                    this.selectedEvent = event;
+                    this.isModalOpen   = true;
+                },
+
+                closePayload() {
+                    this.isModalOpen = false;
+                    setTimeout(() => this.selectedEvent = null, 300);
+                },
+
+                // Combined fetch for events and fleet health
+                async fetchData() {
+                    try {
+                        const [eventsRes, fleetRes] = await Promise.all([
+                            fetch('/api/v1/events'),
+                            fetch('/api/v1/sensors')
+                        ]);
+                        this.events = await eventsRes.json();
+                        this.fleet  = await fleetRes.json();
+                        this.unreadCount = this.filteredEvents.filter(e => e.is_read === 0).length;
+                        this.updateCharts();
+                    } catch (err) {
+                        console.error('Failed to fetch data', err);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async markAsRead() {
+                    try {
+                        await fetch('/api/v1/events/read', { method: 'PATCH' });
+                        await this.fetchData();
+                        showToast('All alerts marked as read', 'success');
+                    } catch {
+                        showToast('Failed to mark alerts as read', 'error');
+                    }
+                },
+
+                async clearLogs() {
+                    if (!confirm('⚠️ Delete all intrusion logs? This cannot be undone.')) return;
+                    try {
+                        await fetch('/api/v1/events', { method: 'DELETE' });
+                        this.selectedFilter = 'ALL';
+                        await this.fetchData();
+                        showToast('All logs cleared', 'info');
+                    } catch {
+                        showToast('Failed to clear logs', 'error');
+                    }
+                },
+
+                initCharts() {
+                    const ctxPort   = document.getElementById('portChart').getContext('2d');
+                    const ctxSensor = document.getElementById('sensorChart').getContext('2d');
+
+                    const commonOptions = {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: '#1e293b', drawBorder: false }, ticks: { precision: 0, font: { size: 11 } } },
+                            y: { grid: { display: false, drawBorder: false }, ticks: { font: { size: 11, weight: '500' } } }
+                        }
+                    };
+
+                    portChart = new Chart(ctxPort, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [{ data: [], backgroundColor: '#34d399', borderRadius: 4, barThickness: 16 }] },
+                        options: commonOptions
+                    });
+
+                    sensorChart = new Chart(ctxSensor, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [{ data: [], backgroundColor: '#fb7185', borderRadius: 4, barThickness: 16 }] },
+                        options: commonOptions
+                    });
+                },
+
+                updateCharts() {
+                    if (!portChart || !sensorChart) return;
+
+                    const data = this.filteredEvents;
+                    const getTop10 = (arr, prefix = '') => {
+                        const counts = arr.reduce((acc, v) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
+                        return Object.entries(counts)
+                            .sort((a, b) => b[1] - a[1]).slice(0, 10)
+                            .map(([k, v]) => ({ label: prefix + k, count: v }));
+                    };
+
+                    if (data.length === 0) {
+                        portChart.data.labels = []; portChart.data.datasets[0].data = [];
+                        sensorChart.data.labels = []; sensorChart.data.datasets[0].data = [];
+                        portChart.update(); sensorChart.update();
+                        return;
+                    }
+
+                    const topPorts = getTop10(data.map(e => e.target_port), 'Port ');
+                    portChart.data.labels           = topPorts.map(p => p.label);
+                    portChart.data.datasets[0].data = topPorts.map(p => p.count);
+                    portChart.update();
+
+                    if (this.selectedFilter === 'ALL') {
+                        const topSensors = getTop10(data.map(e => e.sensor_id));
+                        sensorChart.data.labels           = topSensors.map(s => s.label);
+                        sensorChart.data.datasets[0].data = topSensors.map(s => s.count);
+                        sensorChart.update();
+                    }
+                },
+
+                formatTimestamp(timestamp) {
+                    if (!timestamp) return 'Never';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString();
+                },
+
+                getTimeAgo(timestamp) {
+                    if (!timestamp) return '';
+                    const now = new Date();
+                    const then = new Date(timestamp);
+                    const diffMs = now - then;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMins / 60);
+                    const diffDays = Math.floor(diffHours / 24);
+                    
+                    if (diffDays > 0) {
+                        return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+                    } else if (diffHours > 0) {
+                        return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+                    } else if (diffMins > 0) {
+                        return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+                    } else {
+                        return 'Just now';
+                    }
+                },
+
+                async fetchSystemState() {
+                    try {
+                        const res = await fetch('/api/v1/system/state');
+                        const data = await res.json();
+                        this.isArmed = data.is_armed;
+                    } catch(e) {
+                        console.error('Failed to fetch system state', e);
+                    }
+                },
+
+                async toggleArmed() {
+                    const newState = !this.isArmed;
+                    try {
+                        const res = await fetch('/api/v1/system/state', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_armed: newState })
+                        });
+                        
+                        if (res.ok) {
+                            this.isArmed = newState;
+                            showToast(`System ${newState ? 'Armed' : 'Disarmed'}`, newState ? 'success' : 'info');
+                        } else {
+                            throw new Error('Failed to update');
+                        }
+                    } catch(e) {
+                        showToast('Failed to update system state', 'error');
+                    }
+                },
+            }));
+        });
+    </script>
+</body>
+</html>
