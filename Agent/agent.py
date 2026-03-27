@@ -8,12 +8,25 @@ import threading
 HUB_URL = os.getenv("HUB_URL", "http://localhost:8080")
 API_SECRET = os.getenv("API_SECRET", "super_secret_key_123")
 SENSOR_ID = os.getenv("SENSOR_ID", "alpha-node-01")
-SENSOR_IP = os.getenv("SENSOR_IP", "127.0.0.1") # In production, this would be the machine's LAN IP
-DECOY_PORTS = [int(p) for p in os.getenv("DECOY_PORTS", "2222,3306").split(",")]
+SENSOR_IP = os.getenv("SENSOR_IP", "127.0.0.1")
+
+# Safely parse ports
+raw_ports = os.getenv("DECOY_PORTS", "2222,3306")
+if not raw_ports:
+    raw_ports = "2222,3306"
+DECOY_PORTS = [int(p.strip()) for p in raw_ports.split(",") if p.strip()]
+
+TARPIT_MODE = os.getenv("TARPIT_MODE", "hold").lower()
+
+# Safely parse the banner
+raw_banner = os.getenv("TARPIT_BANNER", "")
+if raw_banner:
+    TARPIT_BANNER = raw_banner.encode('utf-8').decode('unicode_escape').encode('utf-8')
+else:
+    TARPIT_BANNER = b"" # Default to nothing if empty
 
 # --- Hub Communication ---
 def send_heartbeat():
-    """Runs in a background thread, pinging the Hub every 30 seconds."""
     while True:
         try:
             requests.post(
@@ -27,7 +40,6 @@ def send_heartbeat():
         time.sleep(30)
 
 def report_event(attacker_ip, port, duration, payload_buffer):
-    """Fires the JSON alert to the Hub."""
     try:
         requests.post(
             f"{HUB_URL}/api/v1/event",
@@ -38,9 +50,9 @@ def report_event(attacker_ip, port, duration, payload_buffer):
                 "attacker_ip": attacker_ip,
                 "target_port": port,
                 "protocol": "TCP",
-                "action": "tarpitted",
+                "action": TARPIT_MODE, # Log the specific action taken
                 "duration_sec": duration,
-                "raw_payload": payload_buffer # Send the array of commands
+                "raw_payload": payload_buffer 
             },
             timeout=5
         )
@@ -51,71 +63,85 @@ def report_event(attacker_ip, port, duration, payload_buffer):
 # --- The Tarpit Logic ---
 async def handle_client(reader, writer, port):
     addr = writer.get_extra_info('peername')
-    attacker_ip = addr[0]
+    attacker_ip = addr[0] if addr else "Unknown"
     print(f"[!] Incoming connection from {attacker_ip} on port {port}")
     
     start_time = time.time()
     payload_buffer = []
     total_bytes_received = 0
-    max_bytes = 1024 * 50 # 50KB safety limit so they can't crash our memory
+    max_bytes = 1024 * 50 # 50KB safety limit
 
     try:
-        # 1. Send a fake welcome banner to entice the bot to start talking
-        writer.write(b"Connected. Please authenticate.\r\n")
-        await writer.drain()
+        # 1. THE BANNER
+        # Only send a banner if one exists AND we aren't immediately closing the door
+        if TARPIT_BANNER and TARPIT_MODE != "close":
+            writer.write(TARPIT_BANNER)
+            await writer.drain()
+        
+        # 2. THE ACTION
+        if TARPIT_MODE == "close":
+            # Slam the door immediately
+            pass
+        
+        elif TARPIT_MODE == "echo":
+            while True:
+                try:
+                    data = await asyncio.wait_for(reader.read(1024), timeout=60.0)
+                    if not data:
+                        break # Attacker closed connection
 
-        while True:
-            try:
-                # 2. Wait for them to send data. 
-                # If they sit in silence for 60 seconds, we throw a TimeoutError.
-                data = await asyncio.wait_for(reader.read(1024), timeout=60.0)
-                
-                # If data is empty, the attacker closed the connection.
+                    # Record the payload
+                    decoded_data = data.decode('utf-8', errors='replace').strip()
+                    if decoded_data:
+                        payload_buffer.append(decoded_data)
+                        total_bytes_received += len(data)
+
+                    # Waste time, then echo back
+                    await asyncio.sleep(1)
+                    writer.write(data)
+                    await writer.drain()
+
+                    # Safety check
+                    if total_bytes_received > max_bytes:
+                        print(f"[*] {attacker_ip} hit buffer limit. Dropping.")
+                        break
+
+                except asyncio.TimeoutError:
+                    # Infinite hold trick: send a null byte to reset their timeout clock
+                    writer.write(b"\0")
+                    await writer.drain()
+
+        elif TARPIT_MODE == "hold":
+            while True:
+                data = await reader.read(1024)
                 if not data:
                     break
-
-                # 3. Log what they sent
+                
+                # Record the payload even in hold mode
                 decoded_data = data.decode('utf-8', errors='replace').strip()
                 if decoded_data:
                     payload_buffer.append(decoded_data)
                     total_bytes_received += len(data)
 
-                # 4. THE ECHO TARPIT
-                # We wait 1 second to waste their time, then echo their own garbage back to them
-                await asyncio.sleep(1)
-                writer.write(data)
-                await writer.drain()
-
-                # Safety check
                 if total_bytes_received > max_bytes:
-                    print(f"[*] {attacker_ip} hit buffer limit. Dropping.")
                     break
 
-            except asyncio.TimeoutError:
-                # 5. THE INFINITE HOLD
-                # If they are silent, send a single null byte to reset their timeout timer
-                # This holds their socket open indefinitely.
-                writer.write(b"\0")
-                await writer.drain()
-
+                # Sleep to prevent CPU spinning, holding their thread locked
+                await asyncio.sleep(1)
+                
     except Exception as e:
         # Connection violently reset by attacker
         pass 
     finally:
-        # 6. Cleanup and Reporting
+        # Cleanup and Reporting
         writer.close()
         await writer.wait_closed()
         
         duration = round(time.time() - start_time, 2)
         print(f"[*] Connection closed with {attacker_ip}. Held for {duration}s.")
-        
-        # Only report if they actually sent a payload, OR if we held them for more than 5 seconds
-        if payload_buffer or duration > 5.0:
-            # We use asyncio.to_thread so the HTTP request doesn't pause the async trap
-            await asyncio.to_thread(report_event, attacker_ip, port, duration, payload_buffer)
+        await asyncio.to_thread(report_event, attacker_ip, port, duration, payload_buffer)
 
 async def start_tarpit(port):
-    """Starts an asyncio socket server on a specific port."""
     server = await asyncio.start_server(
         lambda r, w: handle_client(r, w, port), 
         '0.0.0.0', 
@@ -126,17 +152,14 @@ async def start_tarpit(port):
         await server.serve_forever()
 
 async def main():
-    print("=== HoneyWire Agent Starting ===")
+    print(f"=== HoneyWire Agent Starting (Mode: {TARPIT_MODE.upper()}) ===")
     
-    # Start the heartbeat in the background
     threading.Thread(target=send_heartbeat, daemon=True).start()
     
-    # Start a tarpit listener for every port in our config
     tasks = [start_tarpit(port) for port in DECOY_PORTS]
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    # Standard graceful exit handling for asyncio
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

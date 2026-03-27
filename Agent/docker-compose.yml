@@ -5,9 +5,5 @@ services:
     restart: unless-stopped
     # Binds directly to the host machine's network to catch real port scans
     network_mode: "host" 
-    environment:
-      - HUB_URL=${HUB_URL}
-      - API_SECRET=${API_SECRET}
-      - SENSOR_ID=${SENSOR_ID}
-      - SENSOR_IP=${SENSOR_IP}
-      - DECOY_PORTS=${DECOY_PORTS}
+    env_file: 
+      - .env
