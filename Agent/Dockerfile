@@ -23,4 +23,4 @@ COPY agent.py .
 # Notice: We intentionally do NOT use a nonroot user here.
 # We remain 'root' to allow binding to privileged decoy ports (1-1024).
 
-CMD ["agent.py"]
+CMD ["/usr/bin/python3", "agent.py"]
