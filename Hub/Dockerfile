@@ -32,4 +32,4 @@ COPY --chown=65532:65532 templates/ /app/templates/
 USER nonroot:nonroot
 
 EXPOSE 8080
-CMD ["/usr/bin/python3", "main.py"]
+CMD ["main.py"]
