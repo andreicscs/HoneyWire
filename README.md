@@ -99,6 +99,9 @@ GOTIFY_TOKEN=your_app_token
 # Point this to your Hub's IP address and Port
 HUB_URL=http://127.0.0.1:8080
 
+# Must match the Hub's secret
+API_SECRET=super_secret_key_123
+
 # Identify this specific sensor and its IP
 SENSOR_ID=dmz-node-01
 SENSOR_IP=192.168.1.50
