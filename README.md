@@ -55,7 +55,7 @@ Create a new directory on your server, and create two files: `docker-compose.yml
 ```yaml
 services:
   hub:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/honeywire-hub:latest
+    image: ghcr.io/andreicscs/honeywire-hub:latest
     container_name: honeywire-hub
     restart: unless-stopped
     ports:
@@ -66,7 +66,7 @@ services:
       - .env
 
   agent:
-    image: ghcr.io/YOUR_GITHUB_USERNAME/honeywire-agent:latest
+    image: ghcr.io/andreicscs/honeywire-agent:latest
     container_name: honeywire-agent
     restart: unless-stopped
     network_mode: "host" # Required to accurately capture port scans against the physical machine
