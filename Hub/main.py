@@ -21,7 +21,7 @@ templates = Jinja2Templates(directory="templates")
 
 # --- Database Setup ---
 def init_db():
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS events
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +60,7 @@ class SystemState(BaseModel):
 # --- API Endpoints ---
 @app.get("/api/v1/system/state")
 async def get_system_state():
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("SELECT value FROM config WHERE key='is_armed'")
     val = c.fetchone()[0]
@@ -69,7 +69,7 @@ async def get_system_state():
 
 @app.patch("/api/v1/system/state")
 async def set_system_state(state: SystemState):
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("UPDATE config SET value=? WHERE key='is_armed'", ('true' if state.is_armed else 'false',))
     conn.commit()
@@ -83,7 +83,7 @@ async def receive_heartbeat(hb: Heartbeat, x_api_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
         
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     # Upsert the sensor's last_seen time
     c.execute('''INSERT INTO sensors (sensor_id, sensor_ip, last_seen) 
@@ -97,7 +97,7 @@ async def receive_heartbeat(hb: Heartbeat, x_api_key: str = Header(None)):
 @app.get("/api/v1/sensors")
 async def get_sensors():
     """Returns the fleet and calculates if they are offline"""
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("SELECT sensor_id, sensor_ip, last_seen FROM sensors ORDER BY sensor_id")
     rows = c.fetchall()
@@ -131,7 +131,7 @@ async def receive_event(event: Event, x_api_key: str = Header(None)):
     else:
         payload_data = str(event.raw_payload)
     
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute('''INSERT INTO events 
                  (timestamp, sensor_id, sensor_ip, attacker_ip, target_port, protocol, action, duration_sec, raw_payload, is_read)
@@ -172,7 +172,7 @@ async def receive_event(event: Event, x_api_key: str = Header(None)):
 
 @app.get("/api/v1/events")
 async def get_events():
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("SELECT * FROM events ORDER BY id DESC")
     rows = c.fetchall()
@@ -189,7 +189,7 @@ async def get_events():
 
 @app.patch("/api/v1/events/read")
 async def mark_events_read():
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("UPDATE events SET is_read = 1 WHERE is_read = 0")
     conn.commit()
@@ -198,7 +198,7 @@ async def mark_events_read():
 
 @app.delete("/api/v1/events")
 async def clear_events():
-    conn = sqlite3.connect("nanotrap.db")
+    conn = sqlite3.connect("/data/nanotrap.db")
     c = conn.cursor()
     c.execute("DELETE FROM events")
     conn.commit()
