@@ -39,5 +39,7 @@ jobs:
         with:
           context: ./${{ matrix.component }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
           labels: ${{ steps.meta.outputs.labels }}
