@@ -1,4 +1,6 @@
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
+  [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+  [![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
 
 # 🕸️ HoneyWire
 
