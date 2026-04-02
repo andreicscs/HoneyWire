@@ -140,50 +140,64 @@ run_migrations()
 # ---------------------------------------------------------------------------
 # Notification dispatcher
 # ---------------------------------------------------------------------------
-def _notify_ntfy(title: str, message: str, priority: int) -> None:
+def _notify_ntfy(title: str, message: str, severity: str) -> None:
     if not NTFY_URL:
         return
+    
+    # Ntfy scale: 1 (min) to 5 (max)
+    priorities = {"info": 1, "low": 2, "medium": 3, "high": 4, "critical": 5}
+    priority = priorities.get(severity.lower(), 3) # Default to medium
+    
     headers = {"Title": title, "Priority": str(priority), "Tags": "rotating_light"}
+    
+    NTFY_TOKEN = os.getenv("NTFY_TOKEN", "")
+    if NTFY_TOKEN:
+        headers["Authorization"] = f"Bearer {NTFY_TOKEN}"
+
     try:
-        requests.post(NTFY_URL, data=message.encode(), headers=headers, timeout=5)
+        response = requests.post(NTFY_URL, data=message.encode('utf-8'), headers=headers, timeout=5)
+        response.raise_for_status() 
+        
+    except requests.exceptions.HTTPError as exc:
+        log.warning("Ntfy rejected the request: %s | Details: %s", exc, response.text)
     except Exception as exc:
-        log.warning("Ntfy failed: %s", exc)
+        log.warning("Ntfy failed to connect entirely: %s", exc)
 
 
-def _notify_gotify(title: str, message: str, priority: int) -> None:
+def _notify_gotify(title: str, message: str, severity: str) -> None:
     if not (GOTIFY_URL and GOTIFY_TOKEN):
         return
+        
+    # Gotify scale: 0-3 (min/silent), 4-7 (default/sound), 8-10 (high/interrupt)
+    priorities = {"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10}
+    priority = priorities.get(severity.lower(), 5) # Default to medium
+
     try:
-        requests.post(
+        response = requests.post(
             GOTIFY_URL,
-            headers={"X-Gotify-Key": GOTIFY_TOKEN},
+            headers={"X-Gotify-App-Token": GOTIFY_TOKEN},
             json={"title": title, "message": message, "priority": priority},
             timeout=5,
         )
+        response.raise_for_status()
+        
+    except requests.exceptions.HTTPError as exc:
+        log.warning("Gotify rejected the request: %s | Details: %s", exc, response.text)
     except Exception as exc:
-        log.warning("Gotify failed: %s", exc)
+        log.warning("Gotify failed to connect entirely: %s", exc)
 
 
-NOTIFICATION_BACKENDS: list[Callable[[str, str, int], None]] = [
+NOTIFICATION_BACKENDS: list[Callable[[str, str, str], None]] = [
     _notify_ntfy,
     _notify_gotify,
 ]
-
-SEVERITY_PRIORITY: dict[str, int] = {
-    "info":     1,
-    "low":      3,
-    "medium":   5,
-    "high":     7,
-    "critical": 10,
-}
 
 
 def notify(title: str, message: str, severity: str) -> None:
     """Dispatch a notification to all configured backends. 
        NOTE: This should always be called via BackgroundTasks to prevent blocking."""
-    priority = SEVERITY_PRIORITY.get(severity.lower(), 5)
     for backend in NOTIFICATION_BACKENDS:
-        backend(title, message, priority)
+        backend(title, message, severity)
 
 
 # ---------------------------------------------------------------------------
