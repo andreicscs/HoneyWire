@@ -2,6 +2,21 @@
   [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
   [![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
 
+## 📋 Table of Contents
+- [Overview](#-honeywire)
+- [Screenshots](#screenshots)
+- [The Universal Event Standard](#-the-universal-event-standard-bring-your-own-sensor)
+- [Features](#-features)
+- [Architecture](#%EF%B8%8F-architecture)
+- [Quick Start Guide](#-quick-start-guide)
+- [Testing the Trap](#-testing-the-trap)
+- [Security Notes](#%EF%B8%8F-security-notes)
+- [Tech Stack](#%EF%B8%8F-tech-stack)
+- [Versioning and API Reference](#-versioning-and-api-reference)
+- [Operational Checklist](#-operational-checklist)
+
+---
+
 # 🕸️ HoneyWire
 
 **HoneyWire Sentinel** is an ultra-lightweight, distributed deception hub and centralized Security Operations Center (SOC). It is designed to deploy silent, asynchronous sensors across multiple servers that detect unauthorized access, trap automated botnets, and report telemetry back to a centralized, high-performance dashboard in real-time.
@@ -182,6 +197,8 @@ nc <agent-ip> 2222
 * **API Secret:** Ensure your `API_SECRET` is strong and identical on both the Hub and the Agents. The Hub will reject any payloads with mismatched keys.
 * **System Arming:** You can toggle the "System Armed" button in the Hub UI to temporarily disable push notifications while doing internal network maintenance or vulnerability scanning.
 * **Container Hardening:** HoneyWire utilizes gcr.io/distroless/python3-debian12. Do not attempt to use docker exec -it honeywire-agent sh as there is no shell binary included in the image by design.
+* **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
+* **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS. Failure to do so exposes your API_SECRET and DASHBOARD_PASSWORD to anyone sniffing the network.
 
 ## 🛠️ Tech Stack
 * **Backend:** Python 3.11, FastAPI, SQLite3, Asyncio
@@ -196,7 +213,7 @@ nc <agent-ip> 2222
 - Runtime version is exposed via env override: `HONEYWIRE_VERSION` (Hub + Agent), and defaults to `VERSION`.
 - `Hub` endpoint:
   - `GET /api/v1/version` → returns `{ "version": "1.0.0" }`
-- API docs file added: `API.md` with full backend route reference and sample payloads.
+- API docs file added: [📖 API.md](./API.md). with full backend route reference and sample payloads.
 
 ### API endpoints to know
 - `GET /api/v1/system/state` / `PATCH /api/v1/system/state`
