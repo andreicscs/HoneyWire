@@ -36,10 +36,10 @@ log = logging.getLogger("honeywire")
 # Configuration  (all values come from HW_ environment variables)
 # ---------------------------------------------------------------------------
 # The API Key sensors use to authenticate to the Hub
-API_SECRET         = os.getenv("HW_HUB_KEY", "super_secret_key_123")
+API_SECRET         = os.getenv("HW_HUB_KEY", "change_this_to_a_secure_random_string")
 
 # Dashboard UI Password
-DASHBOARD_PASSWORD = os.getenv("HW_DASHBOARD_PASSWORD", "")
+DASHBOARD_PASSWORD = os.getenv("HW_DASHBOARD_PASSWORD", "admin")
 
 # Notification Endpoints
 NTFY_URL           = os.getenv("HW_NTFY_URL", "")
@@ -269,12 +269,15 @@ def verify_ui_auth(request: Request) -> None:
             raise HTTPException(status_code=401, detail="Session Expired")
 
 
-def verify_agent_auth(x_api_key: str = Header(None)):
-    """Verifies the secret key sent by the sensor."""
-    if not x_api_key or not secrets.compare_digest(x_api_key, API_SECRET):
+def verify_agent_auth(x_api_key: str = Header(None), authorization: str = Header(None)):
+    """Verifies the secret key sent by the sensor (Supports X-Api-Key and Bearer)."""
+    token = x_api_key
+    if not token and authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+
+    if not token or not secrets.compare_digest(token, API_SECRET):
         log.warning("Unauthorized access attempt detected.")
         raise HTTPException(status_code=401, detail="Unauthorized")
-
 
 # ---------------------------------------------------------------------------
 # Frontend API
@@ -296,7 +299,7 @@ async def set_system_state(state: SystemState):
     return {"status": "success", "is_armed": state.is_armed}
 
 
-@app.get("/api/v1/version", dependencies=[Depends(verify_agent_auth)])
+@app.get("/api/v1/version")
 async def get_version():
     return {"version": HONEYWIRE_VERSION}
 
