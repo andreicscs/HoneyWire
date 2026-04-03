@@ -12,7 +12,7 @@ on:
     paths:
       - 'Sensors/**'
 
-workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   static-analysis:
@@ -109,7 +109,7 @@ jobs:
             fi
           done
 
-# --- PATH A: REVIEWING A COMMUNITY PR ---
+  # --- PATH A: REVIEWING A COMMUNITY PR ---
   review-community-pr:
     name: "👀 Review: Community Contribution"
     needs: [static-analysis, docker-security-scan, functional-test]
