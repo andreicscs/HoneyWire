@@ -269,9 +269,16 @@ def verify_ui_auth(request: Request) -> None:
             raise HTTPException(status_code=401, detail="Session Expired")
 
 
-def verify_agent_auth(x_api_key: str = Header(None)) -> None:
+def verify_agent_auth(x_api_key: str = Header(None), authorization: str = Header(None)) -> None:
     """Validates sensor API keys using constant-time comparison."""
-    if not x_api_key or not secrets.compare_digest(x_api_key, API_SECRET):
+    token = None
+
+    if x_api_key:
+        token = x_api_key
+    elif authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+
+    if not token or not secrets.compare_digest(token, API_SECRET):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
@@ -295,7 +302,7 @@ async def set_system_state(state: SystemState):
     return {"status": "success", "is_armed": state.is_armed}
 
 
-@app.get("/api/v1/version", dependencies=[Depends(verify_ui_auth)])
+@app.get("/api/v1/version", dependencies=[Depends(verify_agent_auth)])
 async def get_version():
     return {"version": HONEYWIRE_VERSION}
 

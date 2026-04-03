@@ -1,13 +1,12 @@
 services:
   tcp-tripwire:
-    # Use 'build: .' if testing locally, or pull from a registry later
-    build: .
+    build:
+      context: ../../../ 
+      dockerfile: Sensors/official/TcpTripWire/Dockerfile
     container_name: hw-tcp-tripwire
     restart: unless-stopped
     
-    # CRITICAL: Binds directly to the host machine's network.
-    # 1. Preserves the real source IP of the attacker.
-    # 2. Automatically exposes whatever ports are set in HW_DECOY_PORTS.
+    # Binds directly to the host machine's network
     network_mode: "host" 
     
     env_file: 

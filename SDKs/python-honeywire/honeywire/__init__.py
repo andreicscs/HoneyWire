@@ -6,27 +6,36 @@ import datetime
 import requests
 from abc import ABC, abstractmethod
 
+SDK_DEFAULT_AGENT_VERSION = "1.0.0"
+HONEYWIRE_SCHEMA_VERSION = "1.0"
+HEARTBEAT_INTERVAL_SECONDS = 30
+
 class HoneyWireSensor(ABC):
     def __init__(self, sensor_type: str):
         self.sensor_type = sensor_type
-        
+
         self.hub_endpoint = os.getenv("HW_HUB_ENDPOINT")
         self.hub_key = os.getenv("HW_HUB_KEY")
         self.sensor_id = os.getenv("HW_SENSOR_ID")
         self.test_mode = os.getenv("HW_TEST_MODE", "false").lower() == "true"
-        self.agent_version = os.getenv("HONEYWIRE_VERSION", "1.0.0")
+        self.agent_version = os.getenv("HONEYWIRE_VERSION", SDK_DEFAULT_AGENT_VERSION)
         self.severity = os.getenv("HW_SEVERITY", "4")
 
+        self._validate_required_env()
+        self.headers = self._build_headers()
+
+        self.hub_contract_version = "unknown"
+
+    def _validate_required_env(self):
         if not all([self.hub_endpoint, self.hub_key, self.sensor_id]):
             print("[!] FATAL: Missing required environment variables (HW_HUB_ENDPOINT, HW_HUB_KEY, HW_SENSOR_ID).")
             sys.exit(1)
 
-        self.headers = {
+    def _build_headers(self) -> dict:
+        return {
             "Authorization": f"Bearer {self.hub_key}",
             "Content-Type": "application/json"
         }
-        
-        self.hub_contract_version = "unknown"
 
     def _normalize_severity(self, raw_severity) -> str:
         """Converts 1-5 or strings into the official schema enum."""
@@ -70,6 +79,10 @@ class HoneyWireSensor(ABC):
             print(f"[!] FATAL: Failed to synchronize with Hub. Details: {e}")
             sys.exit(1)
 
+    def _post_to_hub(self, path: str, payload: dict, timeout: int = 5):
+        url = f"{self.hub_endpoint}{path}"
+        return requests.post(url, headers=self.headers, json=payload, timeout=timeout)
+
     def _heartbeat_loop(self) -> None:
         """Background thread to ping the Hub every 30 seconds."""
         payload = {
@@ -77,17 +90,26 @@ class HoneyWireSensor(ABC):
             "sensor_type": self.sensor_type,
             "metadata": {
                 "agent_version": self.agent_version,
-                "contract_version": self.hub_contract_version
+                "contract_version": self.hub_contract_version,
             }
         }
         while True:
             try:
-                requests.post(f"{self.hub_endpoint}/api/v1/heartbeat", headers=self.headers, json=payload, timeout=5)
+                resp = self._post_to_hub("/api/v1/heartbeat", payload)
+                resp.raise_for_status()
             except Exception as e:
                 print(f"[-] Heartbeat error: {e}")
-            time.sleep(30)
+            time.sleep(HEARTBEAT_INTERVAL_SECONDS)
 
-    def report_event(self, event_type: str, severity, metadata: dict, action_taken: str = "logged") -> bool:
+    def report_event(
+        self,
+        event_type: str,
+        severity,
+        metadata: dict,
+        action_taken: str = "logged",
+        source: str = "Unknown",
+        target: str = "Unknown",
+    ) -> bool:
         """Formats and sends the payload enforcing the HoneyWire JSON Schema."""
         normalized_severity = self._normalize_severity(severity)
         
@@ -99,13 +121,15 @@ class HoneyWireSensor(ABC):
             "severity": normalized_severity,
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "action_taken": action_taken,
-            "metadata": metadata
+            "source": source,
+            "target": target,
+            "details": metadata
         }
 
         try:
-            resp = requests.post(f"{self.hub_endpoint}/api/v1/alert", headers=self.headers, json=payload, timeout=5)
+            resp = self._post_to_hub("/api/v1/event", payload)
             resp.raise_for_status()
-            print(f"[+] Alert sent: {event_type} (Severity: {normalized_severity})")
+            print(f"[+] Event sent: {event_type} (Severity: {normalized_severity})")
             return True
         except requests.exceptions.RequestException as e:
             print(f"[-] Event report failed: {e}")

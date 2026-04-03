@@ -4,7 +4,7 @@ services:
     container_name: honeywire-hub
     restart: unless-stopped
     ports:
-      - "${HUB_PORT}:8080"
+      - "${HW_HUB_PORT}:8080"
     volumes:
       - honeywire_data:/data
     env_file: 
