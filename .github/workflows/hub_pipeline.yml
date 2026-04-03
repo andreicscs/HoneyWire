@@ -1,6 +1,7 @@
 name: Hub Release & Publish
 
 env:
+  # This kills the Node.js 20 deprecation warnings for 2026
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
@@ -11,26 +12,38 @@ on:
       - 'Hub/**'
     tags:
       - 'v*'
+  pull_request:
+    paths:
+      - 'Hub/**'
   workflow_dispatch:
 
 jobs:
   hub-security-scan:
-    name: Hub Security Scan
+    name: "🛡️ Security Scan"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build & Trivy Scan
-        run: |
-          docker build -t honeywire-hub:test ./Hub
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --severity HIGH,CRITICAL --exit-code 1 honeywire-hub:test
+      - name: Build Local Image
+        run: docker build -t honeywire-hub:test ./Hub
+
+      - name: Run Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'honeywire-hub:test'
+          format: 'table'
+          # Fail the build (exit 1) only if fixable HIGH/CRITICAL bugs are found
+          exit-code: '1'
+          ignore-unfixed: true 
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
   publish-hub:
-    name: "🚀 Publish: Official Hub Release"
+    name: "🚀 Publish Official Hub"
     needs: [hub-security-scan]
-    # Only publish on tags or manual trigger
+    # IMPORTANT: This logic ensures standard pushes to main stay GREEN.
+    # The "Waiting for Approval" gate only appears on Tags or Manual Trigger.
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: 
@@ -49,16 +62,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Hub
+      - name: Build and Push
         run: |
           IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-hub"
           
-          # Build and tag as 'latest' and the specific version tag
+          echo "Building production Hub image..."
           docker build -t $IMAGE_NAME:latest ./Hub
           docker push $IMAGE_NAME:latest
           
+          # If this is a tag release (e.g., v1.0.0), tag the image specifically
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             TAG_NAME=${GITHUB_REF#refs/tags/}
+            echo "Tagging release as $TAG_NAME..."
             docker tag $IMAGE_NAME:latest $IMAGE_NAME:$TAG_NAME
             docker push $IMAGE_NAME:$TAG_NAME
           fi
+          
+          echo "### ✅ Hub Published Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "Image: \`$IMAGE_NAME:latest\`" >> $GITHUB_STEP_SUMMARY

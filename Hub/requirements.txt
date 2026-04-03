@@ -1,15 +1,15 @@
-# Web Framework
-fastapi==0.110.0
-uvicorn[standard]==0.29.0
+# Web Framework (Fixed 2024/2025 DoS vulnerabilities)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
 
-# HTML Templating for the Dashboard
-jinja2==3.1.3
+# HTML Templating
+jinja2>=3.1.4
 
-# Data Validation (Required by FastAPI)
-pydantic==2.6.4
+# Data Validation (Pydantic V2.10 is the 2026 stable standard)
+pydantic>=2.10.0
 
-# Used for Login Forms (FastAPI OAuth2PasswordRequestForm needs this)
-python-multipart==0.0.9
+# Security Fixes for multipart parsing (Fixes CVE-2024-53981)
+python-multipart>=0.0.22
 
-# Used for pushing outbound notifications (Ntfy, Gotify, Discord etc.)
-requests==2.31.0
+# Networking
+requests>=2.32.3

@@ -269,17 +269,11 @@ def verify_ui_auth(request: Request) -> None:
             raise HTTPException(status_code=401, detail="Session Expired")
 
 
-def verify_agent_auth(x_api_key: str = Header(None), authorization: str = Header(None)) -> None:
-    """Validates sensor API keys using constant-time comparison."""
-    token = None
-
-    if x_api_key:
-        token = x_api_key
-    elif authorization and authorization.startswith("Bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-
-    if not token or not secrets.compare_digest(token, API_SECRET):
-        raise HTTPException(status_code=401, detail="Invalid API key")
+def verify_agent_auth(x_api_key: str = Header(None)):
+    """Verifies the secret key sent by the sensor."""
+    if not x_api_key or not secrets.compare_digest(x_api_key, API_SECRET):
+        log.warning("Unauthorized access attempt detected.")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # ---------------------------------------------------------------------------
