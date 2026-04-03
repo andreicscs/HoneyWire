@@ -37,25 +37,26 @@ There are existing lightweight honeypots, but none feature a clean, SaaS-grade d
 ![Payload Inspector](screenshots/payload-inspector.png)
 
 ---
-
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
 
 The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. You are not limited to the included Tarpit agent. 
 
-By adhering to the **HoneyWire Event Standard**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data perfectly. 
+By adhering to the **HoneyWire Event Standard V1.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data perfectly. 
 
 Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a **Canary Token** embedded in a PDF, an **Email Honeypot**, or a simple **TCP Port Tripwire**, just POST this JSON to the Hub:
 
 ```json
 {
+  "contract_version": "1.0",
   "sensor_id": "core-dpi-engine",
   "sensor_type": "deep_packet_inspection",
   "event_type": "malformed_jwt_detected",
   "severity": "critical",
-  "source": "104.28.19.12",
-  "target": "Auth Gateway",
+  "timestamp": "2026-04-03T11:30:00Z",
   "action_taken": "ip_banned",
-  "details": {
+  "metadata": {
+    "source_ip": "104.28.19.12",
+    "target": "Auth Gateway",
     "protocol": "TCP",
     "headers_stripped": true,
     "payload_sample": [
@@ -65,6 +66,8 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
   }
 }
 ```
+> Note: If you build your sensor using the official HoneyWire Python SDK, this JSON formatting and delivery is handled for you automatically!
+
 *The Hub's Alpine.js frontend will automatically translate arrays into syntax-highlighted code blocks and primitive values into clean metadata tags.*
 
 ---
@@ -87,8 +90,9 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 
 HoneyWire is split into two independent microservices:
 
-1. **The Hub (`/Hub`)**: The central brain. It runs a FastAPI backend, an SQLite database, and the web dashboard. It runs as a `nonroot` user inside a Distroless container, safely mounting data to a dedicated volume.
-2. **The Agent (`/Agent`)**: The decoy sensor (or any custom script you write). It listens on vulnerable ports, traps attackers, and securely POSTs the intrusion data back to the Hub using an `API_SECRET`.
+1. `/Hub`: The central brain. It runs a FastAPI backend, an SQLite database, and the web dashboard. It runs as a nonroot user inside a Distroless container, safely mounting data to a dedicated volume.
+2. `/Sensors`: The decoy nodes (like the included TCP Tripwire or your custom scripts). They listen on vulnerable ports, trap attackers, and securely POST intrusion data back to the Hub.
+3. `/SDKs`: Official libraries (like python-honeywire) that handle secure Hub communication so community developers can easily build new sensors.
 
 ---
 
@@ -113,9 +117,9 @@ services:
     env_file: 
       - .env
 
-  agent:
-    image: ghcr.io/andreicscs/honeywire-agent:latest
-    container_name: honeywire-agent
+  tcp-tripwire:
+    image: ghcr.io/andreicscs/honeywire-tcptripwire:latest
+    container_name: hw-tcp-tripwire
     restart: unless-stopped
     network_mode: "host" # Required to accurately capture port scans against the physical machine
     env_file: 
@@ -130,43 +134,37 @@ volumes:
 # HUB CONFIGURATION
 # ==========================================
 # The master password for your fleet to communicate
-API_SECRET=super_secret_key_123
+HW_HUB_KEY=super_secret_key_123
 
 # Protect your Web UI (Leave blank for no password)
-DASHBOARD_PASSWORD=my_secure_password
+HW_DASHBOARD_PASSWORD=my_secure_password
 
 # Optional: Push Notifications
-NTFY_URL=https://ntfy.sh/your_private_topic
-GOTIFY_URL=https://gotify.yourdomain.com/message
-GOTIFY_TOKEN=your_app_token
-```
-```
+HW_NTFY_URL=[https://ntfy.sh/your_private_topic](https://ntfy.sh/your_private_topic)
+HW_GOTIFY_URL=[https://gotify.yourdomain.com/message](https://gotify.yourdomain.com/message)
+HW_GOTIFY_TOKEN=your_app_token
+
+
 # ==========================================
-# AGENT CONFIGURATION
+# SENSOR CONFIGURATION
 # ==========================================
 # Point this to your Hub's IP address and Port
-HUB_URL=http://127.0.0.1:8080
+HW_HUB_ENDPOINT=[http://127.0.0.1:8080](http://127.0.0.1:8080)
 
-# Must match the Hub's secret
-API_SECRET=super_secret_key_123
-
-# Identify this specific sensor and its IP
-SENSOR_ID=dmz-node-01
-SENSOR_IP=192.168.1.50
+# Identify this specific sensor
+HW_SENSOR_ID=dmz-node-01
 
 # A comma-separated list of fake ports to open
-DECOY_PORTS=21,22,2222,3306,8080
+HW_DECOY_PORTS=21,22,2222,3306,8080
 
 # Tarpit Behavior: 'hold', 'echo', or 'close'
-TARPIT_MODE=hold
+HW_TARPIT_MODE=hold
 
 # UI Color Coding: info|low|medium|high|critical
-SEVERITY=high
+HW_SEVERITY=high
 
 # Fake Service Banner (Use \r\n for line breaks)
-# Example SSH: SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.1\r\n
-# Example FTP: 220 (vsFTPd 3.0.3)\r\n
-TARPIT_BANNER=SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.1\r\n
+HW_TARPIT_BANNER=SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.1\r\n
 ```
 ### 3. Start the Trap
 Run the following command to pull the images and start the honeypot:
@@ -210,23 +208,22 @@ nc <agent-ip> 2222
 ## 📦 Versioning and API reference
 
 - HoneyWire now uses a single source of truth version file: `VERSION` in the repo root.
-- Runtime version is exposed via env override: `HONEYWIRE_VERSION` (Hub + Agent), and defaults to `VERSION`.
+- Runtime version is exposed via env override: HW_VERSION (Hub + Sensors), and defaults to VERSION.
 - `Hub` endpoint:
   - `GET /api/v1/version` → returns `{ "version": "1.0.0" }`
-- API docs file added: [📖 API.md](./API.md). with full backend route reference and sample payloads.
+- API docs file added: [📖 API.md](./Docs/API.md). with full backend route reference and sample payloads.
 
 ### API endpoints to know
 - `GET /api/v1/system/state` / `PATCH /api/v1/system/state`
 - `GET /api/v1/sensors`
 - `GET /api/v1/events`
 - `PATCH /api/v1/events/read`, `PATCH /api/v1/events/{event_id}/read`, `DELETE /api/v1/events`
-- `POST /api/v1/heartbeat` (agent heartbeat)
-- `POST /api/v1/event` (agent event reports)
+- `POST /api/v1/heartbeat` (Sensor heartbeat)
+- `POST /api/v1/event` (Sensor event reports)
 
 ---
 
 ## 🧪 Operational checklist
-- set `API_SECRET` for all components
-- set optional `DASHBOARD_PASSWORD`
-- optionally set `HONEYWIRE_VERSION` to track deployment version
+- set `HW_HUB_KEY` for all components
+- set optional `HW_DASHBOARD_PASSWORD`
 - build/redeploy containers after any version bump in `VERSION` or env value

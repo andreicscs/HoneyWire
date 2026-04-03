@@ -70,6 +70,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
 ```json
 [
   {
+    "contract_version": "1.0.0",
     "id": 123,
     "timestamp": "2026-04-02 15:25:12",
     "sensor_id": "alpha-node-01",
@@ -130,6 +131,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
 - Request:
 ```json
 {
+  "contract_version": "1.0.0",
   "sensor_id": "alpha-node-01",
   "sensor_type": "tarpit",
   "event_type": "tcp_connection",
@@ -139,8 +141,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
   "action_taken": "hold",
   "details": {
     "duration_sec": 12.3,
-    "payload_sample": ["sudo rm -rf /"],
-    "total_lines": 7
+    "payload": ["sudo rm -rf /"],
   }
 }
 ```

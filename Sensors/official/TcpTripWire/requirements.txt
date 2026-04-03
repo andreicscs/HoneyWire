@@ -1,0 +1,6 @@
+# requirements.txt
+aiohttp==3.9.3
+requests==2.31.0
+
+# Install the official HoneyWire SDK directly from the main branch
+git+https://github.com/andreicscs/HoneyWire.git@main#subdirectory=SDKs/python-honeywire

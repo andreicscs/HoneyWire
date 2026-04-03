@@ -1,5 +1,15 @@
-fastapi
-uvicorn
-pydantic
-requests
-jinja2
+# Web Framework
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+
+# HTML Templating for the Dashboard
+jinja2==3.1.3
+
+# Data Validation (Required by FastAPI)
+pydantic==2.6.4
+
+# Used for Login Forms (FastAPI OAuth2PasswordRequestForm needs this)
+python-multipart==0.0.9
+
+# Used for pushing outbound notifications (Ntfy, Gotify, Discord etc.)
+requests==2.31.0

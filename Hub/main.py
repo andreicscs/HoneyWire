@@ -33,14 +33,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("honeywire")
 
 # ---------------------------------------------------------------------------
-# Configuration  (all values come from environment variables)
+# Configuration  (all values come from HW_ environment variables)
 # ---------------------------------------------------------------------------
-API_SECRET        = os.getenv("API_SECRET", "super_secret_key_123")
-DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
-NTFY_URL          = os.getenv("NTFY_URL", "")
-GOTIFY_URL        = os.getenv("GOTIFY_URL", "")
-GOTIFY_TOKEN      = os.getenv("GOTIFY_TOKEN", "")
-DB_PATH           = os.getenv("DB_PATH", "/data/honeywire.db")
+# The API Key sensors use to authenticate to the Hub
+API_SECRET         = os.getenv("HW_HUB_KEY", "super_secret_key_123")
+
+# Dashboard UI Password
+DASHBOARD_PASSWORD = os.getenv("HW_DASHBOARD_PASSWORD", "")
+
+# Notification Endpoints
+NTFY_URL           = os.getenv("HW_NTFY_URL", "")
+GOTIFY_URL         = os.getenv("HW_GOTIFY_URL", "")
+GOTIFY_TOKEN       = os.getenv("HW_GOTIFY_TOKEN", "")
+
+# Database Location
+DB_PATH            = os.getenv("HW_DB_PATH", "/data/honeywire.db")
 
 # Versioning: one source of truth stored in root file + env override.
 DEFAULT_VERSION   = "1.0.0"
@@ -51,7 +58,8 @@ try:
 except FileNotFoundError:
     FILE_VERSION = DEFAULT_VERSION
 
-HONEYWIRE_VERSION = os.getenv("HONEYWIRE_VERSION", FILE_VERSION)
+# Use HW_VERSION to allow users to override it if strictly necessary
+HONEYWIRE_VERSION = os.getenv("HW_VERSION", FILE_VERSION)
 
 AUTH_COOKIE_NAME  = "hw_auth"
 

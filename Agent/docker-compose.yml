@@ -1,9 +1,0 @@
-services:
-  agent:
-    build: .
-    container_name: honeywire-agent
-    restart: unless-stopped
-    # Binds directly to the host machine's network to catch real port scans
-    network_mode: "host" 
-    env_file: 
-      - .env

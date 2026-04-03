@@ -1,0 +1,8 @@
+# This single line installs the official HoneyWire SDK directly from GitHub.
+# It automatically fetches required libraries like 'requests' and 'aiohttp'.
+git+https://github.com/andreicscs/HoneyWire.git@main#subdirectory=SDKs/python-honeywire
+
+# --- ADD YOUR SENSOR's SPECIFIC LIBRARIES BELOW ---
+# Example: 
+# watchdog==4.0.0
+# scapy==2.5.0

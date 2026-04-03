@@ -1,16 +1,32 @@
+# =========================
 # Secrets and Config
+# =========================
 .env
-**/ .env
+**/.env
+# (Note: We do NOT ignore .env.example so users have a template)
 
+# =========================
 # Database
+# =========================
 *.db
 *.sqlite3
 
+# =========================
 # Python
+# =========================
 __pycache__/
 *.py[cod]
 venv/
 .venv/
+*.egg-info/
+build/
+dist/
 
-# Docker
-.dockerignore
+# =========================
+# OS & IDE Clutter
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+
+# (Notice: .dockerignore is intentionally NOT here. It must be tracked by Git!)

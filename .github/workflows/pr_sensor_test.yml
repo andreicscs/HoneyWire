@@ -1,0 +1,102 @@
+name: Sensor PR Check & Security Scan
+
+on:
+  pull_request:
+    paths:
+      - 'Sensors/community/**'
+      - 'Sensors/official/**'
+
+jobs:
+  static-analysis:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  docker-security-scan:
+    name: Build & Trivy Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # We need to find which sensor changed to build the right Dockerfile
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: Sensors/**
+
+      - name: Build and Scan Changed Sensors
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            SENSOR_DIR=$(dirname "$file")
+            
+            # Only build if there is a Dockerfile
+            if [ -f "$SENSOR_DIR/Dockerfile" ]; then
+              echo "Building $SENSOR_DIR..."
+              docker build -t test-sensor:latest "$SENSOR_DIR"
+              
+              echo "Running Trivy Vulnerability Scanner..."
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+              trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress test-sensor:latest
+            fi
+          done
+
+  functional-test:
+    name: Mock Hub Contract Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start Mock Hub
+        run: |
+          python .github/scripts/mock_hub.py &
+          sleep 3 # Give the server a second to start
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: Sensors/**
+
+      - name: Run Test Mode on Changed Sensors
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            SENSOR_DIR=$(dirname "$file")
+            
+            if [ -f "$SENSOR_DIR/Dockerfile" ]; then
+              docker build -t test-sensor:latest "$SENSOR_DIR"
+              
+              # Run the container with test mode enabled
+              docker run --rm \
+                -e HW_HUB_ENDPOINT="http://172.17.0.1:8080" \
+                -e HW_HUB_KEY="mock_key" \
+                -e HW_SENSOR_ID="ci-test-node" \
+                -e HW_TEST_MODE="true" \
+                test-sensor:latest
+                
+              # Check if the Mock Hub received the success signal
+              if [ -f /tmp/test_passed ]; then
+                echo "✅ Sensor successfully communicated with Mock Hub."
+                rm /tmp/test_passed
+              else
+                echo "❌ Sensor failed to contact Mock Hub or sent invalid JSON."
+                exit 1
+              fi
+            fi
+          done
