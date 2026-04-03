@@ -1,6 +1,7 @@
 name: Sensor PR Check & Security Scan
 
 env:
+  # This silences the Node.js 20 deprecation warnings
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
@@ -14,6 +15,9 @@ on:
       - main
     paths:
       - 'Sensors/**'
+    # This allows the workflow to trigger when you create a version tag
+    tags:
+      - 'v*' 
 
   workflow_dispatch:
 
@@ -28,14 +32,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3 # Use v3, v4 is often still in beta/preview
         with:
           languages: python
-
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v3
 
   docker-security-scan:
     name: Build & Trivy Image Scan
@@ -43,25 +45,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # We need to find which sensor changed to build the right Dockerfile
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
           files: Sensors/**
-
       - name: Build and Scan Changed Sensors
         run: |
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             SENSOR_DIR=$(dirname "$file")
-            
-            # Only build if there is a Dockerfile
             if [ -f "$SENSOR_DIR/Dockerfile" ]; then
-              echo "Building $SENSOR_DIR..."
               docker build -t test-sensor:latest "$SENSOR_DIR"
-              
-              echo "Running Trivy Vulnerability Scanner..."
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
               trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress test-sensor:latest
             fi
@@ -73,95 +67,74 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Start Mock Hub
         run: |
           python .github/scripts/mock_hub.py &
-          sleep 3 # Give the server a second to start
-
+          sleep 3
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
           files: Sensors/**
-
       - name: Run Test Mode on Changed Sensors
         run: |
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             SENSOR_DIR=$(dirname "$file")
-            
             if [ -f "$SENSOR_DIR/Dockerfile" ]; then
               docker build -t test-sensor:latest "$SENSOR_DIR"
-              
-              # Run the container with test mode enabled
               docker run --rm \
                 -e HW_HUB_ENDPOINT="http://172.17.0.1:8080" \
                 -e HW_HUB_KEY="mock_key" \
                 -e HW_SENSOR_ID="ci-test-node" \
                 -e HW_TEST_MODE="true" \
                 test-sensor:latest
-                
-              # Check if the Mock Hub received the success signal
               if [ -f /tmp/test_passed ]; then
-                echo "✅ Sensor successfully communicated with Mock Hub."
                 rm /tmp/test_passed
               else
-                echo "❌ Sensor failed to contact Mock Hub or sent invalid JSON."
                 exit 1
               fi
             fi
           done
 
   # --- PATH A: REVIEWING A COMMUNITY PR ---
+  # This only runs during a Pull Request. It finishes green when you merge.
   review-community-pr:
     name: "👀 Review: Community Contribution"
     needs: [static-analysis, docker-security-scan, functional-test]
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     environment: 
-      name: community_review  # Create this in Settings -> Environments
+      name: community_review
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Report Status
-        run: |
-          echo "### 🛡️ Security & Functional Tests Passed" >> $GITHUB_STEP_SUMMARY
-          echo "This is a **COMMUNITY** contribution. Review the code for malicious intent before merging." >> $GITHUB_STEP_SUMMARY
-          echo "If you approve, the PR can be merged to main." >> $GITHUB_STEP_SUMMARY
+        run: echo "Tests passed. Manual review required for PR merge." >> $GITHUB_STEP_SUMMARY
 
   # --- PATH B: PUBLISHING AN OFFICIAL RELEASE ---
+  # This only runs when you push a TAG (v1.0) or run it manually. 
+  # Standard pushes to 'main' will now SKIP this and finish GREEN.
   publish-official-main:
     name: "🚀 Publish: Official Sensor Release"
     needs: [static-analysis, docker-security-scan, functional-test]
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: 
-      name: production_registry # Create this in Settings -> Environments
+      name: production_registry
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push Official Sensors
+      - name: Build and Push
         run: |
-          # We build from the root context '.' to ensure the SDK is included
           IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-tcptripwire"
-          
-          echo "Building Official TcpTripWire..."
           docker build -t $IMAGE_NAME:latest -f Sensors/official/TcpTripWire/Dockerfile .
-          
-          echo "Pushing to Registry..."
           docker push $IMAGE_NAME:latest
-          
-          echo "### ✅ Official Release Published" >> $GITHUB_STEP_SUMMARY
-          echo "The sensor is now live at: \`$IMAGE_NAME:latest\`" >> $GITHUB_STEP_SUMMARY
