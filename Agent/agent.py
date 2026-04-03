@@ -13,6 +13,7 @@ Environment variables:
 
 import asyncio
 import os
+import sys
 import time
 import threading
 import requests
@@ -52,19 +53,49 @@ CONCURRENCY_LIMIT = 1000   # Max simultaneous connections to prevent FD exhausti
 
 _HEADERS      = {"x-api-key": API_SECRET}
 
+# Dynamically set upon startup synchronization
+HUB_CONTRACT_VERSION = "unknown"
+
 # Global semaphore to limit concurrent TCP sockets
 connection_semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+
 
 # ---------------------------------------------------------------------------
 # Hub Communication
 # ---------------------------------------------------------------------------
+def sync_hub_version() -> None:
+    """Fetches the Hub's contract version on startup to ensure compatibility."""
+    global HUB_CONTRACT_VERSION
+    try:
+        print(f"[*] Synchronizing with Hub at {HUB_URL}...")
+        resp = requests.get(f"{HUB_URL}/api/v1/version", headers=_HEADERS, timeout=5)
+        resp.raise_for_status()
+        
+        HUB_CONTRACT_VERSION = resp.json()["version"]
+        
+        # Semantic Versioning Check (Major Version)
+        hub_major = HUB_CONTRACT_VERSION.split('.')[0]
+        agent_major = AGENT_VERSION.split('.')[0]
+        
+        if hub_major != agent_major:
+            print(f"[!] FATAL: Version mismatch. Hub (v{HUB_CONTRACT_VERSION}) vs Agent (v{AGENT_VERSION})")
+            sys.exit(1)
+            
+        print(f"[+] Synchronized successfully. Operating on contract v{HUB_CONTRACT_VERSION}")
+        
+    except requests.exceptions.RequestException as e:
+        print(f"[!] FATAL: Failed to synchronize with Hub. Is it offline? Details: {e}")
+        sys.exit(1)
+
+
 def send_heartbeat() -> None:
     """Pings the Hub every 30 seconds to stay 'online'."""
     payload = {
         "sensor_id": SENSOR_ID,
         "sensor_type": "tarpit",
         "metadata": {
-            "version": AGENT_VERSION,
+            "agent_version": AGENT_VERSION,
+            "contract_version": HUB_CONTRACT_VERSION,
             "mode": TARPIT_MODE,
             "ports": DECOY_PORTS,
             "severity_config": SEVERITY
@@ -74,14 +105,14 @@ def send_heartbeat() -> None:
         try:
             requests.post(f"{HUB_URL}/api/v1/heartbeat", headers=_HEADERS, json=payload, timeout=5)
         except Exception as e:
-            print(f"[-] Heartbeat error: {e}")
+            print(f[-] Heartbeat error: {e}")
         time.sleep(30)
 
 
 def report_event(source_ip: str, port: int, duration: float, payload: list[str]) -> None:
     """Reports connection to Hub using the Universal Event Standard."""
     event = {
-        "contract_version": "1.0",
+        "contract_version": HUB_CONTRACT_VERSION,  # Integrated dynamic version
         "sensor_id": SENSOR_ID,
         "sensor_type": "tarpit",
         "event_type": "tcp_connection",
@@ -99,6 +130,7 @@ def report_event(source_ip: str, port: int, duration: float, payload: list[str])
         print(f"[+] Alert sent: {source_ip} -> Port {port} ({SEVERITY.upper()})")
     except Exception as e:
         print(f"[-] Event report failed: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Core Logic
@@ -167,8 +199,14 @@ async def connection_wrapper(reader: asyncio.StreamReader, writer: asyncio.Strea
 
 async def main() -> None:
     print(f"[*] HoneyWire Agent v{AGENT_VERSION} | Severity: {SEVERITY.upper()}")
+    
+    # 1. Sync version with Hub before opening any ports
+    sync_hub_version()
+    
+    # 2. Start heartbeat thread
     threading.Thread(target=send_heartbeat, daemon=True).start()
     
+    # 3. Start decoy listeners
     servers = []
     for port in DECOY_PORTS:
         server = await asyncio.start_server(lambda r, w, p=port: connection_wrapper(r, w, p), "0.0.0.0", port)
@@ -181,4 +219,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        pass
+        print("\n[*] Shutting down HoneyWire Agent...")

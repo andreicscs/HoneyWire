@@ -89,6 +89,9 @@ MIGRATIONS: list[str] = [
         value TEXT NOT NULL
     );
     INSERT OR IGNORE INTO config (key, value) VALUES ('is_armed', 'true');
+    """,
+    """
+    ALTER TABLE events ADD COLUMN contract_version TEXT NOT NULL DEFAULT '1.0.0';
     """
 ]
 
@@ -374,16 +377,27 @@ async def receive_heartbeat(hb: Heartbeat):
 
 @app.post("/api/v1/event", dependencies=[Depends(verify_agent_auth)])
 async def receive_event(event: Event, bg_tasks: BackgroundTasks):
+    # Optional but recommended: Semantic versioning check
+    hub_major_version = HONEYWIRE_VERSION.split('.')[0]
+    agent_major_version = event.contract_version.split('.')[0]
+    
+    if hub_major_version != agent_major_version:
+        log.warning(f"Version mismatch rejected: Hub is {HONEYWIRE_VERSION}, Agent sent {event.contract_version}")
+        raise HTTPException(
+            status_code=426, 
+            detail=f"Upgrade Required: Hub is on v{HONEYWIRE_VERSION}, but agent uses v{event.contract_version}"
+        )
+
     timestamp    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     details_json = json.dumps(event.details) if isinstance(event.details, (dict, list)) else str(event.details)
 
     with get_db() as conn:
         conn.execute(
             """INSERT INTO events
-               (timestamp, sensor_id, sensor_type, event_type, severity,
+               (timestamp, contract_version, sensor_id, sensor_type, event_type, severity,
                 source, target, action_taken, details, is_read)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (timestamp, event.sensor_id, event.sensor_type, event.event_type,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (timestamp, event.contract_version, event.sensor_id, event.sensor_type, event.event_type,
              event.severity, event.source, event.target, event.action_taken, details_json),
         )
         is_armed = conn.execute(
@@ -398,7 +412,7 @@ async def receive_event(event: Event, bg_tasks: BackgroundTasks):
     if is_armed:
         bg_tasks.add_task(notify, title=f"HoneyWire Alert ({event.severity.upper()})", message=msg, severity=event.severity)
 
-    log.info("Event received: %s", msg if is_armed else f"{event.sensor_id}/{event.event_type}")
+    log.info("Event received (v%s): %s", event.contract_version, msg if is_armed else f"{event.sensor_id}/{event.event_type}")
     return {"status": "success"}
 
 
