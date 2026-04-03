@@ -5,6 +5,14 @@ on:
     paths:
       - 'Sensors/community/**'
       - 'Sensors/official/**'
+  
+  push:
+    branches:
+      - main
+    paths:
+      - 'Sensors/**'
+
+workflow_dispatch:
 
 jobs:
   static-analysis:
@@ -100,3 +108,57 @@ jobs:
               fi
             fi
           done
+
+# --- PATH A: REVIEWING A COMMUNITY PR ---
+  review-community-pr:
+    name: "👀 Review: Community Contribution"
+    needs: [static-analysis, docker-security-scan, functional-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: 
+      name: community_review  # Create this in Settings -> Environments
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Report Status
+        run: |
+          echo "### 🛡️ Security & Functional Tests Passed" >> $GITHUB_STEP_SUMMARY
+          echo "This is a **COMMUNITY** contribution. Review the code for malicious intent before merging." >> $GITHUB_STEP_SUMMARY
+          echo "If you approve, the PR can be merged to main." >> $GITHUB_STEP_SUMMARY
+
+  # --- PATH B: PUBLISHING AN OFFICIAL RELEASE ---
+  publish-official-main:
+    name: "🚀 Publish: Official Sensor Release"
+    needs: [static-analysis, docker-security-scan, functional-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: 
+      name: production_registry # Create this in Settings -> Environments
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Official Sensors
+        run: |
+          # We build from the root context '.' to ensure the SDK is included
+          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-tcptripwire"
+          
+          echo "Building Official TcpTripWire..."
+          docker build -t $IMAGE_NAME:latest -f Sensors/official/TcpTripWire/Dockerfile .
+          
+          echo "Pushing to Registry..."
+          docker push $IMAGE_NAME:latest
+          
+          echo "### ✅ Official Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "The sensor is now live at: \`$IMAGE_NAME:latest\`" >> $GITHUB_STEP_SUMMARY
