@@ -31,10 +31,10 @@ There are existing lightweight honeypots, but none feature a clean, SaaS-grade d
 ## Screenshots
 
 ### Main Dashboard
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](Screenshots/dashboard.png)
 
 ### Payload Inspector
-![Payload Inspector](screenshots/payload-inspector.png)
+![Payload Inspector](Screenshots/payload-inspector.png)
 
 ---
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
