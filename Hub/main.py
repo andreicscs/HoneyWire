@@ -223,7 +223,7 @@ class Event(BaseModel):
     source:      str = "Unknown"
     target:      str = "Unknown"
     action_taken: str = "logged"
-    details:     dict = {}
+    metadata:    dict = {}
 
     @field_validator("severity")
     @classmethod
@@ -403,8 +403,9 @@ async def receive_event(event: Event, bg_tasks: BackgroundTasks):
             detail=f"Upgrade Required: Hub is on v{HONEYWIRE_VERSION}, but agent uses v{event.contract_version}"
         )
 
-    timestamp    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    details_json = json.dumps(event.details) if isinstance(event.details, (dict, list)) else str(event.details)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    details_payload = event.metadata if hasattr(event, 'metadata') else {}
+    details_json = json.dumps(details_payload) if isinstance(details_payload, (dict, list)) else str(details_payload)
 
     with get_db() as conn:
         conn.execute(

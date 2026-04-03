@@ -123,7 +123,7 @@ class HoneyWireSensor(ABC):
             "action_taken": action_taken,
             "source": source,
             "target": target,
-            "details": metadata
+            "metadata": metadata
         }
 
         try:
