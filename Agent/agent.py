@@ -81,6 +81,7 @@ def send_heartbeat() -> None:
 def report_event(source_ip: str, port: int, duration: float, payload: list[str]) -> None:
     """Reports connection to Hub using the Universal Event Standard."""
     event = {
+        "contract_version": "1.0",
         "sensor_id": SENSOR_ID,
         "sensor_type": "tarpit",
         "event_type": "tcp_connection",

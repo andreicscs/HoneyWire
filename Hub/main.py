@@ -17,7 +17,7 @@ import json
 import hashlib
 import logging
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import requests
@@ -204,6 +204,7 @@ def notify(title: str, message: str, severity: str) -> None:
 # Pydantic models
 # ---------------------------------------------------------------------------
 class Event(BaseModel):
+    contract_version: str
     sensor_id:   str
     sensor_type: str = "generic"
     event_type:  str = "alert"
@@ -315,6 +316,7 @@ async def get_events():
         rows = conn.execute("SELECT * FROM events ORDER BY id DESC").fetchall()
     return [
         {
+            "contract_version": r["contract_version"],
             "id":          r["id"],
             "timestamp":   r["timestamp"],
             "sensor_id":   r["sensor_id"],
@@ -372,7 +374,7 @@ async def receive_heartbeat(hb: Heartbeat):
 
 @app.post("/api/v1/event", dependencies=[Depends(verify_agent_auth)])
 async def receive_event(event: Event, bg_tasks: BackgroundTasks):
-    timestamp    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp    = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     details_json = json.dumps(event.details) if isinstance(event.details, (dict, list)) else str(event.details)
 
     with get_db() as conn:
