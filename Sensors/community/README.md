@@ -1,19 +1,19 @@
-# 🐝 Community Sensor Lab
+# Community Sensor Lab
 
-Welcome to the **HoneyWire community sensors**. While our official sensors provide the foundation, this directory is where the ecosystem truly grows.
+Welcome to the **HoneyWire Community Sensor Lab**. While our official sensors provide the core foundation, this directory is where the decentralized deception ecosystem truly thrives.
 
-The strength of HoneyWire lies in its **Universal Event Standard**—the ability for anyone to build a specialized trap for a niche protocol and see that data come to life on the central dashboard. Whether you've built a DNS sinkhole, a malformed JWT detector, or a custom file-integrity monitor, this is the place to share it.
+The power of HoneyWire lies in the **Universal Event Standard**—the architectural flexibility for anyone to build a specialized trap for any niche protocol and see that telemetry normalized on a central dashboard. Whether you have engineered a DNS sinkhole, a malformed JWT detector, or a custom file-integrity monitor, this is the environment to deploy and share it.
 
 ---
 
-## 🛠️ Get Building
-Don't start from a blank page! We’ve built the tools to get your sensor from an idea to a deployed container in minutes:
+## 🛠️ Engineering Resources
+Don't start from a blank repository. We have provided the scaffolding to move your sensor from a conceptual trap to a hardened, deployed container in minutes:
 
-* **[🐍 Python Sensor Template](./../templates/python-sensor/README.md):** The quickest way to start. It comes pre-configured with the HoneyWire SDK.
-* **[📖 Contribution Guide](./../../CONTRIBUTING.md):** Read this first. It contains the "Golden Rules" for Dockerization, Environment Variables, and the JSON Contract.
-* **[🔬 Official Example](./../official/TcpTripWire/README.md):** See how we built the TCP Tarpit.
+* **[🐍 Python Sensor Template](./../templates/python-sensor/README.md):** The high-velocity starting point, pre-integrated with the HoneyWire SDK.
+* **[📖 Contribution Guide](./../../CONTRIBUTING.md):** **Mandatory reading.** Contains the "Golden Rules" for OCI-compliance, environment parity, and the JSON Contract.
+* **[🔬 Reference Implementation](./../official/TcpTripWire/README.md):** A deep dive into the architecture of our production-grade TCP Tarpit.
 
-> **Note:** We strongly recommend using **Distroless** base images (as seen in the template) to ensure your sensor has the smallest possible attack surface.
+> **🛡️ Security Hardening:** We strongly recommend utilizing **Distroless** or **Alpine** base images to minimize the attack surface and reduce the binary footprint of your sensors.
 
 ---
 
@@ -34,7 +34,7 @@ To protect our users, every sensor submitted here undergoes a rigorous automated
 3.  **Implement** your logic using the [HoneyWire Python SDK](../../SDKs/python-honeywire).
 4.  **Open a Pull Request**.
 
-**Let's build a smarter, faster, and more distributed defense. One sting at a time.** 🐝
+**Join us in building a smarter, faster, and more resilient distributed defense.** 🐝
 
 ---
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](../../LICENSE)
