@@ -39,7 +39,7 @@ There are existing lightweight SIEM/Deception Hubs, but none feature a clean, Sa
 ---
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
 
-** [Community Sensors](./Sensors/community/) **
+[**Community Sensors**](./Sensors/community/)
 
 The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. You are not limited to the included official sensors. 
 
