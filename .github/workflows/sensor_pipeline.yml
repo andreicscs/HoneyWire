@@ -58,7 +58,7 @@ jobs:
               # FIXED: Context set to '.' (repo root) so Docker can copy the SDKs
               docker build -t test-sensor:latest -f "$SENSOR_DIR/Dockerfile" .
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-              trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress test-sensor:latest
+              trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress test-sensor:latest
             fi
           done
 

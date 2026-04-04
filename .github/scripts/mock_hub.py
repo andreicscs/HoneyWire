@@ -54,9 +54,7 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             with open('/tmp/test_passed', 'w') as f:
                 f.write('success')
                 
-            # Exit after receiving the alert so the CI process can finish
-            print("✅ SUCCESS: Event validated. Shutting down Mock Hub.")
-            sys.exit(0)
+            print("✅ SUCCESS: Event validated. Waiting for next sensor...")
                 
         except json.JSONDecodeError:
             print("❌ FAILED: Payload is not valid JSON.")
