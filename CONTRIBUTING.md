@@ -13,7 +13,7 @@ To keep the ecosystem stable, all community-submitted sensors must adhere to a s
 ## How to Submit a New Sensor
 
 ### 1. Use the Template
-Copy the `Sensors/templates/python-sensor/` folder and rename it to your sensor's name inside the `Sensors/community/` directory.
+Copy the [`Sensors/templates/python-sensor/`](./Sensors/templates/python-sensor/) folder and rename it to your sensor's name inside the [`Sensors/community/`](./Sensors/community/) directory.
 You can also build a custom sensor in **any language**, the templates are only there to make it easier for people to start contributing!
 
 ### 2. Follow the JSON Contract (v1.0)
