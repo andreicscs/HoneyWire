@@ -1,0 +1,9 @@
+services:
+  web-router-decoy:
+    build:
+      context: ../../../
+      dockerfile: Sensors/official/WebRouterDecoy/Dockerfile
+    container_name: hw-web-router-decoy
+    network_mode: "host"
+    env_file:
+      - .env

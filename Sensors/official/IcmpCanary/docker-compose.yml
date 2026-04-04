@@ -1,0 +1,11 @@
+services:
+  ping-canary:
+    build:
+      context: ../../../
+      dockerfile: Sensors/official/IcmpCanary/Dockerfile
+    container_name: hw-ping-canary
+    network_mode: "host"
+    cap_add:
+      - NET_RAW
+    env_file:
+      - .env

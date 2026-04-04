@@ -1,0 +1,11 @@
+services:
+  network-scan-detector:
+    build:
+      context: ../../../
+      dockerfile: Sensors/official/NetworkScanDetector/Dockerfile
+    container_name: hw-network-scan-detector
+    network_mode: "host"
+    cap_add:
+      - NET_RAW
+    env_file:
+      - .env

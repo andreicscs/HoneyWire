@@ -1,0 +1,11 @@
+services:
+  file-canary:
+    build:
+      context: ../../../
+      dockerfile: Sensors/official/FileCanary/Dockerfile
+    container_name: hw-file-canary
+    network_mode: "bridge"
+    env_file:
+      - .env
+    volumes:
+      - /home/user/honey_test:/honey_dir:ro
