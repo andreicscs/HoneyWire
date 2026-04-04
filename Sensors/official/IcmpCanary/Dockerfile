@@ -8,7 +8,7 @@ COPY SDKs/python-honeywire /tmp/sdk_src
 RUN pip install --no-cache-dir wheel && \
     pip wheel /tmp/sdk_src --wheel-dir /tmp/wheels
 
-COPY Sensors/official/PingCanary/requirements.txt .
+COPY Sensors/official/IcmpCanary/requirements.txt .
 RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
 
 
@@ -22,9 +22,9 @@ RUN apt-get update && apt-get upgrade -y && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/lib /app/lib
-COPY Sensors/official/PingCanary/PingCanary.py .
+COPY Sensors/official/IcmpCanary/IcmpCanary.py .
 
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python3", "PingCanary.py"]
+CMD ["python3", "IcmpCanary.py"]
