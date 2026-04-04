@@ -135,8 +135,22 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and Push
+      - name: Build and Push All Official Sensors
         run: |
-          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-tcptripwire"
-          docker build -t $IMAGE_NAME:latest -f Sensors/official/TcpTripWire/Dockerfile .
-          docker push $IMAGE_NAME:latest
+          # Loop through every Dockerfile in the official sensors directory
+          for dockerfile in Sensors/official/*/Dockerfile; do
+            
+            # Extract the folder name (e.g., "WebRouterDecoy")
+            SENSOR_DIR_NAME=$(basename $(dirname "$dockerfile"))
+            
+            # Convert to lowercase because Docker registries reject uppercase names
+            LOWERCASE_NAME=$(echo "$SENSOR_DIR_NAME" | tr '[:upper:]' '[:lower:]')
+            
+            # Construct the final GHCR image name
+            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-${LOWERCASE_NAME}"
+            
+            echo "🚀 Building and pushing: $IMAGE_NAME"
+            docker build -t $IMAGE_NAME:latest -f "$dockerfile" .
+            docker push $IMAGE_NAME:latest
+            
+          done
