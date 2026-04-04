@@ -1,34 +1,28 @@
 # --- Stage 1: Builder ---
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 WORKDIR /app
 
-# Install Alpine build tools
-RUN apk add --no-cache git gcc musl-dev linux-headers libpcap-dev
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-# 1. Copy the SDK source
 COPY SDKs/python-honeywire /tmp/sdk_src
-
-# 2. Build the SDK wheel
 RUN pip install --no-cache-dir wheel && \
     pip wheel /tmp/sdk_src --wheel-dir /tmp/wheels
 
-# 3. Install dependencies
-COPY Sensors/official/IcmpCanary/requirements.txt .
+COPY Sensors/official/PingCanary/requirements.txt .
 RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
 
-# --- Stage 2: Runtime (Zero Vulnerability Alpine) ---
-FROM python:3.11-alpine
+
+# --- Stage 2: Runtime (Debian Slim) ---
+FROM python:3.11-slim
 WORKDIR /app
 
-# 1. Force upgrade all Alpine OS packages (fixes zlib), then install libpcap
-RUN apk upgrade --no-cache && \
-    apk add --no-cache libpcap
-
-# 2. Force upgrade Python's core build tools (fixes wheel & jaraco.context)
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel jaraco.context
+# Upgrade to patch known vulnerabilities, then install native libpcap
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y libpcap0.8 && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/lib /app/lib
-COPY Sensors/official/IcmpCanary/PingCanary.py .
+COPY Sensors/official/PingCanary/PingCanary.py .
 
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
