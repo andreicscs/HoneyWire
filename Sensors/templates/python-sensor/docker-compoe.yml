@@ -1,0 +1,16 @@
+# add a sample docker-compose file for the sensor 
+services:
+  python-sensor:
+    # Option A: Pull the pre-built image from GHCR
+    image: ghcr.io/andreicscs/honeywire-python-sensor:latest
+    
+    # Option B: Build locally from source (Uncomment lines below to use)
+    # build:
+    #   context: ../../../ 
+    #   dockerfile: Sensors/templates/python-sensor/Dockerfile
+    
+    container_name: hw-python-sensor
+    restart: unless-stopped
+    
+    env_file: 
+      - .env
