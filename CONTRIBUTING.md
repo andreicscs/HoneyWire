@@ -1,4 +1,4 @@
-# Contributing to HoneyWire 🍯🕸️
+# Contributing to HoneyWire
 
 Welcome to HoneyWire! We are building a centralized, high-fidelity security ecosystem for homelabs and SMBs. 
 
@@ -14,6 +14,7 @@ To keep the ecosystem stable, all community-submitted sensors must adhere to a s
 
 ### 1. Use the Template
 Copy the `Sensors/templates/python-sensor/` folder and rename it to your sensor's name inside the `Sensors/community/` directory.
+You can also build a custom sensor in **any language**, the templates are only there to make it easier for people to start contributing!
 
 ### 2. Follow the JSON Contract (v1.0)
 Your sensor must POST a payload to the Hub (`HW_HUB_ENDPOINT`) matching this exact schema:
@@ -30,6 +31,9 @@ Your sensor must POST a payload to the Hub (`HW_HUB_ENDPOINT`) matching this exa
   "metadata": {
     "ip": "192.168.1.5",
     "custom_data": "anything you want"
+    .
+    .
+    .
   }
 }
 ```
@@ -41,10 +45,13 @@ To ensure your code works before merging, our GitHub Actions will build your Doc
 If this variable is present, your sensor **must immediately send a dummy payload to the Hub and exit**. (The Python SDK handles this out-of-the-box).
 
 ### 4. Provide Documentation
-Your sensor folder must contain a `README.md` that explicitly lists all required environment variables and provides instructions for the user.
+Provide a README.md within your sensor directory containing:
+  - Technical Overview: Purpose of the sensor and the "lure" or monitoring it provides.
+  - Environment Reference: A table of all HW_ variables.
+  - Deployment Example: A docker-compose.yaml and a .env.example snippet.
 
 ## Review Process
 Once you open a Pull Request:
 1. **Functional Testing:** GitHub Actions will automatically build your Docker container and test it against a Mock Hub using `HW_TEST_MODE=true`.
-2. **Automated Security Scanning:** GitHub Actions will run **Trivy** to scan your Docker image for OS and library vulnerabilities, and **CodeQL** to perform static code analysis for security flaws.
+2. **Automated Security Scanning:** GitHub Actions will run **Trivy** to scan your Docker image for OS and library vulnerabilities, and **CodeQL** to perform static code analysis for insecure patterns and security flaws.
 3. **Manual Review:** A core maintainer will manually review the code for malicious intent or blast-radius risks before merging. PRs that fail automated testing or scanning will not be reviewed.
