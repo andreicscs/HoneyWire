@@ -2,12 +2,13 @@
 FROM python:3.11-slim AS builder
 WORKDIR /app
 
-# 1. Install git and the libpcap library
-RUN apt-get update && apt-get install -y git libpcap0.8 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git libpcap0.8 libpcap-dev && rm -rf /var/lib/apt/lists/*
 
-# 2. Extract the compiled libpcap C-libraries into a staging folder
-# We use wildcards so this works on both Intel/AMD (x86) and Apple Silicon (ARM)
-RUN mkdir -p /app/clibs && cp /usr/lib/*-linux-gnu/libpcap.so.* /app/clibs/
+# 1. Create the clibs folder and copy the versioned library
+RUN mkdir -p /app/clibs && \
+    cp /usr/lib/*-linux-gnu/libpcap.so.0.8 /app/clibs/ && \
+    # 2. MANDATORY: Create the generic symlink Scapy expects
+    ln -s /app/clibs/libpcap.so.0.8 /app/clibs/libpcap.so
 
 # 3. Copy SDK and build
 COPY SDKs/python-honeywire /tmp/sdk_src
@@ -18,24 +19,20 @@ RUN pip install --no-cache-dir wheel && \
 COPY Sensors/official/NetworkScanDetector/requirements.txt .
 RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
 
-
-# --- Stage 2: Production (Distroless) ---
+# --- Stage 2: Distroless ---
 FROM gcr.io/distroless/python3-debian12
 WORKDIR /app
 
-# 5. Copy the smuggled C-libraries from the builder
+# 3. Copy the clibs (including the symlink)
 COPY --from=builder /app/clibs /app/clibs
 
-# 6. Copy the Python dependencies
+# 4. Same as before
 COPY --from=builder /app/lib /app/lib
-
-# 7. Copy your sensor logic
 COPY Sensors/official/NetworkScanDetector/NetworkScanDetector.py .
 
-# 8. Tell Python where your packages are, AND tell Linux where your smuggled C-libraries are
 ENV PYTHONPATH="/app/lib"
+# 5. Tell the system to look in /app/clibs for our stolen files
 ENV LD_LIBRARY_PATH="/app/clibs"
 ENV PYTHONUNBUFFERED=1
 
-# Distroless has Python as the hardcoded ENTRYPOINT, so this works natively without throwing Error 127
 CMD ["NetworkScanDetector.py"]

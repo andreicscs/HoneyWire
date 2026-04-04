@@ -33,7 +33,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3 # Use v3, v4 is often still in beta/preview
+        uses: github/codeql-action/init@v3
         with:
           languages: python
       - name: Perform CodeQL Analysis
@@ -51,12 +51,15 @@ jobs:
         with:
           files: Sensors/**
       - name: Build and Scan Changed Sensors
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            SENSOR_DIR=$(dirname "$file")
-            if [ -f "$SENSOR_DIR/Dockerfile" ]; then
-              # FIXED: Context set to '.' (repo root) so Docker can copy the SDKs
-              docker build -t test-sensor:latest -f "$SENSOR_DIR/Dockerfile" .
+          # Extract unique sensor directories (e.g., "Sensors/official/WebRouterDecoy") to prevent double-building
+          UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
+          
+          for TARGET_DIR in $UNIQUE_DIRS; do
+            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
+              echo "🔒 Scanning: $TARGET_DIR"
+              docker build -t test-sensor:latest -f "$TARGET_DIR/Dockerfile" .
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
               trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress test-sensor:latest
             fi
@@ -78,28 +81,32 @@ jobs:
         with:
           files: Sensors/**
       - name: Run Test Mode on Changed Sensors
+        if: steps.changed-files.outputs.any_changed == 'true'
         run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            SENSOR_DIR=$(dirname "$file")
-            if [ -f "$SENSOR_DIR/Dockerfile" ]; then
-              # FIXED: Context set to '.' (repo root) so Docker can copy the SDKs
-              docker build -t test-sensor:latest -f "$SENSOR_DIR/Dockerfile" .
+          # Extract unique sensor directories to prevent double-testing
+          UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
+          
+          for TARGET_DIR in $UNIQUE_DIRS; do
+            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
+              echo "🧪 Testing: $TARGET_DIR"
+              docker build -t test-sensor:latest -f "$TARGET_DIR/Dockerfile" .
               docker run --rm \
                 -e HW_HUB_ENDPOINT="http://172.17.0.1:8080" \
                 -e HW_HUB_KEY="mock_key" \
                 -e HW_SENSOR_ID="ci-test-node" \
                 -e HW_TEST_MODE="true" \
                 test-sensor:latest
+              
               if [ -f /tmp/test_passed ]; then
                 rm /tmp/test_passed
               else
+                echo "❌ Test failed for $TARGET_DIR"
                 exit 1
               fi
             fi
           done
 
   # --- PATH A: REVIEWING A COMMUNITY PR ---
-  # This only runs during a Pull Request. It finishes green when you merge.
   review-community-pr:
     name: "👀 Review: Community Contribution"
     needs: [static-analysis, docker-security-scan, functional-test]
@@ -114,12 +121,11 @@ jobs:
         run: echo "Tests passed. Manual review required for PR merge." >> $GITHUB_STEP_SUMMARY
 
   # --- PATH B: PUBLISHING AN OFFICIAL RELEASE ---
-  # This only runs when you push a TAG (v1.0) or run it manually. 
-  # Standard pushes to 'main' will now SKIP this and finish GREEN.
   publish-official-main:
     name: "🚀 Publish: Official Sensor Release"
     needs: [static-analysis, docker-security-scan, functional-test]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # Triggers on tags OR standard push to main OR manual dispatch
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: 
       name: production_registry
@@ -129,28 +135,42 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          # We ONLY care about changes to OFFICIAL sensors for publishing
+          files: Sensors/official/**
+          
       - name: Log in to GHCR
+        if: steps.changed-files.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and Push All Official Sensors
+          
+      - name: Build and Push Changed Official Sensors
+        if: steps.changed-files.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
-          # Loop through every Dockerfile in the official sensors directory
-          for dockerfile in Sensors/official/*/Dockerfile; do
-            
-            # Extract the folder name (e.g., "WebRouterDecoy")
-            SENSOR_DIR_NAME=$(basename $(dirname "$dockerfile"))
-            
-            # Convert to lowercase because Docker registries reject uppercase names
-            LOWERCASE_NAME=$(echo "$SENSOR_DIR_NAME" | tr '[:upper:]' '[:lower:]')
-            
-            # Construct the final GHCR image name
-            IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-${LOWERCASE_NAME}"
-            
-            echo "🚀 Building and pushing: $IMAGE_NAME"
-            docker build -t $IMAGE_NAME:latest -f "$dockerfile" .
-            docker push $IMAGE_NAME:latest
-            
+          # If triggered manually, build all. Otherwise, only build what changed.
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            UNIQUE_DIRS=$(ls -d Sensors/official/*)
+          else
+            UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
+          fi
+          
+          for TARGET_DIR in $UNIQUE_DIRS; do
+            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
+              
+              SENSOR_DIR_NAME=$(basename "$TARGET_DIR")
+              LOWERCASE_NAME=$(echo "$SENSOR_DIR_NAME" | tr '[:upper:]' '[:lower:]')
+              IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-${LOWERCASE_NAME}"
+              
+              echo "🚀 Building and pushing: $IMAGE_NAME"
+              docker build -t $IMAGE_NAME:latest -f "$TARGET_DIR/Dockerfile" .
+              docker push $IMAGE_NAME:latest
+              
+            fi
           done
