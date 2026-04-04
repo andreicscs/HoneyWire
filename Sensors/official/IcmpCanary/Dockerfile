@@ -16,13 +16,16 @@ RUN pip install --no-cache-dir wheel && \
 COPY Sensors/official/IcmpCanary/requirements.txt .
 RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
 
-
 # --- Stage 2: Runtime (Zero Vulnerability Alpine) ---
 FROM python:3.11-alpine
 WORKDIR /app
 
-# Install libpcap natively so it has all its required dependencies!
-RUN apk add --no-cache libpcap
+# 1. Force upgrade all Alpine OS packages (fixes zlib), then install libpcap
+RUN apk upgrade --no-cache && \
+    apk add --no-cache libpcap
+
+# 2. Force upgrade Python's core build tools (fixes wheel & jaraco.context)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel jaraco.context
 
 COPY --from=builder /app/lib /app/lib
 COPY Sensors/official/IcmpCanary/PingCanary.py .
@@ -30,5 +33,4 @@ COPY Sensors/official/IcmpCanary/PingCanary.py .
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
 
-# Explicitly call python3 to avoid Error 127
 CMD ["python3", "PingCanary.py"]

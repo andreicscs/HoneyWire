@@ -21,6 +21,13 @@ RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r 
 FROM python:3.11-alpine
 WORKDIR /app
 
+# 1. Force upgrade all Alpine OS packages (fixes zlib), then install libpcap
+RUN apk upgrade --no-cache && \
+    apk add --no-cache libpcap
+
+# 2. Force upgrade Python's core build tools (fixes wheel & jaraco.context)
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel jaraco.context
+
 # Install libpcap natively so it has all its required dependencies!
 RUN apk add --no-cache libpcap
 
