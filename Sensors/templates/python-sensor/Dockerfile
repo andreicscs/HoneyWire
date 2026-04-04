@@ -1,3 +1,5 @@
+# Sensors/templates/python-sensor/Dockerfile
+
 # --- Stage 1: Builder ---
 FROM python:3.11-slim AS builder
 WORKDIR /app
@@ -5,28 +7,26 @@ WORKDIR /app
 # Install git (Required to fetch the SDK from GitHub)
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install requirements (This pulls the SDK + your custom libraries)
+# Copy requirements (This pulls the SDK + your custom libraries)
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+
+# Install dependencies into a flat directory (--target /app/lib)
+# This avoids virtualenv symlinks which can break inside Distroless
+RUN pip install --no-cache-dir --target /app/lib -r requirements.txt
 
 # --- Stage 2: Distroless (Production) ---
 FROM gcr.io/distroless/python3-debian12
 WORKDIR /app
 
-# Copy the compiled virtual environment from the builder
-COPY --from=builder /opt/venv /opt/venv
-
-ENV PYTHONPATH="/opt/venv/lib/python3.11/site-packages"
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
+# Copy the FLAT library folder. No symlinks, just code.
+COPY --from=builder /app/lib /app/lib
 
 # Copy the custom sensor script
 COPY sensor.py .
 
-# Run the sensor
+# Tell Python to look in our lib folder first
+ENV PYTHONPATH="/app/lib"
+ENV PYTHONUNBUFFERED=1
+
+# Distroless runs /usr/bin/python3 by default
 CMD ["sensor.py"]

@@ -1,12 +1,17 @@
 services:
   tcp-tripwire:
-    build:
-      context: ../../../ 
-      dockerfile: Sensors/official/TcpTripWire/Dockerfile
+    # Option A: Pull the pre-built image from GHCR
+    image: ghcr.io/andreicscs/honeywire-tcptripwire:latest
+    
+    # Option B: Build locally from source (Uncomment lines below to use)
+    # build:
+    #   context: ../../../ 
+    #   dockerfile: Sensors/official/TcpTripWire/Dockerfile
+    
     container_name: hw-tcp-tripwire
     restart: unless-stopped
     
-    # Binds directly to the host machine's network
+    # CRITICAL: Binds directly to the host machine's network to capture real source IPs
     network_mode: "host" 
     
     env_file: 
