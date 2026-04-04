@@ -21,6 +21,8 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y libpcap0.8 && \
     rm -rf /var/lib/apt/lists/*
 
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 COPY --from=builder /app/lib /app/lib
 COPY Sensors/official/NetworkScanDetector/NetworkScanDetector.py .
 
