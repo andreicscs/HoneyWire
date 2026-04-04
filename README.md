@@ -17,14 +17,14 @@
 
 ---
 
-# 🕸️ HoneyWire
+# HoneyWire
 
-**HoneyWire Sentinel** is an ultra-lightweight, distributed deception hub and centralized Security Operations Center (SOC). It is designed to deploy silent, asynchronous sensors across multiple servers that detect unauthorized access, trap automated botnets, and report telemetry back to a centralized, high-performance dashboard in real-time.
+**HoneyWire Sentinel** is a lightweight, distributed deception hub and Micro-SIEM. It is designed to deploy silent, asynchronous sensors that can act as traps or lures, across multiple servers that detect unauthorized access, trap automated botnets, and report telemetry back to a centralized dashboard in real-time.
 
 Developed in collaboration with Gemini (Google AI). 
 Architected by Termine Andrea, implementation and boilerplate assisted by LLM.
 
-There are existing lightweight honeypots, but none feature a clean, SaaS-grade dashboard with instant webhooks, and the ones that do are incredibly resource-intensive. This project aims at filling that gap in the cybersecurity software and tools landscape for hobbyists.
+There are existing lightweight SIEM/Deception Hubs, but none feature a clean, SaaS-grade dashboard with instant webhooks, and the ones that do are incredibly resource-intensive. This project aims at filling that gap in the cybersecurity software and tools landscape for hobbyists.
 
 ---
 
@@ -39,9 +39,11 @@ There are existing lightweight honeypots, but none feature a clean, SaaS-grade d
 ---
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
 
-The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. You are not limited to the included Tarpit agent. 
+** [Community Sensors](./Sensors/community/) **
 
-By adhering to the **HoneyWire Event Standard V1.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data perfectly. 
+The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. You are not limited to the included official sensors. 
+
+By adhering to the **HoneyWire Event Standard V1.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data. 
 
 Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a **Canary Token** embedded in a PDF, an **Email Honeypot**, or a simple **TCP Port Tripwire**, just POST this JSON to the Hub:
 
@@ -72,21 +74,20 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 
 ---
 
-## ✨ Features
+## Features
 
-- **The Sentinel UI:** A fully responsive, glassmorphic dashboard featuring Dark/Light mode, real-time Chart.js threat distribution, and dynamic forensic payload inspection.
-- **Included Tarpit Sensor:** A Python `asyncio` tripwire capable of handling thousands of concurrent connections with semantic logging to prevent file descriptor exhaustion.
+- **The Sentinel UI:** A fully responsive dashboard featuring Dark/Light mode, real-time Chart.js threat distribution, and dynamic forensic payload inspection.
+- **Included tripwire Sensor:** A Python tripwire capable of handling concurrent connections with semantic logging to prevent file descriptor exhaustion.
   - **Three Tarpit Modes:**
     - `hold`: Keeps connections open indefinitely to waste attacker resources.
     - `echo`: Bounces malicious payloads back to the sender.
     - `close`: Terminates connections immediately after logging the IP.
   - **Service Spoofing:** Customizable banners to impersonate legitimate services (e.g., OpenSSH, vsFTPd).
-  - **Hardened Security:** Built-in protection against Timing Attacks, XSS (Cross-Site Scripting), and Pass-the-Hash vulnerabilities using ephemeral session tokens and constant-time string comparison. Thread-blocking is mitigated via FastAPI Background Tasks.
   - **Instant Notifications:** Built-in support for ntfy.sh and Gotify mobile alerts.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 HoneyWire is split into two independent microservices:
 
@@ -98,7 +99,7 @@ HoneyWire is split into two independent microservices:
 
 ## 🚀 Quick Start Guide
 
-Deploying HoneyWire takes less than 60 seconds using our pre-built GitHub Container Registry images. No compiling required.
+Deploying HoneyWire takes less than 60 seconds using our pre-built GitHub Container images. No compiling required.
 
 Create a new directory on your server, and create two files: `docker-compose.yml` and `.env`.
 
@@ -146,13 +147,13 @@ HW_GOTIFY_TOKEN=your_app_token
 
 
 # ==========================================
-# SENSOR CONFIGURATION
+# TRIPWIRE SENSOR CONFIGURATION
 # ==========================================
 # Point this to your Hub's IP address and Port
 HW_HUB_ENDPOINT=[http://127.0.0.1:8080](http://127.0.0.1:8080)
 
 # Identify this specific sensor
-HW_SENSOR_ID=dmz-node-01
+HW_SENSOR_ID=node-01
 
 # A comma-separated list of fake ports to open
 HW_DECOY_PORTS=21,22,2222,3306,8080
@@ -181,13 +182,13 @@ Once both containers are running, check your Hub dashboard. The Agent should app
 
 To simulate an attack, use `netcat` to connect to one of your decoy ports:
 ```bash
-nc <agent-ip> 2222
+nc <tripwire-ip> 2222
 ```
 1. If your mode is hold or echo, you will immediately see your fake TARPIT_BANNER.
 2. Type a fake exploit payload (e.g., admin).
-3. Notice the tarpit delay (or infinite hold) as it traps your connection.
+3. Notice the tarpit delay (or indefinite hold) as it traps your connection.
 4. Press Ctrl+C to drop the connection.
-5. Watch the alert and payload instantly appear on your HoneyWire dashboard and notification pushed to your phone!
+5. Watch the alert and payloads instantly appear on your HoneyWire dashboard and notification pushed to your phone!
 
 ---
 
@@ -198,14 +199,14 @@ nc <agent-ip> 2222
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
 * **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS. Failure to do so exposes your API_SECRET and DASHBOARD_PASSWORD to anyone sniffing the network.
 
-## 🛠️ Tech Stack
+## Tech Stack
 * **Backend:** Python 3.11, FastAPI, SQLite3, Asyncio
 * **Frontend:** HTML5, TailwindCSS, Alpine.js, Chart.js
 * **Infrastructure:** Docker, Docker Compose, Distroless Linux
 
 ---
 
-## 📦 Versioning and API reference
+## Versioning and API reference
 
 - HoneyWire now uses a single source of truth version file: `VERSION` in the repo root.
 - Runtime version is exposed via env override: HW_VERSION (Hub + Sensors), and defaults to VERSION.
@@ -223,7 +224,7 @@ nc <agent-ip> 2222
 
 ---
 
-## 🧪 Operational checklist
+## Operational checklist
 - set `HW_HUB_KEY` for all components
 - set optional `HW_DASHBOARD_PASSWORD`
 - build/redeploy containers after any version bump in `VERSION` or env value
