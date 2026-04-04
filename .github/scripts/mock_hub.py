@@ -1,9 +1,26 @@
 import http.server
 import json
 import sys
+import os
 
 class MockHubHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        """Handles the HoneyWire SDK synchronization handshake."""
+        if self.path == '/api/v1/version':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            
+            # The SDK expects a version object to confirm compatibility
+            response = {"version": "1.0.0", "status": "operational"}
+            self.wfile.write(json.dumps(response).encode('utf-8'))
+            print("🤝 SUCCESS: Sensor synchronized successfully via GET.")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
     def do_POST(self):
+        """Handles and validates the HoneyWire V1.0 Event Contract."""
         content_length = int(self.headers['Content-Length'])
         post_data = self.rfile.read(content_length)
         
@@ -21,20 +38,25 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
                     print(f"❌ FAILED: Missing required key '{key}'")
                     sys.exit(1)
             
-            # 2. Enforce severity type
-            if not isinstance(payload['severity'], int) and payload['severity'] not in ["info", "low", "medium", "high", "critical"]:
-                print("❌ FAILED: 'severity' must be an int or valid enum.")
+            # 2. Enforce severity type (String enum or Int)
+            valid_severities = ["info", "low", "medium", "high", "critical"]
+            if not isinstance(payload['severity'], int) and payload['severity'] not in valid_severities:
+                print(f"❌ FAILED: 'severity' ({payload['severity']}) is invalid.")
                 sys.exit(1)
 
-            print("✅ SUCCESS: Valid HoneyWire V1.0 payload received.")
+            print(f"🚩 ALERT RECEIVED: {payload['event_type']} from {payload['sensor_id']}")
             print(json.dumps(payload, indent=2))
             
             self.send_response(200)
             self.end_headers()
             
-            # Write a success flag for the CI runner
+            # Write success flag for the CI runner
             with open('/tmp/test_passed', 'w') as f:
                 f.write('success')
+                
+            # Exit after receiving the alert so the CI process can finish
+            print("✅ SUCCESS: Event validated. Shutting down Mock Hub.")
+            sys.exit(0)
                 
         except json.JSONDecodeError:
             print("❌ FAILED: Payload is not valid JSON.")
@@ -44,10 +66,14 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             sys.exit(1)
 
     def log_message(self, format, *args):
-        # Suppress default HTTP logging to keep CI logs clean
         pass
 
 if __name__ == '__main__':
-    print("🛡️ Mock Hub listening on port 8080...")
+    print("🛡️ HoneyWire Mock Hub (V1.1) listening on port 8080...")
     server = http.server.HTTPServer(('0.0.0.0', 8080), MockHubHandler)
-    server.handle_request() # Process exactly one request then exit
+    
+    # We need to stay alive for at least two requests: 
+    # 1. The GET sync from the SDK
+    # 2. The POST alert from the sensor
+    while True:
+        server.handle_request()

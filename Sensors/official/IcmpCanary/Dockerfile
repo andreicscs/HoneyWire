@@ -27,4 +27,4 @@ COPY Sensors/official/IcmpCanary/PingCanary.py .
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python3", "PingCanary.py"]
+CMD ["PingCanary.py"]

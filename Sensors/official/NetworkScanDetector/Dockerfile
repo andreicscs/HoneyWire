@@ -27,4 +27,4 @@ COPY Sensors/official/NetworkScanDetector/NetworkScanDetector.py .
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python3", "NetworkScanDetector.py"]
+CMD ["NetworkScanDetector.py"]
