@@ -55,7 +55,8 @@ jobs:
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             SENSOR_DIR=$(dirname "$file")
             if [ -f "$SENSOR_DIR/Dockerfile" ]; then
-              docker build -t test-sensor:latest "$SENSOR_DIR"
+              # FIXED: Context set to '.' (repo root) so Docker can copy the SDKs
+              docker build -t test-sensor:latest -f "$SENSOR_DIR/Dockerfile" .
               curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
               trivy image --severity HIGH,CRITICAL --exit-code 1 --no-progress test-sensor:latest
             fi
@@ -81,7 +82,8 @@ jobs:
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             SENSOR_DIR=$(dirname "$file")
             if [ -f "$SENSOR_DIR/Dockerfile" ]; then
-              docker build -t test-sensor:latest "$SENSOR_DIR"
+              # FIXED: Context set to '.' (repo root) so Docker can copy the SDKs
+              docker build -t test-sensor:latest -f "$SENSOR_DIR/Dockerfile" .
               docker run --rm \
                 -e HW_HUB_ENDPOINT="http://172.17.0.1:8080" \
                 -e HW_HUB_KEY="mock_key" \
