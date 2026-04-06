@@ -107,8 +107,6 @@ class TcpTarpitSensor(HoneyWireSensor):
 
             duration = time.time() - start_time
             event_payload = {
-                "source_ip": source_ip,
-                "target_port": port,
                 "duration_sec": round(duration, 2),
                 "payload": captured_payload,
             }

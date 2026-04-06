@@ -81,7 +81,6 @@ class WebRouterDecoy(HoneyWireSensor):
                 "user_agent": user_agent,
                 "attempted_username": username,
                 "attempted_password": password,
-                "remote_ip": source_ip,
             }
 
             await asyncio.to_thread(
