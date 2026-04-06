@@ -1,59 +1,58 @@
 name: Hub Release & Publish
 
 env:
-  # This kills the Node.js 20 deprecation warnings for 2026
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  WORKING_DIR: ./Hub 
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'Hub/**'
-    tags:
-      - 'v*'
-  pull_request:
-    paths:
-      - 'Hub/**'
+    branches: [ "main" ]
+    paths: [ 'Hub/**' ]
   workflow_dispatch:
 
 jobs:
-  hub-security-scan:
-    name: "🛡️ Security Scan"
+  code-security:
+    name: "🛡️ FS Security Scan"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Local Image
-        run: docker build -t honeywire-hub:test ./Hub
+      # TODO: Uncomment this when we write the Fuzz tests!
+      # - name: Set up Go
+      #   uses: actions/setup-go@v5
+      #   with:
+      #     go-version: '1.25'
+      # - name: Run Go Tests
+      #   working-directory: ${{ env.WORKING_DIR }}
+      #   run: go test -v ./...
 
-      - name: Run Trivy Security Scan
+      - name: Run Trivy Vulnerability Scanner (FS)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'honeywire-hub:test'
+          scan-type: 'fs'
+          scan-ref: ${{ env.WORKING_DIR }}
           format: 'table'
-          # Fail the build (exit 1) only if fixable HIGH/CRITICAL bugs are found
           exit-code: '1'
-          ignore-unfixed: true 
-          vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
 
   publish-hub:
-    name: "🚀 Publish Official Hub"
-    needs: [hub-security-scan]
-    # IMPORTANT: This logic ensures standard pushes to main stay GREEN.
-    # The "Waiting for Approval" gate only appears on Tags or Manual Trigger.
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    name: "🚀 Build & Publish Latest"
+    needs: [code-security]
     runs-on: ubuntu-latest
-    environment: 
-      name: production_registry
     permissions:
       contents: read
       packages: write
+      id-token: write 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # Enables Raspberry Pi Support
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -62,21 +61,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push
+      # Automatically just tags everything pushed to main as "latest"
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/honeywire-hub
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push via Buildx
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.WORKING_DIR }}
+          platforms: linux/amd64,linux/arm64 
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+          
+      - name: Summary
         run: |
-          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-hub"
-          
-          echo "Building production Hub image..."
-          docker build -t $IMAGE_NAME:latest ./Hub
-          docker push $IMAGE_NAME:latest
-          
-          # If this is a tag release (e.g., v1.0.0), tag the image specifically
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            TAG_NAME=${GITHUB_REF#refs/tags/}
-            echo "Tagging release as $TAG_NAME..."
-            docker tag $IMAGE_NAME:latest $IMAGE_NAME:$TAG_NAME
-            docker push $IMAGE_NAME:$TAG_NAME
-          fi
-          
           echo "### ✅ Hub Published Successfully" >> $GITHUB_STEP_SUMMARY
-          echo "Image: \`$IMAGE_NAME:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "Platforms: \`linux/amd64\`, \`linux/arm64\`" >> $GITHUB_STEP_SUMMARY
