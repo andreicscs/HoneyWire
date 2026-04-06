@@ -18,7 +18,7 @@ func main() {
 	
 	cfg := config.Load()
 
-	dbStore, err := store.NewStore("test_honeywire.db")
+	dbStore, err := store.NewStore(cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}

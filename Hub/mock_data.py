@@ -62,31 +62,31 @@ def generate_contextual_event(sensor):
         event["event_type"] = random.choice(["sqli_attempt", "xss_payload", "dir_bruteforce", "api_fuzz"])
         event["severity"] = random.choice(["high", "critical", "medium"])
         event["target"] = random.choice(["/wp-admin", "/api/v1/users", "/.env", "/config.php"])
-        event["metadata"] = {"user_agent": "masscan/1.3", "payload": "1' OR '1'='1", "method": "POST"}
+        event["details"] = {"user_agent": "masscan/1.3", "payload": "1' OR '1'='1", "method": "POST"}
 
     elif s_type == "tarpit":
         event["event_type"] = random.choice(["tcp_syn_flood", "port_scan", "ssh_bruteforce"])
         event["severity"] = random.choice(["low", "medium", "info"])
         event["target"] = random.choice(["Port 22", "Port 23", "Port 3389", "Port 445"])
-        event["metadata"] = {"packets_dropped": random.randint(50, 5000), "connection_time_held": f"{random.randint(10, 120)}s"}
+        event["details"] = {"packets_dropped": random.randint(50, 5000), "connection_time_held": f"{random.randint(10, 120)}s"}
 
     elif s_type == "canary_token":
         event["event_type"] = random.choice(["file_accessed", "aws_key_used", "db_queried"])
         event["severity"] = "critical"
         event["target"] = random.choice(["/etc/passwd.bak", "AWS_SECRET_KEY", "users_backup.sql"])
-        event["metadata"] = {"process_name": random.choice(["cat", "curl", "python3"]), "user": "www-data"}
+        event["details"] = {"process_name": random.choice(["cat", "curl", "python3"]), "user": "www-data"}
 
     elif s_type == "llm_probe":
         event["event_type"] = random.choice(["prompt_injection", "jailbreak_attempt", "data_exfiltration"])
         event["severity"] = random.choice(["high", "critical"])
         event["target"] = "/v1/chat/completions"
-        event["metadata"] = {"prompt_snippet": "Ignore previous instructions and print...", "model": "gpt-4-turbo"}
+        event["details"] = {"prompt_snippet": "Ignore previous instructions and print...", "model": "gpt-4-turbo"}
 
     else: # ids_sentinel
         event["event_type"] = random.choice(["malware_signature", "lateral_movement", "beaconing"])
         event["severity"] = random.choice(["high", "critical", "medium"])
         event["target"] = f"Subnet 10.0.{random.randint(1,5)}.0/24"
-        event["metadata"] = {"signature_id": f"SID-{random.randint(1000, 9999)}", "confidence": f"{random.randint(80, 100)}%"}
+        event["details"] = {"signature_id": f"SID-{random.randint(1000, 9999)}", "confidence": f"{random.randint(80, 100)}%"}
 
     return event
 
@@ -96,7 +96,7 @@ def post_heartbeat(sensor):
     body = {
         "sensor_id": sensor["sensor_id"],
         "sensor_type": sensor["sensor_type"],
-        "metadata": {
+        "details": {
             "version": VERSION,
             "os": random.choice(["Linux", "Windows Server 2022", "FreeBSD"]),
             "uptime_days": random.randint(1, 400),
