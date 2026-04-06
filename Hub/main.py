@@ -25,6 +25,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, Background
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
+from datetime import datetime, timedelta, timezone
+from fastapi import FastAPI, Request, HTTPException, Depends, Header, BackgroundTasks, Query
+from fastapi import Query
+from datetime import timedelta
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -66,70 +70,67 @@ AUTH_COOKIE_NAME  = "hw_auth"
 # Store active sessions in memory to prevent Pass-the-Hash vulnerabilities
 # Format: { "session_token": expiration_datetime }
 ACTIVE_SESSIONS: dict[str, datetime] = {}
-
 # ---------------------------------------------------------------------------
 # Database — versioned migrations
 # ---------------------------------------------------------------------------
-MIGRATIONS: list[str] = [
-    # v1 — initial schema
-    """
-    CREATE TABLE IF NOT EXISTS events (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp    TEXT    NOT NULL,
-        sensor_id    TEXT    NOT NULL,
-        sensor_type  TEXT    NOT NULL DEFAULT 'generic',
-        event_type   TEXT    NOT NULL DEFAULT 'alert',
-        severity     TEXT    NOT NULL DEFAULT 'medium',
-        source       TEXT    NOT NULL DEFAULT 'Unknown',
-        target       TEXT    NOT NULL DEFAULT 'Unknown',
-        action_taken TEXT    NOT NULL DEFAULT 'logged',
-        details      TEXT    NOT NULL DEFAULT '{}',
-        is_read      INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE IF NOT EXISTS sensors (
-        sensor_id   TEXT PRIMARY KEY,
-        last_seen   TEXT NOT NULL,
-        sensor_type TEXT NOT NULL DEFAULT 'generic',
-        metadata    TEXT NOT NULL DEFAULT '{}'
-    );
-    CREATE TABLE IF NOT EXISTS config (
-        key   TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-    );
-    INSERT OR IGNORE INTO config (key, value) VALUES ('is_armed', 'true');
-    """,
-    """
-    ALTER TABLE events ADD COLUMN contract_version TEXT NOT NULL DEFAULT '1.0.0';
-    """
-]
+# We use one clean initialization string for new deployments
+INIT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS events (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp        TEXT    NOT NULL,
+    contract_version TEXT    NOT NULL DEFAULT '1.0.0',
+    sensor_id        TEXT    NOT NULL,
+    sensor_type      TEXT    NOT NULL DEFAULT 'generic',
+    event_type       TEXT    NOT NULL DEFAULT 'alert',
+    severity         TEXT    NOT NULL DEFAULT 'medium',
+    source           TEXT    NOT NULL DEFAULT 'Unknown',
+    target           TEXT    NOT NULL DEFAULT 'Unknown',
+    action_taken     TEXT    NOT NULL DEFAULT 'logged',
+    details          TEXT    NOT NULL DEFAULT '{}',
+    is_read          INTEGER NOT NULL DEFAULT 0,
+    is_archived INTEGER NOT NULL DEFAULT 0
+);
 
+CREATE TABLE IF NOT EXISTS sensors (
+    sensor_id   TEXT PRIMARY KEY,
+    first_seen  TEXT,
+    last_seen   TEXT NOT NULL,
+    sensor_type TEXT NOT NULL DEFAULT 'generic',
+    metadata    TEXT NOT NULL DEFAULT '{}',
+    is_silenced INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS config (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+INSERT OR IGNORE INTO config (key, value) VALUES ('is_armed', 'true');
+
+CREATE TABLE IF NOT EXISTS sensor_heartbeats (
+    sensor_id   TEXT NOT NULL,
+    time_bucket TEXT NOT NULL,
+    PRIMARY KEY (sensor_id, time_bucket)
+);
+CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
+"""
 
 def _get_db_version(conn: sqlite3.Connection) -> int:
     return conn.execute("PRAGMA user_version").fetchone()[0]
 
-
 def _set_db_version(conn: sqlite3.Connection, version: int) -> None:
     conn.execute(f"PRAGMA user_version = {version}")
 
-
-def run_migrations() -> None:
-    """Apply any pending schema migrations on startup."""
+def init_db():
+    """Run exactly once on startup to ensure tables exist."""
     conn = sqlite3.connect(DB_PATH)
     try:
-        current = _get_db_version(conn)
-        pending  = MIGRATIONS[current:]
-        if not pending:
-            log.info("DB schema is up to date (version %d).", current)
-            return
-        for i, migration in enumerate(pending, start=current + 1):
-            log.info("Applying DB migration to version %d …", i)
-            conn.executescript(migration)
-            _set_db_version(conn, i)
+        conn.executescript(INIT_SCHEMA)
         conn.commit()
-        log.info("DB migrations complete. Schema now at version %d.", current + len(pending))
+        log.info("Database initialized successfully.")
+    except Exception as e:
+        log.error(f"Database initialization failed: {e}")
     finally:
         conn.close()
-
 
 @contextmanager
 def get_db():
@@ -145,8 +146,7 @@ def get_db():
     finally:
         conn.close()
 
-
-run_migrations()
+init_db()
 
 # ---------------------------------------------------------------------------
 # Notification dispatcher
@@ -307,8 +307,9 @@ async def get_version():
 @app.get("/api/v1/sensors", dependencies=[Depends(verify_ui_auth)])
 async def get_sensors():
     with get_db() as conn:
+        # FIX 1: Add is_silenced to the SQL SELECT statement
         rows = conn.execute(
-            "SELECT sensor_id, sensor_type, last_seen, metadata FROM sensors ORDER BY sensor_id"
+            "SELECT sensor_id, sensor_type, last_seen, metadata, is_silenced FROM sensors ORDER BY sensor_id"
         ).fetchall()
 
     now = datetime.now()
@@ -321,28 +322,35 @@ async def get_sensors():
             "last_seen":   r["last_seen"],
             "metadata":    json.loads(r["metadata"]),
             "status":      "online" if (now - last_seen_dt) < timedelta(seconds=90) else "offline",
+            # FIX 2: Pass the boolean value to the frontend
+            "is_silenced": bool(r["is_silenced"])
         })
     return fleet
 
 
 @app.get("/api/v1/events", dependencies=[Depends(verify_ui_auth)])
-async def get_events():
+async def get_events(archived: bool = Query(False)):
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM events ORDER BY id DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM events WHERE is_archived = ? ORDER BY id DESC", 
+            (1 if archived else 0,)
+        ).fetchall()
+        
     return [
         {
             "contract_version": r["contract_version"],
-            "id":          r["id"],
-            "timestamp":   r["timestamp"],
-            "sensor_id":   r["sensor_id"],
-            "sensor_type": r["sensor_type"],
-            "event_type":  r["event_type"],
-            "severity":    r["severity"],
-            "source":      r["source"],
-            "target":      r["target"],
+            "id":           r["id"],
+            "timestamp":    r["timestamp"],
+            "sensor_id":    r["sensor_id"],
+            "sensor_type":  r["sensor_type"],
+            "event_type":   r["event_type"],
+            "severity":     r["severity"],
+            "source":       r["source"],
+            "target":       r["target"],
             "action_taken": r["action_taken"],
-            "details":     json.loads(r["details"]) if r["details"] else {},
-            "is_read":     bool(r["is_read"]),
+            "details":      json.loads(r["details"]) if r["details"] else {},
+            "is_read":      bool(r["is_read"]),
+            "is_archived":  bool(r["is_archived"]),
         }
         for r in rows
     ]
@@ -368,22 +376,159 @@ async def clear_events():
         conn.execute("DELETE FROM events")
     return {"status": "success"}
 
+@app.get("/api/v1/uptime", dependencies=[Depends(verify_ui_auth)])
+async def get_uptime_data(timeframe: str = Query("24H")):
+    now = datetime.now(timezone.utc)
+    
+    if timeframe == "1H":
+        num_blocks = 60
+        delta = timedelta(minutes=1)
+        fmt = "%Y-%m-%d %H:%M" 
+        expected_pings = 1
+    elif timeframe == "24H":
+        num_blocks = 24
+        delta = timedelta(hours=1)
+        fmt = "%Y-%m-%d %H"    
+        expected_pings = 60
+    elif timeframe == "7D":
+        num_blocks = 7
+        delta = timedelta(days=1)
+        fmt = "%Y-%m-%d"       
+        expected_pings = 1440
+    else: # 30D
+        num_blocks = 30
+        delta = timedelta(days=1)
+        fmt = "%Y-%m-%d"       
+        expected_pings = 1440
+
+    cutoff = now - (delta * num_blocks)
+    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+    with get_db() as conn:
+        sensors = conn.execute("SELECT sensor_id, last_seen, first_seen FROM sensors ORDER BY sensor_id").fetchall()
+        rows = conn.execute(
+            "SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?",
+            (cutoff_str,)
+        ).fetchall()
+
+    history = {s["sensor_id"]: {} for s in sensors}
+    for r in rows:
+        bucket_dt = datetime.strptime(r["time_bucket"], "%Y-%m-%d %H:%M:00")
+        time_key = bucket_dt.strftime(fmt)
+        history[r["sensor_id"]][time_key] = history[r["sensor_id"]].get(time_key, 0) + 1
+
+    result = []
+    for s in sensors:
+        sensor_id = s["sensor_id"]
+        blocks = []
+        
+        # Safely parse first_seen (fallback to 'now' if missing)
+        first_seen_str = s["first_seen"] or now.strftime("%Y-%m-%d %H:%M:%S")
+        first_seen_dt = datetime.strptime(first_seen_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        
+        # CRITICAL FIX: Convert first_seen to the exact same bucket format as time_key
+        first_seen_key = first_seen_dt.strftime(fmt)
+        
+        for i in range(num_blocks - 1, -1, -1):
+            block_time = now - (delta * i)
+            time_key = block_time.strftime(fmt)
+            
+            time_label = "Current" if i == 0 else f"{i} " + ("mins ago" if timeframe == "1H" else "hours ago" if timeframe == "24H" else "days ago")
+            
+            # 1. NO DATA CHECK: Elegant string comparison
+            if time_key < first_seen_key:
+                status, label = "nodata", "No Data (Not Deployed Yet)"
+            else:
+                # 2. DEGRADED / UP / DOWN CHECK
+                ping_count = history[sensor_id].get(time_key, 0)
+                
+                if ping_count == 0:
+                    status, label = "down", "Offline"
+                elif ping_count < (expected_pings * 0.85):
+                    status, label = "degraded", f"Degraded ({ping_count}/{expected_pings} pings)"
+                else:
+                    status, label = "up", "Online"
+
+            blocks.append({
+                "status": status,
+                "timeLabel": time_label,
+                "label": label
+            })
+
+        # Override the very last block to strictly match live last_seen status
+        last_seen_dt = datetime.strptime(s["last_seen"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        is_live = (now - last_seen_dt) < timedelta(seconds=90)
+        blocks[-1] = {
+            "status": "up" if is_live else "down",
+            "timeLabel": "Current",
+            "label": "Online (Live)" if is_live else "Offline (Live)"
+        }
+
+        result.append({
+            "id": sensor_id,
+            "name": sensor_id,
+            "isOnline": is_live,
+            "blocks": blocks
+        })
+
+    return result
+
+@app.patch("/api/v1/events/{event_id}/archive", dependencies=[Depends(verify_ui_auth)])
+async def archive_single_event(event_id: int):
+    with get_db() as conn:
+        conn.execute("UPDATE events SET is_archived = 1, is_read = 1 WHERE id = ?", (event_id,))
+    return {"status": "success"}
+
+@app.patch("/api/v1/events/archive-all", dependencies=[Depends(verify_ui_auth)])
+async def archive_all_events():
+    with get_db() as conn:
+        # Only archive currently active events
+        conn.execute("UPDATE events SET is_archived = 1, is_read = 1 WHERE is_archived = 0")
+    return {"status": "success"}
+
+
+
+class SilenceRequest(BaseModel):
+    is_silenced: bool
+
+@app.patch("/api/v1/sensors/{sensor_id}/silence", dependencies=[Depends(verify_ui_auth)])
+async def toggle_sensor_silence(sensor_id: str, req: SilenceRequest):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE sensors SET is_silenced = ? WHERE sensor_id = ?",
+            (1 if req.is_silenced else 0, sensor_id)
+        )
+    return {"status": "success", "sensor_id": sensor_id, "is_silenced": req.is_silenced}
 
 # ---------------------------------------------------------------------------
 # Sensor API
 # ---------------------------------------------------------------------------
 @app.post("/api/v1/heartbeat", dependencies=[Depends(verify_agent_auth)])
 async def receive_heartbeat(hb: Heartbeat):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(timezone.utc)
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Round down to the current minute (e.g., "2026-04-05 21:05:00")
+    minute_bucket = now.strftime("%Y-%m-%d %H:%M:00") 
+
     metadata_json = json.dumps(hb.metadata) if isinstance(hb.metadata, (dict, list)) else "{}"
+    
     with get_db() as conn:
+        # 1. Update current live status & explicitly set first_seen if new
         conn.execute(
-            """INSERT INTO sensors (sensor_id, sensor_type, last_seen, metadata)
-               VALUES (?, ?, ?, ?)
+            """INSERT INTO sensors (sensor_id, first_seen, last_seen, sensor_type, metadata)
+               VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(sensor_id) DO UPDATE SET last_seen=?, sensor_type=?, metadata=?""",
-            (hb.sensor_id, hb.sensor_type, now, metadata_json,
-             now, hb.sensor_type, metadata_json),
+            (hb.sensor_id, now_str, now_str, hb.sensor_type, metadata_json,
+             now_str, hb.sensor_type, metadata_json),
         )
+        
+        # 2. Log historical bucket (Ignores duplicates within the same minute)
+        conn.execute(
+            "INSERT OR IGNORE INTO sensor_heartbeats (sensor_id, time_bucket) VALUES (?, ?)",
+            (hb.sensor_id, minute_bucket)
+        )
+        
     return {"status": "alive"}
 
 
@@ -413,16 +558,24 @@ async def receive_event(event: Event, bg_tasks: BackgroundTasks):
             (timestamp, event.contract_version, event.sensor_id, event.sensor_type, event.event_type,
              event.severity, event.source, event.target, event.action_taken, details_json),
         )
+        # 1. Check Global Arm State
         is_armed = conn.execute(
             "SELECT value FROM config WHERE key='is_armed'"
         ).fetchone()["value"] == "true"
+        
+        # 2. Check Specific Sensor Silence State
+        sensor_row = conn.execute(
+            "SELECT is_silenced FROM sensors WHERE sensor_id = ?", 
+            (event.sensor_id,)
+        ).fetchone()
+        is_silenced = bool(sensor_row["is_silenced"]) if sensor_row else False
 
     msg = (
         f"[{event.sensor_id}] {event.event_type.upper()} — "
         f"{event.source} → {event.target} | action: {event.action_taken}"
     )
     
-    if is_armed:
+    if is_armed and not is_silenced:
         bg_tasks.add_task(notify, title=f"HoneyWire Alert ({event.severity.upper()})", message=msg, severity=event.severity)
 
     log.info("Event received (v%s): %s", event.contract_version, msg if is_armed else f"{event.sensor_id}/{event.event_type}")
@@ -430,7 +583,7 @@ async def receive_event(event: Event, bg_tasks: BackgroundTasks):
 
 
 # ---------------------------------------------------------------------------
-# Web UI & Vault Door
+# Web UI & Vault Door (Uncodixified)
 # ---------------------------------------------------------------------------
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -439,7 +592,7 @@ LOGIN_HTML = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HoneyWire Sentinel | Authentication</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
         tailwind.config = { darkMode: 'class' }
         if (localStorage.getItem('theme') === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -449,12 +602,12 @@ LOGIN_HTML = """<!DOCTYPE html>
         }
     </script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
         .bg-grid {
             background-size: 40px 40px;
-            background-image: linear-gradient(to right, rgba(161, 161, 170, 0.05) 1px, transparent 1px),
-                              linear-gradient(to bottom, rgba(161, 161, 170, 0.05) 1px, transparent 1px);
+            background-image: linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
         }
         .dark .bg-grid {
             background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
@@ -462,32 +615,43 @@ LOGIN_HTML = """<!DOCTYPE html>
         }
     </style>
 </head>
-<body class="bg-zinc-50 dark:bg-[#050507] text-zinc-900 dark:text-zinc-300 h-screen flex items-center justify-center bg-grid transition-colors duration-300">
-    <button onclick="toggleTheme()" class="absolute top-6 right-6 p-2 rounded-xl bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white shadow-sm transition-all backdrop-blur-md">
-        <svg id="moon-icon" class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-        <svg id="sun-icon" class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-    </button>
-    <div class="relative w-full max-w-md p-8 sm:p-12 bg-white/80 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800/50 rounded-[2.5rem] shadow-2xl backdrop-blur-xl">
-        <div class="text-center mb-10">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-emerald-500/10 border border-zinc-200 dark:border-emerald-500/20 text-3xl mb-6 shadow-inner">🕸️</div>
-            <h1 class="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter">HONEYWIRE</h1>
-            <p class="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.25em] mt-2">Sentinel</p>
+<body class="bg-slate-100 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 h-screen flex flex-col items-center justify-center bg-grid transition-colors duration-200 p-6">
+    
+    <div class="w-full max-w-[400px] space-y-8">
+        <div class="flex flex-col items-center">
+            <div class="w-12 h-12 flex items-center justify-center rounded-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm text-2xl mb-4">🕸️</div>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">HoneyWire Sentinel</h1>
+            <p class="text-sm text-slate-500 dark:text-zinc-500 mt-1">Authorized personnel only</p>
         </div>
-        <form onsubmit="doLogin(event)" class="flex flex-col gap-5">
-            <div class="space-y-2">
-                <label for="pwd" class="text-[10px] font-black text-zinc-600 dark:text-zinc-500 uppercase tracking-widest pl-1">Authentication Key</label>
-                <input type="password" id="pwd" placeholder="Enter passphrase..."
-                       class="w-full p-4 rounded-xl bg-zinc-100 dark:bg-zinc-950/50 border border-zinc-300 dark:border-zinc-800 text-sm mono text-zinc-900 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all placeholder-zinc-400 dark:placeholder-zinc-700" required>
+
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg shadow-sm p-8 transition-colors duration-200">
+            <form onsubmit="doLogin(event)" class="space-y-6">
+                <div class="space-y-2">
+                    <label for="pwd" class="text-xs font-semibold text-slate-700 dark:text-zinc-400">Authentication Key</label>
+                    <input type="password" id="pwd" placeholder="••••••••••••"
+                           class="w-full px-3 py-2 rounded-md bg-slate-50 dark:bg-zinc-950 border border-slate-300 dark:border-zinc-800 text-sm mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-zinc-600 focus:border-transparent transition-all placeholder-slate-300 dark:placeholder-zinc-700" required>
+                </div>
+                
+                <button type="submit"
+                        class="w-full py-2 rounded-md bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-slate-800 dark:hover:bg-white text-sm font-semibold transition-all shadow-sm">
+                    Sign in
+                </button>
+            </form>
+
+            <div id="err" class="hidden mt-6 p-3 rounded-md bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/30 text-center">
+                <p class="text-xs font-medium text-rose-700 dark:text-rose-400">Access Denied: Invalid Key</p>
             </div>
-            <button type="submit"
-                    class="w-full mt-2 py-4 rounded-xl bg-zinc-900 dark:bg-emerald-500/10 text-white dark:text-emerald-500 border border-transparent dark:border-emerald-500/20 hover:bg-zinc-800 dark:hover:bg-emerald-500/20 text-[10px] font-black uppercase tracking-[0.25em] transition-all shadow-lg dark:shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                Login
+        </div>
+
+        <div class="flex justify-center">
+            <button onclick="toggleTheme()" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-colors">
+                <svg id="moon-icon" class="w-3.5 h-3.5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                <svg id="sun-icon" class="w-3.5 h-3.5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                <span>Switch Theme</span>
             </button>
-        </form>
-        <div id="err" class="hidden mt-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-center">
-            <p class="text-[10px] font-black text-rose-600 dark:text-rose-500 uppercase tracking-widest">Access Denied: Invalid Key</p>
         </div>
     </div>
+
     <script>
         function toggleTheme() {
             if (document.documentElement.classList.contains('dark')) {
@@ -502,9 +666,10 @@ LOGIN_HTML = """<!DOCTYPE html>
             e.preventDefault();
             const btn = e.target.querySelector('button[type="submit"]');
             const originalText = btn.innerText;
-            btn.innerText = "AUTHENTICATING...";
+            btn.innerText = "Authenticating...";
             btn.disabled = true;
-            btn.classList.add('opacity-75');
+            btn.classList.add('opacity-50');
+            
             try {
                 const res = await fetch('/login', {
                     method: 'POST',
@@ -512,22 +677,23 @@ LOGIN_HTML = """<!DOCTYPE html>
                     body: JSON.stringify({password: document.getElementById('pwd').value})
                 });
                 if (res.ok) {
-                    btn.innerText = "ACCESS GRANTED";
-                    btn.classList.replace('dark:text-emerald-500', 'dark:text-zinc-950');
-                    btn.classList.replace('dark:bg-emerald-500/10', 'dark:bg-emerald-500');
-                    btn.classList.replace('bg-zinc-900', 'bg-emerald-500');
+                    btn.innerText = "Access Granted";
+                    btn.classList.replace('bg-slate-900', 'bg-emerald-600');
+                    btn.classList.replace('dark:bg-zinc-100', 'dark:bg-emerald-600');
+                    btn.classList.add('text-white');
                     setTimeout(() => window.location.reload(), 400);
                 } else {
                     document.getElementById('err').classList.remove('hidden');
                     btn.innerText = originalText;
                     btn.disabled = false;
-                    btn.classList.remove('opacity-75');
+                    btn.classList.remove('opacity-50');
                     document.getElementById('pwd').value = '';
                     document.getElementById('pwd').focus();
                 }
             } catch (err) {
                 btn.innerText = originalText;
                 btn.disabled = false;
+                btn.classList.remove('opacity-50');
             }
         }
     </script>
