@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"log"
 
-	// The underscore means we import it for its side-effects (registering the sqlite3 driver)
-	_ "github.com/mattn/go-sqlite3" 
+	_ "modernc.org/sqlite"
 )
 
-// InitSchema matches your final unified Python schema
 const InitSchema = `
 CREATE TABLE IF NOT EXISTS events (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,19 +47,17 @@ CREATE TABLE IF NOT EXISTS sensor_heartbeats (
 CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
 `
 
-// Store is a wrapper around our database connection
 type Store struct {
 	DB *sql.DB
 }
 
 // NewStore connects to SQLite, runs the migrations, and returns the Store
 func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply the unified schema
 	_, err = db.Exec(InitSchema)
 	if err != nil {
 		return nil, err

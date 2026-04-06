@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # 1. THE FIXER: Runs as root, fixes permissions, and dies instantly.
+  permission-fixer:
+    image: alpine:latest
+    # 65532 is the standard UID/GID for the Distroless nonroot user
+    command: sh -c "chown -R 65532:65532 /data"
+    volumes:
+      - ./honeywire_data:/data
+
+  # 2. THE HUB: pure Go distroless backend.
+  honeywire-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: honeywire-hub
+    restart: unless-stopped
+    ports:
+      - "${HW_PORT:-8080}:${HW_PORT:-8080}"
+    volumes:
+      - ./honeywire_data:/data
+    depends_on:
+      # This ensures the Hub waits until the fixer is completely finished
+      permission-fixer:
+        condition: service_completed_successfully
+    environment:
+      - HW_PORT=8080
+      - HW_DB_PATH=/data/honeywire.db
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_DASHBOARD_PASSWORD=admin
