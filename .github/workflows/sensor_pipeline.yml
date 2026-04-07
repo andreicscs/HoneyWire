@@ -35,20 +35,23 @@ jobs:
           dir_names: true
           dir_names_max_depth: 3 
           json: true
+          escape_json: false # 1. THE FIX: Stop adding backslashes to the JSON
 
       - name: Generate Independent Matrix
         id: generate-matrix
+        env:
+          # 2. THE FIX: Pass the output safely via an environment variable
+          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             # On manual trigger: Find ALL folders in official/ containing a Dockerfile
             MATRIX_JSON=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | jq -R -s -c 'split("\n")[:-1]')
           else
-            # On Push/PR: Parse the changed files JSON
-            CHANGED='${{ steps.changed-files.outputs.all_changed_files }}'
-            if [ "$CHANGED" == "[]" ] || [ -z "$CHANGED" ]; then
+            # On Push/PR: Parse the changed files JSON from the safe environment variable
+            if [ "$ALL_CHANGED_FILES" == "[]" ] || [ -z "$ALL_CHANGED_FILES" ]; then
               MATRIX_JSON="[]"
             else
-              MATRIX_JSON=$(echo "$CHANGED" | jq -c '[.[] | sub("Sensors/official/"; "")]')
+              MATRIX_JSON=$(echo "$ALL_CHANGED_FILES" | jq -c '[.[] | sub("Sensors/official/"; "")]')
             fi
           fi
           
