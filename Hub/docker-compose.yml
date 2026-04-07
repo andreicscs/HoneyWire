@@ -26,6 +26,11 @@ services:
     security_opt: ["no-new-privileges:true"]
     # ------------------------
 
+
+    # Allow sqlite to save tmp files
+    tmpfs:
+      - /tmp
+
     volumes:
       # The database volume remains writable, while the container OS is read-only
       - ./honeywire_data:/data
