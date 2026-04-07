@@ -1,0 +1,32 @@
+services:
+  tcp-tarpit:
+    container_name: hw-tcp-tarpit
+    build:
+      context: ../../..
+      dockerfile: Sensors/official/TcpTarpit-GO/Dockerfile
+    restart: unless-stopped
+    
+    # ---------------------------------------------------------
+    # NETWORKING: Host Mode
+    # ---------------------------------------------------------
+    # Binds directly to the host machine.
+    # 1. Preserves the real Source IP of the attacker.
+    # 2. Automatically exposes ports defined in HW_DECOY_PORTS.
+    network_mode: "host"
+    
+    # ---------------------------------------------------------
+    # SECURITY HARDENING
+    # ---------------------------------------------------------
+    cap_drop:
+      - ALL
+      
+    environment:
+      # Since we are on the host network, use the host's perspective to reach the Hub
+      - HW_HUB_ENDPOINT=http://127.0.0.1:8080 
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_SENSOR_ID=tcp-tarpit-01
+      - HW_TEST_MODE=false
+      
+      - HW_DECOY_PORTS=2222,3306
+      - HW_TARPIT_MODE=hold
+      - HW_TARPIT_BANNER=SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4\r\n

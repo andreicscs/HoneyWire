@@ -6,6 +6,9 @@ services:
       dockerfile: Sensors/official/NetworkScanDetector-GO/Dockerfile
     restart: unless-stopped
     
+    # Binds directly to the host machine to accurately capture true Source IPs
+    network_mode: "host"
+    
     # ---------------------------------------------------------
     # SECURITY HARDENING
     # ---------------------------------------------------------
@@ -15,7 +18,7 @@ services:
       - NET_RAW
     
     environment:
-      - HW_HUB_ENDPOINT=http://172.17.0.1:8080
+      - HW_HUB_ENDPOINT=http://127.0.0.1:8080
       - HW_HUB_KEY=change_this_to_a_secure_random_string
       - HW_SENSOR_ID=scan-detector-01
       - HW_TEST_MODE=false

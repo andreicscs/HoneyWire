@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # 1. THE FIM SETTER: Only runs if the path exists. Simply grants the read-only ACL pass.
   permission-fixer:
@@ -16,6 +18,9 @@ services:
       context: ../../..
       dockerfile: Sensors/official/FileCanary-GO/Dockerfile
     restart: unless-stopped
+    
+    # Ensures uniform communication with a locally hosted Hub
+    network_mode: "host"
     
     depends_on:
       permission-fixer:

@@ -1,4 +1,4 @@
-module github.com/honeywire/sensors/networkscandetector
+module github.com/honeywire/sensors/webrouterdecoy
 
 go 1.25.0
 

@@ -1,9 +1,25 @@
 services:
-  web-router-decoy:
+  web-decoy:
+    container_name: hw-web-decoy
     build:
-      context: ../../../
-      dockerfile: Sensors/official/WebRouterDecoy/Dockerfile
-    container_name: hw-web-router-decoy
+      context: ../../..
+      dockerfile: Sensors/official/WebRouterDecoy-GO/Dockerfile
+    restart: unless-stopped
+    
+    # Binds directly to the host machine to preserve Source IPs
     network_mode: "host"
-    env_file:
-      - .env
+    
+    # SECURITY HARDENING
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+
+    environment:
+      - HW_HUB_ENDPOINT=http://127.0.0.1:8080 
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_SENSOR_ID=production-web-decoy-01
+      - HW_TEST_MODE=false
+      
+      # Web Honeypot Configuration
+      - HW_BIND_PORT=8081
+      - HW_ROUTER_BRAND=Cisco

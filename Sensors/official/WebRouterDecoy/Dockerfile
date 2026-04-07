@@ -1,27 +1,20 @@
-# --- Stage 1: Builder ---
-FROM python:3.11-slim AS builder
-WORKDIR /app
+# STAGE 1: Build
+FROM golang:1.25 AS builder
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY SDKs/go-honeywire ./SDKs/go-honeywire
+COPY Sensors/official/WebRouterDecoy-GO ./Sensors/official/WebRouterDecoy-GO
 
-# 1. Copy the SDK source from the repository root.
-COPY SDKs/python-honeywire /tmp/sdk_src
+WORKDIR /src/Sensors/official/WebRouterDecoy-GO
+RUN go mod download
 
-# 2. Build a wheel for the SDK.
-RUN pip install --no-cache-dir wheel && \
-    pip wheel /tmp/sdk_src --wheel-dir /tmp/wheels
+# Pure Go, fully static binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o web-decoy ./main.go
 
-# 3. Install the wheel and sensor-specific dependencies.
-COPY Sensors/official/WebRouterDecoy/requirements.txt .
-RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
+# STAGE 2: Distroless
+FROM gcr.io/distroless/static-debian12:nonroot
 
-# --- Stage 2: Distroless ---
-FROM gcr.io/distroless/python3-debian12
-WORKDIR /app
-COPY --from=builder /app/lib /app/lib
-COPY Sensors/official/WebRouterDecoy/WebRouterDecoy.py .
+COPY --from=builder /src/Sensors/official/WebRouterDecoy-GO/web-decoy /app/web-decoy
 
-ENV PYTHONPATH="/app/lib"
-ENV PYTHONUNBUFFERED=1
-
-CMD ["WebRouterDecoy.py"]
+USER 65532
+CMD ["/app/web-decoy"]

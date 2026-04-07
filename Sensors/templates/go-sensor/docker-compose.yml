@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  custom-sensor:
+    container_name: hw-custom-sensor
+    build:
+      # Step back to the repo root so Docker can see both the Sensor and the SDK
+      context: ../../..
+      dockerfile: Sensors/custom/MySensor/Dockerfile
+    restart: unless-stopped
+    
+    # Uncomment if you need to capture real Source IPs or bind to host ports
+    # network_mode: "host"
+    
+    # ---------------------------------------------------------
+    # SECURITY HARDENING
+    # ---------------------------------------------------------
+    # Non-root user for the Distroless container
+    user: "65532:65532"
+    
+    # Drops all kernel capabilities for maximum security
+    cap_drop:
+      - ALL
+      
+    # cap_add:
+    #   - NET_RAW # Uncomment ONLY if your Go code requires raw network sockets
+    
+    environment:
+      - HW_HUB_ENDPOINT=http://127.0.0.1:8080
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_SENSOR_ID=custom-sensor-01
+      - HW_TEST_MODE=false
+      - HW_SEVERITY=medium
+      
+      # Custom Variables
+      - HW_CUSTOM_TARGET=/tmp/honey

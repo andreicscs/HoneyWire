@@ -1,3 +1,0 @@
-# requirements.txt
-aiohttp==3.13.3
-requests==2.31.0
