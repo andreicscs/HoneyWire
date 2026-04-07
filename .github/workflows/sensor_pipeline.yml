@@ -137,8 +137,11 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
-          # Updated context to point to the correct folder
-          context: Sensors/official/${{ matrix.sensor }}
+          # FIX 1: Set the context to the root of the repo so it can see the SDKs folder
+          context: . 
+          # FIX 2: Explicitly point to the specific Dockerfile
+          file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
+          
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
