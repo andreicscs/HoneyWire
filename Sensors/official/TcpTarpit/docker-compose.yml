@@ -3,7 +3,7 @@ services:
     container_name: hw-tcp-tarpit
     build:
       context: ../../..
-      dockerfile: Sensors/official/TcpTarpit-GO/Dockerfile
+      dockerfile: Sensors/official/TcpTarpit/Dockerfile
     restart: unless-stopped
     
     # ---------------------------------------------------------

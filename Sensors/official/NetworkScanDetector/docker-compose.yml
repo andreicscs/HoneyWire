@@ -3,7 +3,7 @@ services:
     container_name: hw-scan-detector
     build:
       context: ../../..
-      dockerfile: Sensors/official/NetworkScanDetector-GO/Dockerfile
+      dockerfile: Sensors/official/NetworkScanDetector/Dockerfile
     restart: unless-stopped
     
     # Binds directly to the host machine to accurately capture true Source IPs

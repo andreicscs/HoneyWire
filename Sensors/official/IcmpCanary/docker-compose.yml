@@ -3,7 +3,7 @@ services:
     container_name: hw-icmp-canary
     build:
       context: ../../..
-      dockerfile: Sensors/official/IcmpCanary-GO/Dockerfile
+      dockerfile: Sensors/official/IcmpCanary/Dockerfile
     restart: unless-stopped
     
     # Binds directly to the host machine to capture the true Source IPs

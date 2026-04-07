@@ -16,7 +16,7 @@ services:
     container_name: hw-file-canary
     build:
       context: ../../..
-      dockerfile: Sensors/official/FileCanary-GO/Dockerfile
+      dockerfile: Sensors/official/FileCanary/Dockerfile
     restart: unless-stopped
     
     # Ensures uniform communication with a locally hosted Hub

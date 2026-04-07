@@ -3,7 +3,7 @@ services:
     container_name: hw-web-decoy
     build:
       context: ../../..
-      dockerfile: Sensors/official/WebRouterDecoy-GO/Dockerfile
+      dockerfile: Sensors/official/WebRouterDecoy/Dockerfile
     restart: unless-stopped
     
     # Binds directly to the host machine to preserve Source IPs
