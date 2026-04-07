@@ -1,11 +1,39 @@
 services:
-  file-canary:
-    build:
-      context: ../../../
-      dockerfile: Sensors/official/FileCanary/Dockerfile
-    container_name: hw-file-canary
-    network_mode: "bridge"
-    env_file:
-      - .env
+  # 1. THE FIM SETTER: Only runs if the path exists. Simply grants the read-only ACL pass.
+  permission-fixer:
+    image: alpine:latest
+    command: sh -c "apk add --no-cache acl && setfacl -R -m u:65532:rx /honey_dir"
     volumes:
-      - /home/user/honey_test:/honey_dir:ro
+      # LONG SYNTAX: This forces Docker to throw an error if ${TRAP_PATH} does not exist!
+      - type: bind
+        source: ${TRAP_PATH}
+        target: /honey_dir
+
+  # 2. THE WATCHER
+  file-canary:
+    container_name: hw-file-canary
+    build:
+      context: ../../..
+      dockerfile: Sensors/official/FileCanary-GO/Dockerfile
+    restart: unless-stopped
+    
+    depends_on:
+      permission-fixer:
+        condition: service_completed_successfully
+        
+    user: "65532:65532"
+    
+    environment:
+      - HW_HUB_ENDPOINT=${HW_HUB_ENDPOINT}
+      - HW_HUB_KEY=${HW_HUB_KEY}
+      - HW_SENSOR_ID=${HW_SENSOR_ID}
+      - HW_TEST_MODE=false
+      - HW_HONEY_DIR=/honey_dir
+      - HW_SEVERITY=${HW_SEVERITY}
+
+    volumes:
+      # LONG SYNTAX + READ ONLY
+      - type: bind
+        source: ${TRAP_PATH}
+        target: /honey_dir
+        read_only: true

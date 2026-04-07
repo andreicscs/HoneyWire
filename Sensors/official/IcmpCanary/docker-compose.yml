@@ -1,11 +1,21 @@
 services:
-  ping-canary:
+  icmp-canary:
+    container_name: hw-icmp-canary
     build:
-      context: ../../../
-      dockerfile: Sensors/official/IcmpCanary/Dockerfile
-    container_name: hw-ping-canary
-    network_mode: "host"
+      context: ../../..
+      dockerfile: Sensors/official/IcmpCanary-GO/Dockerfile
+    restart: unless-stopped
+    
+    # ---------------------------------------------------------
+    # SECURITY HARDENING: Principle of Least Privilege
+    # ---------------------------------------------------------
+    cap_drop:
+      - ALL
     cap_add:
       - NET_RAW
-    env_file:
-      - .env
+    
+    environment:
+      - HW_HUB_ENDPOINT=http://172.17.0.1:8080
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_SENSOR_ID=ping-canary-01
+      - HW_TEST_MODE=false

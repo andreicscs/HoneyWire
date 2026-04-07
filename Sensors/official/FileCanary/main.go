@@ -1,0 +1,91 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/honeywire/sdk-go"
+)
+
+func main() {
+	// 1. Initialize the HoneyWire SDK
+	hw := sdk.NewSensor("file_canary")
+	hw.Start() // Syncs version, starts heartbeats, runs tests
+
+	// 2. Setup Sensor-specific logic
+	honeyDir := getEnv("HW_HONEY_DIR", "/honey_dir")
+	if _, err := os.Stat(honeyDir); os.IsNotExist(err) {
+		log.Fatalf("[!] FATAL: Watch directory does not exist: %s", honeyDir)
+	}
+
+	log.Printf("[*] HoneyWire File Canary | Watching %s", honeyDir)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+
+	// 3. The Monitor Loop
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				handleFSEvent(hw, event)
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Printf("[!] Watcher error: %v", err)
+			}
+		}
+	}()
+
+	err = watcher.Add(honeyDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Block main thread forever
+	<-make(chan struct{})
+}
+
+func handleFSEvent(hw *sdk.Sensor, event fsnotify.Event) {
+	var action string
+
+	if event.Has(fsnotify.Write) {
+		action = "File Modified/Encrypted"
+	} else if event.Has(fsnotify.Remove) {
+		action = "File Deleted"
+	} else if event.Has(fsnotify.Rename) {
+		action = "File Moved/Renamed"
+	} else {
+		return
+	}
+
+	// 4. Use the SDK to dispatch the event (no manual HTTP building required!)
+	hw.ReportEvent(
+		"file_tampered",                      // Event Type
+		"critical",                           // Severity
+		map[string]any{                       // Details
+			"action":       action,
+			"timestamp_os": fmt.Sprintf("%d", time.Now().Unix()),
+		},
+		"logged",                             // Action Taken
+		"Unknown (Local OS)",                 // Source
+		event.Name,                           // Target
+	)
+}
+
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
+}

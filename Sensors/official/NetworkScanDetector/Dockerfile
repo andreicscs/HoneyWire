@@ -1,32 +1,18 @@
-# --- Stage 1: Builder ---
-FROM python:3.11-slim AS builder
-WORKDIR /app
+# STAGE 1: Build
+FROM golang:1.25 AS builder
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY SDKs/go-honeywire ./SDKs/go-honeywire
+COPY Sensors/official/NetworkScanDetector-GO ./Sensors/official/NetworkScanDetector-GO
 
-COPY SDKs/python-honeywire /tmp/sdk_src
-RUN pip install --no-cache-dir wheel && \
-    pip wheel /tmp/sdk_src --wheel-dir /tmp/wheels
+WORKDIR /src/Sensors/official/NetworkScanDetector-GO
+RUN go mod download
 
-COPY Sensors/official/NetworkScanDetector/requirements.txt .
-RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o scan-detector ./main.go
 
+# STAGE 2: Distroless
+FROM gcr.io/distroless/static-debian12:latest
 
-# --- Stage 2: Runtime (Debian Slim) ---
-FROM python:3.11-slim
-WORKDIR /app
+COPY --from=builder /src/Sensors/official/NetworkScanDetector-GO/scan-detector /app/scan-detector
 
-# Upgrade to patch known vulnerabilities, then install native libpcap
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y libpcap0.8 && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
-
-COPY --from=builder /app/lib /app/lib
-COPY Sensors/official/NetworkScanDetector/NetworkScanDetector.py .
-
-ENV PYTHONPATH="/app/lib"
-ENV PYTHONUNBUFFERED=1
-
-CMD ["python3", "NetworkScanDetector.py"]
+CMD ["/app/scan-detector"]

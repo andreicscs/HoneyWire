@@ -1,27 +1,28 @@
-# --- Stage 1: Builder ---
-FROM python:3.11-slim AS builder
-WORKDIR /app
+# STAGE 1: Build
+FROM golang:1.25 AS builder
 
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
 
-# 1. Copy the SDK source from the repository root.
-COPY SDKs/python-honeywire /tmp/sdk_src
+# 1. Copy the shared SDK into the builder
+COPY SDKs/go-honeywire ./SDKs/go-honeywire
 
-# 2. Build a wheel for the SDK.
-RUN pip install --no-cache-dir wheel && \
-    pip wheel /tmp/sdk_src --wheel-dir /tmp/wheels
+# 2. Copy the specific sensor code
+COPY Sensors/official/FileCanary-GO ./Sensors/official/FileCanary-GO
 
-# 3. Install the wheel and sensor-specific dependencies.
-COPY Sensors/official/FileCanary/requirements.txt .
-RUN pip install --no-cache-dir --target /app/lib /tmp/wheels/honeywire-*.whl -r requirements.txt
+# 3. Move into the sensor folder to build
+WORKDIR /src/Sensors/official/FileCanary-GO
 
-# --- Stage 2: Distroless ---
-FROM gcr.io/distroless/python3-debian12
-WORKDIR /app
-COPY --from=builder /app/lib /app/lib
-COPY Sensors/official/FileCanary/FileCanary.py .
+# Download dependencies (this will now successfully find the local SDK)
+RUN go mod download
 
-ENV PYTHONPATH="/app/lib"
-ENV PYTHONUNBUFFERED=1
+# Compile the pure Go, fully static binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o file-canary ./main.go
 
-CMD ["FileCanary.py"]
+# STAGE 2: Distroless
+FROM gcr.io/distroless/static-debian12:nonroot
+
+# Create a default mount point with correct nonroot ownership
+COPY --chown=65532:65532 --from=builder /src/Sensors/official/FileCanary-GO/file-canary /app/file-canary
+
+USER 65532
+CMD ["/app/file-canary"]

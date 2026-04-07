@@ -1,11 +1,24 @@
 services:
-  network-scan-detector:
+  scan-detector:
+    container_name: hw-scan-detector
     build:
-      context: ../../../
-      dockerfile: Sensors/official/NetworkScanDetector/Dockerfile
-    container_name: hw-network-scan-detector
-    network_mode: "host"
+      context: ../../..
+      dockerfile: Sensors/official/NetworkScanDetector-GO/Dockerfile
+    restart: unless-stopped
+    
+    # ---------------------------------------------------------
+    # SECURITY HARDENING
+    # ---------------------------------------------------------
+    cap_drop:
+      - ALL
     cap_add:
       - NET_RAW
-    env_file:
-      - .env
+    
+    environment:
+      - HW_HUB_ENDPOINT=http://172.17.0.1:8080
+      - HW_HUB_KEY=change_this_to_a_secure_random_string
+      - HW_SENSOR_ID=scan-detector-01
+      - HW_TEST_MODE=false
+      - HW_SCAN_THRESHOLD=5
+      - HW_SCAN_WINDOW=5
+      - HW_IGNORE_PORTS=80,443
