@@ -33,7 +33,6 @@ jobs:
         with:
           files: Sensors/official/**
           dir_names: true
-          # Depth 3 ensures changes in "Sensors/official/ssh-tarpit/main.go" output "Sensors/official/ssh-tarpit"
           dir_names_max_depth: 3 
           json: true
 
@@ -49,7 +48,6 @@ jobs:
             if [ "$CHANGED" == "[]" ] || [ -z "$CHANGED" ]; then
               MATRIX_JSON="[]"
             else
-              # Strips "Sensors/official/" from the path, leaving just the array of sensor names
               MATRIX_JSON=$(echo "$CHANGED" | jq -c '[.[] | sub("Sensors/official/"; "")]')
             fi
           fi
@@ -75,6 +73,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      security-events: write # REQUIRED FOR CODEQL TO UPLOAD ALERTS
 
     steps:
       - name: Checkout repository
@@ -84,7 +83,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-          # Updated to target the nested directory
           cache-dependency-path: Sensors/official/${{ matrix.sensor }}/go.sum
 
       - name: Run Go Tests
@@ -96,6 +94,30 @@ jobs:
             echo "No go.mod found, skipping native Go tests."
           fi
 
+      # ----------------------------------------------------
+      # CODEQL SAST SCAN
+      # ----------------------------------------------------
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'go'
+
+      - name: Build for CodeQL
+        working-directory: Sensors/official/${{ matrix.sensor }}
+        run: |
+          if [ -f "go.mod" ]; then
+            go build -v ./...
+          fi
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          # Crucial for monorepos: prevents matrix jobs from overwriting each other's alerts
+          category: "/language:go/sensor:${{ matrix.sensor }}"
+
+      # ----------------------------------------------------
+      # TRIVY FILESYSTEM SCA SCAN
+      # ----------------------------------------------------
       - name: Run Trivy FS Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -137,11 +159,8 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: docker/build-push-action@v5
         with:
-          # FIX 1: Set the context to the root of the repo so it can see the SDKs folder
           context: . 
-          # FIX 2: Explicitly point to the specific Dockerfile
           file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
-          
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

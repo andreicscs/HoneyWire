@@ -1,121 +1,97 @@
-# HoneyWire Hub API Reference
+# HoneyWire Hub API Reference (v1.0)
 
-This document describes the HTTP API for the HoneyWire Hub backend.
+This document describes the HTTP API for the HoneyWire Hub Go backend. All API routes are prefixed with `/api/v1`.
 
 ## Authentication
 
-### UI routes
-- Requires an HTTP-only cookie-based session in `hw_auth` with a valid login token.
-- If `DASHBOARD_PASSWORD` is set in the environment, all UI endpoints validate this cookie via the `verify_ui_auth` dependency.
+### UI Routes
+* **Requirement:** An HTTP-only cookie named `hw_auth` containing a valid session token.
+* **Mechanism:** Handled via the `SessionStore`. If `HW_DASHBOARD_PASSWORD` is unset, authentication is bypassed.
 
-### Agent routes
-- Requires the shared secret passed via one of two headers:
-  - `X-Api-Key: <API_SECRET>`
-  - `Authorization: Bearer <API_SECRET>`
-- Validated via the `verify_agent_auth` dependency. Called by sensors for heartbeat and event reporting.
+### Agent/Sensor Routes
+* **Requirement:** The shared secret passed via headers.
+* **Supported Headers:**
+    * `X-Api-Key: <HW_HUB_KEY>`
+    * `Authorization: Bearer <HW_HUB_KEY>`
 
 ---
 
-## System endpoints
+## System Endpoints
 
 ### GET /api/v1/system/state
-- Returns the current armed/disarmed state.
-- Response:
-```json
-{ "is_armed": true }
-```
+Returns the current armed/disarmed state of the Hub.
+* **Response:** `{ "is_armed": true }`
 
 ### PATCH /api/v1/system/state
-- Toggles the system's armed state.
-- Request body:
-```json
-{ "is_armed": false }
-```
-- Response:
-```json
-{ "status": "success", "is_armed": false }
-```
+Toggles the system's armed state. Disarmed systems will still log events but will not trigger push notifications (ntfy/gotify).
+* **Request:** `{ "is_armed": false }`
+* **Response:** `{ "status": "success", "is_armed": false }`
 
 ### GET /api/v1/version
-- Returns the current app version from the `VERSION` file or the `HW_VERSION` environment variable override. *(Note: This endpoint is public and does not require authentication).*
-- Response:
-```json
-{ "version": "1.0.0" }
-```
+Returns the current version of the Hub.
+* **Response:** `{ "version": "1.0.0" }`
 
 ---
 
-## Sensor fleet
+## Sensor Fleet
 
 ### GET /api/v1/sensors
-- Lists registered sensors, their status, and last-seen timestamps.
-- Response example:
+Lists all registered sensors, their health status (Online/Offline), and metadata. A sensor is marked `offline` if its last heartbeat was > 90 seconds ago.
+* **Response Example:**
 ```json
 [
   {
-    "sensor_id": "alpha-node-01",
-    "sensor_type": "tarpit",
-    "last_seen": "2026-04-02 15:25:11",
-    "details": {"version": "1.0.0", "mode": "hold"},
-    "status": "online"
+    "sensor_id": "tarpit-01",
+    "sensor_type": "web_honeypot",
+    "last_seen": "2026-04-07 15:25:11",
+    "metadata": {"version": "1.0.0", "mode": "hold"},
+    "status": "online",
+    "is_silenced": false
   }
 ]
 ```
+
+### PATCH /api/v1/sensors/{sensor_id}/silence
+Silences a specific sensor. Silenced sensors continue to log events to the DB, but will never trigger push notifications regardless of the System Armed state.
+* **Request:** `{ "is_silenced": true }`
+* **Response:** `{ "status": "success", "is_silenced": true }`
+
+### GET /api/v1/uptime
+Returns heatmap data for the Fleet Health dashboard.
+* **Query Params:** `?timeframe=1H|7D|30D` (Default: `30D`)
+* **Response:** Returns an array of sensors with historical "blocks" indicating uptime, degradation, or downtime.
 
 ---
 
 ## Events
 
 ### GET /api/v1/events
-- Returns events in descending chronological order.
-- Example response:
-```json
-[
-  {
-    "contract_version": "1.0.0",
-    "id": 123,
-    "timestamp": "2026-04-02 15:25:12",
-    "sensor_id": "alpha-node-01",
-    "sensor_type": "tarpit",
-    "event_type": "tcp_connection",
-    "severity": "high",
-    "source": "10.0.0.5",
-    "target": "Port 2222",
-    "action_taken": "hold",
-    "details": {"duration_sec": 12.3, "payload_sample": ["..."], "total_lines": 5},
-    "is_read": false
-  }
-]
-```
+Returns a list of events.
+* **Query Params:** `?archived=true` (Default: `false`)
+* **Response:** Array of event objects containing full forensic `details`.
 
 ### PATCH /api/v1/events/read
-- Marks all unread events as read in bulk.
-- Response:
-```json
-{ "status": "success" }
-```
+Marks all unread events as read.
 
 ### PATCH /api/v1/events/{event_id}/read
-- Marks a specific event as read.
-- Response:
-```json
-{ "status": "success" }
-```
+Marks a specific event as read.
+
+### PATCH /api/v1/events/{event_id}/archive
+Archives a specific event. This marks it as read and hides it from the main dashboard view.
+
+### PATCH /api/v1/events/archive-all
+Bulk archives all currently visible (non-archived) events.
 
 ### DELETE /api/v1/events
-- Clears all events in the database.
-- Response:
-```json
-{ "status": "success" }
-```
+Forcefully clears **all** events from the database.
 
 ---
 
-## Agent endpoints
+## Agent Endpoints
 
 ### POST /api/v1/heartbeat
-- Sensors call this every 30 seconds to maintain an "online" status.
-- Request:
+Sensors call this every 30 seconds.
+* **Request:**
 ```json
 {
   "sensor_id": "alpha-node-01",
@@ -123,47 +99,36 @@ This document describes the HTTP API for the HoneyWire Hub backend.
   "metadata": {"version": "1.0.0", "mode": "hold"}
 }
 ```
-- Response:
-```json
-{ "status": "alive" }
-```
 
 ### POST /api/v1/event
-- Sensors report intrusion events here. Triggers background notification tasks if the system is armed.
-- *Note: Extraneous telemetry must be passed in the `details` object to satisfy the Pydantic schema.*
-- Request:
+Sensors report intrusion events here. 
+* **Note:** The Hub performs a **Major Version Check** on the `contract_version`. If the major version mismatches, the Hub returns `426 Upgrade Required`.
+* **Request:**
 ```json
 {
   "contract_version": "1.0.0",
-  "sensor_id": "alpha-node-01",
+  "sensor_id": "node-01",
   "sensor_type": "tarpit",
   "event_type": "tcp_connection",
   "severity": "high",
-  "source": "10.0.0.5",
+  "source": "1.2.3.4",
   "target": "Port 2222",
   "action_taken": "hold",
   "details": {
-    "duration_sec": 12.3,
-    "payload": ["sudo rm -rf /"]
+    "payload": ["user: admin", "pass: 1234"],
+    "any_other_key": "custom_data"
   }
 }
-```
-- Response:
-```json
-{ "status": "success" }
 ```
 
 ---
 
-## UI login flow
+## Dashboard Auth
 
 ### POST /login
-- Authenticates the dashboard user.
-- Request body:
-```json
-{ "password": "my_secure_password" }
-```
-- Response: Returns a JSON `{"status": "ok"}` and sets the HTTP-only `hw_auth` cookie for 30 days.
+Authenticates the UI session.
+* **Request:** `{ "password": "your_password" }`
+* **Response:** Sets an HTTP-only `hw_auth` cookie valid for 30 days.
 
 ### GET /logout
-- Invalidates the current session, deletes the `hw_auth` cookie, and redirects to the login screen.
+Invalidates the session and clears the auth cookie.

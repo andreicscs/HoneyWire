@@ -11,21 +11,46 @@ on:
 
 jobs:
   code-security:
-    name: "🛡️ FS Security Scan"
+    name: "🛡️ Security & SAST Scans"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # REQUIRED FOR CODEQL TO UPLOAD ALERTS
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/go.sum
+
       # TODO: Uncomment this when we write the Fuzz tests!
-      # - name: Set up Go
-      #   uses: actions/setup-go@v5
-      #   with:
-      #     go-version: '1.25'
       # - name: Run Go Tests
       #   working-directory: ${{ env.WORKING_DIR }}
       #   run: go test -v ./...
 
+      # ----------------------------------------------------
+      # CODEQL SAST SCAN
+      # ----------------------------------------------------
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'go'
+
+      - name: Build for CodeQL
+        working-directory: ${{ env.WORKING_DIR }}
+        run: go build -v ./...
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:go/hub"
+
+      # ----------------------------------------------------
+      # TRIVY FILESYSTEM SCA SCAN
+      # ----------------------------------------------------
       - name: Run Trivy Vulnerability Scanner (FS)
         uses: aquasecurity/trivy-action@master
         with:

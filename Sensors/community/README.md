@@ -9,30 +9,31 @@ The power of HoneyWire lies in the **Universal Event Standard**—the architectu
 ## 🛠️ Engineering Resources
 Don't start from a blank repository. We have provided the scaffolding to move your sensor from a conceptual trap to a hardened, deployed container in minutes:
 
-* **[🐍 Python Sensor Template](./../templates/python-sensor/README.md):** The high-velocity starting point, pre-integrated with the HoneyWire SDK.
-* **[📖 Contribution Guide](./../../CONTRIBUTING.md):** **Mandatory reading.** Contains the "Golden Rules" for OCI-compliance, environment parity, and the JSON Contract.
-* **[🔬 Reference Implementation](./../official/TcpTripWire/README.md):** A deep dive into the architecture of our production-grade TCP Tarpit.
+* **[🐹 Go Sensor Template](./../templates/go-sensor-template/README.md):** The high-velocity starting point, natively integrated with the HoneyWire Go SDK and pre-configured for Distroless isolation.
+* **[📖 Contribution Guide](./../../CONTRIBUTING.md):** **Mandatory reading.** Contains the "Golden Rules" for capability stripping, environment parity, and the JSON Contract.
+* **[🔬 Reference Implementation](./../official/TcpTarpit/README.md):** A deep dive into the architecture of our production-grade TCP Tarpit, demonstrating Go routine concurrency and semaphore limits.
 
-> **🛡️ Security Hardening:** We strongly recommend utilizing **Distroless** or **Alpine** base images to minimize the attack surface and reduce the binary footprint of your sensors.
+> **🛡️ Security Standard:** The HoneyWire ecosystem has moved past heavy interpreters. We strongly encourage community submissions to follow our official architecture: **pure Go, statically-linked binaries running as unprivileged users inside `:nonroot` Distroless containers, with all Linux kernel capabilities dropped.**
 
 ---
 
 ## 🛡️ The Security Policy
 To protect our users, every sensor submitted here undergoes a rigorous automated gauntlet before a human maintainer even looks at the code:
 
-1.  **Static Analysis:** CodeQL scans your logic for security vulnerabilities.
+1.  **Static Analysis:** CodeQL scans your Go logic for security vulnerabilities and memory leaks.
 2.  **Container Security:** Trivy scans your `Dockerfile` and base images for known CVEs.
-3.  **Functional Testing:** Our CI/CD spins up your sensor and verifies its "Heartbeat" and "Event" logic against a **Mock Hub**.
+3.  **Functional Testing:** Our CI/CD spins up your sensor with `HW_TEST_MODE=true` and verifies its "Heartbeat" and "Event" logic against a mock network contract.
 
-> **Note:** Community sensors are awesome, but always remember to review the code before deploying them in your own production environment!
+> **Note:** Community sensors expand the ecosystem's detection capabilities significantly, but always remember to review the code and container privileges before deploying them in your own production environment!
 
 ---
 
 ## 🤝 How to Contribute?
 1.  **Fork** the repository.
 2.  **Create** your sensor directory: `Sensors/community/your-sensor-name`.
-3.  **Implement** your logic using the [HoneyWire Python SDK](../../SDKs/python-honeywire).
-4.  **Open a Pull Request**.
+3.  **Implement** your logic using the [HoneyWire Go SDK](../../SDKs/go-honeywire) based on the provided template.
+4.  **Harden** your `docker-compose.yml` to adhere to the principle of least privilege.
+5.  **Open a Pull Request**.
 
 **Join us in building a smarter, faster, and more resilient distributed defense.** 🐝
 
