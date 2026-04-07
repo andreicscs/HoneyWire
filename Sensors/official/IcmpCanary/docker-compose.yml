@@ -1,21 +1,23 @@
 services:
   icmp-canary:
+    image: ghcr.io/andreicscs/honeywire-icmpcanary:latest
     container_name: hw-icmp-canary
     build:
       context: ../../..
       dockerfile: Sensors/official/IcmpCanary/Dockerfile
     restart: unless-stopped
     
-    # Binds directly to the host machine to capture the true Source IPs
+    # Preserves the real Source IP of the attacker.
     network_mode: "host"
-    
-    # ---------------------------------------------------------
-    # SECURITY HARDENING: Principle of Least Privilege
-    # ---------------------------------------------------------
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_RAW
+    # Root user is required by the Linux kernel to utilize NET_RAW for ICMP
+    user: "0:0"
+
+    # --- SECURITY SANDBOX ---
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["NET_RAW"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
     
     environment:
       - HW_HUB_ENDPOINT=http://127.0.0.1:8080

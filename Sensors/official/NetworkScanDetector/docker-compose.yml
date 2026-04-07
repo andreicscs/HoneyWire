@@ -1,27 +1,31 @@
 services:
   scan-detector:
+    image: ghcr.io/andreicscs/honeywire-networkscandetector:latest
     container_name: hw-scan-detector
     build:
       context: ../../..
       dockerfile: Sensors/official/NetworkScanDetector/Dockerfile
     restart: unless-stopped
     
-    # Binds directly to the host machine to accurately capture true Source IPs
+    # Preserves the real Source IP of the attacker.
     network_mode: "host"
-    
-    # ---------------------------------------------------------
-    # SECURITY HARDENING
-    # ---------------------------------------------------------
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_RAW
+    # Root user is required by the kernel to utilize NET_RAW
+    user: "0:0"
+
+    # --- SECURITY SANDBOX ---
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["NET_RAW"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
     
     environment:
       - HW_HUB_ENDPOINT=http://127.0.0.1:8080
       - HW_HUB_KEY=change_this_to_a_secure_random_string
       - HW_SENSOR_ID=scan-detector-01
       - HW_TEST_MODE=false
+
+      # Scan Detector Configuration
       - HW_SCAN_THRESHOLD=5
       - HW_SCAN_WINDOW=5
       - HW_IGNORE_PORTS=80,443

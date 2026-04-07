@@ -7,21 +7,34 @@ services:
     volumes:
       - ./honeywire_data:/data
 
-  # 2. THE HUB: pure Go distroless backend.
+  # 2. THE HUB: Pure Go distroless backend and UI.
   honeywire-hub:
+    image: ghcr.io/andreicscs/honeywire-hub:latest
+    container_name: honeywire-hub
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: honeywire-hub
     restart: unless-stopped
+    
     ports:
       - "${HW_PORT:-8080}:${HW_PORT:-8080}"
+      
+    # --- SECURITY SANDBOX ---
+    user: "65532:65532"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
+
     volumes:
+      # The database volume remains writable, while the container OS is read-only
       - ./honeywire_data:/data
+      
     depends_on:
       # This ensures the Hub waits until the fixer is completely finished
       permission-fixer:
         condition: service_completed_successfully
+        
     environment:
       - HW_PORT=8080
       - HW_DB_PATH=/data/honeywire.db

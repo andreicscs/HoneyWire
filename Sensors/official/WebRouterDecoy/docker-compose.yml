@@ -1,18 +1,22 @@
 services:
   web-decoy:
+    image: ghcr.io/andreicscs/honeywire-webrouterdecoy:latest
     container_name: hw-web-decoy
     build:
       context: ../../..
       dockerfile: Sensors/official/WebRouterDecoy/Dockerfile
     restart: unless-stopped
     
-    # Binds directly to the host machine to preserve Source IPs
+    # Preserves the real Source IP of the attacker.
     network_mode: "host"
-    
-    # SECURITY HARDENING
-    user: "65532:65532"
-    cap_drop:
-      - ALL
+    # Required to bind to low ports
+    user: "0:0"
+
+    # --- SECURITY SANDBOX ---
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
 
     environment:
       - HW_HUB_ENDPOINT=http://127.0.0.1:8080 

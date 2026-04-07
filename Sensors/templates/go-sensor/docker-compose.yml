@@ -1,30 +1,33 @@
-version: '3.8'
-
 services:
   custom-sensor:
+    # Change 'yourusername' and 'mysensor' to match your project
+    image: ghcr.io/yourusername/honeywire-mysensor:latest
     container_name: hw-custom-sensor
     build:
       # Step back to the repo root so Docker can see both the Sensor and the SDK
       context: ../../..
+      # Update this path to match your actual sensor's directory!
       dockerfile: Sensors/custom/MySensor/Dockerfile
     restart: unless-stopped
     
     # Uncomment if you need to capture real Source IPs or bind to host ports
     # network_mode: "host"
     
-    # ---------------------------------------------------------
-    # SECURITY HARDENING
-    # ---------------------------------------------------------
-    # Non-root user for the Distroless container
+    # --- SECURITY SANDBOX ---
     user: "65532:65532"
-    
-    # Drops all kernel capabilities for maximum security
-    cap_drop:
-      - ALL
-      
-    # cap_add:
-    #   - NET_RAW # Uncomment ONLY if your Go code requires raw network sockets
-    
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
+
+    # ⚠️ PRIVILEGE ESCALATION GUIDE
+    # If your sensor requires kernel interactions, uncomment the relevant `cap_add` 
+    # below AND change the user above to "0:0" (Root). The container will remain 
+    # safely isolated via the read_only and no-new-privileges flags.
+    #
+    # cap_add: ["NET_BIND_SERVICE"] # Allows binding to ports under 1024 (e.g., Port 22)
+    # cap_add: ["NET_RAW"]          # Allows raw sockets for packet sniffing (e.g., eBPF/DPI)
+
     environment:
       - HW_HUB_ENDPOINT=http://127.0.0.1:8080
       - HW_HUB_KEY=change_this_to_a_secure_random_string

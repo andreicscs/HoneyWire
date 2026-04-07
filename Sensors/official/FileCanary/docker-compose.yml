@@ -7,12 +7,14 @@ services:
     command: sh -c "apk add --no-cache acl && setfacl -R -m u:65532:rx /honey_dir"
     volumes:
       # LONG SYNTAX: This forces Docker to throw an error if ${TRAP_PATH} does not exist!
+      # Define TRAP_PATH in your .env file (e.g., TRAP_PATH=/opt/fake_secrets)
       - type: bind
         source: ${TRAP_PATH}
         target: /honey_dir
 
   # 2. THE WATCHER
   file-canary:
+    image: ghcr.io/andreicscs/honeywire-filecanary:latest
     container_name: hw-file-canary
     build:
       context: ../../..
@@ -25,14 +27,21 @@ services:
     depends_on:
       permission-fixer:
         condition: service_completed_successfully
-        
+
+    # --- SECURITY SANDBOX ---
     user: "65532:65532"
-    
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    # ------------------------
+
     environment:
       - HW_HUB_ENDPOINT=${HW_HUB_ENDPOINT}
       - HW_HUB_KEY=${HW_HUB_KEY}
       - HW_SENSOR_ID=${HW_SENSOR_ID}
       - HW_TEST_MODE=false
+
+      # File Canary Configuration
       - HW_HONEY_DIR=/honey_dir
       - HW_SEVERITY=${HW_SEVERITY}
 
