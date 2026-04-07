@@ -14,7 +14,7 @@ type Event struct {
 	Source          string                 `json:"source"`
 	Target          string                 `json:"target"`
 	ActionTaken     string                 `json:"action_taken"`
-	Details         map[string]interface{} `json:"details"` // Replaces Python's dict
+	Details         map[string]interface{} `json:"details"`
 	IsRead          bool                   `json:"is_read"`
 	IsArchived      bool                   `json:"is_archived"`
 }

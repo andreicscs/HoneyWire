@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. THE FIXER: Runs as root, fixes permissions, and dies instantly.
   permission-fixer:

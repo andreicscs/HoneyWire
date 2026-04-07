@@ -56,7 +56,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
     "sensor_id": "alpha-node-01",
     "sensor_type": "tarpit",
     "last_seen": "2026-04-02 15:25:11",
-    "metadata": {"version": "1.0.0", "mode": "hold"},
+    "details": {"version": "1.0.0", "mode": "hold"},
     "status": "online"
   }
 ]
@@ -68,7 +68,6 @@ This document describes the HTTP API for the HoneyWire Hub backend.
 
 ### GET /api/v1/events
 - Returns events in descending chronological order.
-- *Note: The sensor's `metadata` payload is returned here under the `details` key based on the database schema.*
 - Example response:
 ```json
 [
@@ -131,7 +130,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
 
 ### POST /api/v1/event
 - Sensors report intrusion events here. Triggers background notification tasks if the system is armed.
-- *Note: Extraneous telemetry must be passed in the `metadata` object to satisfy the Pydantic schema.*
+- *Note: Extraneous telemetry must be passed in the `details` object to satisfy the Pydantic schema.*
 - Request:
 ```json
 {
@@ -143,7 +142,7 @@ This document describes the HTTP API for the HoneyWire Hub backend.
   "source": "10.0.0.5",
   "target": "Port 2222",
   "action_taken": "hold",
-  "metadata": {
+  "details": {
     "duration_sec": 12.3,
     "payload": ["sudo rm -rf /"]
   }

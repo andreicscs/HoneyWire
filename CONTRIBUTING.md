@@ -28,7 +28,7 @@ Your sensor must POST a payload to the Hub (`HW_HUB_ENDPOINT`) matching this exa
   "severity": "critical", 
   "timestamp": "2026-04-03T01:24:18Z",
   "action_taken": "logged",
-  "metadata": {
+  "details": {
     "ip": "192.168.1.5",
     "custom_data": "anything you want"
     .

@@ -40,19 +40,19 @@ class PingCanary(HoneyWireSensor):
         packet_size = len(packet)
         ttl = packet[IP].ttl
 
-        metadata: Dict[str, object] = {
+        details: Dict[str, object] = {
             "packet_size": packet_size,
             "ttl": ttl,
         }
 
         print(f"[+] ICMP Echo Request detected from {source_ip} (size={packet_size}, ttl={ttl})")
-        self._report_ping(source_ip, metadata)
+        self._report_ping(source_ip, details)
 
-    def _report_ping(self, source_ip: str, metadata: Dict) -> None:
+    def _report_ping(self, source_ip: str, details: Dict) -> None:
         self.report_event(
             event_type="icmp_ping_received",
             severity="high",
-            metadata=metadata,
+            details=details,
             action_taken="logged",
             source=source_ip,
             target="ICMP Listener",

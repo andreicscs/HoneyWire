@@ -77,7 +77,7 @@ class WebRouterDecoy(HoneyWireSensor):
             user_agent = request.headers.get("user-agent", "Unknown")
             source_ip = request.client.host if request.client else "Unknown"
 
-            metadata = {
+            details = {
                 "user_agent": user_agent,
                 "attempted_username": username,
                 "attempted_password": password,
@@ -87,7 +87,7 @@ class WebRouterDecoy(HoneyWireSensor):
                 self.report_event,
                 event_type="web_login_attempt",
                 severity="critical",
-                metadata=metadata,
+                details=details,
                 action_taken="logged",
                 source=source_ip,
                 target="Web Interface",

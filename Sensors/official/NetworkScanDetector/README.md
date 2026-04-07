@@ -53,6 +53,6 @@ docker-compose up -d
   "severity": "high",
   "source": "10.0.0.99",
   "target": "Multiple Ports",
-  "metadata": {"ports_hit": [21, 22, 23, 25, 80], "count": 5, "window_sec": 5}
+  "details": {"ports_hit": [21, 22, 23, 25, 80], "count": 5, "window_sec": 5}
 }
 ```

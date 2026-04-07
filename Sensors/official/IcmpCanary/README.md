@@ -50,6 +50,6 @@ docker-compose up -d
   "severity": "high",
   "source": "192.168.1.45",
   "target": "ICMP Listener",
-  "metadata": {"packet_size": 64, "ttl": 64}
+  "details": {"packet_size": 64, "ttl": 64}
 }
 ```

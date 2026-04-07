@@ -30,7 +30,7 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             # 1. Enforce the V1.0 Contract
             required_keys = [
                 "contract_version", "sensor_id", "sensor_type", 
-                "event_type", "severity", "timestamp", "metadata"
+                "event_type", "severity", "timestamp", "details"
             ]
             
             for key in required_keys:

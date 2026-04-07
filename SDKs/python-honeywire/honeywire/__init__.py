@@ -105,7 +105,7 @@ class HoneyWireSensor(ABC):
         self,
         event_type: str,
         severity,
-        metadata: dict,
+        details: dict,
         action_taken: str = "logged",
         source: str = "Unknown",
         target: str = "Unknown",
@@ -123,7 +123,7 @@ class HoneyWireSensor(ABC):
             "action_taken": action_taken,
             "source": source,
             "target": target,
-            "metadata": metadata
+            "details": details
         }
 
         try:
@@ -141,7 +141,7 @@ class HoneyWireSensor(ABC):
         success = self.report_event(
             event_type="test_mode_synthetic_alert",
             severity="info",
-            metadata={"test_message": "Automated CI/CD check."},
+            details={"test_message": "Automated CI/CD check."},
             action_taken="ignored"
         )
         if success:

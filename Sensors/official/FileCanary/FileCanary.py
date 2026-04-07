@@ -21,18 +21,18 @@ class HoneyFileHandler(FileSystemEventHandler):
         self.reporter = reporter
 
     def _report(self, event, action: str, target: str):
-        metadata = {
+        details = {
             "action": action,
             "timestamp_os": str(time.time()),
         }
 
-        self._send_event(target, metadata)
+        self._send_event(target, details)
 
-    def _send_event(self, target: str, metadata: dict):
+    def _send_event(self, target: str, details: dict):
         self.reporter.report_event(
             event_type="file_tampered",
             severity="critical",
-            metadata=metadata,
+            details=details,
             action_taken="logged",
             source="Unknown (Local OS)",
             target=target,

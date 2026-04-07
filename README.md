@@ -56,7 +56,7 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
   "severity": "critical",
   "timestamp": "2026-04-03T11:30:00Z",
   "action_taken": "ip_banned",
-  "metadata": {
+  "details": {
     "source_ip": "104.28.19.12",
     "target": "Auth Gateway",
     "protocol": "TCP",
@@ -70,7 +70,7 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 ```
 > Note: If you build your sensor using the official HoneyWire Python SDK, this JSON formatting and delivery is handled for you automatically!
 
-*The Hub's Alpine.js frontend will automatically translate arrays into syntax-highlighted code blocks and primitive values into clean metadata tags.*
+*The Hub's Alpine.js frontend will automatically translate arrays into syntax-highlighted code blocks and primitive values into clean details tags.*
 
 ---
 

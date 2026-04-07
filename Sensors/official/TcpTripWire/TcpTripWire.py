@@ -115,7 +115,7 @@ class TcpTarpitSensor(HoneyWireSensor):
                 self.report_event,
                 event_type="tcp_connection",
                 severity=self.severity,
-                metadata=event_payload,
+                details=event_payload,
                 action_taken=self.tarpit_mode,
                 source=source_ip,
                 target=f"Port {port}",

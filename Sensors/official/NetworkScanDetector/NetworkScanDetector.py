@@ -89,7 +89,7 @@ class NetworkScanDetector(HoneyWireSensor):
                 self.report_event(
                     event_type="network_scan_detected",
                     severity="high",
-                    metadata={
+                    details={
                         "ports_hit": unique_ports, 
                         "count": len(unique_ports),
                         "window_sec": self.window

@@ -32,7 +32,7 @@ class MyCustomSensor(HoneyWireSensor):
                 print("[!] Attack detected! Gathering forensics...")
                 
                 # Format your specific forensic data
-                metadata = {
+                details = {
                     "source_ip": "192.168.1.100", # Replace with actual data
                     "attack_type": "example_probe",
                     "raw_payload": "GET /etc/passwd HTTP/1.1"
@@ -44,7 +44,7 @@ class MyCustomSensor(HoneyWireSensor):
                     self.report_event,
                     event_type="custom_anomaly_detected",
                     severity=self.severity,
-                    metadata=metadata,
+                    details=details,
                     action_taken="logged"
                 )
                 

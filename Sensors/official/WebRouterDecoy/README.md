@@ -46,7 +46,7 @@ Ensure HW_BIND_PORT=80 in your .env for host mode.
   "severity": "critical",
   "source": "192.168.1.15",
   "target": "Web Interface",
-  "metadata": {
+  "details": {
     "user_agent": "Mozilla/5.0...",
     "attempted_username": "admin",
     "attempted_password": "password123"

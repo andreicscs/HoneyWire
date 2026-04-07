@@ -51,7 +51,7 @@ docker-compose up -d
   "severity": "critical",
   "source": "Unknown (Local OS)",
   "target": "/honey_dir/AWS_Root_Keys.csv",
-  "metadata": {
+  "details": {
     "action": "File Modified/Encrypted",
     "timestamp_os": "1697284411.5"
   }
