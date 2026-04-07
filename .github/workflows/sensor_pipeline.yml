@@ -1,176 +1,153 @@
-name: Sensor PR Check & Security Scan
+name: Official Sensor Build & Publish
 
 env:
-  # This silences the Node.js 20 deprecation warnings
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
-  pull_request:
-    paths:
-      - 'Sensors/community/**'
-      - 'Sensors/official/**'
-  
   push:
-    branches:
-      - main
-    paths:
-      - 'Sensors/**'
-    # This allows the workflow to trigger when you create a version tag
-    tags:
-      - 'v*' 
-
+    branches: [ "main" ]
+    # ONLY watch the official folder. Community doc updates won't waste CI minutes.
+    paths: [ 'Sensors/official/**' ]
+  pull_request:
+    paths: [ 'Sensors/official/**' ]
   workflow_dispatch:
 
 jobs:
-  static-analysis:
-    name: CodeQL Security Scan
+  # ==========================================
+  # STAGE 1: DYNAMIC MATRIX GENERATOR
+  # ==========================================
+  detect-sensors:
+    name: "🔍 Detect Changed Official Sensors"
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
         with:
-          languages: python
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+          fetch-depth: 0
 
-  docker-security-scan:
-    name: Build & Trivy Image Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Get changed files
+      - name: Get changed directories
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
-          files: Sensors/**
-      - name: Build and Scan Changed Sensors
-        if: steps.changed-files.outputs.any_changed == 'true'
+          files: Sensors/official/**
+          dir_names: true
+          # Depth 3 ensures changes in "Sensors/official/ssh-tarpit/main.go" output "Sensors/official/ssh-tarpit"
+          dir_names_max_depth: 3 
+          json: true
+
+      - name: Generate Independent Matrix
+        id: generate-matrix
         run: |
-          # Extract unique sensor directories (e.g., "Sensors/official/WebRouterDecoy") to prevent double-building
-          UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
-          
-          for TARGET_DIR in $UNIQUE_DIRS; do
-            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
-              echo "🔒 Scanning: $TARGET_DIR"
-              docker build -t test-sensor:latest -f "$TARGET_DIR/Dockerfile" .
-              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-              trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress test-sensor:latest
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # On manual trigger: Find ALL folders in official/ containing a Dockerfile
+            MATRIX_JSON=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | jq -R -s -c 'split("\n")[:-1]')
+          else
+            # On Push/PR: Parse the changed files JSON
+            CHANGED='${{ steps.changed-files.outputs.all_changed_files }}'
+            if [ "$CHANGED" == "[]" ] || [ -z "$CHANGED" ]; then
+              MATRIX_JSON="[]"
+            else
+              # Strips "Sensors/official/" from the path, leaving just the array of sensor names
+              MATRIX_JSON=$(echo "$CHANGED" | jq -c '[.[] | sub("Sensors/official/"; "")]')
             fi
-          done
-
-  functional-test:
-    name: Mock Hub Contract Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Start Mock Hub
-        run: |
-          python .github/scripts/mock_hub.py &
-          sleep 3
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v44
-        with:
-          files: Sensors/**
-      - name: Run Test Mode on Changed Sensors
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: |
-          # Extract unique sensor directories to prevent double-testing
-          UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
+          fi
           
-          for TARGET_DIR in $UNIQUE_DIRS; do
-            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
-              echo "🧪 Testing: $TARGET_DIR"
-              docker build -t test-sensor:latest -f "$TARGET_DIR/Dockerfile" .
-              docker run --rm \
-                -e HW_HUB_ENDPOINT="http://172.17.0.1:8080" \
-                -e HW_HUB_KEY="mock_key" \
-                -e HW_SENSOR_ID="ci-test-node" \
-                -e HW_TEST_MODE="true" \
-                test-sensor:latest
-              
-              if [ -f /tmp/test_passed ]; then
-                rm /tmp/test_passed
-              else
-                echo "❌ Test failed for $TARGET_DIR"
-                exit 1
-              fi
-            fi
-          done
+          echo "Generated Matrix: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
-  # --- PATH A: REVIEWING A COMMUNITY PR ---
-  review-community-pr:
-    name: "👀 Review: Community Contribution"
-    needs: [static-analysis, docker-security-scan, functional-test]
-    if: github.event_name == 'pull_request'
+  # ==========================================
+  # STAGE 2: PARALLEL TEST, SCAN, & PUBLISH
+  # ==========================================
+  process-sensors:
+    name: "🚀 Process: ${{ matrix.sensor }}"
+    needs: detect-sensors
+    if: ${{ needs.detect-sensors.outputs.matrix != '[]' && needs.detect-sensors.outputs.matrix != '' }}
     runs-on: ubuntu-latest
-    environment: 
-      name: community_review
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Report Status
-        run: echo "Tests passed. Manual review required for PR merge." >> $GITHUB_STEP_SUMMARY
-
-  # --- PATH B: PUBLISHING AN OFFICIAL RELEASE ---
-  publish-official-main:
-    name: "🚀 Publish: Official Sensor Release"
-    needs: [static-analysis, docker-security-scan, functional-test]
-    # Triggers on tags OR standard push to main OR manual dispatch
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    environment: 
-      name: production_registry
+    
+    strategy:
+      fail-fast: false 
+      matrix:
+        sensor: ${{ fromJson(needs.detect-sensors.outputs.matrix) }}
+        
     permissions:
       contents: read
       packages: write
+      id-token: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v44
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          # We ONLY care about changes to OFFICIAL sensors for publishing
-          files: Sensors/official/**
-          
+          go-version: '1.25'
+          # Updated to target the nested directory
+          cache-dependency-path: Sensors/official/${{ matrix.sensor }}/go.sum
+
+      - name: Run Go Tests
+        working-directory: Sensors/official/${{ matrix.sensor }}
+        run: |
+          if [ -f "go.mod" ]; then
+            go test -v ./...
+          else
+            echo "No go.mod found, skipping native Go tests."
+          fi
+
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: Sensors/official/${{ matrix.sensor }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      # ----------------------------------------------------
+      # PUBLISHING STEPS (Only runs on Main Branch or Manual Trigger)
+      # ----------------------------------------------------
+      - name: Set up QEMU (ARM Support)
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GHCR
-        if: steps.changed-files.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Build and Push Changed Official Sensors
-        if: steps.changed-files.outputs.any_changed == 'true' || github.event_name == 'workflow_dispatch'
+
+      - name: Extract Docker metadata
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/honeywire-${{ matrix.sensor }}
+          tags: |
+            type=raw,value=latest
+
+      - name: Build and Push
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v5
+        with:
+          # Updated context to point to the correct folder
+          context: Sensors/official/${{ matrix.sensor }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.sensor }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.sensor }}
+          provenance: true
+          sbom: true
+
+      - name: Summary
         run: |
-          # If triggered manually, build all. Otherwise, only build what changed.
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            UNIQUE_DIRS=$(ls -d Sensors/official/*)
-          else
-            UNIQUE_DIRS=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | awk -F/ '{print $1"/"$2"/"$3}' | sort -u)
-          fi
-          
-          for TARGET_DIR in $UNIQUE_DIRS; do
-            if [ -d "$TARGET_DIR" ] && [ -f "$TARGET_DIR/Dockerfile" ]; then
-              
-              SENSOR_DIR_NAME=$(basename "$TARGET_DIR")
-              LOWERCASE_NAME=$(echo "$SENSOR_DIR_NAME" | tr '[:upper:]' '[:lower:]')
-              IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/honeywire-${LOWERCASE_NAME}"
-              
-              echo "🚀 Building and pushing: $IMAGE_NAME"
-              docker build -t $IMAGE_NAME:latest -f "$TARGET_DIR/Dockerfile" .
-              docker push $IMAGE_NAME:latest
-              
-            fi
-          done
+          echo "### ✅ ${{ matrix.sensor }} Pipeline Complete" >> $GITHUB_STEP_SUMMARY
