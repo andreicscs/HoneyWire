@@ -2,17 +2,17 @@
   [![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
 
 ## 📋 Table of Contents
-- [Overview](#-honeywire)
+- [Overview](#honeywire)
 - [Screenshots](#screenshots)
 - [The Universal Event Standard](#-the-universal-event-standard-bring-your-own-sensor)
-- [Features](#-features)
-- [Architecture](#-architecture)
+- [Features](#features)
+- [Architecture](#architecture)
 - [Quick Start Guide](#-quick-start-guide)
 - [Testing the Trap](#-testing-the-trap)
-- [Security Notes](#-security-notes)
-- [Tech Stack](#-tech-stack)
-- [Versioning and API Reference](#-versioning-and-api-reference)
-- [Operational Checklist](#-operational-checklist)
+- [Security Notes](#security-notes)
+- [Tech Stack](#tech-stack)
+- [Versioning and API Reference](#versioning-and-api-reference)
+- [Operational Checklist](#operational-checklist)
 
 ---
 
