@@ -1,7 +1,108 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+  import { ref, onMounted } from 'vue'
+  import Sidebar from './components/Sidebar.vue'
+  import Header from './components/Header.vue'
+  import Dashboard from './views/Dashboard.vue'
+  import Login from './views/Login.vue'
+  import { useSentinel } from './api/useSentinel'
+
+  // Import our central brain!
+  const { 
+    version, 
+    isArmed, 
+    unreadCount, 
+    viewingArchive, 
+    startPolling, 
+    toggleArmed, 
+    markAllRead 
+  } = useSentinel()
+
+  const isAuthenticated = ref(false)
+  const currentView = ref('dashboard')
+  const sidebarOpen = ref(true)
+ 
+  const checkAuthAndInit = async () => {
+    try {
+        const res = await fetch('/api/v1/system/state')
+        if (res.ok) {
+            isAuthenticated.value = true
+            startPolling()
+        }
+    } catch (e) {
+        // Not authenticated, leave at false
+    }
+  }
+  
+  const toggleTheme = () => {
+      if (document.documentElement.classList.contains('dark')) {
+          document.documentElement.classList.remove('dark')
+          localStorage.setItem('theme', 'light')
+      } else {
+          document.documentElement.classList.add('dark')
+          localStorage.setItem('theme', 'dark')
+      }
+  }
+
+  const clearLogs = () => {
+      if (confirm("Confirm Database Purge? This will permanently delete all event logs.")) {
+          console.log("Logs Purged!") 
+      }
+  }
+
+  onMounted(() => {
+      checkAuthAndInit()
+      
+      if (localStorage.getItem('theme') === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.remove('dark')
+      } else {
+          document.documentElement.classList.add('dark')
+      }
+  })
 </script>
 
 <template>
-  <HelloWorld />
+  <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
+    <Login @login-success="checkAuthAndInit" /> 
+  </div>
+
+  <div v-else class="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
+    
+    <Sidebar 
+      :isOpen="sidebarOpen" 
+      :currentView="currentView" 
+      :version="version" 
+      :viewingArchive="viewingArchive"
+      @change-view="v => currentView = v" 
+      @toggle-archive="viewingArchive = !viewingArchive" 
+      @clear-logs="clearLogs" 
+    />
+
+    <main class="flex-1 flex flex-col min-w-0 bg-grid">
+      
+      <Header 
+        :currentView="currentView" 
+        :isArmed="isArmed" 
+        :unreadCount="unreadCount" 
+        @toggle-sidebar="sidebarOpen = !sidebarOpen" 
+        @toggle-theme="toggleTheme" 
+        @toggle-armed="isArmed = !isArmed" 
+      />
+      
+      <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
+        
+        <div v-if="currentView === 'dashboard'">
+          <Dashboard /> 
+        </div>
+
+        <div v-else-if="currentView === 'store'">
+          <h1 class="text-xl font-bold">Sensor Store Placeholder</h1>
+        </div>
+
+        <div v-else-if="currentView === 'settings'">
+          <h1 class="text-xl font-bold">Settings Placeholder</h1>
+        </div>
+
+      </div>
+    </main>
+  </div>
 </template>
