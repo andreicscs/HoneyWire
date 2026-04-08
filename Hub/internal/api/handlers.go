@@ -332,7 +332,16 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 
             timeLabel := "Current"
             if i > 0 {
-                timeLabel = fmt.Sprintf("%d ago", i)
+                switch timeframe {
+                case "1H":
+                    timeLabel = fmt.Sprintf("%d mins ago", i)
+                case "24H":
+                    timeLabel = fmt.Sprintf("%d hours ago", i)
+                case "7D", "30D":
+                    timeLabel = fmt.Sprintf("%d days ago", i)
+                default:
+                    timeLabel = fmt.Sprintf("%d ago", i)
+                }
             }
 
             status, label := "", ""
