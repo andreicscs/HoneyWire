@@ -6,7 +6,6 @@
   import Login from './views/Login.vue'
   import { useSentinel } from './api/useSentinel'
 
-  // Import our central brain!
   const { 
     version, 
     isArmed, 
@@ -34,35 +33,39 @@
   }
   
   const toggleTheme = () => {
-      if (document.documentElement.classList.contains('dark')) {
-          document.documentElement.classList.remove('dark')
-          localStorage.setItem('theme', 'light')
-      } else {
-          document.documentElement.classList.add('dark')
-          localStorage.setItem('theme', 'dark')
-      }
+    const html = document.documentElement
+    if (html.classList.contains('dark')) {
+        html.classList.remove('dark')
+        localStorage.setItem('theme', 'light')
+    } else {
+        html.classList.add('dark')
+        localStorage.setItem('theme', 'dark')
+    }
   }
 
   const clearLogs = () => {
-      if (confirm("Confirm Database Purge? This will permanently delete all event logs.")) {
-          console.log("Logs Purged!") 
-      }
+    if (confirm("Confirm Database Purge? This will permanently delete all event logs.")) {
+        console.log("Logs Purged!") 
+    }
   }
 
   onMounted(() => {
-      checkAuthAndInit()
-      
-      if (localStorage.getItem('theme') === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          document.documentElement.classList.remove('dark')
-      } else {
-          document.documentElement.classList.add('dark')
-      }
+    checkAuthAndInit()
+    
+    if (localStorage.getItem('theme') === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.remove('dark')
+    } else {
+        document.documentElement.classList.add('dark')
+    }
   })
 </script>
 
 <template>
   <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
-    <Login @login-success="checkAuthAndInit" /> 
+    <Login 
+      @login-success="checkAuthAndInit" 
+      @toggle-theme="toggleTheme"
+    /> 
   </div>
 
   <div v-else class="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
@@ -75,6 +78,7 @@
       @change-view="v => currentView = v" 
       @toggle-archive="viewingArchive = !viewingArchive" 
       @clear-logs="clearLogs" 
+      @toggle-sidebar="sidebarOpen = !sidebarOpen" 
     />
 
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
@@ -83,9 +87,9 @@
         :currentView="currentView" 
         :isArmed="isArmed" 
         :unreadCount="unreadCount" 
-        @toggle-sidebar="sidebarOpen = !sidebarOpen" 
         @toggle-theme="toggleTheme" 
-        @toggle-armed="isArmed = !isArmed" 
+        @toggle-armed="toggleArmed" 
+        @mark-all-read="markAllRead" 
       />
       
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">

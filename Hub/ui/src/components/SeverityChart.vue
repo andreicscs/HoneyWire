@@ -6,11 +6,10 @@ const props = defineProps({
     events: { type: Array, required: true }
 })
 
-// Vue reference to the actual <canvas> element in the template
 const chartCanvas = ref(null)
 let chartInstance = null
+let themeObserver = null
 
-// --- Chart.js Custom Neon Glow Plugin (From Monolith) ---
 const neonGlowPlugin = {
     id: 'neonGlow',
     beforeDatasetsDraw(chart) {
@@ -31,10 +30,8 @@ const neonGlowPlugin = {
 
 Chart.register(neonGlowPlugin)
 
-// --- Logic to Update the Chart Data ---
 const updateChart = () => {
     if (!chartInstance) return;
-    
     const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
     props.events.forEach(e => {
         const s = e.severity ? e.severity.toLowerCase() : 'info';
@@ -42,15 +39,12 @@ const updateChart = () => {
     });
     
     const newData = ['critical', 'high', 'medium', 'low', 'info'].map(k => counts[k]);
-    
-    // Only trigger a chart re-render if the actual numbers changed
     if (JSON.stringify(chartInstance.data.datasets[0].data) !== JSON.stringify(newData)) {
         chartInstance.data.datasets[0].data = newData;
         chartInstance.update();
     }
 }
 
-// --- Lifecycle Hooks ---
 onMounted(() => {
     if (chartCanvas.value) {
         chartInstance = new Chart(chartCanvas.value, {
@@ -71,31 +65,47 @@ onMounted(() => {
                 plugins: { legend: { display: false } } 
             }
         });
-        // Initial populate
         updateChart();
     }
+
+    themeObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class' && chartInstance) {
+                chartInstance.update(); 
+            }
+        });
+    });
+    themeObserver.observe(document.documentElement, { attributes: true });
 })
 
-// Watch the events prop for changes and update chart automatically
 watch(() => props.events, updateChart, { deep: true })
-
-// Clean up memory when changing views
 onUnmounted(() => {
     if (chartInstance) chartInstance.destroy()
+    if (themeObserver) themeObserver.disconnect()
 })
 </script>
 
 <template>
-    <div class="bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-5 flex flex-col backdrop-blur-sm h-full w-full">
+    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-5 flex flex-col shadow-sm h-full w-full">
         <h3 class="text-sm font-semibold mb-4 text-slate-800 dark:text-zinc-200">Severity Distribution</h3>
         
-        <div class="flex-1 relative min-h-[220px]">
+        <div class="flex-1 relative min-h-[160px]">
             <canvas ref="chartCanvas"></canvas>
-            
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span class="text-3xl font-bold text-slate-900 dark:text-zinc-100">{{ events.length }}</span>
+                <span class="text-3xl font-bold transition-colors"
+                      :class="events.length === 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-500'">
+                    {{ events.length }}
+                </span>
                 <span class="text-xs font-medium text-slate-500 dark:text-zinc-500">Events</span>
             </div>
+        </div>
+
+        <div class="mt-4 flex justify-center gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0">
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#f43f5e]"></span>Crit</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#fb923c]"></span>High</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#eab308]"></span>Med</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#3b82f6]"></span>Low</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#64748b]"></span>Info</div>
         </div>
     </div>
 </template>
