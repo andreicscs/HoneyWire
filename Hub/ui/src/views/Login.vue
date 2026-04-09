@@ -46,7 +46,7 @@ const doLogin = async () => {
             </button>
         </div>
 
-        <div class="w-full max-w-[400px] space-y-8 z-10">
+        <div class="w-full max-w-100 space-y-8 z-10">
             <div class="flex flex-col items-center">
                 <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800/80 shadow-sm mb-5 p-3">
                     <svg class="w-full h-full text-slate-900 dark:text-white fill-current shrink-0" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
