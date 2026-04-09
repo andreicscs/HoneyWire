@@ -192,24 +192,34 @@ const formatTime = (timestamp) => {
                         <tr v-if="expandedRows.has(event.id)" :id="'details-' + event.id">
                             <td :colspan="viewingArchive ? 7 : 8" class="p-0 border-b border-slate-300 dark:border-zinc-950 bg-slate-50 dark:bg-[#18181b]">
                                 <div class="pl-11 pr-5 pb-5 pt-2">
-                                    <div class="px-6 py-6 bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800/80 rounded-lg shadow-sm" :style="{ borderLeft: `4px solid ${getSeverityColor(event.severity)}` }">
+                                    <div class="px-6 py-5 bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800/80 rounded-lg shadow-sm relative overflow-hidden">
                                         
-                                        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                            <div v-for="(val, key) in event.details" :key="key" class="w-full">
-                                                <span class="text-[11px] font-semibold text-slate-500 dark:text-zinc-500 uppercase tracking-wide block mb-1.5">{{ formatString(key) }}</span>
+                                        <div class="absolute left-0 top-0 bottom-0 w-1" :style="{ backgroundColor: getSeverityColor(event.severity) }"></div>
+
+
+                                        
+                                        <div class="flex flex-wrap gap-x-8 gap-y-6">
+                                            <div v-for="(val, key) in event.details" :key="key" class="flex flex-col group max-w-full">
                                                 
-                                                <div v-if="Array.isArray(val)" class="space-y-1.5">
-                                                    <pre v-for="(item, index) in val.slice(0, 5)" :key="index"
-                                                         class="bg-slate-50 dark:bg-[#151518] border border-slate-200 dark:border-zinc-800 rounded p-2.5 text-xs text-emerald-700 dark:text-emerald-400 mono overflow-x-auto custom-scroll whitespace-pre-wrap break-all shadow-sm">{{ formatJson(item) }}</pre>
-                                                    <div v-show="val.length > 5" class="text-[10px] text-slate-500 dark:text-zinc-500 font-medium pt-1">+ {{ val.length - 5 }} items truncated</div>
+                                                <div class="flex items-center gap-1.5 mb-1.5">
+                                                    <span class="w-1 h-1 rounded-full bg-slate-300 dark:bg-zinc-600 transition-colors group-hover:bg-blue-500 dark:group-hover:bg-slate-100 shrink-0"></span>
+                                                    <span class="text-[10px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-widest truncate">{{ formatString(key) }}</span>
                                                 </div>
                                                 
-                                                <div v-else class="text-xs text-slate-800 dark:text-zinc-300 mono break-all bg-slate-50 dark:bg-[#151518] border border-slate-200 dark:border-zinc-800 p-2.5 rounded whitespace-pre-wrap max-h-40 overflow-y-auto custom-scroll shadow-sm">{{ formatJson(val) }}</div>
+                                                <div v-if="Array.isArray(val)" class="space-y-1.5 w-fit min-w-[150px] max-w-full">
+                                                    <pre v-for="(item, index) in val.slice(0, 5)" :key="index"
+                                                         class="bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800/60 rounded p-2.5 text-[11px] text-emerald-700 dark:text-emerald-400 mono overflow-x-auto custom-scroll whitespace-pre-wrap break-all shadow-inner w-fit min-w-[150px] max-w-full">{{ formatJson(item) }}</pre>
+                                                    <div v-show="val.length > 5" class="text-[10px] text-slate-400 dark:text-zinc-600 font-medium pt-1 italic">+ {{ val.length - 5 }} items truncated</div>
+                                                </div>
+                                                
+                                                <div v-else class="text-[11px] text-slate-800 dark:text-zinc-300 mono break-all bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-zinc-800/60 p-2.5 rounded whitespace-pre-wrap max-h-40 overflow-y-auto custom-scroll shadow-inner w-fit min-w-[150px] max-w-[600px] xl:max-w-[800px]">{{ formatJson(val) }}</div>
                                             </div>
                                         </div>
                                         
-                                        <div class="mt-5 pt-3 border-t border-slate-200 dark:border-zinc-800 flex justify-between items-center text-[10px] text-slate-400 dark:text-zinc-500 mono">
-                                            <span>Trace ID: {{ event.id }}</span>
+                                        <div class="mt-5 pt-3 border-t border-slate-100 dark:border-zinc-800/50 flex justify-between items-center text-[10px] text-slate-400 dark:text-zinc-500 mono">
+                                            <div class="flex items-center gap-2">
+                                                <span>Trace ID: {{ event.id }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

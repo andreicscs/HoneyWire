@@ -1,24 +1,49 @@
-# Logs
-logs
-*.log
+# =========================
+# Secrets and Config
+# =========================
+.env
+**/.env
+# (Note: We do NOT ignore .env.example so users have a template)
+
+# =========================
+# Database
+# =========================
+*.db
+*.sqlite3
+
+# =========================
+# Node & UI Build
+# =========================
+node_modules/
+ui/dist/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# =========================
+# Go & Binaries
+# =========================
+honeywire-hub
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# =========================
+# Python (If you use mock_data.py scripts)
+# =========================
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+build/
+dist/
+
+# =========================
+# OS & IDE Clutter
+# =========================
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+.vscode/
+
+# (Notice: .dockerignore is intentionally NOT here. It must be tracked by Git!)
