@@ -39,6 +39,7 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 		r.Patch("/api/v1/events/{event_id}/archive", h.ArchiveEvent)
 		r.Patch("/api/v1/events/archive-all", h.ArchiveAll)
 		r.Patch("/api/v1/sensors/{sensor_id}/silence", h.ToggleSilence)
+		r.Delete("/api/v1/sensors/{sensor_id}", h.ForgetSensor)
 	})
 
 	// Sensor Endpoints (Protected by API Key)

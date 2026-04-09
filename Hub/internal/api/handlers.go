@@ -287,9 +287,13 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
     cutoffStr := cutoff.Format("2006-01-02 15:04:05")
 
     // 1. Get all sensors
-    sensorRows, _ := h.Store.DB.Query("SELECT sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY sensor_id", now.Format("2006-01-02 15:04:05"))
-    defer sensorRows.Close()
-
+    sensorRows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY sensor_id", now.Format("2006-01-02 15:04:05"))
+    if err != nil {
+        http.Error(w, "Database error fetching sensors", http.StatusInternalServerError)
+        return
+    }
+	defer sensorRows.Close()
+	
     type SensorData struct {
         ID        string
         LastSeen  time.Time
@@ -308,7 +312,11 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
     }
 
     // 2. Get heartbeats
-    hbRows, _ := h.Store.DB.Query("SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+    hbRows, err := h.Store.DB.Query("SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+	if err != nil {
+        http.Error(w, "Database error fetching heartbeats", http.StatusInternalServerError)
+        return
+    }
     defer hbRows.Close()
     for hbRows.Next() {
         var sID, tBucket string
@@ -465,6 +473,32 @@ func (h *Handler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 	h.Store.DB.Exec("DELETE FROM events")
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// DELETE /api/v1/sensors/{sensor_id}
+func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
+    sensorID := chi.URLParam(r, "sensor_id")
+    
+    // Explicitly delete the sensor. Historical events remain intact for auditing,
+    // but the sensor configuration and heatbeats will be wiped from active monitoring.
+    h.Store.DB.Exec("DELETE FROM sensor_heartbeats WHERE sensor_id = ?", sensorID)
+    
+    result, err := h.Store.DB.Exec("DELETE FROM sensors WHERE sensor_id = ?", sensorID)
+    if err != nil {
+        http.Error(w, "Database error while deleting sensor", http.StatusInternalServerError)
+        return
+    }
+
+    rowsAffected, _ := result.RowsAffected()
+    if rowsAffected == 0 {
+        http.Error(w, "Sensor not found", http.StatusNotFound)
+        return
+    }
+
+    SendJSON(w, http.StatusOK, map[string]string{
+        "status":  "success",
+        "message": "Sensor forgotten successfully",
+    })
 }
 
 // --- Auth & UI Handlers ---
