@@ -9,7 +9,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read'])
 </script>
 
 <template>
-    <header class="h-14 bg-slate-50/90 dark:bg-zinc-950/90 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between px-4 sm:px-6 shrink-0 backdrop-blur-sm">
+    <header class="h-14 bg-slate-50 dark:bg-zinc-950/90 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between px-4 sm:px-6 shrink-0 backdrop-blur-sm">
         
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2 pr-4 mr-2 border-r border-slate-200 dark:border-zinc-700">
@@ -18,7 +18,6 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read'])
                 <span class="text-sm font-bold text-slate-800 dark:text-white leading-none tracking-wide">HoneyWire</span>
             </div>
             
-            <div class="h-4 w-px bg-slate-300 dark:bg-zinc-700 mx-1 hidden sm:block"></div>
             <h2 class="text-sm font-semibold text-slate-500 dark:text-zinc-400 capitalize hidden sm:block">{{ currentView.replace('-', ' ') }}</h2>
         </div>
         

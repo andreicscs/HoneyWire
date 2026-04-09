@@ -33,7 +33,7 @@ button {
 .custom-scroll::-webkit-scrollbar { height: 14px; width: 14px; }
 .custom-scroll::-webkit-scrollbar-track { background: transparent; }
 .custom-scroll::-webkit-scrollbar-thumb { 
-    background-color: #cbd5e1; 
+    background-color: #989fa8; 
     border-radius: 10px; 
     border: 4px solid transparent; 
     background-clip: padding-box; 

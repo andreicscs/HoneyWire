@@ -96,7 +96,7 @@ const formatTime = (timestamp) => {
 <template>
     <div class="bg-white dark:bg-[#0f0f11] border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden flex flex-col shadow-sm w-full relative z-0">
         
-        <div class="px-5 py-3 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center bg-slate-50 dark:bg-[#151518] shrink-0">
+        <div class="px-5 py-3 border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-[#151518] shrink-0">
             <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-200">
                 {{ viewingArchive ? 'Archived Events' : 'Active Threat Queue' }}
             </h3>
@@ -158,11 +158,11 @@ const formatTime = (timestamp) => {
                     
                     <template v-for="event in sortedEvents" :key="event.id">
                         <tr class="hover:bg-slate-50 dark:hover:bg-[#18181b] cursor-pointer transition-colors relative z-0 group"
-                            :class="[ 'bleed-' + event.severity, expandedRows.has(event.id) ? 'bg-slate-50 dark:bg-[#18181b]' : '' ]"
+                            :class="[ 'bleed-' + event.severity, expandedRows.has(event.id) ? 'bg-white dark:bg-[#18181b]' : '' ]"
                             @click="toggleRow(event.id)">
                             
                             <td class="px-3 py-3 border-l-[3px] text-slate-400 dark:text-zinc-500 transition-all duration-200" 
-                                :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-200 dark:border-zinc-800/50'"
+                                :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-300 dark:border-zinc-800/50'"
                                 :style="{ borderLeftColor: getSeverityColor(event.severity) }">
                                 <svg class="w-4 h-4 transition-transform duration-200" :class="expandedRows.has(event.id) ? 'rotate-90 text-slate-600 dark:text-zinc-300' : 'group-hover:text-slate-600 dark:group-hover:text-zinc-300'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </td>

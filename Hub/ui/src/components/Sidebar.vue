@@ -59,30 +59,25 @@ defineEmits(['change-view', 'toggle-archive', 'clear-logs', 'toggle-sidebar'])
         </nav>
 
         <div class="p-3 border-t border-slate-200 dark:border-zinc-800 shrink-0 space-y-2">
-            
             <button @click="$emit('toggle-archive')" 
-                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs font-semibold transition-colors border"
-                    :class="viewingArchive ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 shadow-sm' : 'text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 border-slate-300 dark:border-zinc-700'"
-                    :title="!isOpen ? (viewingArchive ? 'Active Events' : 'Event Archive') : ''">
+                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs font-bold transition-colors border"
+                    :class="viewingArchive ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 shadow-sm' : 'text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 border-slate-300 dark:border-zinc-700'">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
-                
                 <div class="overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap flex items-center"
-                     :class="isOpen ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'">
+                    :class="isOpen ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'">
                     <span>{{ viewingArchive ? 'Active Events' : 'Event Archive' }}</span>
                 </div>
             </button>
 
             <button @click="$emit('clear-logs')" 
-                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 dark:text-rose-400 dark:bg-rose-900/20 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/30 transition-colors"
+                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs font-bold text-rose-800 bg-rose-100 hover:bg-rose-200 dark:text-rose-400 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 border border-rose-300 dark:border-rose-500/30 transition-colors shadow-sm"
                     :title="!isOpen ? 'Purge Logs' : ''">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                
                 <div class="overflow-hidden transition-all duration-300 ease-in-out whitespace-nowrap flex items-center"
-                     :class="isOpen ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'">
+                    :class="isOpen ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'">
                     <span>Purge System Logs</span>
                 </div>
             </button>
-
         </div>
     </aside>
 </template>

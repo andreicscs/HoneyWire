@@ -91,7 +91,7 @@ const isSilenced = (sensorId) => {
 
                     <div class="flex-1 flex justify-end gap-[2px] overflow-hidden flex-nowrap pl-2">
                         <div v-for="(block, i) in sensor.blocks" :key="i"
-                             class="flex-1 max-w-[8px] min-h-5 min-w-[2px] h-4 rounded-[1px] transition-opacity hover:opacity-70 cursor-pointer"
+                             class="flex-1 max-w-[8px] min-h-5 min-w-[2px] h-4 rounded-[2px] transition-opacity hover:opacity-70 cursor-pointer"
                              :class="{'bg-emerald-500': block.status === 'up', 'bg-rose-500': block.status === 'down', 'bg-amber-500': block.status === 'degraded', 'bg-slate-200 dark:bg-zinc-800': block.status === 'nodata'}"
                              :title="`${block.timeLabel} - ${block.label}`">
                         </div>
@@ -103,10 +103,10 @@ const isSilenced = (sensorId) => {
                 <transition enter-active-class="transition-all duration-300 ease-out" enter-from-class="opacity-0 translate-y-4 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100" leave-active-class="transition-all duration-200 ease-in" leave-from-class="opacity-100 translate-y-0 scale-100" leave-to-class="opacity-0 translate-y-4 scale-95">
                     <div v-show="canScrollDown && uptimeData.some(s => s.blocks.some(b => b.status === 'down' || b.status === 'degraded'))" 
                         @click="scrollToBottom"
-                        class="pointer-events-auto relative cursor-pointer group active:scale-95 transition-transform duration-150 drop-shadow-[0_4px_12px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
-                        <div class="animate-bounce-subtle relative bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 py-2 px-2.5 rounded-full flex justify-center items-center transition-colors duration-200 group-hover:bg-slate-50 dark:group-hover:bg-zinc-700/90 z-10">
+                        class="pointer-events-auto relative cursor-pointer group active:scale-95 transition-transform duration-150 drop-shadow-[0_4px_12px_rgba(0,0,0,0.09)] dark:drop-shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
+                        <div class="animate-bounce-subtle relative bg-white dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 py-2 px-2.5 rounded-full flex justify-center items-center transition-colors duration-200 group-hover:bg-slate-50 dark:group-hover:bg-zinc-700/90 z-10">
                             <div class="w-1.5 z-1 h-3 rounded-[1px]" :class="[(uptimeData.some(s => s.blocks.some(b => b.status === 'down')) ? 'bg-rose-500' : 'bg-amber-500'), { 'animate-pulse': canScrollDown }]"></div>
-                            <div class="absolute z-0 -bottom-[4px] left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white dark:bg-zinc-800 border-r border-b border-slate-200 dark:border-zinc-700 rotate-45 rounded-[1px] transition-colors duration-200 group-hover:bg-slate-50 dark:group-hover:bg-zinc-700/90"></div>
+                            <div class="absolute z-0 -bottom-[4px] left-1/2 transform -translate-x-1/2 w-3 h-3 bg-white dark:bg-zinc-800 border-r border-b border-slate-300 dark:border-zinc-700 rotate-45 rounded-[1px] transition-colors duration-200 group-hover:bg-slate-50 dark:group-hover:bg-zinc-700/90"></div>
                         </div>
                     </div>
                 </transition>

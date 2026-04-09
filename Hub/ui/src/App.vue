@@ -68,7 +68,7 @@
     /> 
   </div>
 
-  <div v-else class="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
+  <div v-else class="flex h-screen overflow-hidden bg-slate-200/60 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
     
     <Sidebar 
       :isOpen="sidebarOpen" 
