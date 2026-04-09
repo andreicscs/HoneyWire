@@ -14,7 +14,6 @@ import (
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/store"
 	"github.com/honeywire/hub/internal/auth"
-	"github.com/honeywire/hub/web"
 )
 
 // Handler holds our dependencies so our API endpoints can access the database
@@ -551,20 +550,3 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
-
-func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	isAuthenticated := false
-	if cookie, err := r.Cookie(auth.CookieName); err == nil {
-		isAuthenticated = h.SessionStore.IsValid(cookie.Value)
-	}
-
-	if h.Cfg.DashboardPassword == "" || isAuthenticated {
-		w.Write(web.IndexHTML)
-	} else {
-		w.Write(web.LoginHTML)
-	}
-}
-
-

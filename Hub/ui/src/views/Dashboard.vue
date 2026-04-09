@@ -17,7 +17,7 @@
 </script>
 
 <template>
-    <div class="max-w-[1600px] mx-auto space-y-6">
+    <div class="max-w-400 mx-auto space-y-6">
         
         <TrafficFilters 
             :fleet="fleet" 

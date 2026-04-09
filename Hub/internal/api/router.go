@@ -1,11 +1,15 @@
 package api
 
 import (
+	"net/http"
+	"io/fs"
+	
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/config"
 	"github.com/honeywire/hub/internal/store"
+	"github.com/honeywire/hub/ui"
 )
 
 func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionStore) *chi.Mux {
@@ -19,7 +23,6 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	r.Get("/api/v1/version", h.HandleVersion)
 	r.Post("/login", h.Login)
 	r.Get("/logout", h.Logout)
-	r.Get("/", h.ServeDashboard)
 
 	// UI Endpoints (Protected by Cookies)
 	r.Group(func(r chi.Router) {
@@ -48,6 +51,19 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 		r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
 		r.Post("/api/v1/event", h.ReceiveEvent)
 	})
+
+	// --- Serve the Vue Frontend ---
+	
+	// Extract the 'dist' sub-folder from the embedded filesystem
+	distFS, err := fs.Sub(ui.StaticFiles, "dist")
+	if err != nil {
+		panic("Failed to mount embedded UI files: " + err.Error())
+	}
+
+	fileServer := http.FileServer(http.FS(distFS))
+
+	// Catch-all route: Serve the Vue files for anything not matching the API routes above
+	r.Handle("/*", fileServer)
 
 	return r
 }
