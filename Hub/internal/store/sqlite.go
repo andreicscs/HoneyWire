@@ -58,11 +58,24 @@ func NewStore(dbPath string) (*Store, error) {
 		return nil, err
 	}
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+
+	// CONCURRENCY FIXES: Enable WAL mode and a 5-second busy timeout
+	_, err = db.Exec(`
+		PRAGMA journal_mode = WAL;
+		PRAGMA busy_timeout = 5000;
+		PRAGMA synchronous = NORMAL;
+	`)
+	if err != nil {
+		log.Printf("Warning: Failed to set SQLite PRAGMAs: %v", err)
+	}
+
 	_, err = db.Exec(InitSchema)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Println("Database initialized successfully.")
+	log.Println("Database initialized successfully in WAL mode.")
 	return &Store{DB: db}, nil
 }

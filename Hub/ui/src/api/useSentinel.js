@@ -9,7 +9,7 @@ const isArmed = ref(true)
 const version = ref('1.0.0')
 const viewingArchive = ref(false)
 const selectedSensor = ref(null)
-const activeTimeframe = ref('30D')
+const activeTimeframe = ref('24H')
 const activeEvent = ref(null)
 const unreadCount = ref(0)
 

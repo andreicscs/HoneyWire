@@ -43,9 +43,32 @@
     }
   }
 
-  const clearLogs = () => {
-    if (confirm("Confirm Database Purge? This will permanently delete all event logs.")) {
-        console.log("Logs Purged!") 
+  const clearLogs = async () => {
+    if (confirm("Confirm Database Purge?\n\nThis will permanently delete ALL active and archived event logs. This action cannot be undone.")) {
+        
+        try {
+            const response = await fetch('/api/v1/events', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (!response.ok) {
+                const errText = await response.text()
+                console.error("Failed to purge logs:", errText)
+                alert("Failed to purge logs. See console for details.")
+            } else {
+                console.log("Database purged successfully. UI will update on next poll.")
+                // Optional: If you want it to clear instantly without waiting for the 5s poll, 
+                // you can do a soft reload here:
+                // window.location.reload()
+            }
+            
+        } catch (error) {
+            console.error("Network error while purging logs:", error)
+            alert("Network error. Could not reach the Hub to purge logs.")
+        }
     }
   }
 
@@ -77,7 +100,7 @@
       :viewingArchive="viewingArchive"
       @change-view="v => currentView = v" 
       @toggle-archive="viewingArchive = !viewingArchive" 
-      @clear-logs="clearLogs" 
+      @clear-logs="clearLogs"
       @toggle-sidebar="sidebarOpen = !sidebarOpen" 
     />
 

@@ -19,7 +19,7 @@ const neonGlowPlugin = {
         ctx.save();
         meta.data.forEach(arc => {
             ctx.shadowColor = arc.options.backgroundColor;
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 5;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
             arc.draw(ctx); 
@@ -86,26 +86,32 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-5 flex flex-col shadow-sm h-full w-full">
-        <h3 class="text-sm font-semibold mb-4 text-slate-800 dark:text-zinc-200">Severity Distribution</h3>
+    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
+        <div>
+            <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-200">Severity Distribution</h3>
+            <div class="flex items-center gap-4 mt-1">
+                <p class="text-xs text-slate-500 dark:text-zinc-400">Active Threat Breakdown</p>
+            </div>
+        </div>
         
-        <div class="flex-1 relative min-h-[160px]">
-            <canvas ref="chartCanvas"></canvas>
+        <div class="flex-1 relative mt-2 min-h-0 w-full">
+            <canvas ref="chartCanvas" class="w-full h-full"></canvas>
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span class="text-3xl font-bold transition-colors"
+                <span class="text-3xl font-bold transition-colors leading-none"
                       :class="events.length === 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-500'">
                     {{ events.length }}
                 </span>
-                <span class="text-xs font-medium text-slate-500 dark:text-zinc-500">Events</span>
+                <span class="text-xs font-medium text-slate-500 dark:text-zinc-400 mt-1 leading-none">Events</span>
             </div>
         </div>
 
-        <div class="mt-4 flex justify-center gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0">
+        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 border-t border-transparent">
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#f43f5e]"></span>Crit</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#fb923c]"></span>High</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#eab308]"></span>Med</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#3b82f6]"></span>Low</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#64748b]"></span>Info</div>
         </div>
+
     </div>
 </template>

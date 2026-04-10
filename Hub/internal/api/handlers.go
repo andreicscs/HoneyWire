@@ -258,172 +258,172 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/uptime
 func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
-    timeframe := r.URL.Query().Get("timeframe")
-    if timeframe == "" {
-        timeframe = "24H"
-    }
+	timeframe := r.URL.Query().Get("timeframe")
+	if timeframe == "" {
+		timeframe = "24H"
+	}
 
-    now := time.Now().UTC()
-    var numBlocks int
-    var delta time.Duration
-    var fmtStr string
-    var expectedPings float64
+	now := time.Now().UTC()
+	var numBlocks int
+	var delta time.Duration
+	var expectedPings float64
 
-    switch timeframe {
-    case "1H":
-        numBlocks, delta, fmtStr, expectedPings = 60, time.Minute, "2006-01-02 15:04", 1
-    case "7D":
-        numBlocks, delta, fmtStr, expectedPings = 7, 24*time.Hour, "2006-01-02", 1440
-    case "30D":
-        numBlocks, delta, fmtStr, expectedPings = 30, 24*time.Hour, "2006-01-02", 1440
-    case "24H":
-        fallthrough
-    default: // 24H (24 blocks, each 1 hour)
-        numBlocks, delta, fmtStr, expectedPings = 24, time.Hour, "2006-01-02 15", 60
-    }
+	switch timeframe {
+	case "1H":
+		numBlocks, delta, expectedPings = 30, 2*time.Minute, 2 // 30 pills, 2 min each
+	case "7D":
+		numBlocks, delta, expectedPings = 7, 24*time.Hour, 1440
+	case "30D":
+		numBlocks, delta, expectedPings = 30, 24*time.Hour, 1440
+	case "24H":
+		fallthrough
+	default: // 24H (24 blocks, each 1 hour)
+		numBlocks, delta, expectedPings = 24, time.Hour, 60
+	}
 
-    cutoff := now.Add(-delta * time.Duration(numBlocks))
-    cutoffStr := cutoff.Format("2006-01-02 15:04:05")
+	cutoff := now.Add(-delta * time.Duration(numBlocks))
+	cutoffStr := cutoff.Format("2006-01-02 15:04:05")
 
-    // 1. Get all sensors
-    sensorRows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY sensor_id", now.Format("2006-01-02 15:04:05"))
-    if err != nil {
-        http.Error(w, "Database error fetching sensors", http.StatusInternalServerError)
-        return
-    }
-	defer sensorRows.Close()
-	
-    type SensorData struct {
-        ID        string
-        LastSeen  time.Time
-        FirstSeen string
-    }
-    var sensors []SensorData
-    history := make(map[string]map[string]float64)
-
-    for sensorRows.Next() {
-        var s SensorData
-        var lastSeenStr string
-        sensorRows.Scan(&s.ID, &lastSeenStr, &s.FirstSeen)
-        s.LastSeen, _ = time.Parse("2006-01-02 15:04:05", lastSeenStr)
-        sensors = append(sensors, s)
-        history[s.ID] = make(map[string]float64)
-    }
-
-    // 2. Get heartbeats
-    hbRows, err := h.Store.DB.Query("SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+	// 1. Get all sensors
+	sensorRows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY sensor_id", now.Format("2006-01-02 15:04:05"))
 	if err != nil {
-        http.Error(w, "Database error fetching heartbeats", http.StatusInternalServerError)
-        return
-    }
-    defer hbRows.Close()
-    for hbRows.Next() {
-        var sID, tBucket string
-        hbRows.Scan(&sID, &tBucket)
-        parsedBucket, _ := time.Parse("2006-01-02 15:04:00", tBucket)
-        timeKey := parsedBucket.Format(fmtStr)
-        history[sID][timeKey]++
-    }
+		http.Error(w, "Database error fetching sensors", http.StatusInternalServerError)
+		return
+	}
+	defer sensorRows.Close()
 
-    // 3. Build the heatmap blocks
-    var result []map[string]interface{}
-    for _, s := range sensors {
-        firstSeenParsed, _ := time.Parse("2006-01-02 15:04:05", s.FirstSeen)
-        firstSeenKey := firstSeenParsed.Format(fmtStr)
+	type SensorData struct {
+		ID        string
+		LastSeen  time.Time
+		FirstSeen string
+	}
+	var sensors []SensorData
+	
+	// history will map sensorID to a slice of pings matching the numBlocks
+	history := make(map[string][]float64)
 
-        var blocks []map[string]string
+	for sensorRows.Next() {
+		var s SensorData
+		var lastSeenStr string
+		sensorRows.Scan(&s.ID, &lastSeenStr, &s.FirstSeen)
+		s.LastSeen, _ = time.Parse("2006-01-02 15:04:05", lastSeenStr)
+		sensors = append(sensors, s)
+		history[s.ID] = make([]float64, numBlocks)
+	}
 
-        for i := numBlocks - 1; i >= 0; i-- {
-            blockTime := now.Add(-delta * time.Duration(i))
-            timeKey := blockTime.Format(fmtStr)
+	// 2. Get heartbeats and map them to block indexes purely via time math
+	hbRows, err := h.Store.DB.Query("SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+	if err != nil {
+		http.Error(w, "Database error fetching heartbeats", http.StatusInternalServerError)
+		return
+	}
+	defer hbRows.Close()
+	
+	for hbRows.Next() {
+		var sID, tBucket string
+		hbRows.Scan(&sID, &tBucket)
+		parsedBucket, _ := time.Parse("2006-01-02 15:04:00", tBucket)
 
-            timeLabel := "Current"
-            if i > 0 {
-                switch timeframe {
-                case "1H":
-                    timeLabel = fmt.Sprintf("%d mins ago", i)
-                case "24H":
-                    timeLabel = fmt.Sprintf("%d hours ago", i)
-                case "7D", "30D":
-                    timeLabel = fmt.Sprintf("%d days ago", i)
-                default:
-                    timeLabel = fmt.Sprintf("%d ago", i)
-                }
-            }
+		if parsedBucket.Before(cutoff) {
+			continue
+		}
 
-            status, label := "", ""
+		// Figure out which block this heartbeat falls into (0 = oldest, numBlocks-1 = newest)
+		idx := int(parsedBucket.Sub(cutoff) / delta)
+		if idx >= numBlocks {
+			idx = numBlocks - 1
+		}
+		
+		if idx >= 0 && history[sID] != nil {
+			history[sID][idx]++
+		}
+	}
 
-            // Math checks
-            if timeKey < firstSeenKey {
-                status, label = "nodata", "No Data (Not Deployed Yet)"
-            } else {
-                pings := history[s.ID][timeKey]
-                targetPings := expectedPings
+	// 3. Build the heatmap blocks
+	var result []map[string]interface{}
+	for _, s := range sensors {
+		firstSeenParsed, _ := time.Parse("2006-01-02 15:04:05", s.FirstSeen)
+		var blocks []map[string]string
 
-                // DYNAMIC TARGET: Adjust expectations for the deployment block and the current live block
-                if timeKey == firstSeenKey || timeKey == now.Format(fmtStr) {
-                    blockStart, _ := time.Parse(fmtStr, timeKey)
-                    blockEnd := blockStart.Add(delta)
+		for i := 0; i < numBlocks; i++ {
+			blockStart := cutoff.Add(time.Duration(i) * delta)
+			blockEnd := blockStart.Add(delta)
 
-                    activeStart := blockStart
-                    if firstSeenParsed.After(blockStart) {
-                        activeStart = firstSeenParsed
-                    }
-                    activeEnd := blockEnd
-                    if now.Before(blockEnd) {
-                        activeEnd = now
-                    }
+			stepsAgo := numBlocks - 1 - i
+			timeLabel := "Current"
+			if stepsAgo > 0 {
+				switch timeframe {
+				case "1H":
+					timeLabel = fmt.Sprintf("%d mins ago", stepsAgo*int(delta.Minutes()))
+				case "24H":
+					timeLabel = fmt.Sprintf("%d hours ago", stepsAgo)
+				case "7D", "30D":
+					timeLabel = fmt.Sprintf("%d days ago", stepsAgo)
+				default:
+					timeLabel = fmt.Sprintf("%d ago", stepsAgo)
+				}
+			}
 
-                    // Calculate exactly how many minutes this block has actually been active
-                    activeDuration := activeEnd.Sub(activeStart)
-                    targetPings = activeDuration.Minutes() // 1 heartbeat expected per minute
+			status, label := "", ""
 
-                    if targetPings > expectedPings {
-                        targetPings = expectedPings
-                    }
-                    if targetPings < 1 && activeDuration > 0 {
-                        targetPings = 1 // Prevent impossible targets
-                    }
-                }
+			// Math checks
+			if blockEnd.Before(firstSeenParsed) {
+				status, label = "nodata", "No Data (Not Deployed Yet)"
+			} else {
+				pings := history[s.ID][i]
+				targetPings := expectedPings
 
-                if pings == 0 && targetPings >= 1 {
-                    status, label = "down", "Offline"
-                } else if targetPings > 0 && pings < (targetPings*0.85) {
-                    status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
-                } else {
-                    status, label = "up", "Online"
-                }
-            }
+				// Adjust expectations for the deployment boundary and the live block boundary
+				if firstSeenParsed.After(blockStart) && firstSeenParsed.Before(blockEnd) {
+					activeDuration := blockEnd.Sub(firstSeenParsed)
+					targetPings = activeDuration.Minutes()
+					if targetPings > expectedPings { targetPings = expectedPings }
+					if targetPings < 1 && activeDuration > 0 { targetPings = 1 }
+				} else if i == numBlocks-1 {
+					activeDuration := now.Sub(blockStart)
+					targetPings = activeDuration.Minutes()
+					if targetPings > expectedPings { targetPings = expectedPings }
+					if targetPings < 1 && activeDuration > 0 { targetPings = 1 }
+				}
 
-            blocks = append(blocks, map[string]string{
-                "status":    status,
-                "timeLabel": timeLabel,
-                "label":     label,
-            })
-        }
+				if pings == 0 && targetPings >= 1 {
+					status, label = "down", "Offline"
+				} else if targetPings > 0 && pings < (targetPings*0.85) {
+					status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
+				} else {
+					status, label = "up", "Online"
+				}
+			}
 
-        // Override final block for live status
-        isLive := now.Sub(s.LastSeen) < 90*time.Second
-        if isLive {
-            blocks[len(blocks)-1]["status"] = "up"
-            blocks[len(blocks)-1]["label"] = "Online (Live)"
-        } else {
-            blocks[len(blocks)-1]["status"] = "down"
-            blocks[len(blocks)-1]["label"] = "Offline (Live)"
-        }
+			blocks = append(blocks, map[string]string{
+				"status":    status,
+				"timeLabel": timeLabel,
+				"label":     label,
+			})
+		}
 
-        result = append(result, map[string]interface{}{
-            "id":       s.ID,
-            "name":     s.ID,
-            "isOnline": isLive,
-            "blocks":   blocks,
-        })
-    }
+		// Override final block for live status
+		isLive := now.Sub(s.LastSeen) < 90*time.Second
+		if isLive {
+			blocks[len(blocks)-1]["status"] = "up"
+			blocks[len(blocks)-1]["label"] = "Online (Live)"
+		} else {
+			blocks[len(blocks)-1]["status"] = "down"
+			blocks[len(blocks)-1]["label"] = "Offline (Live)"
+		}
 
-    if result == nil {
-        result = []map[string]interface{}{}
-    }
-    SendJSON(w, http.StatusOK, result)
+		result = append(result, map[string]interface{}{
+			"id":       s.ID,
+			"name":     s.ID,
+			"isOnline": isLive,
+			"blocks":   blocks,
+		})
+	}
+
+	if result == nil {
+		result = []map[string]interface{}{}
+	}
+	SendJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) HandleVersion(w http.ResponseWriter, r *http.Request) {

@@ -4,8 +4,8 @@
     import SeverityChart from '../components/SeverityChart.vue'
     import UptimeHeatmap from '../components/UptimeHeatmap.vue'
     import EventTable from '../components/EventTable.vue'
+    import ThreatVelocity from '../components/ThreatVelocity.vue'
 
-    // Bring in the state we need for this view
     const { 
         fleet, selectedSensor, filteredEvents, uptimeData, activeTimeframe, 
         overallUptime, viewingArchive, archiveAll,
@@ -17,7 +17,7 @@
 </script>
 
 <template>
-    <div class="max-w-400 mx-auto space-y-6">
+    <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6">
         
         <TrafficFilters 
             :fleet="fleet" 
@@ -27,12 +27,17 @@
             @toggle-silence="toggleSilence"
         />
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-4">
-                <SeverityChart :events="filteredEvents" />
+        <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
+            
+            <div class="flex-[1_1_350px] min-w-[100%] sm:min-w-[350px] h-[320px] lg:h-[340px] shrink-0">
+                <ThreatVelocity :events="filteredEvents" />
             </div>
 
-            <div class="lg:col-span-8">
+            <div class="flex-[1_1_280px] min-w-[100%] sm:min-w-[280px] max-w-[450px] mx-auto h-[320px] lg:h-[340px] shrink-0">
+                <SeverityChart :events="filteredEvents" />
+            </div>
+            
+            <div class="flex-[1.5_1_450px] min-w-[100%] lg:min-w-[450px] h-[320px] lg:h-[340px] shrink-0">
                 <UptimeHeatmap 
                     :uptimeData="uptimeData"
                     :overallUptime="overallUptime"
@@ -45,13 +50,16 @@
             </div>
         </div>
 
-        <EventTable 
-            :events="filteredEvents" 
-            :viewingArchive="viewingArchive" 
-            @archive-all="archiveAll"
-            @archive-event="archiveEvent"
-            @open-event="evt => { activeEvent = evt; if(!evt.is_read) { evt.is_read = 1; fetch(`/api/v1/events/${evt.id}/read`, {method: 'PATCH'})} }"
-            @mark-read="markEventRead"
-        />
+        <div class="flex-1 min-h-0 pb-6 mt-2">
+            <EventTable 
+                :events="filteredEvents" 
+                :viewingArchive="viewingArchive" 
+                @archive-all="archiveAll"
+                @archive-event="archiveEvent"
+                @open-event="evt => { activeEvent = evt; if(!evt.is_read) { evt.is_read = 1; fetch(`/api/v1/events/${evt.id}/read`, {method: 'PATCH'})} }"
+                @mark-read="markEventRead"
+            /> 
+        </div>
+
     </div>
 </template>
