@@ -1,5 +1,5 @@
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
-  [![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
+[![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
 
 ## 📋 Table of Contents
 - [Overview](#honeywire)
@@ -15,22 +15,22 @@
 - [Operational Checklist](#operational-checklist)
 
 ---
+# HoneyWire <img src="Hub/ui/public/favicon.svg" width="100" style="vertical-align: middle;"> 
 
-# HoneyWire
+**HoneyWire Sentinel** is a lightweight, Distributed High-Signal Security Early-Warning System and Micro-SIEM, designed for internal networks. It replaces the "magnifying glass" approach of traditional SIEMs, which often drown analysts in false positives by surveilling legitimate traffic, with a High-Fidelity Tripwire model. Place a sensor that does what you need exactly where you want, for example:
+  - Production Tripwires: Sound the alarm when active services are being poked in ways they shouldn't be. By placing a sensor on a sensitive file that should never be read or a service port that should never be accessed, you identify intruders by their deviation from the "authorized path."
+  - Synthetic Deception: Deploy lures like the [ICMP Canary](./Sensors/official/IcmpCanary/) or [Network Scan Detector](./Sensors/official/NetworkScanDetector/) to act as decoys. Since these sensors provide no legitimate business value, 100% of their traffic is actionable intelligence.
 
-**HoneyWire Sentinel** is a lightweight, distributed deception hub and Micro-SIEM. It is designed to deploy silent, asynchronous sensors that act as traps or lures across multiple servers, detect unauthorized access, trap automated botnets, and report telemetry back to a centralized dashboard in real-time.
-
-There are existing lightweight SIEM/Deception Hubs, but few feature a clean looking, easy to use dashboard with instant webhooks without being incredibly resource-intensive. This project aims to fill that gap in the cybersecurity tool landscape for homelabs and SMBs.
+If it is tripped, something is wrong, set up multiple and you start to have a pretty clear idea of the lateral movement of an intruder. No tuning, no noise, just instant forensics.
 
 ---
 
 ## Screenshots
 
 ### Main Dashboard
-![Dashboard](Screenshots/dashboard.png)
+![DashboardDark](Screenshots/dashboardDark.png)
 
-### Payload Inspector
-![Payload Inspector](Screenshots/payload-inspector.png)
+![DashboardLight](Screenshots/dashboardLight.png)
 
 ---
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
@@ -72,8 +72,9 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 
 ## Features
 
-- **The Sentinel UI:** A fully responsive dashboard featuring Dark/Light mode, real-time Chart.js threat distribution, and dynamic forensic payload inspection.
-- **Suite of Official Sensors:** Includes a native [Go TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
+- **The Sentinel Hub UI:** A fully responsive dashboard featuring Dark/Light mode, real-time Chart.js threat distribution, and dynamic forensic payload inspection.
+- **Suite of Official Sensors:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
+
 ---
 
 ## Architecture
@@ -110,15 +111,17 @@ services:
     container_name: honeywire-hub
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${HW_PORT:-8080}:${HW_PORT:-8080}"
     volumes:
       - ./honeywire_data:/data
     depends_on:
       permission-fixer:
         condition: service_completed_successfully
     user: "65532:65532"
-    cap_drop:
-      - ALL
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
     env_file: 
       - .env
 
@@ -128,13 +131,15 @@ services:
     container_name: hw-tcp-tarpit
     restart: unless-stopped
     network_mode: "host" # Required to capture true source IPs
-    cap_drop:
-      - ALL
+    user: "0:0" # Required to bind to low ports
+    # Security hardening
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+
     env_file: 
       - .env
-
-volumes:
-  honeywire_data:
 ```
 
 ### 2. The `.env` Configuration
@@ -176,21 +181,21 @@ Access the dashboard at `http://localhost:8080` (or your server's IP).
 
 ---
 
-## 🧪 Testing the Trap
+### 4. Testing the Trap
 
 Once your containers are up, the Tarpit sensor should appear as `ONLINE` in the **Fleet Health** section of the dashboard within 30 seconds.
 
 To verify the detection loop, use `netcat` from a different machine (or a different terminal) to trigger the decoy:
 
 ```bash
-# Connect to your decoy port (e.g., 2222)
-nc <your-server-ip> 2222
+# Connect to your decoy port (e.g., 2222) at localhost (or your server's IP).
+nc localhost 2222
 ```
 
 1. **Observe the Lure:** If `HW_TARPIT_MODE` is set to `hold` or `echo`, you will see your fake service banner immediately.
-2. **Interact:** Type a string (e.g., `admin` or `exploit_payload`) and press Enter.
+2. **Interact:** The connection will be intentionally stalled (Tarpit). Type a string (e.g., `admin` or `exploit_payload`) and press Enter.
 3. **Close:** Press `Ctrl+C` to terminate the test connection.
-4. **Verify Capture:** - The connection will be intentionally stalled (Tarpit).
+4. **Verify Capture:**
    - Check the HoneyWire Dashboard; the event, your Source IP, and the payload will appear instantly.
    - If configured, you will receive a push notification on your mobile device.
 
@@ -198,11 +203,12 @@ nc <your-server-ip> 2222
 ---
 
 ## Security Notes
-* **API Secret:** Ensure your `HW_HUB_KEY` is strong and identical on both the Hub and the Sensors. The Hub will reject any payloads with mismatched keys.
+* **API Secret:** Ensure your `HW_HUB_KEY` is strong and identical on both the Hub and the Sensors. The Hub will reject any payloads with mismatched keys. We will eventually implement automatic API key generation from the Hub for each sensor.
 * **System Arming:** You can toggle the "System Armed" button in the Hub UI to temporarily disable push notifications while doing internal network maintenance or vulnerability scanning.
-* **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. Do not attempt to use `docker exec -it <container> sh` as there is no shell binary or package manager included in the images by design.
+* **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. We follow the principle of least privelege to make sure that if a container is compromised, the blast is contained.
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
-* **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik). Failure to do so exposes your `HW_HUB_KEY` and `HW_DASHBOARD_PASSWORD` to network sniffing.
+* ! **Encryption (HTTPS):** We **do not** yet implement HTTPS as this project is a work in progress. 
+It is important to Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik). Failure to do so exposes your `HW_HUB_KEY` and `HW_DASHBOARD_PASSWORD` to network sniffing.
 
 ---
 
@@ -221,17 +227,9 @@ nc <your-server-ip> 2222
   - `GET /api/v1/version` → returns `{ "version": "1.0.0" }`
 - API docs file: [📖 API.md](./Docs/API.md) with full backend route reference and sample payloads.
 
-### Key API Endpoints
-- `GET /api/v1/system/state` / `PATCH /api/v1/system/state`
-- `GET /api/v1/sensors`
-- `GET /api/v1/events`
-- `PATCH /api/v1/events/read`, `PATCH /api/v1/events/{event_id}/read`, `DELETE /api/v1/events`
-- `POST /api/v1/heartbeat` (Sensor heartbeat)
-- `POST /api/v1/event` (Sensor event reports)
-
 ---
 
 ## Operational Checklist
-- [ ] Set `HW_HUB_KEY` for all components.
-- [ ] Set optional `HW_DASHBOARD_PASSWORD`.
-- [ ] Rebuild/redeploy containers after any version bump in `VERSION` or environment variable changes.
+- [x] Set `HW_HUB_KEY` for all components.
+- [x] Set optional `HW_DASHBOARD_PASSWORD`.
+- [x] Rebuild/redeploy containers after any version bump in `VERSION` or environment variable changes.

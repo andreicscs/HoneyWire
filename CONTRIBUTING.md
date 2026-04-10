@@ -1,3 +1,6 @@
+[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()
+
 # Contributing to HoneyWire
 
 Welcome to HoneyWire! We are building a centralized, high-fidelity security and deception ecosystem for homelabs and SMBs. 
