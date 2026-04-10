@@ -142,7 +142,7 @@ func parseIgnorePorts(raw string) map[uint16]bool {
 		if p == "" {
 			continue
 		}
-		val, err := strconv.Atoi(p)
+		val, err := strconv.ParseUint(p, 10, 16)
 		if err == nil {
 			ports[uint16(val)] = true
 		} else {
