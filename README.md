@@ -8,14 +8,13 @@
 - [Features](#features)
 - [Architecture](#architecture)
 - [Quick Start Guide](#-quick-start-guide)
-- [Testing the Trap](#-testing-the-trap)
 - [Security Notes](#security-notes)
 - [Tech Stack](#tech-stack)
 - [Versioning and API Reference](#versioning-and-api-reference)
 - [Operational Checklist](#operational-checklist)
 
 ---
-# HoneyWire <img src="Hub/ui/public/favicon.svg" width="100" style="vertical-align: middle;"> 
+# HoneyWire
 
 **HoneyWire Sentinel** is a lightweight, Distributed High-Signal Security Early-Warning System and Micro-SIEM, designed for internal networks. It replaces the "magnifying glass" approach of traditional SIEMs, which often drown analysts in false positives by surveilling legitimate traffic, with a High-Fidelity Tripwire model. Place a sensor that does what you need exactly where you want, for example:
   - Production Tripwires: Sound the alarm when active services are being poked in ways they shouldn't be. By placing a sensor on a sensitive file that should never be read or a service port that should never be accessed, you identify intruders by their deviation from the "authorized path."
