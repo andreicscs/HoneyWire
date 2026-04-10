@@ -29,7 +29,7 @@ jobs:
 
       - name: Get changed directories
         id: changed-files
-        uses: tj-actions/changed-files@v44
+        uses: tj-actions/changed-files@v46
         with:
           files: Sensors/official/**
           dir_names: true
