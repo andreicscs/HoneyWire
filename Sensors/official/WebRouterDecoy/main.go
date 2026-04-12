@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/honeywire/sdk-go"
 )
@@ -50,32 +54,59 @@ const loginHTML = `<!DOCTYPE html>
 </html>`
 
 func main() {
-	// 1. Initialize SDK
-	hw = sdk.NewSensor()
-	hw.Start()
+	var err error
+	hw, err = sdk.NewSensor()
+	if err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+
+	if hw.TestMode {
+		if hw.RunTestMode() { os.Exit(0) }
+		os.Exit(1)
+	}
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
 
 	log.Printf("[*] HoneyWire Web Router Decoy | Brand: %s | Port: %s", routerBrand, port)
 
-	// 2. Register Routes
-	http.HandleFunc("/", handleRoot)
-	http.HandleFunc("/login", handleLogin)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleRoot)
+	mux.HandleFunc("/login", handleLogin)
 
-	// 3. Start the Server
-	addr := fmt.Sprintf("0.0.0.0:%s", port)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("[!] FATAL: Web server failed: %v", err)
+	server := &http.Server{
+		Addr:    fmt.Sprintf("0.0.0.0:%s", port),
+		Handler: mux,
+	}
+
+	// Run server in background
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("[!] FATAL: Web server failed: %v", err)
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+
+	log.Println("[*] Shutting down web decoy...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("[-] Shutdown error: %v", err)
 	}
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
-	// Only respond to GET requests on the root path
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
-	
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Inject the brand name into the HTML
 	fmt.Fprintf(w, loginHTML, routerBrand, routerBrand)
 }
 
@@ -85,7 +116,6 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the submitted form data
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
@@ -94,19 +124,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	userAgent := r.UserAgent()
-	if userAgent == "" {
-		userAgent = "Unknown"
-	}
+	if userAgent == "" { userAgent = "Unknown" }
 
-	// Extract the real IP (strip the ephemeral port)
 	srcIP := r.RemoteAddr
-	if ip, _, err := net.SplitHostPort(srcIP); err == nil {
-		srcIP = ip
-	}
+	if ip, _, err := net.SplitHostPort(srcIP); err == nil { srcIP = ip }
 
 	log.Printf("[!] Login attempt from %s (User: %s)", srcIP, username)
 
-	// Dispatch the Event via the SDK
 	hw.ReportEvent(
 		"critical",
 		"web_login_attempt",
@@ -120,15 +144,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
-	// Always return 401 Unauthorized to keep them guessing
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
 	fmt.Fprint(w, "<h1>401 Unauthorized</h1><p>Invalid Username or Password.</p>")
 }
 
 func getEnv(key, fallback string) string {
-	if val, exists := os.LookupEnv(key); exists {
-		return val
-	}
+	if val, exists := os.LookupEnv(key); exists { return val }
 	return fallback
 }

@@ -1,19 +1,34 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/honeywire/sdk-go"
 )
 
 func main() {
-	// 1. Initialize the HoneyWire SDK
-	hw := sdk.NewSensor()
-	hw.Start() // Syncs version, starts heartbeats, runs tests
+	hw, err := sdk.NewSensor()
+	if err != nil {
+		log.Fatalf("[!] FATAL: Failed to initialize sensor: %v", err)
+	}
 
-	// 2. Setup Sensor-specific logic
+	if hw.TestMode {
+		if hw.RunTestMode() {
+			os.Exit(0)
+		}
+		os.Exit(1)
+	}
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: Failed to start SDK: %v", err)
+	}
+	defer hw.Stop()
+
 	honeyDir := getEnv("HW_HONEY_DIR", "/honey_dir")
 	if _, err := os.Stat(honeyDir); os.IsNotExist(err) {
 		log.Fatalf("[!] FATAL: Watch directory does not exist: %s", honeyDir)
@@ -27,7 +42,9 @@ func main() {
 	}
 	defer watcher.Close()
 
-	// 3. The Monitor Loop
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	go func() {
 		for {
 			select {
@@ -41,6 +58,8 @@ func main() {
 					return
 				}
 				log.Printf("[!] Watcher error: %v", err)
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
@@ -50,8 +69,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Block main thread forever
-	<-make(chan struct{})
+	<-ctx.Done()
+	log.Println("[*] Shutting down watcher.")
 }
 
 func handleFSEvent(hw *sdk.Sensor, event fsnotify.Event) {
@@ -67,7 +86,6 @@ func handleFSEvent(hw *sdk.Sensor, event fsnotify.Event) {
 		return
 	}
 
-	// 4. Use the SDK to dispatch the event (no manual HTTP building required!)
 	hw.ReportEvent(
 		"critical",
 		"file_tampered",

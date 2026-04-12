@@ -73,10 +73,40 @@ Returns heatmap data for the Fleet Health dashboard.
 
 ---
 
+## Real-Time (WebSockets)
+
+### GET /api/v1/ws
+Upgrades the connection to a persistent WebSocket for real-time dashboard updates.
+* **Requirement:** Must be authenticated via the UI `hw_auth` session cookie.
+* **Behavior:** The Hub holds the connection open and instantly pushes a JSON message downstream whenever a sensor reports a new event.
+* **Pushed Message Example:**
+```json
+{
+  "type": "NEW_EVENT",
+  "payload": {
+    "id": 42,
+    "timestamp": "2026-04-12 18:30:05",
+    "contract_version": "1.0",
+    "sensor_id": "core-dpi-engine",
+    "event_trigger": "malformed_jwt_detected",
+    "severity": "critical",
+    "source": "104.28.19.12",
+    "target": "Auth Gateway",
+    "details": {
+      "action_taken": "logged"
+    },
+    "is_read": false,
+    "is_archived": false
+  }
+}
+```
+
+---
+
 ## Events
 
 ### GET /api/v1/events/unread
-Returns a lightweight integer representing the count of active, unread events. Used for UI badge polling without downloading full payloads.
+Returns a lightweight integer representing the count of active, unread events. Used for UI badge syncing without downloading full payloads.
 * **Response:** `{ "count": 12 }`
 
 ### GET /api/v1/events
