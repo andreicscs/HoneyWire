@@ -11,7 +11,7 @@ import (
 
 func main() {
 	// 1. Initialize the HoneyWire SDK
-	hw := sdk.NewSensor("network")
+	hw := sdk.NewSensor()
 	hw.Start()
 
 	log.Printf("[*] HoneyWire Ping Canary | Listening for ICMP Echo Requests...")
@@ -48,14 +48,14 @@ func main() {
 
 			// 4. Dispatch the Event via the SDK
 			hw.ReportEvent(
-				"icmp_ping_received", // Event Type
-				"high",               // Severity
-				map[string]any{       // Details
-					"packet_size": packetSize,
+				"high",
+				"icmp_ping_received",
+				sourceIP,
+				"ICMP Listener",
+				map[string]any{
+					"packet_size":  packetSize,
+					"action_taken": "logged",
 				},
-				"logged",        // Action Taken
-				sourceIP,        // Source
-				"ICMP Listener", // Target
 			)
 		}
 	}

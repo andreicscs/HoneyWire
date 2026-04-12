@@ -13,12 +13,10 @@ CREATE TABLE IF NOT EXISTS events (
     timestamp        TEXT    NOT NULL,
     contract_version TEXT    NOT NULL DEFAULT '1.0.0',
     sensor_id        TEXT    NOT NULL,
-    sensor_type      TEXT    NOT NULL DEFAULT 'generic',
-    event_type       TEXT    NOT NULL DEFAULT 'alert',
+    event_trigger    TEXT    NOT NULL DEFAULT 'alert',
     severity         TEXT    NOT NULL DEFAULT 'medium',
     source           TEXT    NOT NULL DEFAULT 'Unknown',
     target           TEXT    NOT NULL DEFAULT 'Unknown',
-    action_taken     TEXT    NOT NULL DEFAULT 'logged',
     details          TEXT    NOT NULL DEFAULT '{}',
     is_read          INTEGER NOT NULL DEFAULT 0,
     is_archived      INTEGER NOT NULL DEFAULT 0
@@ -28,7 +26,6 @@ CREATE TABLE IF NOT EXISTS sensors (
     sensor_id   TEXT PRIMARY KEY,
     first_seen  TEXT,
     last_seen   TEXT NOT NULL,
-    sensor_type TEXT NOT NULL DEFAULT 'generic',
     metadata    TEXT NOT NULL DEFAULT '{}',
     is_silenced INTEGER NOT NULL DEFAULT 0
 );

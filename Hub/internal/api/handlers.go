@@ -38,7 +38,7 @@ func SendJSON(w http.ResponseWriter, status int, data interface{}) {
 
 // GET /api/v1/sensors
 func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Store.DB.Query("SELECT sensor_id, sensor_type, last_seen, metadata, is_silenced FROM sensors ORDER BY sensor_id")
+	rows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, metadata, is_silenced FROM sensors ORDER BY sensor_id")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -51,9 +51,9 @@ func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
 		var metadataStr string
 		var isSilencedInt int
 
-		if err := rows.Scan(&s.SensorID, &s.SensorType, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
-			continue // Skip bad rows
-		}
+		if err := rows.Scan(&s.SensorID, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
+            continue 
+        }
 
 		s.IsSilenced = isSilencedInt == 1
 		
@@ -87,7 +87,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		isArchived = 1
 	}
 
-	rows, err := h.Store.DB.Query("SELECT id, timestamp, contract_version, sensor_id, sensor_type, event_type, severity, source, target, action_taken, details, is_read, is_archived FROM events WHERE is_archived = ? ORDER BY id DESC", isArchived)
+	rows, err := h.Store.DB.Query("SELECT id, timestamp, contract_version, sensor_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ? ORDER BY id DESC", isArchived)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -95,18 +95,18 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	var events []models.Event
-	for rows.Next() {
-		var e models.Event
-		var detailsStr string
-		var isReadInt, isArchivedInt int
+    for rows.Next() {
+        var e models.Event
+        var detailsStr string
+        var isReadInt, isArchivedInt int
 
-		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID, &e.SensorType,
-			&e.EventType, &e.Severity, &e.Source, &e.Target, &e.ActionTaken,
-			&detailsStr, &isReadInt, &isArchivedInt,
-		); err != nil {
-			continue
-		}
+        if err := rows.Scan(
+            &e.ID, &e.ContractVersion, &e.SensorID,
+            &e.EventTrigger, &e.Severity, &e.Source, &e.Target,
+            &detailsStr, &isReadInt, &isArchivedInt,
+        ); err != nil {
+            continue
+        }
 
 		e.IsRead = isReadInt == 1
 		e.IsArchived = isArchivedInt == 1
@@ -141,12 +141,12 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	// 1. Update live status & first_seen
 	_, err := h.Store.DB.Exec(`
-		INSERT INTO sensors (sensor_id, first_seen, last_seen, sensor_type, metadata)
-		VALUES (?, ?, ?, ?, ?)
-		ON CONFLICT(sensor_id) DO UPDATE SET last_seen=?, sensor_type=?, metadata=?`,
-		hb.SensorID, nowStr, nowStr, hb.SensorType, string(metadataJSON),
-		nowStr, hb.SensorType, string(metadataJSON),
-	)
+        INSERT INTO sensors (sensor_id, first_seen, last_seen, metadata)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(sensor_id) DO UPDATE SET last_seen=?, metadata=?`,
+        hb.SensorID, nowStr, nowStr, string(metadataJSON),
+        nowStr, string(metadataJSON),
+    )
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -179,10 +179,10 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Insert Event
 	_, err := h.Store.DB.Exec(`
-		INSERT INTO events (timestamp, contract_version, sensor_id, sensor_type, event_type, severity, source, target, action_taken, details, is_read, is_archived)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		nowStr, e.ContractVersion, e.SensorID, e.SensorType, e.EventType, e.Severity, e.Source, e.Target, e.ActionTaken, string(detailsJSON),
-	)
+        INSERT INTO events (timestamp, contract_version, sensor_id, event_trigger, severity, source, target, details, is_read, is_archived)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+        nowStr, e.ContractVersion, e.SensorID, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
+    )
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -195,11 +195,11 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	var isSilencedInt int
 	h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
 
-	msg := "[" + e.SensorID + "] " + strings.ToUpper(e.EventType) + " — " + e.Source + " -> " + e.Target + " | action: " + e.ActionTaken // TODO check for unused fields
+	msg := "[" + e.SensorID + "] " + strings.ToUpper(e.EventTrigger) + " — " + e.Source + " -> " + e.Target 
 
-	if isArmedStr == "true" && isSilencedInt == 0 {
-		notify.Dispatch(h.Cfg, "HoneyWire Alert ("+strings.ToUpper(e.Severity)+")", msg, e.Severity)
-	}
+    if isArmedStr == "true" && isSilencedInt == 0 {
+        notify.Dispatch(h.Cfg, "HoneyWire Alert ("+strings.ToUpper(e.Severity)+")", msg, e.Severity)
+    }
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }

@@ -18,41 +18,36 @@ const (
 
 // Sensor represents the HoneyWire SDK instance
 type Sensor struct {
-	SensorType         string
+	HubContractVersion string
+	Severity           string
+	SensorID           string
 	HubEndpoint        string
 	HubKey             string
-	SensorID           string
 	TestMode           bool
 	AgentVersion       string
-	Severity           string
-	HubContractVersion string
 	HTTPClient         *http.Client
 }
 
 // EventPayload enforces the strict JSON contract expected by the Hub
 type EventPayload struct {
-	ContractVersion string         `json:"contract_version"`
-	SensorID        string         `json:"sensor_id"`
-	SensorType      string         `json:"sensor_type"`
-	EventType       string         `json:"event_type"`
-	Severity        string         `json:"severity"`
-	Timestamp       string         `json:"timestamp"`
-	ActionTaken     string         `json:"action_taken"`
+    ContractVersion string         `json:"contract_version"`
+    Severity        string         `json:"severity"`
+	EventTrigger    string         `json:"event_trigger"`
 	Source          string         `json:"source"`
-	Target          string         `json:"target"`
-	Details         map[string]any `json:"details"`
+    Target          string         `json:"target"`
+    SensorID        string         `json:"sensor_id"`
+    Details         map[string]any `json:"details"`
 }
 
 // NewSensor initializes the SDK, validates environment variables, and returns a Sensor instance
-func NewSensor(sensorType string) *Sensor {
+func NewSensor() *Sensor {
 	s := &Sensor{
-		SensorType:   sensorType,
+		Severity:     getEnv("HW_SEVERITY", "4"),
+		SensorID:     os.Getenv("HW_SENSOR_ID"),
 		HubEndpoint:  os.Getenv("HW_HUB_ENDPOINT"),
 		HubKey:       os.Getenv("HW_HUB_KEY"),
-		SensorID:     os.Getenv("HW_SENSOR_ID"),
 		TestMode:     strings.ToLower(os.Getenv("HW_TEST_MODE")) == "true",
 		AgentVersion: getEnv("HONEYWIRE_VERSION", SDKDefaultAgentVersion),
-		Severity:     getEnv("HW_SEVERITY", "4"),
 		HTTPClient:   &http.Client{Timeout: 5 * time.Second},
 	}
 
@@ -76,12 +71,9 @@ func (s *Sensor) Start() {
 }
 
 // ReportEvent formats and sends the payload to the Hub
-func (s *Sensor) ReportEvent(eventType, severity string, details map[string]any, actionTaken, source, target string) bool {
+func (s *Sensor) ReportEvent(severity string, eventTrigger string, source string, target string, details map[string]any) bool {
 	normSeverity := s.normalizeSeverity(severity)
 
-	if actionTaken == "" {
-		actionTaken = "logged"
-	}
 	if source == "" {
 		source = "Unknown"
 	}
@@ -92,11 +84,8 @@ func (s *Sensor) ReportEvent(eventType, severity string, details map[string]any,
 	payload := EventPayload{
 		ContractVersion: HoneyWireSchemaVersion,
 		SensorID:        s.SensorID,
-		SensorType:      s.SensorType,
-		EventType:       eventType,
+		EventTrigger:    eventTrigger,
 		Severity:        normSeverity,
-		Timestamp:       time.Now().UTC().Format(time.RFC3339),
-		ActionTaken:     actionTaken,
 		Source:          source,
 		Target:          target,
 		Details:         details,
@@ -109,7 +98,7 @@ func (s *Sensor) ReportEvent(eventType, severity string, details map[string]any,
 	}
 	defer resp.Body.Close()
 
-	log.Printf("[+] Event sent: %s (Severity: %s)", eventType, normSeverity)
+	log.Printf("[+] Event sent: %s (Severity: %s)", eventTrigger, normSeverity)
 	return true
 }
 
@@ -149,7 +138,6 @@ func (s *Sensor) syncHubVersion() {
 func (s *Sensor) heartbeatLoop() {
 	payload := map[string]any{
 		"sensor_id":   s.SensorID,
-		"sensor_type": s.SensorType,
 		"details": map[string]string{
 			"agent_version":    s.AgentVersion,
 			"contract_version": s.HubContractVersion,
@@ -173,12 +161,11 @@ func (s *Sensor) heartbeatLoop() {
 func (s *Sensor) runTestMode() {
 	log.Println("🛠️ TEST MODE ACTIVE: Sending synthetic payload...")
 	success := s.ReportEvent(
-		"test_mode_synthetic_alert",
 		"info",
-		map[string]any{"test_message": "Automated CI/CD check."},
-		"ignored",
+		"test_mode_synthetic_alert",
 		"CI/CD Runner",
 		"Mock Hub",
+		map[string]any{"test_message": "Automated CI/CD check."},
 	)
 
 	if success {

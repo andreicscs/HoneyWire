@@ -57,16 +57,14 @@ def generate_fleet(num_sensors=8):
         fleet.append({"sensor_id": sensor_id, "sensor_type": s_type})
     return fleet
 
-def create_event(sensor, event_type, severity, target, details, source_ip=None):
+def create_event(sensor, event_trigger, severity, target, details, source_ip=None):
     return {
-        "sensor_id": sensor["sensor_id"],
-        "sensor_type": sensor["sensor_type"],
         "contract_version": VERSION,
-        "source": source_ip or generate_random_ip(),
-        "action_taken": random.choice(["logged", "blocked", "tarpitted", "alert_only"]),
-        "event_type": event_type,
         "severity": severity,
+        "event_trigger": event_trigger,
+        "source": source_ip or generate_random_ip(),
         "target": target,
+        "sensor_id": sensor["sensor_id"],
         "details": details
     }
 
@@ -146,7 +144,6 @@ def simulate_campaign(fleet):
 def post_heartbeat(sensor):
     body = {
         "sensor_id": sensor["sensor_id"],
-        "sensor_type": sensor["sensor_type"],
         "details": {
             "version": VERSION,
             "os": random.choice(["Ubuntu 22.04 LTS", "Windows Server 2022", "Alpine 3.18"]),
@@ -162,7 +159,7 @@ def post_heartbeat(sensor):
 def post_event(event_data):
     try:
         requests.post(f"{HUB_URL}/api/v1/event", json=event_data, headers=HEADERS, timeout=2)
-        print(f" ↳ {event_data['severity'].upper().ljust(8)} | {event_data['sensor_id']} | {event_data['event_type']}")
+        print(f" ↳ {event_data['severity'].upper().ljust(8)} | {event_data['sensor_id']} | {event_data['event_trigger']}")
     except requests.exceptions.RequestException:
         print(" ❌ Connection refused. Is the Hub running?")
 

@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import threading
-import datetime
 import requests
 from abc import ABC, abstractmethod
 
@@ -87,10 +86,10 @@ class HoneyWireSensor(ABC):
         """Background thread to ping the Hub every 30 seconds."""
         payload = {
             "sensor_id": self.sensor_id,
-            "sensor_type": self.sensor_type,
-            "metadata": {
+            "details": {
                 "agent_version": self.agent_version,
                 "contract_version": self.hub_contract_version,
+                "sensor_type": self.sensor_type
             }
         }
         while True:
@@ -103,33 +102,32 @@ class HoneyWireSensor(ABC):
 
     def report_event(
         self,
-        event_type: str,
-        severity,
-        details: dict,
-        action_taken: str = "logged",
+        event_trigger: str,
+        severity: str,
         source: str = "Unknown",
         target: str = "Unknown",
+        details: dict = None
     ) -> bool:
         """Formats and sends the payload enforcing the HoneyWire JSON Schema."""
+        if details is None:
+            details = {}
+            
         normalized_severity = self._normalize_severity(severity)
         
         payload = {
-            "contract_version": "1.0",
-            "sensor_id": self.sensor_id,
-            "sensor_type": self.sensor_type,
-            "event_type": event_type,
+            "contract_version": HONEYWIRE_SCHEMA_VERSION,
             "severity": normalized_severity,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "action_taken": action_taken,
+            "event_trigger": event_trigger,
             "source": source,
             "target": target,
+            "sensor_id": self.sensor_id,
             "details": details
         }
 
         try:
             resp = self._post_to_hub("/api/v1/event", payload)
             resp.raise_for_status()
-            print(f"[+] Event sent: {event_type} (Severity: {normalized_severity})")
+            print(f"[+] Event sent: {event_trigger} (Severity: {normalized_severity})")
             return True
         except requests.exceptions.RequestException as e:
             print(f"[-] Event report failed: {e}")
@@ -139,10 +137,14 @@ class HoneyWireSensor(ABC):
         """Used by CI/CD to verify sensor works and exits cleanly."""
         print("🛠️ TEST MODE ACTIVE: Sending synthetic payload...")
         success = self.report_event(
-            event_type="test_mode_synthetic_alert",
+            event_trigger="test_mode_synthetic_alert",
             severity="info",
-            details={"test_message": "Automated CI/CD check."},
-            action_taken="ignored"
+            source="CI/CD Runner",
+            target="Mock Hub",
+            details={
+                "test_message": "Automated CI/CD check.",
+                "action_taken": "ignored"
+            }
         )
         if success:
             print("✅ Test mode complete. Exiting gracefully.")

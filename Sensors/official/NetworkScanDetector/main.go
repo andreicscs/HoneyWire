@@ -33,7 +33,7 @@ var (
 
 func main() {
 	// 1. Initialize SDK
-	hw := sdk.NewSensor("network")
+	hw := sdk.NewSensor()
 	hw.Start()
 
 	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
@@ -117,16 +117,16 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 			log.Printf("[!] Port scan detected from %s: %v", srcIP, uniquePortsList)
 
 			hw.ReportEvent(
-				"network_scan_detected",
 				"high",
-				map[string]any{
-					"ports_hit":  uniquePortsList,
-					"count":      len(uniquePortsList),
-					"window_sec": window.Seconds(),
-				},
-				"logged",
+				"network_scan_detected",
 				srcIP,
 				"Multiple Ports",
+				map[string]any{
+					"ports_hit":    uniquePortsList,
+					"count":        len(uniquePortsList),
+					"window_sec":   window.Seconds(),
+					"action_taken": "logged",
+				},
 			)
 			
 			// Clear queue to save memory after an alert

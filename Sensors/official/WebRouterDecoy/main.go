@@ -51,7 +51,7 @@ const loginHTML = `<!DOCTYPE html>
 
 func main() {
 	// 1. Initialize SDK
-	hw = sdk.NewSensor("web_honeypot")
+	hw = sdk.NewSensor()
 	hw.Start()
 
 	log.Printf("[*] HoneyWire Web Router Decoy | Brand: %s | Port: %s", routerBrand, port)
@@ -108,16 +108,16 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Dispatch the Event via the SDK
 	hw.ReportEvent(
-		"web_login_attempt",
 		"critical",
+		"web_login_attempt",
+		srcIP,
+		"Web Interface",
 		map[string]any{
 			"user_agent":         userAgent,
 			"attempted_username": username,
 			"attempted_password": password,
+			"action_taken":       "logged", 
 		},
-		"logged",
-		srcIP,
-		"Web Interface",
 	)
 
 	// Always return 401 Unauthorized to keep them guessing

@@ -24,7 +24,7 @@ var (
 
 func main() {
 	// 1. Initialize SDK
-	hw := sdk.NewSensor("tarpit")
+	hw := sdk.NewSensor()
 	hw.Start()
 
 	log.Printf("[*] HoneyWire Tarpit | Mode: %s", strings.ToUpper(tarpitMode))
@@ -140,15 +140,15 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 
 	// 3. Dispatch the Event via the SDK
 	hw.ReportEvent(
-		"tcp_connection",
 		"high",
+		"tcp_connection",
+		srcIP,
+		fmt.Sprintf("Port %d", port),
 		map[string]any{
 			"duration_sec": duration,
 			"payload":      payload,
+			"action_taken": tarpitMode, 
 		},
-		tarpitMode,
-		srcIP,
-		fmt.Sprintf("Port %d", port),
 	)
 }
 

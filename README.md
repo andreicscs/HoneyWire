@@ -45,15 +45,12 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 ```json
 {
   "contract_version": "1.0",
-  "sensor_id": "core-dpi-engine",
-  "sensor_type": "deep_packet_inspection",
-  "event_type": "malformed_jwt_detected",
   "severity": "critical",
-  "timestamp": "2026-04-03T11:30:00Z",
-  "action_taken": "ip_banned",
+  "event_trigger": "malformed_jwt_detected",
+  "source": "104.28.19.12",
+  "target": "Auth Gateway",
+  "sensor_id": "core-dpi-engine",  
   "details": {
-    "source_ip": "104.28.19.12",
-    "target": "Auth Gateway",
     "protocol": "TCP",
     "headers_stripped": true,
     "payload_sample": [

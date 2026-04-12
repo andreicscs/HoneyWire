@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// 1. Initialize the HoneyWire SDK
-	hw := sdk.NewSensor("file_canary")
+	hw := sdk.NewSensor()
 	hw.Start() // Syncs version, starts heartbeats, runs tests
 
 	// 2. Setup Sensor-specific logic
@@ -71,15 +71,14 @@ func handleFSEvent(hw *sdk.Sensor, event fsnotify.Event) {
 
 	// 4. Use the SDK to dispatch the event (no manual HTTP building required!)
 	hw.ReportEvent(
-		"file_tampered",                      // Event Type
-		"critical",                           // Severity
-		map[string]any{                       // Details
+		"critical",
+		"file_tampered",
+		"Unknown (Local OS)",
+		event.Name,
+		map[string]any{
 			"action":       action,
-			"timestamp_os": fmt.Sprintf("%d", time.Now().Unix()),
+			"action_taken": "logged",
 		},
-		"logged",                             // Action Taken
-		"Unknown (Local OS)",                 // Source
-		event.Name,                           // Target
 	)
 }
 

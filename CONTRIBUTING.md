@@ -25,19 +25,18 @@ Your sensor must POST a payload to the Hub (`HW_HUB_ENDPOINT`) matching this exa
 ```json
 {
   "contract_version": "1.0",
-  "sensor_id": "provided-by-env",
-  "sensor_type": "your_sensor_category",
-  "event_type": "what_just_happened",
-  "severity": "critical", 
-  "timestamp": "2026-04-03T01:24:18Z",
-  "action_taken": "logged",
+  "severity": "critical",
+  "event_trigger": "what_just_happened",
+  "source": "104.28.19.12",
+  "target": "Auth Gateway",
+  "sensor_id": "provided-by-env",  
   "details": {
     "ip": "192.168.1.5",
     "custom_data": "anything you want"
   }
 }
 ```
-*(Note: If you use the official HoneyWire Go SDK provided in the template, this formatting and timestamping is handled for you automatically).*
+*(Note: If you use the official HoneyWire Go SDK provided in the template, this formatting is handled for you automatically).*
 
 ### 3. Implement Test Mode (Required for CI/CD)
 To ensure your code works before merging, our GitHub Actions will build your Docker container and pass `HW_TEST_MODE=true` as an environment variable. 

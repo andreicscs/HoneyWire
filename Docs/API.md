@@ -113,17 +113,19 @@ Sensors report intrusion events here.
 * **Request:**
 ```json
 {
-  "contract_version": "1.0.0",
-  "sensor_id": "node-01",
-  "sensor_type": "tarpit",
-  "event_type": "tcp_connection",
-  "severity": "high",
-  "source": "1.2.3.4",
-  "target": "Port 2222",
-  "action_taken": "hold",
+  "contract_version": "1.0",
+  "severity": "critical",
+  "event_trigger": "malformed_jwt_detected",
+  "source": "104.28.19.12",
+  "target": "Auth Gateway",
+  "sensor_id": "core-dpi-engine",  
   "details": {
-    "payload": ["user: admin", "pass: 1234"],
-    "any_other_key": "custom_data"
+    "protocol": "TCP",
+    "headers_stripped": true,
+    "payload_sample": [
+      "Authorization: Bearer eyJhbG... [TRUNCATED]",
+      "User-Agent: curl/7.64.1"
+    ]
   }
 }
 ```
