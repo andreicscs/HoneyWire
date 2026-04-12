@@ -101,7 +101,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
         var isReadInt, isArchivedInt int
 
         if err := rows.Scan(
-            &e.ID, &e.ContractVersion, &e.SensorID,
+            &e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID,
             &e.EventTrigger, &e.Severity, &e.Source, &e.Target,
             &detailsStr, &isReadInt, &isArchivedInt,
         ); err != nil {
@@ -498,6 +498,16 @@ func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
         "status":  "success",
         "message": "Sensor forgotten successfully",
     })
+}
+
+// GET /api/v1/events/unread
+func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
+    var count int
+    err := h.Store.DB.QueryRow("SELECT COUNT(*) FROM events WHERE is_read = 0 AND is_archived = 0").Scan(&count)
+    if err != nil {
+        count = 0
+    }
+    SendJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
 // --- Auth & UI Handlers ---

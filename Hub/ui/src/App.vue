@@ -13,7 +13,8 @@
     viewingArchive, 
     startPolling, 
     toggleArmed, 
-    markAllRead 
+    markAllRead,
+    events
   } = useSentinel()
 
   const isAuthenticated = ref(false)
@@ -45,7 +46,9 @@
 
   const clearLogs = async () => {
     if (confirm("Confirm Database Purge?\n\nThis will permanently delete ALL active and archived event logs. This action cannot be undone.")) {
-        
+        if (events) {
+            events.value = [] 
+        }
         try {
             const response = await fetch('/api/v1/events', {
                 method: 'DELETE',

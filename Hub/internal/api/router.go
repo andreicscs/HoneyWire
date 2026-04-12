@@ -35,6 +35,7 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 		r.Get("/api/v1/system/state", h.GetSystemState)
 		r.Patch("/api/v1/system/state", h.SetSystemState)
 
+		r.Get("/api/v1/events/unread", h.GetUnreadCount)
 		r.Patch("/api/v1/events/read", h.MarkEventsRead)
 		r.Patch("/api/v1/events/{event_id}/read", h.MarkSingleEventRead)
 		r.Delete("/api/v1/events", h.ClearEvents)

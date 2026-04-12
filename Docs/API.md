@@ -45,9 +45,12 @@ Lists all registered sensors, their health status (Online/Offline), and metadata
 [
   {
     "sensor_id": "tarpit-01",
-    "sensor_type": "web_honeypot",
     "last_seen": "2026-04-07 15:25:11",
-    "metadata": {"version": "1.0.0", "mode": "hold"},
+    "metadata": {
+      "agent_version": "1.0.0", 
+      "contract_version": "1.0",
+      "sensor_type": "web_honeypot"
+    },
     "status": "online",
     "is_silenced": false
   }
@@ -72,8 +75,12 @@ Returns heatmap data for the Fleet Health dashboard.
 
 ## Events
 
+### GET /api/v1/events/unread
+Returns a lightweight integer representing the count of active, unread events. Used for UI badge polling without downloading full payloads.
+* **Response:** `{ "count": 12 }`
+
 ### GET /api/v1/events
-Returns a list of events.
+Returns a list of events. Hard-capped at 1000 records to protect UI performance.
 * **Query Params:** `?archived=true` (Default: `false`)
 * **Response:** Array of event objects containing full forensic `details`.
 
@@ -102,8 +109,11 @@ Sensors call this every 30 seconds.
 ```json
 {
   "sensor_id": "alpha-node-01",
-  "sensor_type": "tarpit",
-  "metadata": {"version": "1.0.0", "mode": "hold"}
+  "details": {
+    "agent_version": "1.0.0",
+    "contract_version": "1.0",
+    "sensor_type": "tarpit"
+  }
 }
 ```
 
@@ -125,7 +135,8 @@ Sensors report intrusion events here.
     "payload_sample": [
       "Authorization: Bearer eyJhbG... [TRUNCATED]",
       "User-Agent: curl/7.64.1"
-    ]
+    ],
+    "action_taken": "logged"
   }
 }
 ```
