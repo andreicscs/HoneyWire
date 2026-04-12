@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/honeywire/sdk-go"
