@@ -62,45 +62,48 @@ onUnmounted(() => { window.removeEventListener('click', closeMenu); window.remov
     <div class="flex justify-between items-center gap-4">
         <div class="flex items-center w-full gap-2">
             <div class="flex-1 relative overflow-hidden">
-                <div ref="scrollArea" @scroll.passive="checkScroll" class="flex overflow-x-auto whitespace-nowrap gap-2 items-center custom-scroll pb-3 pr-2 relative">
-                    
-                    <div class="sticky left-0 z-20 pr-2 bg-slate-200 dark:bg-[#0a0a0c] flex items-center border-r border-slate-300 dark:border-zinc-800 transition-all duration-200">
-                        <button id="pill-all" @click="$emit('select-sensor', null)" 
-                                class="shrink-0 px-3.5 py-1.5 rounded-md border text-sm font-bold transition-all shadow-sm"
-                                :class="!selectedSensor ? 'bg-slate-800 text-white dark:bg-zinc-200 dark:text-black border-transparent' : 'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'">
-                            All Traffic
-                        </button>
-                    </div>
+                <div class="relative flex overflow-x-auto gap-1">
+                    <div ref="scrollArea" @scroll.passive="checkScroll" class="flex overflow-x-auto whitespace-nowrap gap-2 items-center custom-scroll pb-3 pr-2 relative">
+                        
+                        <div class="sticky left-0 z-20 pr-2 bg-slate-200 dark:bg-[#0a0a0c] flex items-center border-r border-slate-300 dark:border-zinc-800 transition-all duration-200">
+                            <button id="pill-all" @click="$emit('select-sensor', null)" 
+                                    class="shrink-0 px-3.5 py-1.5 rounded-md border text-sm font-bold transition-all shadow-sm"
+                                    :class="!selectedSensor ? 'bg-slate-800 text-white dark:bg-zinc-200 dark:text-black border-transparent' : 'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'">
+                                All Traffic
+                            </button>
+                        </div>
 
-                    <div v-for="s in fleet" :key="s.sensor_id" class="shrink-0 relative">
-                        <button :id="'pill-' + s.sensor_id" @click="$emit('select-sensor', s.sensor_id)" 
-                                class="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-md border text-xs font-semibold transition-colors group shadow-sm"
-                                :class="[
-                                    selectedSensor === s.sensor_id ? 'bg-slate-700 text-white dark:bg-zinc-700 dark:text-white border-transparent' : 'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800',
-                                    s.status !== 'online' ? 'is-offline' : ''
-                                ]"
-                                :title="s.status === 'online' ? 'Active' : 'Last seen: ' + s.last_seen">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="s.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
-                            <span class="mono pointer-events-none">{{ s.sensor_id }}</span>
-                            
-                            <div @click.stop="toggleMenu($event, s.sensor_id)" 
-                                 class="meatball-toggle w-4 h-4 ml-1 rounded flex items-center justify-center transition-all text-current opacity-40 group-hover:opacity-100 hover:bg-current/10 pointer-events-auto"
-                                 :class="{'opacity-100 bg-current/10': activeMenu === s.sensor_id}">
-                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                        <div v-for="s in fleet" :key="s.sensor_id" class="shrink-0 relative">
+                            <button :id="'pill-' + s.sensor_id" @click="$emit('select-sensor', s.sensor_id)" 
+                                    class="flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-md border text-xs font-semibold transition-colors group shadow-sm"
+                                    :class="[
+                                        selectedSensor === s.sensor_id ? 'bg-slate-700 text-white dark:bg-zinc-700 dark:text-white border-transparent' : 'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800',
+                                        s.status !== 'online' ? 'is-offline' : ''
+                                    ]"
+                                    :title="s.status === 'online' ? 'Active' : 'Last seen: ' + s.last_seen">
+                                <span class="w-1.5 h-1.5 rounded-full" :class="s.status === 'online' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                                <span class="mono pointer-events-none">{{ s.sensor_id }}</span>
+                                
+                                <div @click.stop="toggleMenu($event, s.sensor_id)" 
+                                    class="meatball-toggle w-4 h-4 ml-1 rounded flex items-center justify-center transition-all text-current opacity-40 group-hover:opacity-100 hover:bg-current/10 pointer-events-auto"
+                                    :class="{'opacity-100 bg-current/10': activeMenu === s.sensor_id}">
+                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="w-6 h-8 shrink-0 flex items-center justify-center z-1">
+                        <transition enter-active-class="transition-opacity duration-300 ease-out" leave-active-class="transition-opacity duration-300 ease-in" enter-from-class="opacity-0" leave-to-class="opacity-0">
+                            <div v-show="showOfflineWarning" class="flex items-center justify-center">
+                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500" :class="{ 'animate-pulse': showOfflineWarning }"></span>
                             </div>
-                        </button>
+                        </transition>
                     </div>
                 </div>
-                <div class="absolute right-0 top-0 bottom-3 w-10 bg-gradient-to-l from-slate-200/60 dark:from-[#0a0a0c] to-transparent pointer-events-none"></div>
+                <div class="absolute right-5 top-0 bottom-7 w-10 bg-gradient-to-l from-slate-200/60 dark:from-[#0a0a0c] to-transparent pointer-events-none"></div>
             </div>
             
-            <div class="w-6 h-8 shrink-0 flex items-center justify-center">
-                <transition enter-active-class="transition-opacity duration-300 ease-out" leave-active-class="transition-opacity duration-300 ease-in" enter-from-class="opacity-0" leave-to-class="opacity-0">
-                    <div v-show="showOfflineWarning" class="flex items-center justify-center">
-                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500" :class="{ 'animate-pulse': showOfflineWarning }"></span>
-                    </div>
-                </transition>
-            </div>
+            
         </div>
 
         <Teleport to="body">

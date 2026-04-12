@@ -115,7 +115,7 @@ const isSilenced = (sensorId) => {
             </div>
         </div>
         
-        <div class="hidden sm:flex mt-auto h-4 pt-5 items-center justify-end gap-3 sm:gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 border-t border-transparent">
+        <div class="hidden sm:flex mt-auto h-4 pt-5 items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 border-t border-transparent">
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span>Up</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span>Degraded</div>
             <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span>Down</div>
