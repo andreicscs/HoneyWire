@@ -4,6 +4,7 @@ package models
 // Event represents an incoming alert from a sensor
 type Event struct { 
     ID              int                    `json:"id"`
+	Timestamp       string                 `json:"timestamp"`
     ContractVersion string                 `json:"contract_version"`
     SensorID        string                 `json:"sensor_id"`
     EventTrigger    string                 `json:"event_trigger"`
