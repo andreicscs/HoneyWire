@@ -28,6 +28,8 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	r.Group(func(r chi.Router) {
 		r.Use(UIAuthMiddleware(cfg, sessionStore))
 
+		r.Get("/api/v1/ws", h.ServeWS)
+
 		r.Get("/api/v1/sensors", h.GetSensors)
 		r.Get("/api/v1/events", h.GetEvents)
 		r.Get("/api/v1/uptime", h.GetUptime)
