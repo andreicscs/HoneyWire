@@ -14,7 +14,8 @@
     startPolling, 
     toggleArmed, 
     markAllRead,
-    events
+    events,
+    logout // <-- Extracted logout action
   } = useSentinel()
 
   const isAuthenticated = ref(false)
@@ -29,7 +30,7 @@
             startPolling()
         }
     } catch (e) {
-        // Not authenticated, leave at false
+        // Not authenticated
     }
   }
   
@@ -44,34 +45,44 @@
     }
   }
 
+  // --- DRYRUN PURGE LOGIC ---
   const clearLogs = async () => {
-    if (confirm("Confirm Database Purge?\n\nThis will permanently delete ALL active and archived event logs. This action cannot be undone.")) {
-        if (events) {
-            events.value = [] 
+    try {
+        // Step 1: Perform the Dry Run to get the exact count
+        const dryRes = await fetch('/api/v1/events?dryrun=true', { method: 'DELETE' })
+        if (!dryRes.ok) throw new Error("Failed to fetch dryrun data")
+        
+        const dryData = await dryRes.json()
+        const count = dryData.would_delete || 0
+
+        if (count === 0) {
+            alert("The database is already empty.")
+            return
         }
-        try {
+
+        // Step 2: Ask user with the specific count
+        if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
+            
+            // Optimistic UI wipe
+            if (events) events.value = [] 
+            if (unreadCount) unreadCount.value = 0 
+            
+            // Step 3: The actual deletion
             const response = await fetch('/api/v1/events', {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             })
 
             if (!response.ok) {
-                const errText = await response.text()
-                console.error("Failed to purge logs:", errText)
-                alert("Failed to purge logs. See console for details.")
+                console.error("Failed to purge logs")
+                alert("Failed to purge logs. Check server console.")
             } else {
-                console.log("Database purged successfully. UI will update on next poll.")
-                // Optional: If you want it to clear instantly without waiting for the 5s poll, 
-                // you can do a soft reload here:
-                // window.location.reload()
+                console.log("Database purged successfully.")
             }
-            
-        } catch (error) {
-            console.error("Network error while purging logs:", error)
-            alert("Network error. Could not reach the Hub to purge logs.")
         }
+    } catch (error) {
+        console.error("Network error while purging logs:", error)
+        alert("Network error. Could not reach the Hub.")
     }
   }
 
@@ -116,6 +127,7 @@
         @toggle-theme="toggleTheme" 
         @toggle-armed="toggleArmed" 
         @mark-all-read="markAllRead" 
+        @logout="logout" 
       />
       
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">

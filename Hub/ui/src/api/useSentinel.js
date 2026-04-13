@@ -12,20 +12,15 @@ const activeTimeframe = ref('24H')
 const activeEvent = ref(null)
 const unreadCount = ref(0)
 
+// --- PAGINATION STATE ---
+const isFetching = ref(false)
+
 export function useSentinel() {
     
-    // --- COMPUTED PROPERTIES ---    
-    const filteredEvents = computed(() => {
-        return selectedSensor.value 
-            ? events.value.filter(e => e.sensor_id === selectedSensor.value) 
-            : events.value
-    })
-
     const overallUptime = computed(() => {
         if (!uptimeData.value || uptimeData.value.length === 0) return '0.0%'
         let validBlocks = 0
         let upBlocks = 0
-        
         uptimeData.value.forEach(sensor => {
             sensor.blocks.forEach(block => {
                 if (block.status !== 'nodata') {
@@ -35,7 +30,6 @@ export function useSentinel() {
                 }
             })
         })
-        
         if (validBlocks === 0) return '100.0%'
         return ((upBlocks / validBlocks) * 100).toFixed(1) + '%'
     })
@@ -46,21 +40,29 @@ export function useSentinel() {
     })
 
     // --- FETCHERS ---
+    const refreshUnreadCount = async () => {
+        const res = await fetch('/api/v1/events/unread').then(r => r.json()).catch(() => ({count: 0}))
+        unreadCount.value = res.count
+    }
+
     const fetchEvents = async () => {
         try {
-            if (viewingArchive.value) {
-                const archiveEv = await fetch(`/api/v1/events?archived=true`).then(r => r.json()).catch(() => [])
-                events.value = archiveEv 
-                
-                const activeEv = await fetch(`/api/v1/events?archived=false`).then(r => r.json()).catch(() => [])
-                if (activeEv) unreadCount.value = activeEv.filter(e => !e.is_read).length
-            } else {
-                const activeEv = await fetch(`/api/v1/events?archived=false`).then(r => r.json()).catch(() => [])
-                events.value = activeEv 
-                if (activeEv) unreadCount.value = activeEv.filter(e => !e.is_read).length
+            isFetching.value = true
+            const url = new URL('/api/v1/events', window.location.origin)
+            url.searchParams.append('archived', viewingArchive.value)
+            
+            if (selectedSensor.value) {
+                url.searchParams.append('sensor_id', selectedSensor.value)
             }
+
+            const res = await fetch(url.toString()).then(r => r.json())
+            
+            events.value = res || []
+            await refreshUnreadCount()
         } catch(e) {
             console.error('Failed to fetch events', e)
+        } finally {
+            isFetching.value = false
         }
     }
 
@@ -83,15 +85,9 @@ export function useSentinel() {
 
             if (sn && sn.length) {
                 fleet.value = sn.map(newSensor => {
-                    const normalizedSensor = { ...newSensor, is_silenced: !!newSensor.is_silenced }
-                    const current = fleet.value.find(f => f.sensor_id === normalizedSensor.sensor_id)
-                    if (current && current._lockedUntil && Date.now() < current._lockedUntil) {
-                        return { ...normalizedSensor, is_silenced: current.is_silenced, _lockedUntil: current._lockedUntil }
-                    }
-                    return normalizedSensor
+                    return { ...newSensor, is_silenced: !!newSensor.is_silenced }
                 })
             }
-
             isArmed.value = st.is_armed !== undefined ? st.is_armed : isArmed.value
             version.value = ver.version || version.value
 
@@ -103,11 +99,10 @@ export function useSentinel() {
     // --- WEBSOCKET ENGINE ---
     let ws = null;
     let pollInterval = null;
-    let isDestroyed = false; // Prevents memory leaks if unmounted
+    let isDestroyed = false; 
 
-    const connectWS = () => {
+const connectWS = () => {
         if (isDestroyed) return;
-
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
 
@@ -119,11 +114,21 @@ export function useSentinel() {
                 
                 if (data.type === 'NEW_EVENT') {
                     unreadCount.value++; 
-
                     if (!viewingArchive.value) {
-                        events.value.unshift(data.payload);
-                        if (events.value.length > 1000) events.value.pop();
+                        if (!selectedSensor.value || selectedSensor.value === data.payload.sensor_id) {
+                            events.value.unshift(data.payload);
+                        }
                     }
+                } else if (data.type === 'NEW_SENSOR') {
+                    fetchFleet();
+                    fetchUptime();
+                } else if (data.type === 'DELETE_SENSOR') {
+                    fleet.value = fleet.value.filter(s => s.sensor_id !== data.payload.sensor_id);
+                    uptimeData.value = uptimeData.value.filter(s => s.id !== data.payload.sensor_id);
+                    if (selectedSensor.value === data.payload.sensor_id) selectedSensor.value = null;
+                } else if (data.type === 'SILENCE_SENSOR') {
+                    const s = fleet.value.find(s => s.sensor_id === data.payload.sensor_id);
+                    if (s) s.is_silenced = data.payload.is_silenced;
                 }
             } catch (e) {
                 console.error("WS Parse error", e);
@@ -131,24 +136,26 @@ export function useSentinel() {
         };
 
         ws.onclose = () => {
-            if (!isDestroyed) {
-                console.warn('🔴 WebSockets Disconnected. Reconnecting in 3s...');
-                setTimeout(connectWS, 3000); 
-            }
+            if (!isDestroyed) setTimeout(connectWS, 3000); 
         };
     }
 
     // --- ACTIONS ---
+    const logout = async () => {
+        try {
+            await fetch('/logout', { method: 'POST' })
+            // Hard redirect to clear frontend state and force re-auth
+            window.location.href = '/'
+        } catch(err) {
+            console.error("Logout failed", err)
+        }
+    }
+
     const startPolling = async () => {
         isDestroyed = false;
-        
         await Promise.all([fetchEvents(), fetchFleet(), fetchUptime()])
         connectWS()
-
-        pollInterval = setInterval(() => {
-            fetchFleet()
-            fetchUptime()
-        }, 30000)
+        pollInterval = setInterval(() => { fetchFleet(); fetchUptime() }, 30000)
     }
 
     const stopPolling = () => {
@@ -158,7 +165,7 @@ export function useSentinel() {
     }
 
     // --- WATCHERS ---
-    watch(viewingArchive, () => fetchEvents())
+    watch([viewingArchive, selectedSensor], () => fetchEvents())
     watch(activeTimeframe, () => fetchUptime())
 
     const toggleArmed = async () => {
@@ -195,17 +202,15 @@ export function useSentinel() {
             await fetch(`/api/v1/events/${id}/archive`, {method: 'PATCH'})
             events.value = events.value.filter(e => e.id !== id)
             activeEvent.value = null
+            await refreshUnreadCount()
         } catch(err) { console.error(err) }
     }
 
     const forgetSensor = async (sensorId) => {
         fleet.value = fleet.value.filter(s => s.sensor_id !== sensorId)
+        uptimeData.value = uptimeData.value.filter(s => s.id !== sensorId)
         if (selectedSensor.value === sensorId) selectedSensor.value = null
-
-        try {
-            await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' })
-            fetchFleet() 
-        } catch (err) {}
+        try { await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' }) } catch (err) {}
     }
 
     const toggleSilence = async (sensorId) => {
@@ -227,24 +232,20 @@ export function useSentinel() {
     const markEventRead = async (eventId) => {
         const ev = events.value.find(e => e.id === eventId)
         if (!ev || ev.is_read) return
-        
-        // Optimistic update
         ev.is_read = true
         unreadCount.value = Math.max(0, unreadCount.value - 1)
-
         try {
             await fetch(`/api/v1/events/${eventId}/read`, { method: 'PATCH' })
         } catch (err) {
-            // Rollback on failure
             ev.is_read = false
-            unreadCount.value = events.value.filter(e => !e.is_read).length
+            await refreshUnreadCount()
         }
     }
     
     return {
         events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe,
-        unreadCount, filteredEvents, overallUptime,
-        startPolling, stopPolling, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
+        unreadCount, overallUptime, isFetching,
+        logout, startPolling, stopPolling, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
         activeEvent, isActiveSensorSilenced
     }
 }

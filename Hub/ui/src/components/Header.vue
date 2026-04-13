@@ -5,7 +5,7 @@ defineProps({
     unreadCount: Number
 })
 
-defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read'])
+defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
 </script>
 
 <template>
@@ -45,7 +45,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read'])
             </button>
             
             <div class="w-px h-4 bg-slate-300 dark:bg-zinc-700 mx-1"></div>
-            <a href="/logout" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-colors">Exit</a>
+            <a @click="$emit('logout')" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer">Exit</a>
         </div>
     </header>
 </template>

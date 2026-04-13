@@ -21,7 +21,7 @@ services:
     environment:
       - HW_HUB_ENDPOINT=http://127.0.0.1:8080 
       - HW_HUB_KEY=change_this_to_a_secure_random_string
-      - HW_SENSOR_ID=production-web-decoy-01
+      - HW_SENSOR_ID=web-decoy-01
       - HW_TEST_MODE=false
       
       # Web Honeypot Configuration

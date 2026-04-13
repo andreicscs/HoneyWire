@@ -1,7 +1,9 @@
 package api
 
 import (
+	"log"
 	"net/http"
+	"time"
 	"io/fs"
 	
 	"github.com/go-chi/chi/v5"
@@ -12,9 +14,25 @@ import (
 	"github.com/honeywire/hub/ui"
 )
 
+func ErrorOnlyLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+		start := time.Now()
+
+		next.ServeHTTP(ww, r)
+
+		// Only print to the terminal if something went wrong
+		if ww.Status() >= 400 {
+			log.Printf("[-] HTTP %d | %s %s from %s (took %v)",
+				ww.Status(), r.Method, r.URL.Path, r.RemoteAddr, time.Since(start))
+		}
+	})
+}
+
 func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionStore) *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	
+	r.Use(ErrorOnlyLogger)
 	r.Use(middleware.Recoverer)
 
 	h := NewHandler(s, cfg, sessionStore)
@@ -22,7 +40,7 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	// Public Endpoints
 	r.Get("/api/v1/version", h.HandleVersion)
 	r.Post("/login", h.Login)
-	r.Get("/logout", h.Logout)
+	r.Post("/logout", h.Logout)
 
 	// UI Endpoints (Protected by Cookies)
 	r.Group(func(r chi.Router) {
@@ -56,16 +74,12 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	})
 
 	// --- Serve the Vue Frontend ---
-	
-	// Extract the 'dist' sub-folder from the embedded filesystem
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")
 	if err != nil {
 		panic("Failed to mount embedded UI files: " + err.Error())
 	}
 
 	fileServer := http.FileServer(http.FS(distFS))
-
-	// Catch-all route: Serve the Vue files for anything not matching the API routes above
 	r.Handle("/*", fileServer)
 
 	return r

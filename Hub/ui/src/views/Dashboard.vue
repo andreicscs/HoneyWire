@@ -7,7 +7,7 @@
     import ThreatVelocity from '../components/ThreatVelocity.vue'
 
     const { 
-        fleet, selectedSensor, filteredEvents, uptimeData, activeTimeframe, 
+        fleet, selectedSensor, events, uptimeData, activeTimeframe, 
         overallUptime, viewingArchive, archiveAll,
         activeEvent, isActiveSensorSilenced, archiveEvent, toggleSilence, forgetSensor, markEventRead
     } = useSentinel()
@@ -30,11 +30,11 @@
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
             
             <div class="flex-[1_1_350px] min-w-[100%] sm:min-w-[350px] h-[320px] lg:h-[340px] shrink-0">
-                <ThreatVelocity :events="filteredEvents" />
+                <ThreatVelocity :events="events" />
             </div>
 
             <div class="flex-[1_1_280px] min-w-[100%] sm:min-w-[280px] max-w-[450px] mx-auto h-[320px] lg:h-[340px] shrink-0">
-                <SeverityChart :events="filteredEvents" />
+                <SeverityChart :events="events" />
             </div>
             
             <div class="flex-[1.5_1_450px] min-w-[100%] lg:min-w-[450px] h-[320px] lg:h-[340px] shrink-0">
@@ -52,13 +52,12 @@
 
         <div class="flex-1 min-h-0 pb-6 mt-2">
             <EventTable 
-                :events="filteredEvents" 
-                :viewingArchive="viewingArchive" 
+                :events="events" 
+                :viewingArchive="viewingArchive"
                 @archive-all="archiveAll"
                 @archive-event="archiveEvent"
-                @open-event="evt => { activeEvent = evt; if(!evt.is_read) { evt.is_read = 1; fetch(`/api/v1/events/${evt.id}/read`, {method: 'PATCH'})} }"
                 @mark-read="markEventRead"
-            /> 
+            />
         </div>
 
     </div>

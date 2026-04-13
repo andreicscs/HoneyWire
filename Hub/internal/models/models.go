@@ -14,6 +14,7 @@ type Event struct {
     Details         map[string]interface{} `json:"details"`
     IsRead          bool                   `json:"is_read"`
     IsArchived      bool                   `json:"is_archived"`
+    Count           int                    `json:"count"`
 }
 
 // Heartbeat represents a routine ping from a sensor

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"log"
+	"fmt"
 
 	_ "modernc.org/sqlite"
 )
@@ -51,7 +52,8 @@ type Store struct {
 
 // NewStore connects to SQLite, runs the migrations, and returns the Store
 func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)", dbPath)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -59,15 +61,6 @@ func NewStore(dbPath string) (*Store, error) {
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(25)
 
-	// CONCURRENCY FIXES: Enable WAL mode and a 5-second busy timeout
-	_, err = db.Exec(`
-		PRAGMA journal_mode = WAL;
-		PRAGMA busy_timeout = 5000;
-		PRAGMA synchronous = NORMAL;
-	`)
-	if err != nil {
-		log.Printf("Warning: Failed to set SQLite PRAGMAs: %v", err)
-	}
 
 	_, err = db.Exec(InitSchema)
 	if err != nil {
