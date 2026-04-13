@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS events (
     target           TEXT    NOT NULL DEFAULT 'Unknown',
     details          TEXT    NOT NULL DEFAULT '{}',
     is_read          INTEGER NOT NULL DEFAULT 0,
-    is_archived      INTEGER NOT NULL DEFAULT 0
+    is_archived      INTEGER NOT NULL DEFAULT 0,
+	count            INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS sensors (
