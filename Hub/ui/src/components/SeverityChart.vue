@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
 import Chart from 'chart.js/auto'
 
 const props = defineProps({
@@ -30,19 +30,30 @@ const neonGlowPlugin = {
 
 Chart.register(neonGlowPlugin)
 
-const updateChart = () => {
+const updateData = () => {
     if (!chartInstance) return;
     const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    props.events.forEach(e => {
+    
+    // FIX: Strip Vue Reactivity before looping
+    const rawEvents = toRaw(props.events);
+    
+    rawEvents.forEach(e => {
         const s = e.severity ? e.severity.toLowerCase() : 'info';
         if (counts.hasOwnProperty(s)) counts[s]++;
     });
     
     const newData = ['critical', 'high', 'medium', 'low', 'info'].map(k => counts[k]);
-    if (JSON.stringify(chartInstance.data.datasets[0].data) !== JSON.stringify(newData)) {
+    const currentData = chartInstance.data.datasets[0].data;
+    const hasChanged = newData.some((val, i) => val !== currentData[i]);
+
+    if (hasChanged) {
         chartInstance.data.datasets[0].data = newData;
-        chartInstance.update();
+        chartInstance.update(); 
     }
+}
+
+const updateTheme = () => {
+    if (chartInstance) chartInstance.update('none'); 
 }
 
 onMounted(() => {
@@ -65,20 +76,24 @@ onMounted(() => {
                 plugins: { legend: { display: false } } 
             }
         });
-        updateChart();
+        updateData();
     }
 
     themeObserver = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class' && chartInstance) {
-                chartInstance.update(); 
-            }
-        });
-    });
+        let themeToggled = false
+        mutations.forEach((m) => { if (m.attributeName === 'class') themeToggled = true })
+        
+        if (themeToggled) {
+            setTimeout(() => {
+                updateTheme()
+            }, 50)
+        }
+    })
     themeObserver.observe(document.documentElement, { attributes: true });
 })
 
-watch(() => props.events, updateChart, { deep: true })
+watch([() => props.events.length, () => props.events[0]?.id], updateData)
+
 onUnmounted(() => {
     if (chartInstance) chartInstance.destroy()
     if (themeObserver) themeObserver.disconnect()
