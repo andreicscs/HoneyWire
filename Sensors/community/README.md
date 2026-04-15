@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](../../LICENSE)
+
 # Community Sensor Lab
 
 Welcome to the **HoneyWire Community Sensor Lab**. While our official sensors provide the core foundation, this directory is where the decentralized deception ecosystem truly thrives.
@@ -38,5 +40,3 @@ To protect our users, every sensor submitted here undergoes a rigorous automated
 **Join us in building a smarter, faster, and more resilient distributed defense.** 🐝
 
 ---
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](../../LICENSE)
-[![Status](https://img.shields.io/badge/status-WIP-yellow.svg)]()

@@ -12,13 +12,13 @@ HoneyWire uses two separate authentication mechanisms depending on the caller.
 
 ### Dashboard (UI) routes
 
-Protected by an HTTP-only session cookie named `hw_auth`. The cookie is issued by `POST /login` and is valid for 30 days. If `HW_DASHBOARD_PASSWORD` is not set in the Hub's environment, authentication is bypassed entirely — do not deploy without this variable set.
+Protected by an HTTP-only session cookie named `hw_auth`. The cookie is issued by `POST /login` and is valid for 30 days.
 
 ### Agent (sensor) routes
 
-Protected by a shared secret configured as `HW_HUB_KEY` on both the Hub and each sensor. Pass the key using either of these headers:
+Protected by a shared secret configured via the UI and stored in the Hub's SQLite database. Pass the key using either of these headers:
 
-```
+```text
 X-Api-Key: <HW_HUB_KEY>
 Authorization: Bearer <HW_HUB_KEY>
 ```
@@ -72,10 +72,77 @@ All messages share the same envelope:
 
 ---
 
-## System
+## System & Configuration
+
+HoneyWire splits configuration into two layers:
+1. **Infrastructure Level (`.env`):** Defines immutable properties like ports, database paths, and emergency dashboard password overrides (`HW_DASHBOARD_PASSWORD`).
+2. **Runtime Level (SQLite):** Governs hot-reloadable application logic like API keys, retention policies, and webhooks.
+
+### GET /api/v1/setup/status
+Checks if the database requires an initial master password and routing configuration. Automatically returns `false` if the `HW_DASHBOARD_PASSWORD` environment variable is strictly set.
+
+**Response:**
+```json
+{
+  "requires_setup": true
+}
+```
+
+### POST /api/v1/setup
+Initializes the runtime configuration and secures the Hub. Fails with `403 Forbidden` if the system has already been set up or if the environment variable lock is active.
+
+**Payload:**
+```json
+{
+  "password": "super_secure_password123",
+  "hub_endpoint": "https://honeywire.my-domain.com",
+  "hub_key": "hw_sk_randomstring"
+}
+```
+**Response:** `200 OK`
+
+---
+
+### GET /api/v1/config
+Retrieves the runtime settings.
+**Requires Authentication:** Yes (UI Cookie)
+
+**Default Values (On first boot):**
+* `auto_archive_days` / `auto_purge_days`: `0` (Disabled)
+* `webhook_type`: `ntfy`
+* `webhook_events`: `["critical", "high", "medium", "low", "info"]`
+
+**Response:**
+```json
+{
+  "hub_endpoint": "https://honeywire.my-domain.com",
+  "hub_key": "hw_sk_randomstring",
+  "auto_archive_days": 0,
+  "auto_purge_days": 30,
+  "webhook_type": "ntfy",
+  "webhook_url": "https://ntfy.sh/my_alerts",
+  "webhook_events": ["critical", "high", "medium", "low", "info"]
+}
+```
+
+### PATCH /api/v1/config
+Partially updates the runtime configuration. Omitted fields are ignored and remain unchanged in the database. Valid types for `webhook_type` are: `ntfy`, `gotify`, `discord`, `slack`.
+**Requires Authentication:** Yes (UI Cookie)
+
+**Payload Example:**
+```json
+{
+  "auto_archive_days": 14,
+  "webhook_type": "discord",
+  "webhook_url": "https://discord.com/api/webhooks/...",
+  "webhook_events": ["critical", "high"]
+}
+```
+**Response:** `200 OK`
+
+---
 
 ### GET /api/v1/version
-
 Returns the running Hub version.
 
 **Response**
@@ -83,10 +150,7 @@ Returns the running Hub version.
 { "version": "1.0.0" }
 ```
 
----
-
 ### GET /api/v1/system/state
-
 Returns the current armed/disarmed state. Disarmed hubs log events normally but suppress all push notifications.
 
 **Response**
@@ -94,10 +158,7 @@ Returns the current armed/disarmed state. Disarmed hubs log events normally but 
 { "is_armed": true }
 ```
 
----
-
 ### PATCH /api/v1/system/state
-
 Sets the armed state.
 
 **Request**
@@ -110,6 +171,40 @@ Sets the armed state.
 { "status": "success", "is_armed": false }
 ```
 
+---
+
+### PATCH /api/v1/system/password
+Updates the Master Password. The current password must be provided and validated against the database. On success, all active sessions are terminated. Fails with `403 Forbidden` if the `HW_DASHBOARD_PASSWORD` environment variable is set.
+**Requires Authentication:** Yes (UI Cookie)
+
+**Payload:**
+```json
+{
+  "current_password": "old_password123",
+  "new_password": "new_password456"
+}
+```
+**Response:** `200 OK`
+
+---
+
+---
+
+### POST /api/v1/system/reset
+Performs a full factory reset. Wipes all events, sensors, heartbeats, and configurations. The Hub will immediately revert to Setup mode. Terminates all active sessions.
+**Requires Authentication:** Yes (UI Cookie)
+
+**Payload:**
+```json
+{
+  "password": "your_master_password"
+}
+```
+**Response:** `200 OK`
+
+**Errors**: 
+  * 400 Bad Request if the payload is missing/malformed.
+  * 401 Unauthorized if the password does not match.
 ---
 
 ## Sensor Fleet
@@ -304,7 +399,7 @@ Permanently deletes all events from the database. This action is irreversible an
 
 ## Agent Endpoints
 
-These endpoints are called by sensors, not the dashboard. Both require the `HW_HUB_KEY` header.
+These endpoints are called by sensors, not the dashboard. Both require the configured database `hub_key`.
 
 ### POST /api/v1/heartbeat
 
@@ -333,7 +428,7 @@ Called by sensors every 30 seconds to signal they are alive and update their met
 
 Reports an intrusion event to the Hub. The Hub validates that the `contract_version` major number matches its own before accepting the event. On a mismatch, `426 Upgrade Required` is returned and the sensor should be updated.
 
-If the Hub is armed and the reporting sensor is not silenced, a push notification is dispatched immediately via the configured notifiers (ntfy/Gotify).
+If the Hub is armed and the reporting sensor is not silenced, a push notification is dispatched immediately via the configured notifiers (ntfy/Gotify/Discord/Slack).
 
 **Request**
 ```json

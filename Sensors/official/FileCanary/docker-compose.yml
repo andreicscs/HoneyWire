@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # 1. THE FIM SETTER: Only runs if the path exists. Simply grants the read-only ACL pass.
   permission-fixer:

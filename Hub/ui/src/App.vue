@@ -5,32 +5,55 @@
   import Dashboard from './views/Dashboard.vue'
   import Login from './views/Login.vue'
   import { useSentinel } from './api/useSentinel'
+  import Store from './views/Store.vue'
+  import Settings from './views/Settings.vue'
+  import { useConfig } from './api/useConfig'
+  import Setup from './views/Setup.vue'
 
   const { 
     version, 
     isArmed, 
     unreadCount, 
     viewingArchive, 
-    startPolling, 
+    startRealtimeSync, 
     toggleArmed, 
     markAllRead,
     events,
-    logout // <-- Extracted logout action
+    logout
   } = useSentinel()
+  const { fetchConfig } = useConfig()
 
+  const requiresSetup = ref(false)
   const isAuthenticated = ref(false)
   const currentView = ref('dashboard')
   const sidebarOpen = ref(true)
  
   const checkAuthAndInit = async () => {
     try {
+        const setupRes = await fetch('/api/v1/setup/status')
+        if (setupRes.ok) {
+            const setupData = await setupRes.json()
+            if (setupData.requires_setup) {
+                requiresSetup.value = true
+                isAuthenticated.value = false
+                return
+            }
+        }
+        
+        requiresSetup.value = false
+
         const res = await fetch('/api/v1/system/state')
         if (res.ok) {
             isAuthenticated.value = true
-            startPolling()
+            await fetchConfig() 
+            
+            startRealtimeSync()
+        } else {
+            isAuthenticated.value = false
         }
     } catch (e) {
-        // Not authenticated
+        console.error("Hub connection error:", e)
+        isAuthenticated.value = false
     }
   }
   
@@ -48,7 +71,7 @@
   // --- DRYRUN PURGE LOGIC ---
   const clearLogs = async () => {
     try {
-        // Step 1: Perform the Dry Run to get the exact count
+        //Perform the Dry Run to get the exact count
         const dryRes = await fetch('/api/v1/events?dryrun=true', { method: 'DELETE' })
         if (!dryRes.ok) throw new Error("Failed to fetch dryrun data")
         
@@ -60,15 +83,15 @@
             return
         }
 
-        // Step 2: Ask user with the specific count
+        //Ask user with the specific count
         if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
             
             // Optimistic UI wipe
             if (events) events.value = [] 
             if (unreadCount) unreadCount.value = 0 
             
-            // Step 3: The actual deletion
-            const response = await fetch('/api/v1/events', {
+            //The actual deletion
+            const response = await fetch('/api/v1/events?dryrun=false', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
             })
@@ -88,16 +111,21 @@
 
   onMounted(() => {
     checkAuthAndInit()
-    
-    if (localStorage.getItem('theme') === 'light' || (!('theme' in localStorage) && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.remove('dark')
-    } else {
-        document.documentElement.classList.add('dark')
-    }
   })
 </script>
 
+<script>
+  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && 
+      window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark')
+  }
+</script>
+
 <template>
+  <div v-if="requiresSetup" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
+    <Setup @setup-complete="checkAuthAndInit" @toggle-theme="toggleTheme" />
+  </div>
+  
   <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
     <Login 
       @login-success="checkAuthAndInit" 
@@ -137,11 +165,11 @@
         </div>
 
         <div v-else-if="currentView === 'store'">
-          <h1 class="text-xl font-bold">Sensor Store Placeholder</h1>
+          <Store />
         </div>
 
         <div v-else-if="currentView === 'settings'">
-          <h1 class="text-xl font-bold">Settings Placeholder</h1>
+          <Settings />
         </div>
 
       </div>

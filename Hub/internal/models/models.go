@@ -1,6 +1,24 @@
 package models
 
 
+// SetupPayload represents the initial setup POST request
+type SetupPayload struct {
+	Password    string `json:"password"`
+	HubEndpoint string `json:"hub_endpoint"`
+	HubKey      string `json:"hub_key"`
+}
+
+// ConfigPayload represents the runtime configuration of the Hub
+type ConfigPayload struct {
+	HubEndpoint     string   `json:"hub_endpoint"`
+	HubKey          string   `json:"hub_key"`
+	AutoArchiveDays int      `json:"auto_archive_days"`
+	AutoPurgeDays   int      `json:"auto_purge_days"`
+	WebhookURL      string   `json:"webhook_url"`
+    WebhookType     string   `json:"webhook_type"`
+	WebhookEvents   []string `json:"webhook_events"`
+}
+
 // Event represents an incoming alert from a sensor
 type Event struct { 
     ID              int                    `json:"id"`

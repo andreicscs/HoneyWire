@@ -38,5 +38,3 @@ services:
     environment:
       - HW_PORT=8080
       - HW_DB_PATH=/data/honeywire.db
-      - HW_HUB_KEY=change_this_to_a_secure_random_string
-      - HW_DASHBOARD_PASSWORD=admin

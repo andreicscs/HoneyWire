@@ -6,33 +6,36 @@ import (
 	"strings"
 
 	"github.com/honeywire/hub/internal/auth"
-	"github.com/honeywire/hub/internal/config"
+	"github.com/honeywire/hub/internal/store"
 )
 
-// UIAuthMiddleware requires a valid session cookie
-func UIAuthMiddleware(cfg *config.Config, store *auth.SessionStore) func(http.Handler) http.Handler {
+// UIAuthMiddleware strictly requires a valid session cookie for ALL dashboard routes
+func UIAuthMiddleware(sessionStore *auth.SessionStore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if cfg.DashboardPassword != "" {
-				cookie, err := r.Cookie(auth.CookieName)
-				if err != nil || !store.IsValid(cookie.Value) {
-					http.Error(w, "Unauthorized", http.StatusUnauthorized)
-					return
-				}
+			cookie, err := r.Cookie(auth.CookieName)
+			if err != nil || !sessionStore.IsValid(cookie.Value) {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
 			}
-			// If authorized, pass the request to the actual endpoint
+			
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-// AgentAuthMiddleware requires the correct API Secret from the sensors
-func AgentAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+// AgentAuthMiddleware securely validates sensor heartbeats/events against the DB Config
+func AgentAuthMiddleware(s *store.Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var configuredKey string
+			err := s.DB.QueryRow("SELECT value FROM config WHERE key='hub_key'").Scan(&configuredKey)
+			if err != nil || configuredKey == "" {
+				http.Error(w, "Hub is not fully configured.", http.StatusServiceUnavailable)
+				return
+			}
+
 			token := r.Header.Get("X-Api-Key")
-			
-			// Fallback to Bearer token
 			if token == "" {
 				authHeader := r.Header.Get("Authorization")
 				if strings.HasPrefix(authHeader, "Bearer ") {
@@ -40,9 +43,9 @@ func AgentAuthMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
 				}
 			}
 
-			// subtle.ConstantTimeCompare prevents timing attacks
-			if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(cfg.APISecret)) != 1 {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			//Constant Time Compare prevents timing-attack vulnerability scanning
+			if token == "" || len(token) != len(configuredKey) || subtle.ConstantTimeCompare([]byte(token), []byte(configuredKey)) != 1 {
+				http.Error(w, "Unauthorized Sensor", http.StatusUnauthorized)
 				return
 			}
 

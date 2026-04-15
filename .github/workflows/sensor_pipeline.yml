@@ -6,7 +6,7 @@ env:
 on:
   push:
     branches: [ "main" ]
-    # ONLY watch the official folder. Community doc updates won't waste CI minutes.
+    tags: [ "v*.*.*" ]
     paths: [ 'Sensors/official/**' ]
   pull_request:
     paths: [ 'Sensors/official/**' ]
@@ -40,11 +40,10 @@ jobs:
       - name: Generate Independent Matrix
         id: generate-matrix
         env:
-          # 2. THE FIX: Pass the output safely via an environment variable
           ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # On manual trigger: Find ALL folders in official/ containing a Dockerfile
+          # NEW: If it's a manual trigger OR a new Tag Release, build ALL sensors
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.ref_type }}" == "tag" ]; then
             MATRIX_JSON=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | jq -R -s -c 'split("\n")[:-1]')
           else
             # On Push/PR: Parse the changed files JSON from the safe environment variable
@@ -150,13 +149,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract Docker metadata
-        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/honeywire-${{ matrix.sensor }}
           tags: |
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
 
       - name: Build and Push
         if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

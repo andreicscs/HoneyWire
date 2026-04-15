@@ -6,22 +6,30 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/honeywire/hub/internal/config"
+	"fmt"
+	"strings"
 )
 
 var client = &http.Client{Timeout: 5 * time.Second}
 
-func Dispatch(cfg *config.Config, title, message, severity string) {
-	if cfg.NtfyURL != "" {
-		go sendNtfy(cfg, title, message, severity)
+func Dispatch(webhookType, webhookURL, title, message, severity string) {
+	if webhookURL == "" {
+		return
 	}
-	if cfg.GotifyURL != "" && cfg.GotifyToken != "" {
-		go sendGotify(cfg, title, message, severity)
+
+	switch strings.ToLower(webhookType) {
+	case "discord", "slack":
+		go sendDiscordSlack(webhookURL, title, message, severity)
+	case "gotify":
+		go sendGotify(webhookURL, title, message, severity)
+	case "ntfy":
+		fallthrough
+	default:
+		go sendNtfy(webhookURL, title, message, severity)
 	}
 }
 
-func sendGotify(cfg *config.Config, title, message, severity string) {
+func sendGotify(webhookURL, title, message, severity string) {
 	priorities := map[string]int{"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10}
 	priority, exists := priorities[severity]
 	if !exists {
@@ -35,8 +43,9 @@ func sendGotify(cfg *config.Config, title, message, severity string) {
 	}
 	body, _ := json.Marshal(payload)
 
-	req, _ := http.NewRequest("POST", cfg.GotifyURL, bytes.NewBuffer(body))
-	req.Header.Set("X-Gotify-App-Token", cfg.GotifyToken)
+	// If the user pasted the Gotify URL as https://gotify.domain.com/message?token=XYZ,
+	// standard POSTing to it natively works without needing the separate Header.
+	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
@@ -51,25 +60,44 @@ func sendGotify(cfg *config.Config, title, message, severity string) {
 	}
 }
 
-func sendNtfy(cfg *config.Config, title, message, severity string) {
+func sendNtfy(webhookURL, title, message, severity string) {
 	priorities := map[string]string{"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5"}
 	priority, exists := priorities[severity]
 	if !exists {
 		priority = "3"
 	}
 
-	req, _ := http.NewRequest("POST", cfg.NtfyURL, bytes.NewBufferString(message))
+	req, _ := http.NewRequest("POST", webhookURL, strings.NewReader(message))
 	req.Header.Set("Title", title)
 	req.Header.Set("Priority", priority)
 	req.Header.Set("Tags", "rotating_light")
 
-	if cfg.NtfyURL != "" { // Only add auth if token exists (logic can be expanded here)
-		// req.Header.Set("Authorization", "Bearer "+cfg.NtfyToken)
-	}
-
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Ntfy connection failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+}
+
+func sendDiscordSlack(webhookURL, title, message, severity string) {
+	// Discord and Slack both accept basic JSON payloads with a "content" string.
+	icon := "⚠️"
+	if severity == "critical" || severity == "high" {
+		icon = "🚨"
+	}
+
+	payload := map[string]interface{}{
+		"content": fmt.Sprintf("%s **%s**\n%s", icon, title, message),
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Discord/Slack connection failed: %v", err)
 		return
 	}
 	defer resp.Body.Close()

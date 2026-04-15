@@ -98,15 +98,13 @@ export function useSentinel() {
 
     // --- WEBSOCKET ENGINE ---
     let ws = null;
-    let pollInterval = null;
+    let healthSyncInterval = null;
     let isDestroyed = false; 
 
 const connectWS = () => {
         if (isDestroyed) return;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
-
-        ws.onopen = () => console.log('🟢 WebSockets Connected. Real-time active.');
 
         ws.onmessage = (message) => {
             try {
@@ -151,16 +149,25 @@ const connectWS = () => {
         }
     }
 
-    const startPolling = async () => {
+    const startRealtimeSync = async () => {
         isDestroyed = false;
+        
+        // Initial data load
         await Promise.all([fetchEvents(), fetchFleet(), fetchUptime()])
+        
+        // 1. Establish the WebSocket for instant Push Notifications (Events, Silence toggles, etc.)
         connectWS()
-        pollInterval = setInterval(() => { fetchFleet(); fetchUptime() }, 30000)
+        
+        // 2. Establish the Health Sync loop for fleet and uptime data.
+        healthSyncInterval = setInterval(() => { 
+            fetchFleet(); 
+            fetchUptime() 
+        }, 30000)
     }
 
-    const stopPolling = () => {
+    const stopRealtimeSync = () => {
         isDestroyed = true;
-        if (pollInterval) clearInterval(pollInterval);
+        if (healthSyncInterval) clearInterval(healthSyncInterval);
         if (ws) ws.close();
     }
 
@@ -245,7 +252,7 @@ const connectWS = () => {
     return {
         events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe,
         unreadCount, overallUptime, isFetching,
-        logout, startPolling, stopPolling, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
+        logout, startRealtimeSync, stopRealtimeSync, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
         activeEvent, isActiveSensorSilenced
     }
 }
