@@ -1,0 +1,29 @@
+name: Prune Untagged Docker Images
+
+on:
+  workflow_dispatch: # Allows you to run it manually
+  schedule:
+    - cron: '0 0 * * 0' # Runs automatically every Sunday at midnight
+
+jobs:
+  clean-ghcr:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # List all your packages here
+        package: 
+          - honeywire-hub
+          - honeywire-tcptarpit
+          - honeywire-networkscandetector
+          - honeywire-icmpcanary
+          - honeywire-webrouterdecoy
+          - honeywire-filecanary
+    steps:
+      - name: Delete untagged versions for ${{ matrix.package }}
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: '${{ matrix.package }}'
+          package-type: 'container'
+          delete-only-untagged-versions: 'true'
+          min-versions-to-keep: 1 # Keeps 'latest' and '1.0.0' safe
+          token: ${{ secrets.DELETE_PACKAGES_TOKEN }}
