@@ -1,9 +1,7 @@
 name: Prune Untagged Docker Images
 
 on:
-  workflow_dispatch: # Allows you to run it manually
-  schedule:
-    - cron: '0 0 * * 0' # Runs automatically every Sunday at midnight
+  workflow_dispatch: # Allows you to trigger this manually from the Actions tab
 
 jobs:
   clean-ghcr:
