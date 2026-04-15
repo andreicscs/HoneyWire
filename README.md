@@ -121,6 +121,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     
     environment:
+      - HW_ENV=development # Required if not using HTTPS, or the cookie will have the secure flag set, in production it is highly raccomended to remove this and run this behind a reverse proxy using https
       - HW_PORT=8080
       # Optional: Hardcode the dashboard password (disables the UI password reset feature)
       # - HW_DASHBOARD_PASSWORD=admin
