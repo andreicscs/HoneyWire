@@ -1,7 +1,12 @@
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+<p align="center">
+  <img  src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
+</p>
+<h1 align="center">HoneyWire</h1>
 
+---
 ## 📋 Table of Contents
-- [Overview](#honeywire)
+- [Overview](#overview)
 - [Screenshots](#screenshots)
 - [The Universal Event Standard](#-the-universal-event-standard-bring-your-own-sensor)
 - [Features](#features)
@@ -13,8 +18,8 @@
 - [Operational Checklist](#operational-checklist)
 
 ---
-# HoneyWire
 
+## Overview
 **HoneyWire Sentinel** is a lightweight, Distributed High-Signal Security Early-Warning System, designed for internal networks. It replaces the "magnifying glass" approach of traditional SIEMs, which often drown analysts in false positives by surveilling legitimate traffic, with a High-Fidelity Tripwire model. 
 
 Place a sensor exactly where you want it. If it trips, you have an intruder.
@@ -121,7 +126,7 @@ services:
     security_opt: ["no-new-privileges:true"]
     
     environment:
-      - HW_ENV=development # Required if not using HTTPS, or the cookie will have the secure flag set, in production it is highly raccomended to remove this and run this behind a reverse proxy using https
+      - HW_ENV=development # Required if not using HTTPS, or the cookie will have the secure flag set, in production it is highly recommended to remove this and run this behind a reverse proxy using https
       - HW_PORT=8080
       # Optional: Hardcode the dashboard password (disables the UI password reset feature)
       # - HW_DASHBOARD_PASSWORD=admin
@@ -165,11 +170,11 @@ nc localhost 2222
 ---
 
 ## Security Notes
-* **API Secret:** Ensure your `HW_HUB_KEY` is strong and identical on both the Hub and the Sensors. The Hub will reject any payloads with mismatched keys.
+* **API Secret:** Ensure your `Hub Secret Key` is strong and identical on both the Hub and the Sensors. The Hub will reject any payloads with mismatched keys.
 * **System Arming:** You can toggle the "System Armed" button in the Hub UI to temporarily disable push notifications while doing internal network maintenance or vulnerability scanning.
 * **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. We follow the principle of least privilege to make sure that if a container is compromised, the blast is contained.
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
-* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your `HW_HUB_KEY` and Dashboard password to network sniffing.
+* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your `Hub Secret Key` and Dashboard password to network sniffing.
 ---
 
 ## Tech Stack
@@ -190,6 +195,6 @@ nc localhost 2222
 
 ## Operational Checklist
 - [x] Complete the Web UI Initial Setup to set the Master Password.
-- [x] Retrieve the generated `HW_HUB_KEY` from Settings and apply it to your sensors.
+- [x] Retrieve the generated `Hub Secret Key` from Settings and apply it to your sensors.
 - [x] Configure your push notification webhooks via the Settings UI.
 - [x] Rebuild/redeploy containers after any version bump in `VERSION` or environment variable changes.

@@ -137,7 +137,7 @@ const sensors = [
             </div>
 
             <h3>Security Architecture</h3>
-            <p>This sensor is architected for extreme resilience against exploits. By utilizing a minimal attack surface and enforcing strict container sandboxing, it ensures the host filesystem remains protected.</p>
+            <p>This sensor is architected for extreme resilience against exploits by utilizing a minimal attack surface and enforcing strict container sandboxing, ensuring the host filesystem remains protected.</p>
             <ul class="list-disc pl-5 mb-6 space-y-1">
                 <li><strong>Unprivileged Execution:</strong> Runs entirely as a non-root user (<code>UID 65532</code>), preventing system-level modifications even in the event of a container breach.</li>
                 <li><strong>Read-Only Mounts:</strong> The target directory is mounted with strict <code>read_only: true</code> flags, ensuring the container cannot write to or modify the host files.</li>
@@ -207,7 +207,7 @@ const sensors = [
             </div>
 
             <h3>Security Architecture</h3>
-            <p>This sensor is architected for extreme resilience against exploits. By utilizing a minimal attack surface and enforcing strict container sandboxing, it safely intercepts raw ICMP traffic.</p>
+            <p>This sensor is architected for extreme resilience against exploits by utilizing a minimal attack surface and enforcing strict container sandboxing to safely intercept raw ICMP traffic.</p>
             <ul class="list-disc pl-5 mb-6 space-y-1">
                 <li><strong>Raw Socket Isolation:</strong> Bypasses heavy NIDS frameworks by interacting directly with network packets in pure Go, eliminating external C-library vulnerabilities.</li>
                 <li><strong>Least Privilege Execution:</strong> Runs as container root strictly to bind the raw socket, relying on container boundaries to limit system access.</li>
@@ -296,7 +296,7 @@ const sensors = [
             </div>
             
             <h3>Security Architecture</h3>
-            <p>This sensor is architected for extreme resilience against exploits. By utilizing a minimal attack surface and enforcing strict container sandboxing, it safely handles raw network traffic.</p>
+            <p>This sensor is architected for extreme resilience against exploits by utilizing a minimal attack surface and enforcing strict container sandboxing to safely handle raw network traffic.</p>
             <ul class="list-disc pl-5 mb-6 space-y-1">
                 <li><strong>Raw Socket Isolation:</strong> Bypasses heavy NIDS frameworks by interacting directly with network packets in pure Go, eliminating external C-library vulnerabilities.</li>
                 <li><strong>Least Privilege Execution:</strong> Runs as container root strictly to bind the raw socket, but relies on capability dropping to prevent privilege escalation.</li>
@@ -393,7 +393,7 @@ const sensors = [
             </ul>
 
             <h3>Security Architecture</h3>
-            <p>This sensor is architected for extreme resilience against exploitation. By adhering to the principle of least privilege and enforcing strict resource limits.</p>
+            <p>This sensor is architected for extreme resilience against exploitation by adhering to the principle of least privilege and enforcing strict resource limits.</p>
             <ul class="list-disc pl-5 mb-6 space-y-1">
                 <li><strong>Kernel Capability Stripping:</strong> Drops all Linux kernel capabilities (<code>cap_drop: ALL</code>) via the Docker Compose configuration, neutralizing advanced kernel exploitation techniques.</li>
                 <li><strong>Distroless Isolation:</strong> Built on a statically-linked Distroless image. It completely lacks a shell (<code>/bin/sh</code>), package managers, or common Linux utilities (like <code>curl</code> or <code>wget</code>), leaving attackers with zero tools to pivot if they achieve Remote Code Execution.</li>
@@ -477,7 +477,7 @@ const sensors = [
             </div>
 
             <h3>Security Architecture</h3>
-            <p>This sensor is architected for extreme resilience against web-based exploits. By utilizing a minimal attack surface and enforcing strict container sandboxing.</p>
+            <p>This sensor is architected for extreme resilience against web-based exploits by utilizing a minimal attack surface and enforcing strict container sandboxing.</p>
             <ul class="list-disc pl-5 mb-6 space-y-1">
                 <li><strong>Framework-Free Execution:</strong> Built purely on Go's native <code>net/http</code> library, eliminating the massive attack surface and supply-chain risks associated with heavy third-party web frameworks (like FastAPI, Flask, or Express).</li>
                 <li><strong>Unprivileged Execution:</strong> Runs entirely as a non-root user (<code>UID 65532</code>), preventing system-level modifications even in the event of a container breach.</li>

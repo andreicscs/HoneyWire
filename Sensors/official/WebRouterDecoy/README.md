@@ -34,7 +34,7 @@ docker compose up -d
 
 ## Security Architecture
 
-This sensor is architected for extreme resilience against web-based exploits. By utilizing a minimal attack surface and enforcing strict container sandboxing.
+This sensor is architected for extreme resilience against web-based exploits by utilizing a minimal attack surface and enforcing strict container sandboxing.
 
 **Core Defense-in-Depth Measures:**
 * **Framework-Free Execution:** Built purely on Go's native `net/http` library, eliminating the massive attack surface and supply-chain risks associated with heavy third-party web frameworks (like FastAPI, Flask, or Express).

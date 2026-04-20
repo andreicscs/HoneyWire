@@ -43,7 +43,7 @@ docker compose up -d
 
 ## Security Architecture
 
-This sensor is architected for extreme resilience against exploitation. By adhering to the principle of least privilege and enforcing strict resource limits.
+This sensor is architected for extreme resilience against exploitation by adhering to the principle of least privilege and enforcing strict resource limits.
 
 **Core Defense-in-Depth Measures:**
 * **Kernel Capability Stripping:** Drops all Linux kernel capabilities (`cap_drop: ALL`) via the Docker Compose configuration, neutralizing advanced kernel exploitation techniques.
