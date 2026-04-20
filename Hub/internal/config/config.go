@@ -6,7 +6,7 @@ import (
 )
 
 // Config represents immutable infrastructure-level settings.
-// Runtime settings (like API keys and webhooks) are managed in SQLite.
+// Runtime settings (like API keys, webhooks, and SIEM) are managed in SQLite.
 type Config struct {
 	DashboardPassword string // Optional override. If set, bypasses the Setup UI.
 	DBPath            string
@@ -29,11 +29,11 @@ func Load() *Config {
 
 	return &Config{
 		// Default to empty string. If empty, the Vue frontend will force the Setup screen.
-		DashboardPassword: getEnv("HW_DASHBOARD_PASSWORD", ""), 
+		DashboardPassword: getEnv("HW_DASHBOARD_PASSWORD", ""),
 		DBPath:            getEnv("HW_DB_PATH", "honeywire.db"),
 		Port:              getEnv("HW_PORT", "8080"),
-		Version:           getEnv("HW_VERSION", "1.0.0"),
-		Env:               getEnv("HW_ENV", "production"), 
+		Version:           getEnv("HW_VERSION", "1.1.0"),
+		Env:               getEnv("HW_ENV", "production"),
 		TrustProxy:        isProxyTrusted,
 	}
 }

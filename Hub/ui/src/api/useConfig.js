@@ -8,7 +8,9 @@ const state = reactive({
     autoPurgeDays: 0,
     webhookType: 'ntfy',
     webhookUrl: '',
-    webhookEvents: []
+    webhookEvents: [],
+    siemAddress: '',
+    siemProtocol: 'tcp'
 })
 
 export function useConfig() {
@@ -24,6 +26,8 @@ export function useConfig() {
                 state.webhookType = data.webhook_type || 'ntfy'
                 state.webhookUrl = data.webhook_url || ''
                 state.webhookEvents = data.webhook_events || []
+                state.siemAddress = data.siem_address || ''
+                state.siemProtocol = data.siem_protocol || 'tcp'
                 state.isLoaded = true
             }
         } catch (error) {
@@ -41,6 +45,8 @@ export function useConfig() {
             if (updates.webhookType !== undefined) payload.webhook_type = updates.webhookType
             if (updates.webhookUrl !== undefined) payload.webhook_url = updates.webhookUrl
             if (updates.webhookEvents !== undefined) payload.webhook_events = updates.webhookEvents
+            if (updates.siemAddress !== undefined) payload.siem_address = updates.siemAddress
+            if (updates.siemProtocol !== undefined) payload.siem_protocol = updates.siemProtocol
 
             const res = await fetch('/api/v1/config', {
                 method: 'PATCH',

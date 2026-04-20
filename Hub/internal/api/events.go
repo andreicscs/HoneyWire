@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/notify"
+	"github.com/honeywire/hub/internal/siem"
 )
 
 func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
@@ -44,38 +45,20 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.ID = int(lastInsertID)
 	e.Timestamp = nowStr
 
-	// Fetch all configs
-	var isArmed, webhookType, webhookURL, webhookEvents string
-	rows, err := h.Store.DB.Query("SELECT key, value FROM config WHERE key IN ('is_armed', 'webhook_type', 'webhook_url', 'webhook_events')")
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var k, v string
-			rows.Scan(&k, &v)
-			switch k {
-			case "is_armed":
-				isArmed = v
-			case "webhook_type":
-				webhookType = v
-			case "webhook_url":
-				webhookURL = v
-			case "webhook_events":
-				webhookEvents = v
-			}
-		}
-		
-		// FIX: Closing the DB scope *after* reading but *before* executing the dispatch logic
-		var isSilencedInt int
-		h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
+	var isSilencedInt int
+	h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
 
-		if isArmed == "true" && isSilencedInt == 0 && webhookURL != "" {
-			if strings.Contains(strings.ToLower(webhookEvents), strings.ToLower(e.Severity)) {
-				title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
-				message := fmt.Sprintf("Trigger: %s\nSource: %s\nTarget: %s", e.EventTrigger, e.Source, e.Target)
-				
-				notify.Dispatch(webhookType, webhookURL, title, message, e.Severity) 
-			}
-		}
+	if isSilencedInt == 0 {
+		title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
+		message := fmt.Sprintf("Trigger: %s\nSource: %s\nTarget: %s", e.EventTrigger, e.Source, e.Target)
+		notify.Dispatch(title, message, e.Severity)
+	}
+
+	select {
+	case siem.EventQueue <- e:
+		// Successfully queued for SIEM forwarder
+	default:
+		log.Println("[!] SIEM Queue full, dropping event")
 	}
 
 	h.broadcastWS("NEW_EVENT", e)
@@ -180,7 +163,7 @@ func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 
 	ip := h.getRealIP(r)
 	log.Printf("[!] AUDIT: Database purged by IP %s", ip)
-	
+
 	h.Store.DB.Exec("DELETE FROM events")
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "success",

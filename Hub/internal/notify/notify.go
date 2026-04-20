@@ -3,29 +3,91 @@ package notify
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
-	"time"
-	"fmt"
 	"strings"
+	"time"
 )
 
 var client = &http.Client{Timeout: 5 * time.Second}
 
-func Dispatch(webhookType, webhookURL, title, message, severity string) {
-	if webhookURL == "" {
+type WebhookPayload struct {
+	Type     string
+	URL      string
+	Title    string
+	Message  string
+	Severity string
+	QueuedAt time.Time
+}
+
+type NotifyConfig struct {
+	IsArmed       bool
+	WebhookType   string
+	WebhookURL    string
+	WebhookEvents string
+}
+
+var CurrentConfig NotifyConfig
+
+func UpdateConfig(isArmed bool, webhookType, webhookURL, webhookEvents string) {
+	CurrentConfig.IsArmed = isArmed
+	CurrentConfig.WebhookType = webhookType
+	CurrentConfig.WebhookURL = webhookURL
+	CurrentConfig.WebhookEvents = webhookEvents
+}
+
+func UpdateIsArmed(isArmed bool) {
+	CurrentConfig.IsArmed = isArmed
+}
+
+var WebhookQueue = make(chan WebhookPayload, 1000)
+
+func StartWorker() {
+	go func() {
+		for payload := range WebhookQueue {
+			sendWebhook(payload)
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
+	log.Println("[Notify] Worker started.")
+}
+
+func Dispatch(title, message, severity string) {
+	if !CurrentConfig.IsArmed || CurrentConfig.WebhookURL == "" {
 		return
 	}
 
-	switch strings.ToLower(webhookType) {
+	if !strings.Contains(strings.ToLower(CurrentConfig.WebhookEvents), strings.ToLower(severity)) {
+		return
+	}
+
+	payload := WebhookPayload{
+		Type:     CurrentConfig.WebhookType,
+		URL:      CurrentConfig.WebhookURL,
+		Title:    title,
+		Message:  message,
+		Severity: severity,
+		QueuedAt: time.Now(),
+	}
+
+	select {
+	case WebhookQueue <- payload:
+	default:
+		log.Println("[!] Webhook queue full, dropping notification")
+	}
+}
+
+func sendWebhook(payload WebhookPayload) {
+	switch strings.ToLower(payload.Type) {
 	case "discord", "slack":
-		go sendDiscordSlack(webhookURL, title, message, severity)
+		sendDiscordSlack(payload.URL, payload.Title, payload.Message, payload.Severity)
 	case "gotify":
-		go sendGotify(webhookURL, title, message, severity)
+		sendGotify(payload.URL, payload.Title, payload.Message, payload.Severity)
 	case "ntfy":
 		fallthrough
 	default:
-		go sendNtfy(webhookURL, title, message, severity)
+		sendNtfy(payload.URL, payload.Title, payload.Message, payload.Severity)
 	}
 }
 
@@ -101,4 +163,24 @@ func sendDiscordSlack(webhookURL, title, message, severity string) {
 		return
 	}
 	defer resp.Body.Close()
+}
+
+func FlushQueue(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		select {
+		case payload := <-WebhookQueue:
+			sendWebhook(payload)
+		case <-time.After(100 * time.Millisecond):
+			select {
+			case payload := <-WebhookQueue:
+				sendWebhook(payload)
+			default:
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("webhook flush timeout exceeded")
+		}
+	}
 }

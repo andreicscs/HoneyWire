@@ -7,7 +7,7 @@
 ---
 ## 📋 Table of Contents
 - [Overview](#overview)
-- [Screenshots](#screenshots)
+- [Showcase](#showcase)
 - [The Universal Event Standard](#-the-universal-event-standard-bring-your-own-sensor)
 - [Features](#features)
 - [Architecture](#architecture)
@@ -30,12 +30,12 @@ Set up multiple and you start to have a pretty clear idea of the lateral movemen
 
 ---
 
-## Screenshots
+## Showcase
 
-### Main Dashboard
-![DashboardDark](Screenshots/dashboardDark.png)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/8a405edc-a183-42bc-a1b9-50cc380814ed" autoplay loop muted playsinline width="100%"></video>
+</div>
 
-![DashboardLight](Screenshots/dashboardLight.png)
 
 ---
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
@@ -75,6 +75,7 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 - **The Sentinel Hub UI:** A fully responsive, Vue 3-powered dashboard featuring Dark/Light mode, live WebSocket event streaming, and dynamic forensic payload inspection.
 - **In-Browser Configuration:** Manage Master Passwords, Hub API Keys, Data Retention policies, and Webhooks directly from the UI. No need to touch `.env` files or restart containers to update alert targets.
 - **Universal Push Notifications:** Native, zero-dependency integration for routing critical alerts to **Discord, Slack, Ntfy, and Gotify**.
+- **Enterprise SIEM Integration:** Native RFC 3164 Syslog forwarding (TCP/UDP) for seamlessly pushing structured telemetry to Splunk, Elastic, Wazuh, or Vector.
 - **Suite of Official Sensors:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
 
 ---

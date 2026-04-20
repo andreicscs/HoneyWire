@@ -3,12 +3,14 @@ import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick, toRaw } from 
 import Chart from 'chart.js/auto'
 
 const props = defineProps({
-    events: { type: Array, required: true }
+    events: { type: Array, required: true },
+    activeTimeframe: { type: String, required: true }
 })
+
+const emit = defineEmits(['update:timeframe'])
 
 const chartCanvas = ref(null)
 const recentEventCount = ref(0)
-const activeTimeframe = ref('24H')
 let chartInstance = shallowRef(null)
 let themeObserver = null
 let liveTicker = null 
@@ -74,9 +76,9 @@ const updateData = () => {
     let buckets = 30
     let bucketSizeMs = 120000
 
-    if (activeTimeframe.value === '24H') { buckets = 24; bucketSizeMs = 3600000 } 
-    else if (activeTimeframe.value === '7D') { buckets = 14; bucketSizeMs = 43200000 } 
-    else if (activeTimeframe.value === '30D') { buckets = 30; bucketSizeMs = 86400000 }
+    if (props.activeTimeframe === '24H') { buckets = 24; bucketSizeMs = 3600000 } 
+    else if (props.activeTimeframe === '7D') { buckets = 14; bucketSizeMs = 43200000 } 
+    else if (props.activeTimeframe === '30D') { buckets = 30; bucketSizeMs = 86400000 }
 
     const labels = new Array(buckets).fill('')
     exactTimesList = new Array(buckets).fill('')
@@ -88,10 +90,10 @@ const updateData = () => {
         
         if (stepsAgo === 0) labels[i] = 'Now'
         else {
-            if (activeTimeframe.value === '1H') labels[i] = `-${stepsAgo * 2}m`
-            else if (activeTimeframe.value === '24H') labels[i] = `-${stepsAgo}h`
-            else if (activeTimeframe.value === '7D') labels[i] = `-${stepsAgo * 12}h`
-            else if (activeTimeframe.value === '30D') labels[i] = `-${stepsAgo}d`
+            if (props.activeTimeframe === '1H') labels[i] = `-${stepsAgo * 2}m`
+            else if (props.activeTimeframe === '24H') labels[i] = `-${stepsAgo}h`
+            else if (props.activeTimeframe === '7D') labels[i] = `-${stepsAgo * 12}h`
+            else if (props.activeTimeframe === '30D') labels[i] = `-${stepsAgo}d`
         }
     }
 
@@ -176,7 +178,7 @@ onMounted(async () => {
     liveTicker = setInterval(() => { updateData() }, 2000)
 })
 
-watch([() => props.events[0]?.id, activeTimeframe, () => props.events.length], () => {
+watch([() => props.events[0]?.id, () => props.activeTimeframe, () => props.events.length], () => {
     updateData()
 })
 
@@ -202,7 +204,7 @@ onUnmounted(() => {
             
             <div class="flex bg-slate-50 border border-slate-100 dark:border-transparent dark:bg-zinc-800 p-0.5 rounded-md text-[11px] font-medium text-slate-500 dark:text-zinc-400">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
-                        @click="activeTimeframe = time"
+                        @click="$emit('update:timeframe', time)"
                         class="px-2.5 py-1 rounded transition-colors"
                         :class="activeTimeframe === time ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm border border-slate-200 dark:border-transparent' : 'hover:text-slate-700 dark:hover:text-zinc-200'">
                     {{ time }}

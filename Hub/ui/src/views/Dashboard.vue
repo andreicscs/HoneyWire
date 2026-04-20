@@ -7,7 +7,7 @@
     import ThreatVelocity from '../components/ThreatVelocity.vue'
 
     const { 
-        fleet, selectedSensor, events, uptimeData, activeTimeframe, 
+        fleet, selectedSensor, events, uptimeData, activeTimeframe, velocityTimeframe, 
         overallUptime, viewingArchive, archiveAll,
         activeEvent, isActiveSensorSilenced, archiveEvent, toggleSilence, forgetSensor, markEventRead
     } = useSentinel()
@@ -30,7 +30,11 @@
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
             
             <div class="flex-[1_1_350px] min-w-[100%] sm:min-w-[350px] h-[320px] lg:h-[340px] shrink-0">
-                <ThreatVelocity :events="events" />
+                <ThreatVelocity 
+                    :events="events"
+                    :activeTimeframe="velocityTimeframe"
+                    @update:timeframe="t => velocityTimeframe = t"
+                />
             </div>
 
             <div class="flex-[1_1_280px] min-w-[100%] sm:min-w-[280px] max-w-[450px] mx-auto h-[320px] lg:h-[340px] shrink-0">

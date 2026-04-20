@@ -53,7 +53,15 @@ const updateData = () => {
 }
 
 const updateTheme = () => {
-    if (chartInstance) chartInstance.update('none'); 
+    if (!chartInstance) return;
+    
+    const isDark = document.documentElement.classList.contains('dark')
+    chartInstance.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(24, 24, 27, 0.95)' : 'rgba(255, 255, 255, 0.95)'
+    chartInstance.options.plugins.tooltip.titleColor = isDark ? '#a1a1aa' : '#64748b'
+    chartInstance.options.plugins.tooltip.bodyColor = isDark ? '#f4f4f5' : '#0f172a'
+    chartInstance.options.plugins.tooltip.borderColor = isDark ? '#3f3f46' : '#e2e8f0'
+    
+    chartInstance.update('none'); 
 }
 
 onMounted(() => {
@@ -73,9 +81,18 @@ onMounted(() => {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: true,
-                plugins: { legend: { display: false } } 
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: { 
+                        borderWidth: 1, padding: 10, boxPadding: 4, 
+                        usePointStyle: true, boxWidth: 8, boxHeight: 8, 
+                        titleFont: { size: 11, family: 'ui-monospace, monospace', weight: 'normal' }, 
+                        bodyFont: { size: 12, weight: 'bold' }
+                    }
+                } 
             }
         });
+        updateTheme();
         updateData();
     }
 

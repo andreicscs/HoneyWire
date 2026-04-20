@@ -9,6 +9,7 @@ const version = ref('1.0.0')
 const viewingArchive = ref(false)
 const selectedSensor = ref(null)
 const activeTimeframe = ref('24H')
+const velocityTimeframe = ref('24H')
 const activeEvent = ref(null)
 const unreadCount = ref(0)
 
@@ -250,7 +251,7 @@ const connectWS = () => {
     }
     
     return {
-        events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe,
+        events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe, velocityTimeframe,
         unreadCount, overallUptime, isFetching,
         logout, startRealtimeSync, stopRealtimeSync, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
         activeEvent, isActiveSensorSilenced

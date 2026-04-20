@@ -12,7 +12,9 @@ const settings = ref({
     autoPurgeDays: 0,
     webhookType: 'ntfy',
     webhookUrl: '',
-    webhookEvents: []
+    webhookEvents: [],
+    siemAddress: '',
+    siemProtocol: 'tcp'
 })
 
 // Deep clone to track original state
@@ -27,7 +29,9 @@ watch(() => config.isLoaded, (loaded) => {
             autoPurgeDays: config.autoPurgeDays || 0,
             webhookType: config.webhookType || 'ntfy',
             webhookUrl: config.webhookUrl || '',
-            webhookEvents: [...(config.webhookEvents || [])]
+            webhookEvents: [...(config.webhookEvents || [])],
+            siemAddress: config.siemAddress || '',
+            siemProtocol: config.siemProtocol || 'tcp'
         }
         settings.value = JSON.parse(JSON.stringify(loadedSettings))
         initialSettings.value = JSON.parse(JSON.stringify(loadedSettings))
@@ -217,6 +221,14 @@ const submitFactoryReset = async () => {
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     Push Notifications
                 </button>
+                <button @click="activeTab = 'siem'" 
+                        class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
+                        :class="activeTab === 'siem' ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 font-bold shadow-sm border-slate-300 dark:border-zinc-700' : 'bg-white dark:bg-zinc-900 font-medium text-slate-500 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800/50 hover:text-slate-700 dark:hover:text-zinc-300 border-slate-200 dark:border-zinc-800/50'">
+                    <svg class="w-5 h-5 shrink-0" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" xml:space="preserve">
+                        <path d="M77.2,56.2h-3.7c-1,0-1.8,1-1.8,1.8v12.3c0,1-0.9,1.8-1.8,1.8H29.3c-1,0-1.8-0.9-1.8-1.8V58 c0-0.9-0.9-1.8-1.8-1.8h-3.7c-1,0-1.8,1-1.8,1.8v16.6c0,2.7,2.2,4.9,4.9,4.9h49.1c2.7,0,4.9-2.2,4.9-4.9V58 C79,57.1,78.2,56.2,77.2,56.2z M50.8,21c-0.7-0.7-1.8-0.7-2.6,0L31.6,37.6c-0.7,0.7-0.7,1.8,0,2.6l2.6,2.6c0.7,0.7,1.8,0.7,2.6,0 l6.9-6.9c0.7-0.7,2.2-0.2,2.2,0.9v26c0,1,0.7,1.8,1.7,1.8h3.7c1,0,2-1,2-1.8V36.9c0-1.1,1.2-1.6,2.1-0.9l6.9,6.9 c0.7,0.7,1.8,0.7,2.6,0l2.6-2.6c0.7-0.7,0.7-1.8,0-2.6C67.3,37.7,50.8,21,50.8,21z"></path>
+                    </svg>
+                    SIEM Forwarding
+                </button>
                 <div class="h-px bg-slate-200 dark:bg-zinc-800/80 my-2 mx-4"></div>
                 <button @click="activeTab = 'security'" 
                         class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
@@ -331,6 +343,38 @@ const submitFactoryReset = async () => {
                                         {{ sev }}
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-show="activeTab === 'siem'" class="space-y-6">
+                    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/80 rounded-lg p-5 md:p-6 shadow-sm transition-colors">
+                        <div class="flex items-center gap-3 mb-6">
+                            <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100">SIEM Forwarding</h3>
+                        </div>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-2">Server Address</label>
+                                <p class="text-xs text-slate-500 dark:text-zinc-400 mb-3">Forward syslog events to your SIEM (e.g., <code>elk.example.com:514</code>).</p>
+                                <input type="text" v-model="settings.siemAddress" placeholder="host:port"
+                                       class="w-full max-w-xl px-4 py-2 rounded-md bg-slate-50 dark:bg-[#121215] border border-slate-200 dark:border-zinc-800/80 text-sm mono text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:border-slate-400 focus:ring-slate-400/50 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/50 shadow-inner transition-colors placeholder:text-slate-400 dark:placeholder:text-zinc-600">
+                            </div>
+                            <div class="pt-5 border-t border-slate-100 dark:border-zinc-800/50">
+                                <label class="block text-[11px] font-bold text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-3">Protocol</label>
+                                <div class="flex flex-wrap gap-2.5">
+                                    <button v-for="proto in ['tcp', 'udp']" :key="proto"
+                                            @click="settings.siemProtocol = proto"
+                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all flex items-center justify-center"
+                                            :class="settings.siemProtocol === proto 
+                                                ? 'bg-slate-800 dark:bg-zinc-200 text-white dark:text-slate-900 border-slate-800 dark:border-zinc-200 shadow-sm' 
+                                                : 'bg-white dark:bg-[#121215] border-slate-200 dark:border-zinc-800/80 text-slate-500 dark:text-zinc-500 hover:bg-slate-50 dark:hover:bg-zinc-800'">
+                                        {{ proto }}
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="pt-5 border-t border-slate-100 dark:border-zinc-800/50">
+                                <p class="text-xs text-slate-500 dark:text-zinc-400">Events are sent in RFC3164 syslog format. Leave blank to disable SIEM forwarding.</p>
                             </div>
                         </div>
                     </div>
