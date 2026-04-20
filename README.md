@@ -4,7 +4,6 @@
 </p>
 <h1 align="center">HoneyWire</h1>
 
----
 ## 📋 Table of Contents
 - [Overview](#overview)
 - [Showcase](#showcase)
@@ -28,8 +27,6 @@ Place a sensor exactly where you want it. If it trips, you have an intruder.
 
 Set up multiple and you start to have a pretty clear idea of the lateral movement of an intruder. No tuning, no noise, just instant forensics.
 
----
-
 ## Showcase
 
 <div align="center">
@@ -37,7 +34,7 @@ Set up multiple and you start to have a pretty clear idea of the lateral movemen
 </div>
 
 
----
+
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
 
 [**Community Sensors**](./Sensors/community/)
@@ -78,8 +75,6 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 - **Enterprise SIEM Integration:** Native RFC 3164 Syslog forwarding (TCP/UDP) for seamlessly pushing structured telemetry to Splunk, Elastic, Wazuh, or Vector.
 - **Suite of Official Sensors:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
 
----
-
 ## Architecture
 
 HoneyWire is split into three independent microservices:
@@ -87,8 +82,6 @@ HoneyWire is split into three independent microservices:
 1. `/Hub`: The central brain. A pure Go binary running an embedded SQLite database and the Vue.js dashboard. It runs as a non-root user inside a Distroless container, safely mounting data to a dedicated volume.
 2. `/Sensors`: The decoy nodes. Statically-linked Go binaries that listen on vulnerable ports, trap attackers, and securely POST intrusion data back to the Hub.
 3. `/SDKs`: Official libraries (like `sdk-go`) that handle secure Hub communication so community developers can easily build new sensors.
-
----
 
 ## 🚀 Quick Start Guide
 
@@ -176,13 +169,13 @@ nc localhost 2222
 * **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. We follow the principle of least privilege to make sure that if a container is compromised, the blast is contained.
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
 * ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your `Hub Secret Key` and Dashboard password to network sniffing.
----
+
 
 ## Tech Stack
 * **Backend:** Go 1.25, `net/http` (Standard Library), SQLite (ModernC Pure Go Driver)
 * **Frontend:** Vue 3 (Composition API), TailwindCSS, Chart.js
 * **Infrastructure:** Docker, Docker Compose, Distroless Linux Sandbox
----
+
 
 ## Versioning and API Reference
 
@@ -192,7 +185,7 @@ nc localhost 2222
   - `GET /api/v1/version` → returns `{ "version": "1.0.0" }`
 - API docs file: [📖 API.md](./Docs/API.md) with full backend route reference and sample payloads.
 
----
+
 
 ## Operational Checklist
 - [x] Complete the Web UI Initial Setup to set the Master Password.
