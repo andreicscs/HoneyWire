@@ -1,8 +1,22 @@
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 <p align="center">
-  <img  src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
+  <img src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
 </p>
 <h1 align="center">HoneyWire</h1>
+
+<p align="center">
+  <a href="https://github.com/andreicscs/HoneyWire/releases">
+    <img src="https://img.shields.io/badge/release-v1.1.0-blue.svg?style=flat-square" alt="Latest Release" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-GPLv3-blue.svg?style=flat-square" alt="License: GPLv3" />
+  </a>
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/badge/Go-1.25+-00ADD8.svg?style=flat-square&logo=go&logoColor=white" alt="Go Version" />
+  </a>
+  <a href="Hub/docker-compose.yml">
+    <img src="https://img.shields.io/badge/Docker-Native-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Native" />
+  </a>
+</p>
 
 ## 📋 Table of Contents
 - [Overview](#overview)
@@ -15,8 +29,6 @@
 - [Tech Stack](#tech-stack)
 - [Versioning and API Reference](#versioning-and-api-reference)
 - [Operational Checklist](#operational-checklist)
-
----
 
 ## Overview
 **HoneyWire Sentinel** is a lightweight, Distributed High-Signal Security Early-Warning System, designed for internal networks. It replaces the "magnifying glass" approach of traditional SIEMs, which often drown analysts in false positives by surveilling legitimate traffic, with a High-Fidelity Tripwire model. 
