@@ -153,6 +153,8 @@
                     <span class="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Live</span>
                 </div>
                 <button v-show="!viewingArchive && events.length > 0" @click="$emit('archive-all')"
+                        type="button"
+                        aria-label="Archive all active events"
                         class="px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-700 dark:hover:text-amber-400 transition-colors border border-slate-200 dark:border-zinc-700 hover:border-amber-300 dark:hover:border-amber-800/50 shadow-sm">
                     Archive All
                 </button>
@@ -164,32 +166,32 @@
                 <thead class="text-xs font-semibold text-slate-500 dark:text-zinc-400 sticky top-0 bg-slate-50 dark:bg-[#151518] z-30 shadow-[0_1px_0_0_#e2e8f0] dark:shadow-[0_1px_0_0_#27272a] select-none">
                     <tr>
                         <th class="px-3 py-3 w-8"></th>
-                        <th @click="toggleSort('severity')" class="px-3 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('severity')" class="px-3 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by threat severity">
                             <div class="flex items-center gap-1.5">Threat
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'severity' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('severity') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('event_trigger')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('event_trigger')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by event trigger type">
                             <div class="flex items-center gap-1.5">Event Trigger
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'event_trigger' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('event_trigger') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('source')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('source')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by source">
                             <div class="flex items-center gap-1.5">Source
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'source' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('source') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('target')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('target')" class="px-4 py-3 cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by target">
                             <div class="flex items-center gap-1.5">Target
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'target' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('target') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('sensor_id')" class="px-4 py-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('sensor_id')" class="px-4 py-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by sensor node">
                             <div class="flex items-center justify-end gap-1.5">Node
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'sensor_id' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('sensor_id') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('timestamp')" class="px-5 py-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group">
+                        <th @click="toggleSort('timestamp')" class="px-5 py-3 text-right cursor-pointer hover:text-slate-800 dark:hover:text-zinc-200 transition-colors group" role="button" tabindex="0" aria-label="Sort by timestamp">
                             <div class="flex items-center justify-end gap-1.5">Time
                                 <svg class="w-3 h-3 transition-transform duration-200" :class="[sortCol === 'timestamp' ? 'opacity-100 text-blue-500 dark:text-zinc-300' : 'opacity-0 group-hover:opacity-50 text-slate-400 dark:text-zinc-500', isDownArrow('timestamp') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
@@ -226,8 +228,8 @@
                             <td class="px-5 py-3 text-sm text-right text-slate-500 dark:text-zinc-500 mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-200 dark:border-zinc-800/50'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             
                             <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-200 dark:border-zinc-800/50'">
-                                <button @click.stop="$emit('archive-event', event.id)"
-                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md bg-white dark:bg-[#1f1f22] border border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-300 dark:hover:border-amber-700/50 hover:text-amber-600 dark:hover:text-amber-400 transition-all duration-200 shadow-sm active:scale-95"
+                                <button @click.stop="$emit('archive-event', event.id)"                                    type="button"
+                                    aria-label="Archive this event"                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md bg-white dark:bg-[#1f1f22] border border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-300 dark:hover:border-amber-700/50 hover:text-amber-600 dark:hover:text-amber-400 transition-all duration-200 shadow-sm active:scale-95"
                                         title="Archive Event">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
@@ -291,11 +293,15 @@
 
         <div v-if="sortedEvents.length > itemsPerPage" class="flex items-center justify-between border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#151518] px-4 py-3 sm:px-5 shrink-0">
             <div class="flex flex-1 justify-between sm:hidden">
-                <button @click="prevPage" :disabled="currentPage === 1" 
+                <button @click="prevPage" :disabled="currentPage === 1"
+                        type="button"
+                        aria-label="Previous page"
                         class="relative inline-flex items-center rounded-md border border-slate-200 dark:border-zinc-700 bg-white dark:bg-[#1f1f22] px-4 py-2 text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                     Previous
                 </button>
-                <button @click="nextPage" :disabled="currentPage === totalPages" 
+                <button @click="nextPage" :disabled="currentPage === totalPages"
+                        type="button"
+                        aria-label="Next page"
                         class="relative ml-3 inline-flex items-center rounded-md border border-slate-200 dark:border-zinc-700 bg-white dark:bg-[#1f1f22] px-4 py-2 text-sm font-medium text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                     Next
                 </button>

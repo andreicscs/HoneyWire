@@ -37,18 +37,24 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
         
         <div class="flex items-center gap-3">
             <button v-show="unreadCount > 0" @click="$emit('mark-all-read')"
+                    type="button"
+                    aria-label="Mark all events as read"
                     class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-semibold mr-1 border border-rose-200 dark:border-rose-800/30">
                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
                 <span>{{ unreadCount }} Unread</span>
             </button>
 
             <button @click="$emit('toggle-armed')" 
+                    type="button"
+                    :aria-label="isArmed ? 'Disarm system' : 'Arm system'"
                     class="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border"
                     :class="isArmed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' : 'bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-300 dark:border-zinc-700'">
                 <span>{{ isArmed ? 'Armed' : 'Passive' }}</span>
             </button>
 
             <button @click="$emit('toggle-theme')" 
+                    type="button"
+                    aria-label="Toggle light and dark theme"
                     class="w-8 h-8 rounded-md bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 transition-colors flex items-center justify-center group overflow-hidden">
                 <svg class="w-4 h-4 transition-transform duration-300 ease-out group-hover:rotate-45 group-hover:scale-110 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
@@ -59,7 +65,10 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
             </button>
             
             <div class="w-px h-4 bg-slate-300 dark:bg-zinc-700 mx-1"></div>
-            <a @click="$emit('logout')" class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer">Exit</a>
+            <button @click="$emit('logout')" 
+                    type="button"
+                    aria-label="Logout and exit the system"
+                    class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">Exit</button>
         </div>
     </header>
 </template>

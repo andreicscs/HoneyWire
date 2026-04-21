@@ -1,5 +1,5 @@
 <script setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, onUnmounted } from 'vue'
   import Sidebar from './components/Sidebar.vue'
   import Header from './components/Header.vue'
   import Dashboard from './views/Dashboard.vue'
@@ -16,10 +16,12 @@
     unreadCount, 
     viewingArchive, 
     startRealtimeSync, 
+    stopRealtimeSync,
     toggleArmed, 
     markAllRead,
     events,
-    logout
+    logout,
+    purgeEvents
   } = useSentinel()
   const { fetchConfig } = useConfig()
 
@@ -86,9 +88,8 @@
         //Ask user with the specific count
         if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
             
-            // Optimistic UI wipe
-            if (events) events.value = [] 
-            if (unreadCount) unreadCount.value = 0 
+            // Optimistic UI wipe using encapsulated mutation
+            purgeEvents() 
             
             //The actual deletion
             const response = await fetch('/api/v1/events?dryrun=false', {
@@ -111,6 +112,10 @@
 
   onMounted(() => {
     checkAuthAndInit()
+  })
+
+  onUnmounted(() => {
+    stopRealtimeSync()
   })
 </script>
 

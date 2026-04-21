@@ -249,11 +249,16 @@ const connectWS = () => {
             await refreshUnreadCount()
         }
     }
+
+    const purgeEvents = () => {
+        events.value = []
+        unreadCount.value = 0
+    }
     
     return {
         events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe, velocityTimeframe,
         unreadCount, overallUptime, isFetching,
         logout, startRealtimeSync, stopRealtimeSync, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
-        activeEvent, isActiveSensorSilenced
+        activeEvent, isActiveSensorSilenced, purgeEvents
     }
 }
