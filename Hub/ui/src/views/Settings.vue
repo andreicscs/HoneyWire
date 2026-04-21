@@ -60,7 +60,7 @@ const saveSettings = async () => {
         saveMessage.value = 'Configuration saved successfully.'
         setTimeout(() => saveMessage.value = '', 3000)
     } else {
-        alert("Failed to save configuration. Check server logs.")
+        saveMessage.value = 'Failed to save configuration. Check console and server logs.'
     }
 }
 

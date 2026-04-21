@@ -100,12 +100,28 @@ export function useSentinel() {
     // --- WEBSOCKET ENGINE ---
     let ws = null;
     let healthSyncInterval = null;
-    let isDestroyed = false; 
+    let isDestroyed = false;
+    let wsRetryCount = 0;
+    const maxRetries = 10;
+    let wsRetryDelay = 3000;
 
-const connectWS = () => {
+    const connectWS = () => {
         if (isDestroyed) return;
+        
+        // Check max retry limit
+        if (wsRetryCount >= maxRetries) {
+            console.error('WebSocket: Max retries reached, stopping reconnection attempts');
+            return;
+        }
+        
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
+
+        ws.onopen = () => {
+            // Reset retry counter on successful connection
+            wsRetryCount = 0;
+            wsRetryDelay = 3000;
+        };
 
         ws.onmessage = (message) => {
             try {
@@ -135,7 +151,13 @@ const connectWS = () => {
         };
 
         ws.onclose = () => {
-            if (!isDestroyed) setTimeout(connectWS, 3000); 
+            if (!isDestroyed) {
+                wsRetryCount++;
+                console.warn(`WebSocket disconnected. Retry ${wsRetryCount}/${maxRetries} in ${wsRetryDelay}ms`);
+                setTimeout(connectWS, wsRetryDelay);
+                // Exponential backoff: 3s, 6s, 12s, 24s, capped at 30s
+                wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
+            }
         };
     }
 
@@ -178,61 +200,111 @@ const connectWS = () => {
 
     const toggleArmed = async () => {
         const next = !isArmed.value
+        const previous = isArmed.value
         try {
-            await fetch('/api/v1/system/state', {
+            const response = await fetch('/api/v1/system/state', {
                 method: 'PATCH', 
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({is_armed: next})
             })
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
             isArmed.value = next
-        } catch(err) {}
+        } catch(err) {
+            console.error('Failed to toggle armed state:', err)
+            isArmed.value = previous
+            alert(`Failed to ${next ? 'arm' : 'disarm'} system. Please try again.`)
+        }
     }
 
     const markAllRead = async () => {
         try {
-            await fetch('/api/v1/events/read', {method: 'PATCH'})
+            const response = await fetch('/api/v1/events/read', {method: 'PATCH'})
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
             events.value.forEach(e => e.is_read = 1) 
             unreadCount.value = 0
-        } catch(err) {}
+        } catch(err) {
+            console.error('Failed to mark all events as read:', err)
+            alert('Failed to mark events as read. Please try again.')
+        }
     }
 
     const archiveAll = async () => {
         if (confirm("Archive all currently active events?")) {
             try {
-                await fetch('/api/v1/events/archive-all', {method: 'PATCH'})
+                const response = await fetch('/api/v1/events/archive-all', {method: 'PATCH'})
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`)
+                }
                 fetchEvents() 
-            } catch(err) { console.error(err) }
+            } catch(err) {
+                console.error('Failed to archive all events:', err)
+                alert('Failed to archive events. Please try again.')
+            }
         }
     }
 
     const archiveEvent = async (id) => {
+        const originalEvents = [...events.value]
         try {
-            await fetch(`/api/v1/events/${id}/archive`, {method: 'PATCH'})
+            const response = await fetch(`/api/v1/events/${id}/archive`, {method: 'PATCH'})
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
             events.value = events.value.filter(e => e.id !== id)
             activeEvent.value = null
             await refreshUnreadCount()
-        } catch(err) { console.error(err) }
+        } catch(err) {
+            console.error('Failed to archive event:', err)
+            events.value = originalEvents
+            alert('Failed to archive event. Please try again.')
+        }
     }
 
     const forgetSensor = async (sensorId) => {
+        const originalFleet = [...fleet.value]
+        const originalUptime = [...uptimeData.value]
+        const originalSelected = selectedSensor.value
+        
         fleet.value = fleet.value.filter(s => s.sensor_id !== sensorId)
         uptimeData.value = uptimeData.value.filter(s => s.id !== sensorId)
         if (selectedSensor.value === sensorId) selectedSensor.value = null
-        try { await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' }) } catch (err) {}
+        
+        try {
+            const response = await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' })
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
+        } catch (err) {
+            console.error('Failed to forget sensor:', err)
+            fleet.value = originalFleet
+            uptimeData.value = originalUptime
+            selectedSensor.value = originalSelected
+            alert('Failed to remove sensor. Please try again.')
+        }
     }
 
     const toggleSilence = async (sensorId) => {
         const sensor = fleet.value.find(s => s.sensor_id === sensorId)
         if (sensor) {
+            const previousState = sensor.is_silenced
             sensor.is_silenced = !sensor.is_silenced
             try {
-                await fetch(`/api/v1/sensors/${sensorId}/silence`, {
+                const response = await fetch(`/api/v1/sensors/${sensorId}/silence`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_silenced: sensor.is_silenced })
                 })
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`)
+                }
             } catch (err) {
-                sensor.is_silenced = !sensor.is_silenced
+                sensor.is_silenced = previousState
+                console.error('Failed to toggle sensor silence:', err)
+                alert(`Failed to ${previousState ? 'unsilence' : 'silence'} sensor. Please try again.`)
             }
         }
     }
@@ -240,13 +312,18 @@ const connectWS = () => {
     const markEventRead = async (eventId) => {
         const ev = events.value.find(e => e.id === eventId)
         if (!ev || ev.is_read) return
+        const wasRead = ev.is_read
         ev.is_read = true
         unreadCount.value = Math.max(0, unreadCount.value - 1)
         try {
-            await fetch(`/api/v1/events/${eventId}/read`, { method: 'PATCH' })
+            const response = await fetch(`/api/v1/events/${eventId}/read`, { method: 'PATCH' })
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
         } catch (err) {
-            ev.is_read = false
-            await refreshUnreadCount()
+            ev.is_read = wasRead
+            unreadCount.value = Math.max(0, unreadCount.value + 1)
+            console.error('Failed to mark event as read:', err)
         }
     }
 

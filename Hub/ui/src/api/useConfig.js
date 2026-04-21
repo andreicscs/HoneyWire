@@ -57,9 +57,13 @@ export function useConfig() {
             if (res.ok) {
                 Object.assign(state, updates)
                 return true
+            } else {
+                const errText = await res.text()
+                console.error(`Config patch failed: ${res.status} - ${errText}`)
+                return false
             }
-            return false
         } catch (error) {
+            console.error('Config patch network error:', error)
             return false
         }
     }

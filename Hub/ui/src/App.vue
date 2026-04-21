@@ -87,21 +87,24 @@
 
         //Ask user with the specific count
         if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
-            
-            // Optimistic UI wipe using encapsulated mutation
-            purgeEvents() 
-            
-            //The actual deletion
-            const response = await fetch('/api/v1/events?dryrun=false', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' }
-            })
+            try {
+                //The actual deletion
+                const response = await fetch('/api/v1/events?dryrun=false', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                })
 
-            if (!response.ok) {
-                console.error("Failed to purge logs")
-                alert("Failed to purge logs. Check server console.")
-            } else {
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`)
+                }
+                
+                // Only update UI after successful server deletion
+                purgeEvents()
                 console.log("Database purged successfully.")
+                alert("Database purged successfully.")
+            } catch(error) {
+                console.error("Failed to purge logs:", error)
+                alert("Failed to purge logs. The database remains unchanged.")
             }
         }
     } catch (error) {
