@@ -10,8 +10,8 @@
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-GPLv3-blue.svg?style=flat-square" alt="License: GPLv3" />
   </a>
-  <a href="https://go.dev/">
-    <img src="https://img.shields.io/badge/Go-1.25+-00ADD8.svg?style=flat-square&logo=go&logoColor=white" alt="Go Version" />
+  <a href="https://news.risky.biz/risky-bulletin-nist-gives-up-enriching-most-cves/#:~:text=New%20tool%E2%80%94HoneyWire%3A%20Andrea%20Termine">
+    <img src="https://img.shields.io/badge/Risky%20Bulletin-New%20Tools-2E8B57?logo=RiskyBusiness&style=flat-square" alt="Risky Bulletin" />
   </a>
   <a href="Hub/docker-compose.yml">
     <img src="https://img.shields.io/badge/Docker-Native-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Native" />
