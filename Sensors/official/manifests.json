@@ -16,17 +16,17 @@
           "title": "Features",
           "type": "list",
           "content": [
-            "Connection Exhaustion: Holds malicious lateral connections open for extended periods",
-            "Banner Spoofing: Mimics legitimate internal services to attract rogue scanning",
-            "Resource Denial: Consumes attacker threads and bandwidth silently"
+            "Connection Exhaustion: Holds malicious lateral connections open for extended periods.",
+            "Banner Spoofing: Mimics legitimate internal services to attract rogue scanning.",
+            "Resource Denial: Consumes attacker threads and bandwidth silently."
           ]
         },
         {
           "title": "Security Architecture",
           "type": "list",
           "content": [
-            "Host Network Mode: Direct access to host networking for port binding",
-            "Isolated Execution: No persistent data or external dependencies"
+            "Host Network Mode: Direct access to host networking for port binding.",
+            "Isolated Execution: No persistent data or external dependencies."
           ]
         }
       ]
@@ -102,17 +102,17 @@
           "title": "Features",
           "type": "list",
           "content": [
-            "Router Simulation: Mimics popular router brands (Netgear, TP-Link, Cisco)",
-            "Credential Logging: Captures attempted login credentials from internal threats",
-            "Browser Fingerprinting: Logs user-agent and request patterns"
+            "Router Simulation: Mimics popular router brands (Netgear, TP-Link, Cisco).",
+            "Credential Logging: Captures attempted login credentials from internal threats.",
+            "Browser Fingerprinting: Logs user-agent and request patterns."
           ]
         },
         {
           "title": "Security Architecture",
           "type": "list",
           "content": [
-            "Bridge Network Mode: Isolated networking with port mapping",
-            "Stateless Design: No persistent storage of sensitive data"
+            "Bridge Network Mode: Isolated networking with port mapping.",
+            "Stateless Design: No persistent storage of sensitive data."
           ]
         }
       ]
@@ -180,7 +180,7 @@
           "title": "Features",
           "type": "list",
           "content": [
-            "Zero-Setup SDK Integration: Natively built on the HoneyWire Go SDK.",
+            "Zero-Dependency Execution: Runs as a statically compiled binary without requiring external interpreters or libraries.",
             "Safe Permissions Handling: Uses Access Control Lists (ACLs) to securely read target directories without altering host ownership.",
             "Context-Aware Lures: Automatically generates realistic trap files based on detected services (database backups, config files, etc.).",
             "Real-time Monitoring: Instant alerts on file access, modification, or deletion."
@@ -262,6 +262,22 @@
           "type": "string",
           "required": true,
           "hidden": false
+        },
+        {
+          "name": "TRAP_FILE_1",
+          "description": "Primary decoy file name.",
+          "default": "{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}secrets_backup.yaml{{ end }}",
+          "type": "string",
+          "required": false,
+          "hidden": false
+        },
+        {
+          "name": "TRAP_FILE_2",
+          "description": "Secondary decoy file name (if multiple services detected).",
+          "default": "{{ if gt (len .MatchedServices) 1 }}{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}api_keys.txt{{ end }}{{ end }}",
+          "type": "string",
+          "required": false,
+          "hidden": false
         }
       ]
     }
@@ -283,18 +299,18 @@
           "title": "Features",
           "type": "list",
           "content": [
-            "Passive Monitoring: Listens for ICMP traffic without generating responses",
-            "Detailed Logging: Captures source IP, TTL, packet size, and timing information",
-            "Network Discovery Detection: Identifies internal subnet scanning and host enumeration"
+            "Passive Monitoring: Listens for ICMP traffic without generating responses.",
+            "Detailed Logging: Captures source IP, TTL, packet size, and timing information.",
+            "Network Discovery Detection: Identifies internal subnet scanning and host enumeration."
           ]
         },
         {
           "title": "Security Architecture",
           "type": "list",
           "content": [
-            "Raw Socket Access: Requires NET_RAW capability for packet inspection",
-            "Host Network Mode: Direct access to host network interfaces",
-            "Zero External Dependencies: Self-contained monitoring solution"
+            "Raw Socket Access: Requires NET_RAW capability for packet inspection.",
+            "Host Network Mode: Direct access to host network interfaces.",
+            "Zero External Dependencies: Self-contained monitoring solution."
           ]
         }
       ]
@@ -344,19 +360,19 @@
           "title": "Features",
           "type": "list",
           "content": [
-            "Threshold-Based Detection: Configurable scan detection parameters",
-            "Multiple Scan Types: Detects SYN scans, UDP sweeps, and banner grabbing",
-            "Intelligent Filtering: Excludes legitimate internal services from scan detection",
-            "Source Tracking: Logs internal attacker IP addresses and scan patterns"
+            "Threshold-Based Detection: Configurable scan detection parameters.",
+            "Multiple Scan Types: Detects SYN scans, UDP sweeps, and banner grabbing.",
+            "Intelligent Filtering: Excludes legitimate internal services from scan detection.",
+            "Source Tracking: Logs internal attacker IP addresses and scan patterns."
           ]
         },
         {
           "title": "Security Architecture",
           "type": "list",
           "content": [
-            "Raw Socket Monitoring: Uses packet-level inspection for accuracy",
-            "Host Network Access: Direct visibility into all network traffic",
-            "Configurable Sensitivity: Adjustable detection thresholds"
+            "Raw Socket Monitoring: Uses packet-level inspection for accuracy.",
+            "Host Network Access: Direct visibility into all network traffic.",
+            "Configurable Sensitivity: Adjustable detection thresholds."
           ]
         }
       ]
