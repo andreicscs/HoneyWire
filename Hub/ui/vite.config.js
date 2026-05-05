@@ -29,7 +29,11 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
           secure: false,
-        }
+        },
+      },
+      fs: {
+        // Allow serving files from one level up to the project root
+        allow: ['..']
       }
     }
   }

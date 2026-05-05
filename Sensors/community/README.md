@@ -8,6 +8,54 @@ The power of HoneyWire lies in the **Universal Event Standard**—the architectu
 
 ---
 
+## 🏗️ The Single Source of Truth: JSON Manifests
+HoneyWire uses a unified **Data-Driven Architecture**. To add a sensor to the HoneyWire ecosystem, you do **not** need to write Vue.js frontend code or modify the Go Wizard engine. 
+
+You only need to define your sensor in a `SensorManifest` JSON object. This single JSON block automatically:
+1. Generates the interactive UI forms and documentation cards in the HoneyWire Hub.
+2. Instructs the Wizard CLI's heuristic engine on when to recommend your sensor.
+3. Provides the exact deployment infrastructure (`InitContainers`, `VolumeMounts`, `EnvVars`) needed to safely run it.
+
+**Example `manifest.json` Schema:**
+```json
+{
+  "id": "hw-sensor-custom-name",
+  "version": "1.0.0",
+  "schema_version": "1.0",
+  "name": "My Custom Trap",
+  "category": "network",
+  "osi_layer": "Application Layer",
+  "icon_svg": "M12...",
+  "description": "Short description for the Hub UI cards.",
+  "documentation": {
+    "summary": "Longer explanation for the deep-dive view.",
+    "sections": [
+      { "title": "Features", "type": "list", "content": ["Feature 1", "Feature 2"] }
+    ]
+  },
+  "heuristics": {
+    "triggers": { "processes": ["nginx"], "ports": [80] },
+    "recommendation_reason": "Web server detected."
+  },
+  "deployment": {
+    "image": "ghcr.io/yourname/custom-trap:latest",
+    "network_mode": "bridge",
+    "env_vars": [
+      {
+        "name": "CUSTOM_VAR",
+        "description": "Adjustable in the Hub UI.",
+        "default": "8080",
+        "type": "int",
+        "required": true,
+        "hidden": false
+      }
+    ]
+  }
+}
+```
+
+---
+
 ## 🛠️ Engineering Resources
 Don't start from a blank repository. We have provided the scaffolding to move your sensor from a conceptual trap to a hardened, deployed container in minutes:
 
@@ -15,7 +63,7 @@ Don't start from a blank repository. We have provided the scaffolding to move yo
 * **[📖 Contribution Guide](./../../CONTRIBUTING.md):** **Mandatory reading.** Contains the "Golden Rules" for capability stripping, environment parity, and the JSON Contract.
 * **[🔬 Reference Implementation](./../official/TcpTarpit/README.md):** A deep dive into the architecture of our production-grade TCP Tarpit, demonstrating Go routine concurrency and semaphore limits.
 
-> **🛡️ Security Standard:** The HoneyWire ecosystem has moved past heavy interpreters. We strongly encourage community submissions to follow our official architecture: **pure Go, statically-linked binaries running as unprivileged users inside `:nonroot` Distroless containers, with all Linux kernel capabilities dropped.**
+> **🛡️ Security Standard:** The HoneyWire ecosystem has moved past heavy interpreters. We strongly encourage community submissions to follow our official architecture: **pure Go, statically-linked binaries running as unprivileged users inside `:nonroot` Distroless containers, with all Linux kernel capabilities dropped (`cap_drop: ["ALL"]`).**
 
 ---
 
@@ -34,9 +82,7 @@ To protect our users, every sensor submitted here undergoes a rigorous automated
 1.  **Fork** the repository.
 2.  **Create** your sensor directory: `Sensors/community/your-sensor-name`.
 3.  **Implement** your logic using the [HoneyWire Go SDK](../../SDKs/go-honeywire) based on the provided template.
-4.  **Harden** your `docker-compose.yml` to adhere to the principle of least privilege.
+4.  **Define** your `manifest.json` ensuring it adheres to the schema.
 5.  **Open a Pull Request**.
 
 **Join us in building a smarter, faster, and more resilient distributed defense.** 🐝
-
----
