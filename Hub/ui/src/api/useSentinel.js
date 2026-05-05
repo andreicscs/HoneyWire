@@ -7,13 +7,13 @@ const uptimeData = ref([])
 const isArmed = ref(true)
 const version = ref('1.0.0')
 const viewingArchive = ref(false)
-const selectedSensor = ref(null)
+const selectedNode = ref(null)   
+const selectedSensor = ref(null) 
 const activeTimeframe = ref('24H')
 const velocityTimeframe = ref('24H')
 const activeEvent = ref(null)
 const unreadCount = ref(0)
 
-// --- PAGINATION STATE ---
 const isFetching = ref(false)
 
 export function useSentinel() {
@@ -54,10 +54,11 @@ export function useSentinel() {
             
             if (selectedSensor.value) {
                 url.searchParams.append('sensor_id', selectedSensor.value)
+            } else if (selectedNode.value) {
+                url.searchParams.append('node_id', selectedNode.value)
             }
 
             const res = await fetch(url.toString()).then(r => r.json())
-            
             events.value = res || []
             await refreshUnreadCount()
         } catch(e) {
@@ -108,7 +109,6 @@ export function useSentinel() {
     const connectWS = () => {
         if (isDestroyed) return;
         
-        // Check max retry limit
         if (wsRetryCount >= maxRetries) {
             console.error('WebSocket: Max retries reached, stopping reconnection attempts');
             return;
@@ -118,7 +118,6 @@ export function useSentinel() {
         ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws`);
 
         ws.onopen = () => {
-            // Reset retry counter on successful connection
             wsRetryCount = 0;
             wsRetryDelay = 3000;
         };
@@ -130,7 +129,11 @@ export function useSentinel() {
                 if (data.type === 'NEW_EVENT') {
                     unreadCount.value++; 
                     if (!viewingArchive.value) {
-                        if (!selectedSensor.value || selectedSensor.value === data.payload.sensor_id) {
+                        const matchNoFilter = !selectedSensor.value && !selectedNode.value;
+                        const matchSensorFilter = selectedSensor.value === data.payload.sensor_id;
+                        const matchNodeFilter = !selectedSensor.value && selectedNode.value === data.payload.node_id;
+
+                        if (matchNoFilter || matchSensorFilter || matchNodeFilter) {
                             events.value.unshift(data.payload);
                         }
                     }
@@ -155,17 +158,14 @@ export function useSentinel() {
                 wsRetryCount++;
                 console.warn(`WebSocket disconnected. Retry ${wsRetryCount}/${maxRetries} in ${wsRetryDelay}ms`);
                 setTimeout(connectWS, wsRetryDelay);
-                // Exponential backoff: 3s, 6s, 12s, 24s, capped at 30s
                 wsRetryDelay = Math.min(wsRetryDelay * 2, 30000);
             }
         };
     }
 
-    // --- ACTIONS ---
     const logout = async () => {
         try {
             await fetch('/logout', { method: 'POST' })
-            // Hard redirect to clear frontend state and force re-auth
             window.location.href = '/'
         } catch(err) {
             console.error("Logout failed", err)
@@ -174,14 +174,8 @@ export function useSentinel() {
 
     const startRealtimeSync = async () => {
         isDestroyed = false;
-        
-        // Initial data load
         await Promise.all([fetchEvents(), fetchFleet(), fetchUptime()])
-        
-        // 1. Establish the WebSocket for instant Push Notifications (Events, Silence toggles, etc.)
         connectWS()
-        
-        // 2. Establish the Health Sync loop for fleet and uptime data.
         healthSyncInterval = setInterval(() => { 
             fetchFleet(); 
             fetchUptime() 
@@ -194,8 +188,7 @@ export function useSentinel() {
         if (ws) ws.close();
     }
 
-    // --- WATCHERS ---
-    watch([viewingArchive, selectedSensor], () => fetchEvents())
+    watch([viewingArchive, selectedSensor, selectedNode], () => fetchEvents())
     watch(activeTimeframe, () => fetchUptime())
 
     const toggleArmed = async () => {
@@ -207,9 +200,7 @@ export function useSentinel() {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({is_armed: next})
             })
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`Server error: ${response.status}`)
             isArmed.value = next
         } catch(err) {
             console.error('Failed to toggle armed state:', err)
@@ -221,9 +212,7 @@ export function useSentinel() {
     const markAllRead = async () => {
         try {
             const response = await fetch('/api/v1/events/read', {method: 'PATCH'})
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`Server error: ${response.status}`)
             events.value.forEach(e => e.is_read = 1) 
             unreadCount.value = 0
         } catch(err) {
@@ -236,9 +225,7 @@ export function useSentinel() {
         if (confirm("Archive all currently active events?")) {
             try {
                 const response = await fetch('/api/v1/events/archive-all', {method: 'PATCH'})
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`)
-                }
+                if (!response.ok) throw new Error(`Server error: ${response.status}`)
                 fetchEvents() 
             } catch(err) {
                 console.error('Failed to archive all events:', err)
@@ -251,9 +238,7 @@ export function useSentinel() {
         const originalEvents = [...events.value]
         try {
             const response = await fetch(`/api/v1/events/${id}/archive`, {method: 'PATCH'})
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`Server error: ${response.status}`)
             events.value = events.value.filter(e => e.id !== id)
             activeEvent.value = null
             await refreshUnreadCount()
@@ -275,15 +260,27 @@ export function useSentinel() {
         
         try {
             const response = await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' })
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`Server error: ${response.status}`)
         } catch (err) {
             console.error('Failed to forget sensor:', err)
             fleet.value = originalFleet
             uptimeData.value = originalUptime
             selectedSensor.value = originalSelected
             alert('Failed to remove sensor. Please try again.')
+        }
+    }
+
+    // NEW: Forget entire Node
+    const forgetNode = async (nodeId) => {
+        if (!confirm(`Are you sure you want to delete Node "${nodeId}" and ALL of its underlying sensors?`)) return;
+        
+        const nodeSensors = fleet.value.filter(s => s.node_id === nodeId);
+        for (const s of nodeSensors) {
+            await forgetSensor(s.sensor_id);
+        }
+        
+        if (selectedNode.value === nodeId) {
+            selectedNode.value = null;
         }
     }
 
@@ -298,13 +295,27 @@ export function useSentinel() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_silenced: sensor.is_silenced })
                 })
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`)
-                }
+                if (!response.ok) throw new Error(`Server error: ${response.status}`)
             } catch (err) {
                 sensor.is_silenced = previousState
                 console.error('Failed to toggle sensor silence:', err)
                 alert(`Failed to ${previousState ? 'unsilence' : 'silence'} sensor. Please try again.`)
+            }
+        }
+    }
+
+    // NEW: Silence entire Node
+    const silenceNode = async (nodeId) => {
+        const nodeSensors = fleet.value.filter(s => s.node_id === nodeId);
+        if (!nodeSensors.length) return;
+        
+        // If all are silenced, target is Unsilence. Otherwise, Silence all.
+        const allSilenced = nodeSensors.every(s => s.is_silenced);
+        const targetState = !allSilenced;
+        
+        for (const s of nodeSensors) {
+            if (s.is_silenced !== targetState) {
+                await toggleSilence(s.sensor_id);
             }
         }
     }
@@ -317,9 +328,7 @@ export function useSentinel() {
         unreadCount.value = Math.max(0, unreadCount.value - 1)
         try {
             const response = await fetch(`/api/v1/events/${eventId}/read`, { method: 'PATCH' })
-            if (!response.ok) {
-                throw new Error(`Server error: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`Server error: ${response.status}`)
         } catch (err) {
             ev.is_read = wasRead
             unreadCount.value = Math.max(0, unreadCount.value + 1)
@@ -333,9 +342,9 @@ export function useSentinel() {
     }
     
     return {
-        events, fleet, uptimeData, isArmed, version, viewingArchive, selectedSensor, activeTimeframe, velocityTimeframe,
+        events, fleet, uptimeData, isArmed, version, viewingArchive, selectedNode, selectedSensor, activeTimeframe, velocityTimeframe,
         unreadCount, overallUptime, isFetching,
         logout, startRealtimeSync, stopRealtimeSync, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
-        activeEvent, isActiveSensorSilenced, purgeEvents
+        activeEvent, isActiveSensorSilenced, purgeEvents, silenceNode, forgetNode // <-- Exposed
     }
 }

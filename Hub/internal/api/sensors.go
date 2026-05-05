@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"log"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
@@ -22,23 +23,46 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	minuteBucket := now.Format("2006-01-02 15:04:00")
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
+	var nodeID interface{} = hb.NodeID
+	if hb.NodeID == "" {
+		nodeID = nil
+	}
+
+	// 1. UPSERT the sensor (this handles both new inserts AND updates)
 	res, err := h.Store.DB.Exec(`
-		INSERT OR IGNORE INTO sensors (sensor_id, first_seen, last_seen, metadata)
-		VALUES (?, ?, ?, ?)`,
-		hb.SensorID, nowStr, nowStr, string(metadataJSON),
+		INSERT INTO sensors (sensor_id, node_id, first_seen, last_seen, metadata, is_silenced)
+		VALUES (?, ?, ?, ?, ?, 0)
+		ON CONFLICT(sensor_id) DO UPDATE SET last_seen = ?, metadata = ?, node_id = ?`,
+		hb.SensorID, nodeID, nowStr, nowStr, string(metadataJSON), nowStr, string(metadataJSON), nodeID,
 	)
 	if err != nil {
+		log.Printf("[ERROR] Heartbeat DB Upsert failed for sensor %s: %v", hb.SensorID, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
+	}
+
+	// 2. Auto-register the Node if it doesn't exist
+	if hb.NodeID != "" {
+		ip := h.getRealIP(r)
+		_, err := h.Store.DB.Exec(`
+			INSERT INTO nodes (node_id, alias, ip_address, first_seen, last_seen)
+			VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(node_id) DO UPDATE SET last_seen = ?, ip_address = ?`,
+			hb.NodeID, hb.NodeID, ip, nowStr, nowStr, nowStr, ip,
+		)
+		if err != nil {
+			log.Printf("[WARNING] Failed to upsert node %s from heartbeat: %v", hb.NodeID, err)
+		}
 	}
 
 	affected, _ := res.RowsAffected()
 	isNew := affected == 1
 
-	h.Store.DB.Exec(`UPDATE sensors SET last_seen=?, metadata=? WHERE sensor_id=?`,
-		nowStr, string(metadataJSON), hb.SensorID)
-
-	h.Store.DB.Exec("INSERT OR IGNORE INTO sensor_heartbeats (sensor_id, time_bucket) VALUES (?, ?)", hb.SensorID, minuteBucket)
+	// 3. Log the heartbeat bucket
+	_, err = h.Store.DB.Exec("INSERT OR IGNORE INTO sensor_heartbeats (sensor_id, time_bucket) VALUES (?, ?)", hb.SensorID, minuteBucket)
+	if err != nil {
+		log.Printf("[WARNING] Failed to log heartbeat bucket for sensor %s: %v", hb.SensorID, err)
+	}
 
 	if isNew {
 		h.broadcastWS("NEW_SENSOR", map[string]string{"sensor_id": hb.SensorID})
@@ -48,7 +72,11 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, metadata, is_silenced FROM sensors ORDER BY sensor_id")
+	rows, err := h.Store.DB.Query(`
+		SELECT sensor_id, node_id, first_seen, last_seen, metadata, is_silenced 
+		FROM sensors 
+		ORDER BY COALESCE(node_id, 'ZZZ') ASC, sensor_id ASC
+	`) // Note: COALESCE(node_id, 'ZZZ') ensures orphan sensors drop to the bottom of the list.
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -60,9 +88,15 @@ func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
 		var s models.Sensor
 		var metadataStr string
 		var isSilencedInt int
+		var dbNodeID *string
 
-		if err := rows.Scan(&s.SensorID, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
+		if err := rows.Scan(&s.SensorID, &dbNodeID, &s.FirstSeen, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
+			log.Printf("Error scanning sensor: %v", err)
 			continue
+		}
+
+		if dbNodeID != nil {
+			s.NodeID = *dbNodeID
 		}
 
 		s.IsSilenced = isSilencedInt == 1

@@ -7,13 +7,30 @@
     import ThreatVelocity from '../components/ThreatVelocity.vue'
 
     const { 
-        fleet, selectedSensor, events, uptimeData, activeTimeframe, velocityTimeframe, 
+        fleet, selectedNode, selectedSensor, events, uptimeData, activeTimeframe, velocityTimeframe, 
         overallUptime, viewingArchive, archiveAll,
-        activeEvent, isActiveSensorSilenced, archiveEvent, toggleSilence, forgetSensor, markEventRead
+        activeEvent, isActiveSensorSilenced, archiveEvent, toggleSilence, forgetSensor, markEventRead,
+        silenceNode, forgetNode
     } = useSentinel()
 
-    const handleSelect = (id) => { selectedSensor.value = id }
-    const handleToggle = (id) => { selectedSensor.value = selectedSensor.value === id ? null : id }
+    const handleNodeSelect = (nodeId) => { 
+        if (selectedNode.value === nodeId) {
+            selectedNode.value = null
+            selectedSensor.value = null
+        } else {
+            selectedNode.value = nodeId
+            selectedSensor.value = null
+        }
+    }
+
+    const handleSensorSelect = (sensorId, nodeId) => { 
+        if (selectedSensor.value === sensorId) {
+            selectedSensor.value = null
+        } else {
+            selectedSensor.value = sensorId
+            selectedNode.value = null
+        }
+    }
 </script>
 
 <template>
@@ -21,14 +38,14 @@
         
         <TrafficFilters 
             :fleet="fleet" 
-            :selectedSensor="selectedSensor" 
-            @select-sensor="handleSelect" 
-            @forget-sensor="forgetSensor"
-            @toggle-silence="toggleSilence"
+            :selectedNode="selectedNode" 
+            :selectedSensor="selectedSensor"
+            @select-node="handleNodeSelect" 
+            @silence-node="silenceNode"
+            @forget-node="forgetNode"
         />
 
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
-            
             <div class="flex-[1_1_350px] min-w-[100%] sm:min-w-[350px] h-[320px] lg:h-[340px] shrink-0">
                 <ThreatVelocity 
                     :events="events"
@@ -47,9 +64,13 @@
                     :overallUptime="overallUptime"
                     :activeTimeframe="activeTimeframe"
                     :fleet="fleet"
+                    :selectedNode="selectedNode"
                     :selectedSensor="selectedSensor"
                     @update:timeframe="t => activeTimeframe = t"
-                    @select-sensor="handleToggle"
+                    @select-sensor="handleSensorSelect"
+                    @select-node="handleNodeSelect" 
+                    @toggle-silence="toggleSilence"
+                    @forget-sensor="forgetSensor"
                 />
             </div>
         </div>
@@ -63,6 +84,5 @@
                 @mark-read="markEventRead"
             />
         </div>
-
     </div>
 </template>

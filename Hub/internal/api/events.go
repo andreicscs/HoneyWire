@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
+	"database/sql"
+	
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/notify"
@@ -21,6 +22,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Version check
 	hubMajor := strings.Split(h.Cfg.Version, ".")[0]
 	agentMajor := strings.Split(e.ContractVersion, ".")[0]
 	if agentMajor == "" || hubMajor != agentMajor {
@@ -31,12 +33,19 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
 	detailsJSON, _ := json.Marshal(e.Details)
 
+	// Handle nullable NodeID for backwards compatibility
+	var nodeID interface{} = e.NodeID
+	if e.NodeID == "" {
+		nodeID = nil
+	}
+
 	result, err := h.Store.DB.Exec(`
-		INSERT INTO events (timestamp, contract_version, sensor_id, event_trigger, severity, source, target, details, is_read, is_archived)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		nowStr, e.ContractVersion, e.SensorID, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
+		INSERT INTO events (timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+		nowStr, e.ContractVersion, e.SensorID, nodeID, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
 	)
 	if err != nil {
+		log.Printf("[ERROR] Failed to insert event: %v", err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -45,8 +54,30 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.ID = int(lastInsertID)
 	e.Timestamp = nowStr
 
+	// Auto-register the Node and link the Sensor if NodeID exists
+	if e.NodeID != "" {
+		ip := h.getRealIP(r)
+		_, err := h.Store.DB.Exec(`
+			INSERT INTO nodes (node_id, alias, ip_address, first_seen, last_seen)
+			VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(node_id) DO UPDATE SET last_seen = ?, ip_address = ?`,
+			e.NodeID, e.NodeID, ip, nowStr, nowStr, nowStr, ip,
+		)
+		if err != nil {
+			log.Printf("[WARNING] Failed to upsert node %s: %v", e.NodeID, err)
+		}
+
+		_, err = h.Store.DB.Exec(`UPDATE sensors SET node_id = ? WHERE sensor_id = ?`, e.NodeID, e.SensorID)
+		if err != nil {
+			log.Printf("[WARNING] Failed to link sensor %s to node %s: %v", e.SensorID, e.NodeID, err)
+		}
+	}
+
 	var isSilencedInt int
-	h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
+	err = h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("[WARNING] Failed to check silence status for sensor %s: %v", e.SensorID, err)
+	}
 
 	if isSilencedInt == 0 {
 		title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
@@ -72,14 +103,19 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		isArchived = 1
 	}
 
-	query := "SELECT id, timestamp, contract_version, sensor_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
+	query := "SELECT id, timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
 	args := []interface{}{isArchived}
 
-	if sensorID := r.URL.Query().Get("sensor_id"); sensorID != "" {
+	if nodeID := r.URL.Query().Get("node_id"); nodeID != "" {
+		query += " AND node_id = ?"
+		args = append(args, nodeID)
+	} else if sensorID := r.URL.Query().Get("sensor_id"); sensorID != "" {
 		query += " AND sensor_id = ?"
 		args = append(args, sensorID)
 	}
 
+
+	
 	query += " ORDER BY id DESC"
 
 	rows, err := h.Store.DB.Query(query, args...)
@@ -94,13 +130,18 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		var e models.Event
 		var detailsStr string
 		var isReadInt, isArchivedInt int
-
+		var dbNodeID *string // Use pointer to handle SQL NULL safely
+		
 		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID,
+			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID, &dbNodeID,
 			&e.EventTrigger, &e.Severity, &e.Source, &e.Target,
 			&detailsStr, &isReadInt, &isArchivedInt,
 		); err != nil {
 			continue
+		}
+
+		if dbNodeID != nil {
+			e.NodeID = *dbNodeID
 		}
 
 		e.IsRead = isReadInt == 1

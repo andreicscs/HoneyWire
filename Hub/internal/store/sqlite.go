@@ -53,9 +53,30 @@ CREATE TABLE IF NOT EXISTS sensor_heartbeats (
 CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
 `
 
+// v2Schema introduces the Node hierarchy and backwards-compatible relations
+const v2Schema = `
+CREATE TABLE IF NOT EXISTS nodes (
+    node_id TEXT PRIMARY KEY,
+    alias TEXT,
+    ip_address TEXT,
+    first_seen TEXT,
+    last_seen TEXT NOT NULL,
+    metadata TEXT NOT NULL DEFAULT '{}'
+);
+
+ALTER TABLE events ADD COLUMN node_id TEXT DEFAULT NULL;
+ALTER TABLE sensors ADD COLUMN node_id TEXT DEFAULT NULL;
+ALTER TABLE sensor_heartbeats ADD COLUMN node_id TEXT DEFAULT NULL;
+
+-- High performance indexing for Node filtering
+CREATE INDEX IF NOT EXISTS idx_events_node ON events(node_id);
+CREATE INDEX IF NOT EXISTS idx_sensors_node ON sensors(node_id);
+`
+
 // migrations holds all schema changes in chronological order.
 var migrations = []string{
 	baselineSchema, // Version 1 (v1.0.0)
+	v2Schema,       // Version 2 (v1.1.0) - Node Integration
 }
 
 type Store struct {

@@ -322,7 +322,7 @@ const copyToClipboard = () => {
                                         class="absolute inset-0 w-full h-full bg-slate-50 dark:bg-[#121215] text-slate-800 dark:text-zinc-300 p-5 rounded-md text-[13px] mono custom-scroll border border-slate-200 dark:border-zinc-800/80 leading-relaxed overflow-auto focus:outline-none"
                                     ></pre>
                                     <button id="copy-btn" @click="copyToClipboard"
-                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-white dark:bg-[#1f1f22] hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:border-blue-500/50 text-slate-600 dark:text-zinc-300 text-[11px] font-bold uppercase tracking-wider transition-colors border border-slate-200 dark:border-zinc-700 shadow-sm active:scale-95 z-10">
+                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-white dark:bg-[#1f1f22] hover:bg-blue-50 hover:text-blue-600 dark:hover:text-slate-300 dark:hover:bg-slate-500/30 dark:hover:border-slate-300/50 text-slate-600 dark:text-zinc-300 text-[11px] font-bold uppercase tracking-wider transition-colors border border-slate-200 dark:border-zinc-700 shadow-sm active:scale-95 z-10">
                                         Copy
                                     </button>
                                 </div>
