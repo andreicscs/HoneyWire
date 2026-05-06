@@ -39,49 +39,14 @@
       "recommendation_reason": "Database or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-tcptarpit:latest",
+      "image": "192.168.1.11:5000/honeywire-tcptarpit:dev",
       "network_mode": "host",
       "env_vars": [
-        {
-          "name": "HW_HUB_ENDPOINT",
-          "description": "The URL of your central HoneyWire Hub.",
-          "default": "__HUB_ENDPOINT__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HUB_KEY",
-          "description": "The shared secret API key.",
-          "default": "__HUB_KEY__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_DECOY_PORTS",
-          "description": "Comma-separated list of internal ports to tarpit.",
-          "default": "2222,3306",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "HW_TARPIT_MODE",
-          "description": "Tarpit behavior mode.",
-          "default": "hold",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "HW_TARPIT_BANNER",
-          "description": "Service banner to spoof.",
-          "default": "SSH-2.0-OpenSSH_8.2p1\\r\\n",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        }
+        { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HUB_KEY", "description": "The shared secret API key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_DECOY_PORTS", "description": "Comma-separated list of internal ports to tarpit.", "default": "2222,3306", "type": "string", "required": false, "hidden": false },
+        { "name": "HW_TARPIT_MODE", "description": "Tarpit behavior mode.", "default": "hold", "type": "string", "required": false, "hidden": false },
+        { "name": "HW_TARPIT_BANNER", "description": "Service banner to spoof.", "default": "SSH-2.0-OpenSSH_8.2p1\\r\\n", "type": "string", "required": false, "hidden": false }
       ]
     }
   },
@@ -125,41 +90,13 @@
       "recommendation_reason": "Web server detected. Deploy fake admin panel to catch internal network snooping."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-webdecoy:latest",
+      "image": "192.168.1.11:5000/honeywire-webrouterdecoy:dev",
       "network_mode": "bridge",
       "env_vars": [
-        {
-          "name": "HW_HUB_ENDPOINT",
-          "description": "The URL of your central HoneyWire Hub.",
-          "default": "__HUB_ENDPOINT__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HUB_KEY",
-          "description": "The shared secret API key.",
-          "default": "__HUB_KEY__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_BIND_PORT",
-          "description": "Port to bind the decoy web server.",
-          "default": "{{ availablePort 8080 }}",
-          "type": "int",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "HW_ROUTER_BRAND",
-          "description": "Router brand to simulate.",
-          "default": "Netgear",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        }
+        { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HUB_KEY", "description": "The shared secret API key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_BIND_PORT", "description": "Port to bind the decoy web server.", "default": "{{ availablePort 8080 }}", "type": "int", "required": false, "hidden": false },
+        { "name": "HW_ROUTER_BRAND", "description": "Router brand to simulate.", "default": "Netgear", "type": "string", "required": false, "hidden": false }
       ]
     }
   },
@@ -204,7 +141,7 @@
       "recommendation_reason": "Runtime/app service detected. Deploy to catch malicious file scraping."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-filecanary:latest",
+      "image": "192.168.1.11:5000/honeywire-filecanary:dev",
       "network_mode": "host",
       "user": "65532:65532",
       "init_containers": [
@@ -212,73 +149,17 @@
           "name": "permission-fixer",
           "image": "alpine:latest",
           "command": "sh -c \"apk add --no-cache acl && setfacl -R -m u:65532:rx /honey_dir\"",
-          "volume_mounts": [
-            {
-              "type": "bind",
-              "source": "{{ .TrapPath }}",
-              "target": "/honey_dir",
-              "read_only": false
-            }
-          ]
+          "volume_mounts": [ { "type": "bind", "source": "{{ .TrapPath }}", "target": "/honey_dir", "read_only": false } ]
         }
       ],
-      "volume_mounts": [
-        {
-          "type": "bind",
-          "source": "{{ .TrapPath }}",
-          "target": "/honey_dir",
-          "read_only": true
-        }
-      ],
+      "volume_mounts": [ { "type": "bind", "source": "{{ .TrapPath }}", "target": "/honey_dir", "read_only": true } ],
       "env_vars": [
-        {
-          "name": "HW_HUB_ENDPOINT",
-          "description": "The URL of your central HoneyWire Hub.",
-          "default": "__HUB_ENDPOINT__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HUB_KEY",
-          "description": "The shared secret API key.",
-          "default": "__HUB_KEY__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HONEY_DIR",
-          "description": "Internal container mount path.",
-          "default": "/honey_dir",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "TRAP_PATH",
-          "description": "The physical path on the host machine to monitor.",
-          "default": "{{ if .HasWeb }}/var/www/html/.backups{{ else if .HasDB }}/var/lib/db_backups{{ else }}/opt/app_data/backups{{ end }}",
-          "type": "string",
-          "required": true,
-          "hidden": false
-        },
-        {
-          "name": "TRAP_FILE_1",
-          "description": "Primary decoy file name.",
-          "default": "{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}secrets_backup.yaml{{ end }}",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "TRAP_FILE_2",
-          "description": "Secondary decoy file name (if multiple services detected).",
-          "default": "{{ if gt (len .MatchedServices) 1 }}{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}api_keys.txt{{ end }}{{ end }}",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        }
+        { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HUB_KEY", "description": "The shared secret API key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HONEY_DIR", "description": "Internal container mount path.", "default": "/honey_dir", "type": "string", "required": true, "hidden": true },
+        { "name": "TRAP_PATH", "description": "The physical path on the host machine to monitor.", "default": "{{ if .HasWeb }}/var/www/html/.backups{{ else if .HasDB }}/var/lib/db_backups{{ else }}/opt/app_data/backups{{ end }}", "type": "string", "required": true, "hidden": false },
+        { "name": "TRAP_FILE_1", "description": "Primary decoy file name.", "default": "{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}secrets_backup.yaml{{ end }}", "type": "string", "required": false, "hidden": false },
+        { "name": "TRAP_FILE_2", "description": "Secondary decoy file name (if multiple services detected).", "default": "{{ if gt (len .MatchedServices) 1 }}{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}api_keys.txt{{ end }}{{ end }}", "type": "string", "required": false, "hidden": false }
       ]
     }
   },
@@ -320,26 +201,12 @@
       "recommendation_reason": "Core sensor. Internal pings to isolated workloads are highly suspicious."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-icmpcanary:latest",
+      "image": "192.168.1.11:5000/honeywire-icmpcanary:dev",
       "network_mode": "host",
       "cap_add": ["NET_RAW"],
       "env_vars": [
-        {
-          "name": "HW_HUB_ENDPOINT",
-          "description": "The URL of your central HoneyWire Hub.",
-          "default": "__HUB_ENDPOINT__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HUB_KEY",
-          "description": "The shared secret API key.",
-          "default": "__HUB_KEY__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        }
+        { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HUB_KEY", "description": "The shared secret API key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true }
       ]
     }
   },
@@ -382,50 +249,15 @@
       "recommendation_reason": "Core sensor. Always recommended to detect internal horizontal port scanning."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-networkscandetector:latest",
+      "image": "192.168.1.11:5000/honeywire-networkscandetector:dev",
       "network_mode": "host",
       "cap_add": ["NET_RAW"],
       "env_vars": [
-        {
-          "name": "HW_HUB_ENDPOINT",
-          "description": "The URL of your central HoneyWire Hub.",
-          "default": "__HUB_ENDPOINT__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_HUB_KEY",
-          "description": "The shared secret API key.",
-          "default": "__HUB_KEY__",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "HW_SCAN_THRESHOLD",
-          "description": "Number of ports that must be scanned to trigger detection.",
-          "default": "5",
-          "type": "int",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "HW_SCAN_WINDOW",
-          "description": "Time window in seconds for scan detection.",
-          "default": "5",
-          "type": "int",
-          "required": false,
-          "hidden": false
-        },
-        {
-          "name": "HW_IGNORE_PORTS",
-          "description": "Comma-separated list of ports to exclude from scan detection.",
-          "default": "{{ if .IgnorePorts }}{{ .IgnorePorts }}{{ else }}22,80,443{{ end }}",
-          "type": "string",
-          "required": false,
-          "hidden": false
-        }
+        { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_HUB_KEY", "description": "The shared secret API key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
+        { "name": "HW_SCAN_THRESHOLD", "description": "Number of ports that must be scanned to trigger detection.", "default": "5", "type": "int", "required": false, "hidden": false },
+        { "name": "HW_SCAN_WINDOW", "description": "Time window in seconds for scan detection.", "default": "5", "type": "int", "required": false, "hidden": false },
+        { "name": "HW_IGNORE_PORTS", "description": "Comma-separated list of ports to exclude from scan detection.", "default": "{{ if .IgnorePorts }}{{ .IgnorePorts }}{{ else }}22,80,443{{ end }}", "type": "string", "required": false, "hidden": false }
       ]
     }
   }

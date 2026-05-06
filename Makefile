@@ -18,8 +18,11 @@ save:
 # Use this once a week. It switches to main, merges your work, and publishes to GitHub.
 release:
 	@echo "🚀 Publishing to Public GitHub..."
-	git checkout main
-	git merge dev --squash -m "Release: New features and sensor updates"
-	git push origin main
-	git push public main
+	@read -p "Enter release commit message (or press Enter for default): " msg; \
+	if [ -z "$$msg" ]; then msg="Release: New features and sensor updates"; fi; \
+	git checkout main; \
+	git merge dev --squash; \
+	git commit -m "$$msg"; \
+	git push origin main; \
+	git push public main; \
 	git checkout dev

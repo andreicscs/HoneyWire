@@ -4,6 +4,13 @@ on:
   push:
     branches: [ "dev" ]
     paths: [ 'Sensors/official/**' ]
+  workflow_dispatch:
+    inputs:
+      sensor_folder:
+        description: "Folder name in Sensors/official/ (e.g., tcptarpit) or 'all'"
+        required: true
+        default: "all"
+        type: string
 
 jobs:
   # ==========================================
@@ -18,21 +25,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Need full history to compare branches
+          fetch-depth: 0
 
       - name: Generate Independent Matrix
         id: generate-matrix
         run: |
-          # Look specifically inside Sensors/official/
-          if git rev-parse --verify origin/main >/dev/null 2>&1; then
-            CHANGED=$(git diff --name-only origin/main...HEAD | grep '^Sensors/official/' | awk -F/ '{print $3}' | sort -u)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # MANUAL UI TRIGGER
+            INPUT="${{ github.event.inputs.sensor_folder }}"
+            if [ "$INPUT" == "all" ]; then
+              CHANGED=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}')
+            else
+              # Modular check: verify the folder exists and has a Dockerfile
+              if [ -d "Sensors/official/$INPUT" ] && [ -f "Sensors/official/$INPUT/Dockerfile" ]; then
+                CHANGED="$INPUT"
+              else
+                echo "❌ Error: Folder 'Sensors/official/$INPUT' not found or missing Dockerfile."
+                exit 1
+              fi
+            fi
           else
-            CHANGED=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}')
+            # AUTOMATIC PUSH
+            if git rev-parse --verify origin/main >/dev/null 2>&1; then
+              CHANGED=$(git diff --name-only origin/main...HEAD | grep '^Sensors/official/' | awk -F/ '{print $3}' | sort -u)
+            else
+              CHANGED=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}')
+            fi
           fi
           
           if [ -z "$CHANGED" ]; then
             MATRIX_JSON="[]"
           else
+            # Convert bash list to JSON array
             MATRIX_JSON=$(echo "$CHANGED" | jq -R -s -c 'split("\n")[:-1]')
           fi
           echo "Generated Matrix: $MATRIX_JSON"
@@ -70,21 +94,15 @@ jobs:
             echo "No go.mod found, skipping native Go tests."
           fi
 
-      # ----------------------------------------------------
-      # GOSEC SAST SCAN
-      # ----------------------------------------------------
       - name: Run Gosec Security Scanner
         working-directory: Sensors/official/${{ matrix.sensor }}
         run: |
           if [ -f "go.mod" ]; then
             curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.19.0
-            $(go env GOPATH)/bin/gosec -fmt=text -out=results.txt ./... || echo "Gosec found vulnerabilities, but continuing dev build."
+            $(go env GOPATH)/bin/gosec -fmt=text -out=results.txt ./... || echo "Vulnerabilities found, continuing dev build."
             cat results.txt
           fi
 
-      # ----------------------------------------------------
-      # BUILD & PUSH TO LOCAL HOMELAB REGISTRY
-      # ----------------------------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
