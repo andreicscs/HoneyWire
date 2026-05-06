@@ -51,7 +51,9 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 
 		r.Get("/api/v1/ws", h.ServeWS)
 
-		// Provisioning (UI protected)
+		r.Get("/api/v1/manifests", h.GetManifests)
+
+		// Provisioning
 		r.Post("/api/v1/tokens/generate", h.GenerateToken)
 
 		// System Configuration & Danger Zone

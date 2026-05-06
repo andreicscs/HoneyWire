@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"time"
-
+	"io"
+	"os"
+		
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
 )
@@ -348,4 +350,33 @@ func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
 		"status":  "success",
 		"message": "Sensor forgotten successfully",
 	})
+}
+
+// GetManifests fetches the sensor manifest JSON.
+// It proxies the request through the Hub to bypass browser CORS restrictions.
+func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
+	// 1. Determine the target URL
+	manifestURL := os.Getenv("HW_MANIFEST_URL")
+	if manifestURL == "" {
+		// Production fallback
+		manifestURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
+	}
+
+	// 2. Fetch the manifest
+	resp, err := http.Get(manifestURL)
+	if err != nil {
+		http.Error(w, `{"error": "Failed to reach manifest registry"}`, http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, `{"error": "Manifest registry returned an error"}`, http.StatusBadGateway)
+		return
+	}
+
+	// 3. Proxy the JSON back to the Vue frontend
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, resp.Body)
 }

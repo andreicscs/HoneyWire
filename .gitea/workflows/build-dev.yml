@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       sensor:
-        description: "Folder name (e.g., tcptarpit) or 'all'"
+        description: "Exact folder name (e.g., TcpTarpit) or 'all'"
         required: true
         default: "all"
         type: string
@@ -21,8 +21,8 @@ jobs:
           INPUT="${{ github.event.inputs.sensor }}"
           
           if [ "$INPUT" == "all" ]; then
-            # Safely grab folder names, excluding empty lines
-            RAW_LIST=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | grep -v '^$')
+            # Grab exact case-sensitive folder names
+            RAW_LIST=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
           else
             RAW_LIST="$INPUT"
           fi
@@ -42,10 +42,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Format Docker Tag (Lowercase)
+        id: format-tag
+        run: |
+          # Docker strictly requires lowercase tags. 
+          # This converts 'TcpTarpit' to 'tcptarpit'
+          LOWER_NAME=$(echo "${{ matrix.sensor }}" | tr '[:upper:]' '[:lower:]')
+          echo "tag=$LOWER_NAME" >> $GITHUB_OUTPUT
+
       - name: Build and Push locally
         uses: docker/build-push-action@v5
         with:
           context: .
+          # Use exact case for the folder path
           file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
           push: true
-          tags: 192.168.1.11:5000/honeywire-${{ matrix.sensor }}:dev
+          # Use the lowercased name for the docker tag
+          tags: 192.168.1.11:5000/honeywire-${{ steps.format-tag.outputs.tag }}:dev

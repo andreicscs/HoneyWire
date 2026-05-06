@@ -13,22 +13,21 @@ const sensors = ref([])
 const isLoading = ref(true)
 const fetchError = ref(false) // Replaces offline fallback flag
 
-// Vite will inject VITE_MANIFEST_URL if it exists in a .env file.
-// If it doesn't exist (like in production), it safely falls back to GitHub.
-const REGISTRY_URL = import.meta.env.VITE_MANIFEST_URL || "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
-
 onMounted(async () => {
     try {
-        const response = await fetch(REGISTRY_URL, { cache: "no-store" })
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
-        sensors.value = await response.json()
+        isLoading.value = true;
+        const response = await fetch("/api/v1/manifests", { cache: "no-store" });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        sensors.value = await response.json();
     } catch (error) {
-        console.error("HoneyWire: Failed to fetch sensor registry.", error)
-        fetchError.value = true
+        console.error("HoneyWire: Failed to fetch sensor registry.", error);
+        fetchError.value = true;
     } finally {
-        isLoading.value = false
+        isLoading.value = false;
     }
-})
+});
 
 // Intelligently extracts a clean default value from Go Templates for the UI
 const getUIDefault = (def) => {
