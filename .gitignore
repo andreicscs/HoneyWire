@@ -1,18 +1,27 @@
 # =========================
+# OS & IDE Clutter
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+
+# =========================
 # Secrets and Config
 # =========================
 .env
 **/.env
+.token
 # (Note: We do NOT ignore .env.example so users have a template)
 
 # =========================
-# Database
+# Database & Backups
 # =========================
 *.db
 *.db-wal
 *.db-shm
-
 *.sqlite3
+*.bak        # Catches honeywire.db.bak and any other backups
+*.swp
 
 # =========================
 # Python
@@ -22,14 +31,14 @@ __pycache__/
 venv/
 .venv/
 *.egg-info/
-build/
 dist/
 
 # =========================
-# OS & IDE Clutter
+# Go & Builds
 # =========================
-.DS_Store
-Thumbs.db
-.vscode/
+build/
+wizard/build/
+*.exe
+*.test
 
 # (Notice: .dockerignore is intentionally NOT here. It must be tracked by Git!)
