@@ -18,18 +18,35 @@ jobs:
       - uses: actions/checkout@v4
       - id: set-matrix
         run: |
-          INPUT="${{ github.event.inputs.sensor }}"
+          # Use Gitea's direct inputs syntax, fallback to 'all' if empty
+          INPUT="${{ inputs.sensor }}"
+          if [ -z "$INPUT" ]; then INPUT="all"; fi
+          
+          echo "Target sensor(s): $INPUT"
           
           if [ "$INPUT" == "all" ]; then
-            # Grab exact case-sensitive folder names
-            RAW_LIST=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+            DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
           else
-            RAW_LIST="$INPUT"
+            DIRS="$INPUT"
           fi
           
-          # Convert to JSON array safely
-          MATRIX_JSON=$(echo "$RAW_LIST" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          # Build the JSON array manually in pure bash (bulletproof)
+          JSON_ARRAY="["
+          FIRST=1
+          for dir in $DIRS; do
+            if [ -n "$dir" ]; then
+              if [ $FIRST -eq 1 ]; then
+                JSON_ARRAY="$JSON_ARRAY\"$dir\""
+                FIRST=0
+              else
+                JSON_ARRAY="$JSON_ARRAY,\"$dir\""
+              fi
+            fi
+          done
+          JSON_ARRAY="$JSON_ARRAY]"
+          
+          echo "Generated JSON Matrix: $JSON_ARRAY"
+          echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
 
   build:
     needs: generate-matrix
