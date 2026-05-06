@@ -1,0 +1,119 @@
+name: Smart Dev Sensor Build
+
+on:
+  push:
+    branches: [ "dev" ]
+    paths: [ 'Sensors/**' ]
+
+jobs:
+  # ==========================================
+  # STAGE 1: DYNAMIC MATRIX GENERATOR
+  # ==========================================
+  detect-sensors:
+    name: "🔍 Detect Changed Sensors"
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history to compare branches
+
+      - name: Generate Independent Matrix
+        id: generate-matrix
+        run: |
+          # Find directories inside Sensors/ that have changed compared to the main branch
+          # Fallback to building everything in Sensors/ if main doesn't exist yet
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only origin/main...HEAD | grep '^Sensors/' | awk -F/ '{print $2}' | sort -u)
+          else
+            CHANGED=$(ls -1 Sensors/)
+          fi
+          
+          # Convert the bash list into a JSON array for the matrix
+          if [ -z "$CHANGED" ]; then
+            MATRIX_JSON="[]"
+          else
+            MATRIX_JSON=$(echo "$CHANGED" | jq -R -s -c 'split("\n")[:-1]')
+          fi
+          
+          echo "Generated Matrix: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  # ==========================================
+  # STAGE 2: PARALLEL TEST, SCAN, & PUBLISH
+  # ==========================================
+  process-sensors:
+    name: "🚀 Process: ${{ matrix.sensor }}"
+    needs: detect-sensors
+    if: ${{ needs.detect-sensors.outputs.matrix != '[]' && needs.detect-sensors.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false 
+      matrix:
+        sensor: ${{ fromJson(needs.detect-sensors.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go Tests
+        working-directory: Sensors/${{ matrix.sensor }}
+        run: |
+          if [ -f "go.mod" ]; then
+            go test -v ./...
+          else
+            echo "No go.mod found, skipping native Go tests."
+          fi
+
+      # ----------------------------------------------------
+      # GOSEC SAST SCAN (Replaces CodeQL for Gitea)
+      # ----------------------------------------------------
+      - name: Run Gosec Security Scanner
+        working-directory: Sensors/${{ matrix.sensor }}
+        run: |
+          if [ -f "go.mod" ]; then
+            curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.19.0
+            $(go env GOPATH)/bin/gosec -fmt=text -out=results.txt ./... || echo "Gosec found vulnerabilities, but continuing build for dev."
+            cat results.txt
+          fi
+
+      # ----------------------------------------------------
+      # TRIVY FILESYSTEM SCA SCAN
+      # ----------------------------------------------------
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: Sensors/${{ matrix.sensor }}
+          format: 'table'
+          exit-code: '0' # Set to 0 for dev so it doesn't break your workflow while testing
+          severity: 'CRITICAL,HIGH'
+
+      # ----------------------------------------------------
+      # BUILD & PUSH TO LOCAL HOMELAB REGISTRY
+      # ----------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          # Required to allow pushing to your HTTP (non-HTTPS) Proxmox registry
+          driver-opts: image=moby/buildkit:latest,network=host
+          buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+
+      - name: Build and Push locally
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Sensors/${{ matrix.sensor }}/Dockerfile 
+          push: true
+          tags: 192.168.1.11:5000/honeywire-${{ matrix.sensor }}:dev
+          # Automatically use cache to make builds lightning fast
+          cache-from: type=gha,scope=${{ matrix.sensor }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.sensor }}
