@@ -17,6 +17,9 @@ save:
 
 # Use this once a week. It switches to main, merges your work, and publishes to GitHub.
 release:
+	@echo "⚠️ WARNING: This will push to PUBLIC GITHUB."
+	@read -p "Are you sure? [y/N]: " confirm; \
+	if [ "$$confirm" != "y" ]; then echo "Aborted."; exit 1; fi; \
 	@echo "🚀 Publishing to Public GitHub..."
 	@read -p "Enter release commit message (or press Enter for default): " msg; \
 	if [ -z "$$msg" ]; then msg="Release: New features and sensor updates"; fi; \

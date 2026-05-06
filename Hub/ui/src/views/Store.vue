@@ -197,9 +197,6 @@ const copyToClipboard = () => {
                 <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Sensor Store</h1>
                 <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-3xl">Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations.</p>
             </div>
-            <div v-if="isOfflineFallback" class="hidden sm:flex items-center gap-2 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/30">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Offline Mode
-            </div>
         </div>
 
         <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">

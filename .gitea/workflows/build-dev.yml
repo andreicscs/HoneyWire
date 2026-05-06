@@ -1,72 +1,16 @@
-name: Smart Dev Sensor Build
+name: Manual Dev Sensor Build
 
 on:
-  push:
-    branches: [ "dev" ]
-    paths: [ 'Sensors/official/**' ]
   workflow_dispatch:
     inputs:
-      sensor_folder:
-        description: "Folder name in Sensors/official/ (e.g., tcptarpit) or 'all'"
+      sensor:
+        description: "Sensor folder name (e.g., tcptarpit, webrouterdecoy, etc.)"
         required: true
-        default: "all"
         type: string
 
 jobs:
-  detect-sensors:
-    name: "🔍 Detect Changed Sensors"
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.generate-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate Independent Matrix
-        id: generate-matrix
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            INPUT="${{ github.event.inputs.sensor_folder }}"
-            if [ "$INPUT" == "all" ]; then
-              CHANGED=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}')
-            else
-              if [ -d "Sensors/official/$INPUT" ] && [ -f "Sensors/official/$INPUT/Dockerfile" ]; then
-                CHANGED="$INPUT"
-              else
-                echo "❌ Error: Folder 'Sensors/official/$INPUT' not found."
-                exit 1
-              fi
-            fi
-          else
-            # For Pushes: Check what changed in the last commit
-            # We filter out empty lines to prevent the [""] bug
-            CHANGED=$(git show --name-only --format="" ${{ github.sha }} | grep '^Sensors/official/' | awk -F/ '{print $3}' | sort -u | xargs)
-          fi
-          
-          # Strictly handle empty strings
-          if [ -z "$CHANGED" ]; then
-            MATRIX_JSON="[]"
-          else
-            # Ensure no trailing spaces/newlines mess up the JSON array
-            MATRIX_JSON=$(echo "$CHANGED" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          fi
-          
-          echo "Generated Matrix: $MATRIX_JSON"
-          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
-
-  process-sensors:
-    name: "🚀 Process: ${{ matrix.sensor }}"
-    needs: detect-sensors
-    # Only run if matrix is not empty and NOT [""]
-    if: ${{ needs.detect-sensors.outputs.matrix != '[]' && needs.detect-sensors.outputs.matrix != '[""]' }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false 
-      matrix:
-        sensor: ${{ fromJson(needs.detect-sensors.outputs.matrix) }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,9 +24,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
+          file: Sensors/official/${{ github.event.inputs.sensor }}/Dockerfile 
           push: true
-          # Naming matched exactly to your GHCR conventions
-          tags: 192.168.1.11:5000/honeywire-${{ matrix.sensor }}:dev
-          cache-from: type=gha,scope=${{ matrix.sensor }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.sensor }}
+          tags: 192.168.1.11:5000/honeywire-${{ github.event.inputs.sensor }}:dev
