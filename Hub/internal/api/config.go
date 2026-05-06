@@ -276,9 +276,13 @@ func (h *Handler) FactoryReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetSystemState(w http.ResponseWriter, r *http.Request) {
-	var isArmedStr string
-	h.Store.DB.QueryRow("SELECT value FROM config WHERE key='is_armed'").Scan(&isArmedStr)
-	SendJSON(w, http.StatusOK, map[string]bool{"is_armed": isArmedStr == "true"})
+    var isArmedStr string
+    // Read from the new config table
+    err := h.Store.DB.QueryRow("SELECT value FROM config WHERE key = 'is_armed'").Scan(&isArmedStr)
+    if err != nil {
+        isArmedStr = "true" // Default fallback
+    }
+    SendJSON(w, http.StatusOK, map[string]bool{"is_armed": isArmedStr == "true"})
 }
 
 func (h *Handler) SetSystemState(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +298,10 @@ func (h *Handler) SetSystemState(w http.ResponseWriter, r *http.Request) {
 	if req.IsArmed {
 		val = "true"
 	}
-	h.Store.DB.Exec("UPDATE config SET value=? WHERE key='is_armed'", val)
+	h.Store.DB.Exec(`
+		INSERT INTO config (key, value) VALUES ('is_armed', ?) 
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, 
+	val)
 	notify.UpdateIsArmed(req.IsArmed)
 	SendJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "is_armed": req.IsArmed})
 }

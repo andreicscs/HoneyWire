@@ -1,11 +1,11 @@
 package api
 
 import (
+	"io/fs"
 	"log"
 	"net/http"
 	"time"
-	"io/fs"
-	
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/honeywire/hub/internal/auth"
@@ -31,7 +31,7 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 
 func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionStore) *chi.Mux {
 	r := chi.NewRouter()
-	
+
 	r.Use(ErrorOnlyLogger)
 	r.Use(middleware.Recoverer)
 
@@ -43,6 +43,7 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	r.Post("/logout", h.Logout)
 	r.Get("/api/v1/setup/status", h.GetSetupStatus)
 	r.Post("/api/v1/setup", h.CompleteSetup)
+	r.Post("/api/v1/wizard/link", h.WizardLink)
 
 	// UI Endpoints (Protected by Cookies)
 	r.Group(func(r chi.Router) {
@@ -50,12 +51,15 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 
 		r.Get("/api/v1/ws", h.ServeWS)
 
+		// Provisioning (UI protected)
+		r.Post("/api/v1/tokens/generate", h.GenerateToken)
+
 		// System Configuration & Danger Zone
 		r.Get("/api/v1/config", h.GetConfig)
 		r.Patch("/api/v1/config", h.UpdateConfig)
 		r.Patch("/api/v1/system/password", h.ChangePassword)
 		r.Post("/api/v1/system/reset", h.FactoryReset)
-		
+
 		// Telemetry & State
 		r.Get("/api/v1/sensors", h.GetSensors)
 		r.Get("/api/v1/events", h.GetEvents)
@@ -70,18 +74,18 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 		r.Delete("/api/v1/events", h.ClearEvents)
 		r.Patch("/api/v1/events/{event_id}/archive", h.ArchiveEvent)
 		r.Patch("/api/v1/events/archive-all", h.ArchiveAll)
-		
+
 		// Sensor Management
 		r.Patch("/api/v1/sensors/{sensor_id}/silence", h.ToggleSilence)
 		r.Delete("/api/v1/sensors/{sensor_id}", h.ForgetSensor)
 	})
 
-	// Sensor Endpoints (Protected by API Key)
-	r.Group(func(r chi.Router) {
-		r.Use(AgentAuthMiddleware(s))
-		r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
-		r.Post("/api/v1/event", h.ReceiveEvent)
-	})
+	// --- Sensor Endpoints ---
+	// no middleware, Node authentication requires the 'node_id', which is inside the JSON payload.
+	// If a middleware reads the http.Request Body to extract the ID, it drains the IO stream.
+	// Therefore, auth is checked inside the handler immediately AFTER the JSON is parsed.
+	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
+	r.Post("/api/v1/event", h.ReceiveEvent)
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

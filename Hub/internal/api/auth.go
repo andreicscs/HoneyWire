@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
-
 	"github.com/honeywire/hub/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -138,4 +138,49 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// --- Per-Node Authentication ---
+// nodeAuthCache stores per-node keys in memory for fast validation
+// Key: node_id, Value: node_key (64-char hex string)
+var nodeAuthCache sync.Map
+
+// validateNodeAuth checks if a request is authenticated for a given node
+// Extracts Bearer token from Authorization header and compares against node_key
+func (h *Handler) validateNodeAuth(r *http.Request, nodeID string) bool {
+    authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return false
+	}
+
+	// Parse "Bearer <token>" format
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return false
+	}
+	token := parts[1]
+
+	// Check cache first
+	if cachedKey, ok := nodeAuthCache.Load(nodeID); ok {
+		return subtle.ConstantTimeCompare([]byte(token), []byte(cachedKey.(string))) == 1
+	}
+
+	// Cache miss - query database
+	var nodeKey string
+	err := h.Store.DB.QueryRow("SELECT node_key FROM nodes WHERE node_id = ?", nodeID).Scan(&nodeKey)
+	if err != nil {
+		return false
+	}
+
+	// Cache the key for future requests
+	nodeAuthCache.Store(nodeID, nodeKey)
+
+	// Validate token
+	return subtle.ConstantTimeCompare([]byte(token), []byte(nodeKey)) == 1
+}
+
+// invalidateNodeCache removes a node from the auth cache
+// Called after node deletion or key rotation
+func invalidateNodeCache(nodeID string) {
+	nodeAuthCache.Delete(nodeID)
 }

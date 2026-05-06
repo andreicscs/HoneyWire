@@ -26,7 +26,7 @@ type Event struct {
 	Timestamp       string                 `json:"timestamp"`
 	ContractVersion string                 `json:"contract_version"`
 	SensorID        string                 `json:"sensor_id"`
-	NodeID          string                 `json:"node_id,omitempty"`
+	NodeID          string                 `json:"node_id"`
 	EventTrigger    string                 `json:"event_trigger"`
 	Severity        string                 `json:"severity"`
 	Source          string                 `json:"source"`
@@ -40,14 +40,14 @@ type Event struct {
 // Heartbeat represents a routine ping from a sensor
 type Heartbeat struct {
 	SensorID string                 `json:"sensor_id"`
-	NodeID   string                 `json:"node_id,omitempty"`
+	NodeID   string                 `json:"node_id"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // Sensor represents a known node in the fleet
 type Sensor struct {
 	SensorID   string                 `json:"sensor_id"`
-	NodeID     string                 `json:"node_id,omitempty"`
+	NodeID     string                 `json:"node_id"`
 	FirstSeen  string                 `json:"first_seen"`
 	LastSeen   string                 `json:"last_seen"`
 	Metadata   map[string]interface{} `json:"metadata"`

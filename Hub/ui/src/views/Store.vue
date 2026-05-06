@@ -13,7 +13,9 @@ const sensors = ref([])
 const isLoading = ref(true)
 const fetchError = ref(false) // Replaces offline fallback flag
 
-const REGISTRY_URL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
+// Vite will inject VITE_MANIFEST_URL if it exists in a .env file.
+// If it doesn't exist (like in production), it safely falls back to GitHub.
+const REGISTRY_URL = import.meta.env.VITE_MANIFEST_URL || "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
 
 onMounted(async () => {
     try {

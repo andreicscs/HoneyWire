@@ -3,9 +3,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
-	"log"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
@@ -18,55 +18,59 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate required fields
+	if hb.NodeID == "" || hb.SensorID == "" {
+		http.Error(w, "node_id and sensor_id are required", http.StatusBadRequest)
+		return
+	}
+
+	// Per-node authentication
+	if !h.validateNodeAuth(r, hb.NodeID) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	now := time.Now().UTC()
-	nowStr := now.Format("2006-01-02 15:04:05")
+	nowStr := now.Format(time.RFC3339)
 	minuteBucket := now.Format("2006-01-02 15:04:00")
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
-	var nodeID interface{} = hb.NodeID
-	if hb.NodeID == "" {
-		nodeID = nil
-	}
-
-	// 1. UPSERT the sensor (this handles both new inserts AND updates)
-	res, err := h.Store.DB.Exec(`
-		INSERT INTO sensors (sensor_id, node_id, first_seen, last_seen, metadata, is_silenced)
+	// Update sensor last_seen and metadata with composite key (node_id, sensor_id)
+	_, err := h.Store.DB.Exec(`
+		INSERT INTO sensors (node_id, sensor_id, first_seen, last_seen, metadata, is_silenced)
 		VALUES (?, ?, ?, ?, ?, 0)
-		ON CONFLICT(sensor_id) DO UPDATE SET last_seen = ?, metadata = ?, node_id = ?`,
-		hb.SensorID, nodeID, nowStr, nowStr, string(metadataJSON), nowStr, string(metadataJSON), nodeID,
+		ON CONFLICT(node_id, sensor_id) DO UPDATE SET last_seen = ?, metadata = ?`,
+		hb.NodeID, hb.SensorID, nowStr, nowStr, string(metadataJSON), nowStr, string(metadataJSON),
 	)
 	if err != nil {
-		log.Printf("[ERROR] Heartbeat DB Upsert failed for sensor %s: %v", hb.SensorID, err)
+		log.Printf("[ERROR] Heartbeat DB Upsert failed for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	// 2. Auto-register the Node if it doesn't exist
-	if hb.NodeID != "" {
-		ip := h.getRealIP(r)
-		_, err := h.Store.DB.Exec(`
-			INSERT INTO nodes (node_id, alias, ip_address, first_seen, last_seen)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(node_id) DO UPDATE SET last_seen = ?, ip_address = ?`,
-			hb.NodeID, hb.NodeID, ip, nowStr, nowStr, nowStr, ip,
-		)
-		if err != nil {
-			log.Printf("[WARNING] Failed to upsert node %s from heartbeat: %v", hb.NodeID, err)
-		}
-	}
-
-	affected, _ := res.RowsAffected()
-	isNew := affected == 1
-
-	// 3. Log the heartbeat bucket
-	_, err = h.Store.DB.Exec("INSERT OR IGNORE INTO sensor_heartbeats (sensor_id, time_bucket) VALUES (?, ?)", hb.SensorID, minuteBucket)
+	// Update node last_seen
+	_, err = h.Store.DB.Exec(`
+		UPDATE nodes SET last_seen = ? WHERE node_id = ?`,
+		nowStr, hb.NodeID,
+	)
 	if err != nil {
-		log.Printf("[WARNING] Failed to log heartbeat bucket for sensor %s: %v", hb.SensorID, err)
+		log.Printf("[WARNING] Failed to update node %s last_seen: %v", hb.NodeID, err)
 	}
 
-	if isNew {
-		h.broadcastWS("NEW_SENSOR", map[string]string{"sensor_id": hb.SensorID})
+	// Log heartbeat bucket with composite key
+	_, err = h.Store.DB.Exec(
+		"INSERT OR IGNORE INTO sensor_heartbeats (node_id, sensor_id, time_bucket) VALUES (?, ?, ?)",
+		hb.NodeID, hb.SensorID, minuteBucket,
+	)
+	if err != nil {
+		log.Printf("[WARNING] Failed to log heartbeat bucket for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
 	}
+
+	h.broadcastWS("SENSOR_HEARTBEAT", map[string]string{
+		"node_id":   hb.NodeID,
+		"sensor_id": hb.SensorID,
+		"timestamp": nowStr,
+	})
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "alive"})
 }

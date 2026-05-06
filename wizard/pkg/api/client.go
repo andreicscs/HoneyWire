@@ -11,7 +11,14 @@ import (
 	"github.com/honeywire/wizard/pkg/schema"
 )
 
-const DefaultRegistryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
+var DefaultRegistryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
+
+// init() runs automatically before main() starts
+func init() {
+	if envURL := os.Getenv("HW_MANIFEST_URL"); envURL != "" {
+		DefaultRegistryURL = envURL
+	}
+}
 
 func FetchManifests(source string) ([]*schema.SensorManifest, error) {
 	// 1. Testing Logic: If source is a local file path

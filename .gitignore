@@ -20,8 +20,9 @@ Thumbs.db
 *.db-wal
 *.db-shm
 *.sqlite3
-*.bak        # Catches honeywire.db.bak and any other backups
+*.bak
 *.swp
+*.*.bak # Catches honeywire.db.bak and any other backups
 
 # =========================
 # Python

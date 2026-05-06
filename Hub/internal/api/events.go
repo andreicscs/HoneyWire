@@ -1,14 +1,14 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	"time"
-	"database/sql"
-	
+
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/notify"
@@ -22,6 +22,18 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate required fields
+	if e.NodeID == "" || e.SensorID == "" {
+		http.Error(w, "node_id and sensor_id are required", http.StatusBadRequest)
+		return
+	}
+
+	// Per-node authentication
+	if !h.validateNodeAuth(r, e.NodeID) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	// Version check
 	hubMajor := strings.Split(h.Cfg.Version, ".")[0]
 	agentMajor := strings.Split(e.ContractVersion, ".")[0]
@@ -30,22 +42,17 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
+	nowStr := time.Now().UTC().Format(time.RFC3339)
 	detailsJSON, _ := json.Marshal(e.Details)
 
-	// Handle nullable NodeID for backwards compatibility
-	var nodeID interface{} = e.NodeID
-	if e.NodeID == "" {
-		nodeID = nil
-	}
-
+	// Insert event with composite key reference (node_id, sensor_id)
 	result, err := h.Store.DB.Exec(`
-		INSERT INTO events (timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived)
+		INSERT INTO events (node_id, sensor_id, timestamp, contract_version, event_trigger, severity, source, target, details, is_read, is_archived)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		nowStr, e.ContractVersion, e.SensorID, nodeID, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
+		e.NodeID, e.SensorID, nowStr, e.ContractVersion, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
 	)
 	if err != nil {
-		log.Printf("[ERROR] Failed to insert event: %v", err)
+		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -54,29 +61,23 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.ID = int(lastInsertID)
 	e.Timestamp = nowStr
 
-	// Auto-register the Node and link the Sensor if NodeID exists
-	if e.NodeID != "" {
-		ip := h.getRealIP(r)
-		_, err := h.Store.DB.Exec(`
-			INSERT INTO nodes (node_id, alias, ip_address, first_seen, last_seen)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(node_id) DO UPDATE SET last_seen = ?, ip_address = ?`,
-			e.NodeID, e.NodeID, ip, nowStr, nowStr, nowStr, ip,
-		)
-		if err != nil {
-			log.Printf("[WARNING] Failed to upsert node %s: %v", e.NodeID, err)
-		}
-
-		_, err = h.Store.DB.Exec(`UPDATE sensors SET node_id = ? WHERE sensor_id = ?`, e.NodeID, e.SensorID)
-		if err != nil {
-			log.Printf("[WARNING] Failed to link sensor %s to node %s: %v", e.SensorID, e.NodeID, err)
-		}
+	// Update node last_seen
+	_, err = h.Store.DB.Exec(`
+		UPDATE nodes SET last_seen = ? WHERE node_id = ?`,
+		nowStr, e.NodeID,
+	)
+	if err != nil {
+		log.Printf("[WARNING] Failed to update node %s last_seen: %v", e.NodeID, err)
 	}
 
+	// Check if sensor is silenced
 	var isSilencedInt int
-	err = h.Store.DB.QueryRow("SELECT is_silenced FROM sensors WHERE sensor_id = ?", e.SensorID).Scan(&isSilencedInt)
+	err = h.Store.DB.QueryRow(
+		"SELECT is_silenced FROM sensors WHERE node_id = ? AND sensor_id = ?",
+		e.NodeID, e.SensorID,
+	).Scan(&isSilencedInt)
 	if err != nil && err != sql.ErrNoRows {
-		log.Printf("[WARNING] Failed to check silence status for sensor %s: %v", e.SensorID, err)
+		log.Printf("[WARNING] Failed to check silence status for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
 	}
 
 	if isSilencedInt == 0 {
@@ -114,8 +115,6 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		args = append(args, sensorID)
 	}
 
-
-	
 	query += " ORDER BY id DESC"
 
 	rows, err := h.Store.DB.Query(query, args...)
@@ -131,7 +130,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		var detailsStr string
 		var isReadInt, isArchivedInt int
 		var dbNodeID *string // Use pointer to handle SQL NULL safely
-		
+
 		if err := rows.Scan(
 			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID, &dbNodeID,
 			&e.EventTrigger, &e.Severity, &e.Source, &e.Target,
