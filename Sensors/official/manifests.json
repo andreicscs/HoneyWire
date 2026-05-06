@@ -125,7 +125,7 @@
       "recommendation_reason": "Web server detected. Deploy fake admin panel to catch internal network snooping."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-webdecoy:latest",
+      "image": "ghcr.io/andreicscs/honeywire-webrouterdecoy:latest",
       "network_mode": "bridge",
       "env_vars": [
         {
