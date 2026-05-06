@@ -1,16 +1,15 @@
-name: Modular Dev Sensor Build
+name: Manual Dev Sensor Build
 
 on:
   workflow_dispatch:
     inputs:
       sensor:
-        description: "Folder name (e.g., tcptarpit) or 'all' to build everything"
+        description: "Folder name (e.g., tcptarpit) or 'all'"
         required: true
         default: "all"
         type: string
 
 jobs:
-  # --- STAGE 1: GENERATE LIST ---
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
@@ -20,20 +19,23 @@ jobs:
       - id: set-matrix
         run: |
           INPUT="${{ github.event.inputs.sensor }}"
+          
           if [ "$INPUT" == "all" ]; then
-            # Find all directories in Sensors/official that have a Dockerfile
-            LIST=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | jq -R -s -c 'split("\n")[:-1]')
+            # Safely grab folder names, excluding empty lines
+            RAW_LIST=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}' | grep -v '^$')
           else
-            # Wrap the single input into a JSON array
-            LIST=$(echo "[\"$INPUT\"]")
+            RAW_LIST="$INPUT"
           fi
-          echo "matrix=$LIST" >> $GITHUB_OUTPUT
+          
+          # Convert to JSON array safely
+          MATRIX_JSON=$(echo "$RAW_LIST" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
-  # --- STAGE 2: BUILD ---
   build:
     needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         sensor: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
@@ -46,5 +48,4 @@ jobs:
           context: .
           file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
           push: true
-          # Exactly matching your naming convention
           tags: 192.168.1.11:5000/honeywire-${{ matrix.sensor }}:dev
