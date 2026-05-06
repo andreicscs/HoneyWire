@@ -10,69 +10,37 @@ on:
         type: string
 
 jobs:
-  generate-matrix:
+  build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: set-matrix
-        run: |
-          # Use Gitea's direct inputs syntax, fallback to 'all' if empty
-          INPUT="${{ inputs.sensor }}"
-          if [ -z "$INPUT" ]; then INPUT="all"; fi
-          
-          echo "Target sensor(s): $INPUT"
-          
-          if [ "$INPUT" == "all" ]; then
-            DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
-          else
-            DIRS="$INPUT"
-          fi
-          
-          # Build the JSON array manually in pure bash (bulletproof)
-          JSON_ARRAY="["
-          FIRST=1
-          for dir in $DIRS; do
-            if [ -n "$dir" ]; then
-              if [ $FIRST -eq 1 ]; then
-                JSON_ARRAY="$JSON_ARRAY\"$dir\""
-                FIRST=0
-              else
-                JSON_ARRAY="$JSON_ARRAY,\"$dir\""
-              fi
-            fi
-          done
-          JSON_ARRAY="$JSON_ARRAY]"
-          
-          echo "Generated JSON Matrix: $JSON_ARRAY"
-          echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
-
-  build:
-    needs: generate-matrix
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        sensor: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Format Docker Tag (Lowercase)
-        id: format-tag
+      - name: Build and Push Sensors
         run: |
-          # Docker strictly requires lowercase tags. 
-          # This converts 'TcpTarpit' to 'tcptarpit'
-          LOWER_NAME=$(echo "${{ matrix.sensor }}" | tr '[:upper:]' '[:lower:]')
-          echo "tag=$LOWER_NAME" >> $GITHUB_OUTPUT
+          # 1. Determine which sensors to build
+          INPUT="${{ inputs.sensor }}"
+          if [ -z "$INPUT" ] || [ "$INPUT" == "all" ]; then
+            DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+          else
+            DIRS="$INPUT"
+          fi
 
-      - name: Build and Push locally
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          # Use exact case for the folder path
-          file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
-          push: true
-          # Use the lowercased name for the docker tag
-          tags: 192.168.1.11:5000/honeywire-${{ steps.format-tag.outputs.tag }}:dev
+          echo "Targeting sensors: $DIRS"
+
+          # 2. Loop through each folder, build, and push
+          for SENSOR in $DIRS; do
+            if [ -n "$SENSOR" ]; then
+              # Force lowercase for Docker tag
+              LOWER_NAME=$(echo "$SENSOR" | tr '[:upper:]' '[:lower:]')
+              TAG="192.168.1.11:5000/honeywire-$LOWER_NAME:dev"
+              
+              echo "----------------------------------------"
+              echo "🍯 Building $SENSOR as $TAG"
+              echo "----------------------------------------"
+              
+              # Standard build and push (no custom actions needed)
+              docker build -t "$TAG" -f "Sensors/official/$SENSOR/Dockerfile" .
+              docker push "$TAG"
+            fi
+          done
