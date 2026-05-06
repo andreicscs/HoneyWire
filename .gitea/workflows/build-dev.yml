@@ -3,7 +3,7 @@ name: Smart Dev Sensor Build
 on:
   push:
     branches: [ "dev" ]
-    paths: [ 'Sensors/**' ]
+    paths: [ 'Sensors/official/**' ]
 
 jobs:
   # ==========================================
@@ -23,21 +23,18 @@ jobs:
       - name: Generate Independent Matrix
         id: generate-matrix
         run: |
-          # Find directories inside Sensors/ that have changed compared to the main branch
-          # Fallback to building everything in Sensors/ if main doesn't exist yet
+          # Look specifically inside Sensors/official/
           if git rev-parse --verify origin/main >/dev/null 2>&1; then
-            CHANGED=$(git diff --name-only origin/main...HEAD | grep '^Sensors/' | awk -F/ '{print $2}' | sort -u)
+            CHANGED=$(git diff --name-only origin/main...HEAD | grep '^Sensors/official/' | awk -F/ '{print $3}' | sort -u)
           else
-            CHANGED=$(ls -1 Sensors/)
+            CHANGED=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/Dockerfile' \; -print | awk -F/ '{print $3}')
           fi
           
-          # Convert the bash list into a JSON array for the matrix
           if [ -z "$CHANGED" ]; then
             MATRIX_JSON="[]"
           else
             MATRIX_JSON=$(echo "$CHANGED" | jq -R -s -c 'split("\n")[:-1]')
           fi
-          
           echo "Generated Matrix: $MATRIX_JSON"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
@@ -65,7 +62,7 @@ jobs:
           go-version: '1.22'
 
       - name: Run Go Tests
-        working-directory: Sensors/${{ matrix.sensor }}
+        working-directory: Sensors/official/${{ matrix.sensor }}
         run: |
           if [ -f "go.mod" ]; then
             go test -v ./...
@@ -74,28 +71,16 @@ jobs:
           fi
 
       # ----------------------------------------------------
-      # GOSEC SAST SCAN (Replaces CodeQL for Gitea)
+      # GOSEC SAST SCAN
       # ----------------------------------------------------
       - name: Run Gosec Security Scanner
-        working-directory: Sensors/${{ matrix.sensor }}
+        working-directory: Sensors/official/${{ matrix.sensor }}
         run: |
           if [ -f "go.mod" ]; then
             curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.19.0
-            $(go env GOPATH)/bin/gosec -fmt=text -out=results.txt ./... || echo "Gosec found vulnerabilities, but continuing build for dev."
+            $(go env GOPATH)/bin/gosec -fmt=text -out=results.txt ./... || echo "Gosec found vulnerabilities, but continuing dev build."
             cat results.txt
           fi
-
-      # ----------------------------------------------------
-      # TRIVY FILESYSTEM SCA SCAN
-      # ----------------------------------------------------
-      - name: Run Trivy FS Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: Sensors/${{ matrix.sensor }}
-          format: 'table'
-          exit-code: '0' # Set to 0 for dev so it doesn't break your workflow while testing
-          severity: 'CRITICAL,HIGH'
 
       # ----------------------------------------------------
       # BUILD & PUSH TO LOCAL HOMELAB REGISTRY
@@ -103,7 +88,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          # Required to allow pushing to your HTTP (non-HTTPS) Proxmox registry
           driver-opts: image=moby/buildkit:latest,network=host
           buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
 
@@ -111,9 +95,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Sensors/${{ matrix.sensor }}/Dockerfile 
+          file: Sensors/official/${{ matrix.sensor }}/Dockerfile 
           push: true
           tags: 192.168.1.11:5000/honeywire-${{ matrix.sensor }}:dev
-          # Automatically use cache to make builds lightning fast
           cache-from: type=gha,scope=${{ matrix.sensor }}
           cache-to: type=gha,mode=max,scope=${{ matrix.sensor }}

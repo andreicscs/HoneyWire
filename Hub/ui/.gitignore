@@ -3,6 +3,7 @@
 # =========================
 .env
 **/.env
+.env.development
 # (Note: We do NOT ignore .env.example so users have a template)
 
 # =========================
