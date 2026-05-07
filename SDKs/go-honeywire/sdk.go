@@ -11,6 +11,7 @@ import (
 )
 
 type Sensor struct {
+	NodeID             string // Added NodeID
 	SensorID           string
 	AgentVersion       string
 	hubContractVersion string
@@ -21,9 +22,9 @@ type Sensor struct {
 	stopCh             chan struct{}
 }
 
-// NewSensor now returns an error instead of calling log.Fatal, making it testable.
 func NewSensor() (*Sensor, error) {
 	s := &Sensor{
+		NodeID:       getEnv("HW_NODE_ID", ""),
 		SensorID:     getEnv("HW_SENSOR_ID", ""),
 		AgentVersion: "1.0.0",
 		HubEndpoint:  getEnv("HW_HUB_ENDPOINT", ""),
@@ -33,8 +34,8 @@ func NewSensor() (*Sensor, error) {
 		stopCh:       make(chan struct{}),
 	}
 
-	if s.HubEndpoint == "" || s.HubKey == "" || s.SensorID == "" {
-		return nil, fmt.Errorf("missing required env vars: HW_HUB_ENDPOINT, HW_HUB_KEY, HW_SENSOR_ID")
+	if s.HubEndpoint == "" || s.HubKey == "" || s.SensorID == "" || s.NodeID == "" {
+		return nil, fmt.Errorf("missing required env vars: HW_HUB_ENDPOINT, HW_HUB_KEY, HW_NODE_ID, HW_SENSOR_ID")
 	}
 
 	return s, nil
@@ -121,8 +122,9 @@ func (s *Sensor) heartbeatLoop() {
 
 func (s *Sensor) sendHeartbeat() {
 	payload := map[string]any{
+		"node_id":   s.NodeID,
 		"sensor_id": s.SensorID,
-		"details": map[string]string{
+		"metadata": map[string]string{
 			"agent_version":    s.AgentVersion,
 			"contract_version": s.hubContractVersion,
 		},
@@ -133,6 +135,7 @@ func (s *Sensor) sendHeartbeat() {
 func (s *Sensor) ReportEvent(severity, trigger, source, target string, details map[string]any) bool {
 	payload := map[string]any{
 		"contract_version": s.hubContractVersion,
+		"node_id":          s.NodeID,
 		"sensor_id":        s.SensorID,
 		"severity":         severity,
 		"event_trigger":    trigger,

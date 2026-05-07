@@ -155,13 +155,6 @@ func Apply(recs []*autodiscovery.Recommendation) error {
 			}
 		}
 
-		for _, env := range rec.DeploymentTemplate.EnvVars {
-			val := strings.TrimSpace(env.Default)
-			if val != "" {
-				svc.Environment = append(svc.Environment, fmt.Sprintf("%s=%s", env.Name, val))
-			}
-		}
-
 		for _, vol := range rec.DeploymentTemplate.VolumeMounts {
 			mount := fmt.Sprintf("%s:%s", vol.Source, vol.Target)
 			if vol.ReadOnly {
