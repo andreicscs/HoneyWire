@@ -2,6 +2,9 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -84,38 +87,34 @@ type Store struct {
 
 // NewStore initializes the SQLite database with the v2.0.0 schema
 func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	// Enable WAL mode, set a 5-second busy timeout to prevent locking, and enable Foreign Keys
+	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)", dbPath)
+	
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	// Enable foreign keys
-	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		return nil, err
-	}
+	// Connection Pooling for SQLite performance
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	// Apply the clean v2 schema
 	if _, err := db.Exec(v2Schema); err != nil {
 		return nil, err
 	}
 
+	if err := InitializeDefaultConfig(db); err != nil {
+		return nil, fmt.Errorf("failed to initialize default config: %w", err)
+	}
+
+	log.Println("[DB] Database v2.0.0 initialized successfully in WAL mode.")
 	return &Store{DB: db}, nil
 }
 
 func InitializeDefaultConfig(db *sql.DB) error {
-	// Check if config already exists
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM config").Scan(&count)
-	if err != nil {
-		return err
-	}
-
-	if count > 0 {
-		return nil // Already initialized
-	}
-
-	// Insert default config values
-	defaultConfig := map[string]string{
+	defaults := map[string]string{
 		"is_armed":          "true",
 		"webhook_type":      "none",
 		"webhook_url":       "",
@@ -126,12 +125,23 @@ func InitializeDefaultConfig(db *sql.DB) error {
 		"siem_protocol":     "syslog",
 	}
 
-	for key, value := range defaultConfig {
-		_, err := db.Exec("INSERT INTO config (key, value) VALUES (?, ?)", key, value)
-		if err != nil {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for k, v := range defaults {
+		if _, err := stmt.Exec(k, v); err != nil {
+			tx.Rollback()
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }

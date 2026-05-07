@@ -129,7 +129,17 @@ func (s *Sensor) sendHeartbeat() {
 			"contract_version": s.hubContractVersion,
 		},
 	}
-	s.postToHub("/api/v1/heartbeat", payload)
+	
+	resp, err := s.postToHub("/api/v1/heartbeat", payload)
+	if err != nil {
+		log.Printf("[-] Heartbeat failed to send: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		log.Printf("[-] Hub rejected heartbeat (HTTP %d). Check API keys or Node status.", resp.StatusCode)
+	}
 }
 
 func (s *Sensor) ReportEvent(severity, trigger, source, target string, details map[string]any) bool {
@@ -145,13 +155,18 @@ func (s *Sensor) ReportEvent(severity, trigger, source, target string, details m
 	}
 
 	resp, err := s.postToHub("/api/v1/event", payload)
-	if resp != nil {
-		defer resp.Body.Close()
-	}
-	if err != nil || resp.StatusCode >= 400 {
-		log.Printf("[-] Event report failed: %v", err)
+	if err != nil {
+		log.Printf("[-] Event report network failure: %v", err)
 		return false
 	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		log.Printf("[-] Hub rejected event report (HTTP %d).", resp.StatusCode)
+		return false
+	}
+	
+	log.Printf("[+] Event successfully reported to Hub.")
 	return true
 }
 
