@@ -105,7 +105,7 @@ const updateData = () => {
 
     rawEvents.forEach(e => {
         if (!e.timestamp) return
-        const eTime = new Date(e.timestamp.replace(' ', 'T') + 'Z')
+        const eTime = new Date(e.timestamp)
         const diffMins = Math.floor((now - eTime) / bucketSizeMs)
         
         if (diffMins >= 0 && diffMins < buckets) {

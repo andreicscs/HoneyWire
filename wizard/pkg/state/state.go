@@ -91,7 +91,7 @@ func CheckMemory() (string, error) {
 				memMB := memKB / 1024
 
 				if memMB < 500 {
-					return "⚠️ Low memory detected (<500MB). Deploying multiple sensors may impact host performance.", nil
+					return "⚠️  Low memory detected (<500MB). Deploying multiple sensors may impact host performance.", nil
 				}
 			}
 			break

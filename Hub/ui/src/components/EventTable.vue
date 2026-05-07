@@ -112,7 +112,7 @@
     }
     const formatTime = (timestamp) => {
         if (!timestamp) return ''
-        const dateObj = new Date(timestamp.replace(' ', 'T') + 'Z')
+        const dateObj = new Date(timestamp)
         const now = new Date()
 
         const isToday = 

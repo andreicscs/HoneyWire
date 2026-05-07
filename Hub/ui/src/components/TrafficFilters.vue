@@ -101,7 +101,7 @@ watch(() => props.selectedNode, (newVal) => {
 
 watch(() => props.selectedSensor, (newVal) => {
     nextTick(() => {
-        const elId = newVal ? `pill-${highlightedNodeId.value}` : 'pill-all'
+        const elId = newVal && props.selectedNode ? `pill-${props.selectedNode}` : 'pill-all'
         const el = document.getElementById(elId)
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     })
@@ -140,14 +140,20 @@ onUnmounted(() => {
                         <div v-for="n in activeNodes" :key="n.node_id" :id="'pill-' + n.node_id"
                              class="shrink-0 relative flex items-center rounded-md border transition-all duration-300 shadow-sm group/pill"
                              :class="[
-                                 selectedNode === n.node_id ? 'bg-slate-700 text-white dark:bg-zinc-300 dark:text-zinc-900 border-slate-700 dark:border-zinc-300' : 
-                                 highlightedNodeId === n.node_id ? 'bg-blue-50 dark:bg-transparent border-blue-400 dark:border-zinc-400 text-blue-900 dark:text-zinc-200 ring-1 ring-blue-500/30 dark:ring-zinc-400/50' : 
+                                 /* Dark Selected Style: Node is selected, NO sensor is selected */
+                                 (selectedNode === n.node_id && !selectedSensor) ? 'bg-slate-700 text-white dark:bg-zinc-300 dark:text-zinc-900 border-slate-700 dark:border-zinc-300' : 
+                                 
+                                 /* Blue Highlight Style: Node is selected, AND a specific sensor is selected */
+                                 (selectedNode === n.node_id && selectedSensor) ? 'bg-blue-50 dark:bg-transparent border-blue-400 dark:border-zinc-400 text-blue-900 dark:text-zinc-200 ring-1 ring-blue-500/30 dark:ring-zinc-400/50' : 
+                                 
+                                 /* Default Unselected Style */
                                  'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800',
                                  
                                  n.status === 'offline' ? 'is-offline' : '',
                                  n.status === 'degraded' ? 'is-degraded' : '',
                                  
-                                 ((selectedNode && selectedNode !== n.node_id) || (highlightedNodeId && highlightedNodeId !== n.node_id)) ? 'opacity-40 grayscale-[50%]' : ''
+                                 /* Dimming logic: Dim if ANY node is selected, and it's NOT this specific node */
+                                 (selectedNode && selectedNode !== n.node_id) ? 'opacity-40 grayscale-[50%]' : ''
                              ]">
                              
                             <!-- Clickable Filter Area -->

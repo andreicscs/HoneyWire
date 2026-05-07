@@ -1,13 +1,13 @@
 package generator
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
-	"bufio"
-
 
 	"github.com/honeywire/wizard/pkg/autodiscovery"
 	"gopkg.in/yaml.v3"
@@ -25,9 +25,9 @@ const DeployDir = "/opt/honeywire/sensors"
 const ComposeFile = "honeywire-compose.yml"
 const ProjectName = "honeywire"
 
-// DockerCompose represents the structure of a v3 compose file
+// DockerCompose represents the structure of a modern Compose file.
+// Note: 'Version' is intentionally omitted as it is obsolete in Compose V2.
 type DockerCompose struct {
-	Version  string             `yaml:"version"`
 	Services map[string]Service `yaml:"services"`
 }
 
@@ -42,100 +42,141 @@ type Service struct {
 	Ports         []string `yaml:"ports,omitempty"`
 }
 
-// getDockerCommand determines the correct compose command and gracefully handles missing dependencies
-func getDockerCommand() ([]string, error) {
-	// 1. Check if the base 'docker' command exists on the host
-	_, err := exec.LookPath("docker")
-	if err == nil {
-		if err := exec.Command("docker", "info").Run(); err != nil {
-			return nil, fmt.Errorf("Docker is installed, but the daemon is not running.\nPlease start it (e.g., 'sudo systemctl start docker') and try again")
-		}
-
-		if err := exec.Command("docker", "compose", "version").Run(); err == nil {
-			return []string{"docker", "compose"}, nil
-		}
-		if err := exec.Command("docker-compose", "version").Run(); err == nil {
-			return []string{"docker-compose"}, nil
-		}
-
-		// --- NEW: Cryptographically Secure Plugin Installation ---
-		fmt.Printf("\n    %s⚠️ Docker is running, but the Compose plugin is missing.%s\n", Yellow, Reset)
-		fmt.Printf("    Would you like HoneyWire to securely install the official Docker Compose plugin? [y/N]: ")
-
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(strings.ToLower(input))
-
-		if input == "y" || input == "yes" {
-			fmt.Printf("\n    %s⚙️ Verifying checksums and installing official plugin...%s\n", Cyan, Reset)
-			
-			// Secure bash script: Downloads original name, verifies, then renames and installs.
-			secureInstallCmd := `
-				set -e
-				cd /tmp
-				echo "↳ Downloading binary..."
-				curl -sSL "https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-linux-x86_64" -o docker-compose-linux-x86_64
-				echo "↳ Downloading official signature..."
-				curl -sSL "https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-linux-x86_64.sha256" -o docker-compose-linux-x86_64.sha256
-				echo "↳ Verifying cryptographic checksum..."
-				sha256sum -c docker-compose-linux-x86_64.sha256
-				echo "↳ Installing to Docker CLI plugins..."
-				mkdir -p /usr/local/lib/docker/cli-plugins
-				mv docker-compose-linux-x86_64 /usr/local/lib/docker/cli-plugins/docker-compose
-				chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-				rm docker-compose-linux-x86_64.sha256
-			`
-			cmd := exec.Command("sh", "-c", secureInstallCmd)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			
-			if err := cmd.Run(); err != nil {
-				return nil, fmt.Errorf("security verification or installation failed: %v", err)
-			}
-			
-			fmt.Printf("    %s✅ Secure installation successful!%s\n", Green, Reset)
-			return []string{"docker", "compose"}, nil
-		}
-
-		return nil, fmt.Errorf("deployment aborted: Docker Compose plugin is required")
+// GetDockerCommand determines the correct compose command, handling missing dependencies securely.
+func GetDockerCommand() ([]string, error) {
+	// 1. Check if Docker CLI is installed
+	if _, err := exec.LookPath("docker"); err != nil {
+		return handleMissingDocker()
 	}
 
-	// 2. Base Docker Installation (Uses Official Convenience Script which validates GPG keys internally)
-	fmt.Printf("\n    %s⚠️ Docker is not installed on this system.%s\n", Yellow, Reset)
-	fmt.Printf("    %sHoneyWire requires Docker to safely isolate the honeypot sensors.%s\n", Dim, Reset)
-	fmt.Printf("    Would you like to automatically install Docker using the official convenience script? [y/N]: ")
+	// 2. Check if Docker Daemon is actively running
+	if err := checkDaemon(); err != nil {
+		return nil, err
+	}
+
+	// 3. Look for an existing Compose installation
+	if cmd, err := findCompose(); err == nil {
+		return cmd, nil
+	}
+
+	// 4. Compose is missing. Attempt secure installation.
+	return installCompose()
+}
+
+// --- HELPER FUNCTIONS ---
+
+func checkDaemon() error {
+	if err := exec.Command("docker", "info").Run(); err != nil {
+		return fmt.Errorf("Docker is installed, but the daemon is not running.\nPlease start it (e.g., 'sudo systemctl start docker') and try again")
+	}
+	return nil
+}
+
+func findCompose() ([]string, error) {
+	if err := exec.Command("docker", "compose", "version").Run(); err == nil {
+		return []string{"docker", "compose"}, nil
+	}
+	if err := exec.Command("docker-compose", "version").Run(); err == nil {
+		return []string{"docker-compose"}, nil
+	}
+	return nil, fmt.Errorf("compose not found")
+}
+
+func installCompose() ([]string, error) {
+	fmt.Printf("\n    %s⚠️ Docker is running, but the Compose plugin is missing.%s\n", Yellow, Reset)
+
+	// Map Go architecture to Docker release binaries
+	arch := runtime.GOARCH
+	var dockerArch string
+	switch arch {
+	case "amd64":
+		dockerArch = "x86_64"
+	case "arm64":
+		dockerArch = "aarch64"
+	default:
+		// We don't crash the wizard! We just inform them we can't auto-install.
+		return nil, fmt.Errorf("automatic compose installation is not supported for architecture '%s'. Please install docker-compose manually", arch)
+	}
+
+	fmt.Printf("    Would you like HoneyWire to securely install the official Docker Compose plugin for %s? [y/N]: ", dockerArch)
 
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "y" || input == "yes" {
-		fmt.Printf("\n    %s⚙️ Downloading and running official Docker install script...%s\n", Cyan, Reset)
-		
-		cmd := exec.Command("sh", "-c", "curl -fsSL https://get.docker.com | sh")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		
-		if err := cmd.Run(); err != nil {
-			return nil, fmt.Errorf("failed to install Docker: %v", err)
-		}
-		
-		fmt.Printf("    %s✅ Docker installed successfully!%s\n", Green, Reset)
-		return []string{"docker", "compose"}, nil
+	if strings.TrimSpace(strings.ToLower(input)) != "y" {
+		return nil, fmt.Errorf("deployment aborted: Docker Compose plugin is required")
 	}
 
-	return nil, fmt.Errorf("deployment aborted: Docker is required to isolate sensors")
+	fmt.Printf("\n    %s⚙️ Verifying checksums and installing official plugin...%s\n", Cyan, Reset)
+
+	version := "v2.26.1"
+	binaryName := fmt.Sprintf("docker-compose-linux-%s", dockerArch)
+	baseURL := fmt.Sprintf("https://github.com/docker/compose/releases/download/%s", version)
+
+	secureInstallCmd := fmt.Sprintf(`
+		set -e
+		cd /tmp
+		echo "↳ Downloading binary..."
+		curl -sSL "%s/%s" -o %s
+		echo "↳ Downloading official signature..."
+		curl -sSL "%s/%s.sha256" -o %s.sha256
+		echo "↳ Verifying cryptographic checksum..."
+		sha256sum -c %s.sha256
+		echo "↳ Installing to Docker CLI plugins..."
+		mkdir -p /usr/local/lib/docker/cli-plugins
+		mv %s /usr/local/lib/docker/cli-plugins/docker-compose
+		chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+		rm %s.sha256
+	`, baseURL, binaryName, binaryName, baseURL, binaryName, binaryName, binaryName, binaryName, binaryName)
+
+	cmd := exec.Command("sh", "-c", secureInstallCmd)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("security verification or installation failed: %v", err)
+	}
+
+	fmt.Printf("    %s✅ Secure installation successful!%s\n", Green, Reset)
+	return []string{"docker", "compose"}, nil
 }
 
-// Apply writes the compartmentalized compose file and brings the containers up.
+func handleMissingDocker() ([]string, error) {
+	fmt.Printf("\n    %s⚠️ Docker is not installed on this system.%s\n", Yellow, Reset)
+	fmt.Printf("    %sHoneyWire requires Docker to safely isolate the honeypot sensors.%s\n", Dim, Reset)
+	fmt.Printf("    Would you like to automatically install Docker using the official Docker convenience script? [y/N]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	if strings.TrimSpace(strings.ToLower(input)) != "y" {
+		return nil, fmt.Errorf("deployment aborted: Docker is required to isolate sensors")
+	}
+
+	fmt.Printf("\n    %s⚙️ Downloading and running official Docker install script...%s\n", Cyan, Reset)
+
+	cmd := exec.Command("sh", "-c", "curl -fsSL https://get.docker.com | sh")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to install Docker: %v", err)
+	}
+
+	fmt.Printf("    %s✅ Docker installed successfully!%s\n", Green, Reset)
+	// Modern Docker convenience script installs docker-compose-plugin by default
+	return []string{"docker", "compose"}, nil
+}
+
+
+// --- CORE ACTIONS ---
+
+// Apply writes the compartmentalized compose file and spins the containers up.
 func Apply(recs []*autodiscovery.Recommendation) error {
-	cmdBase, err := getDockerCommand()
+	cmdBase, err := GetDockerCommand()
 	if err != nil {
 		return err
 	}
 
 	compose := DockerCompose{
-		Version:  "3.8",
 		Services: make(map[string]Service),
 	}
 
@@ -186,7 +227,6 @@ func Apply(recs []*autodiscovery.Recommendation) error {
 		return fmt.Errorf("failed to write %s: %w", ComposeFile, err)
 	}
 
-	// Execute: docker compose -f honeywire-compose.yml -p honeywire up -d --remove-orphans
 	args := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--remove-orphans")
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = DeployDir
@@ -201,9 +241,9 @@ func Apply(recs []*autodiscovery.Recommendation) error {
 
 // Uninstall safely tears down the isolated namespace and cleans up the config
 func Uninstall() error {
-	cmdBase, err := getDockerCommand()
+	cmdBase, err := GetDockerCommand()
 	if err != nil {
-		return err 
+		return err
 	}
 
 	composePath := filepath.Join(DeployDir, ComposeFile)
@@ -211,8 +251,7 @@ func Uninstall() error {
 		return fmt.Errorf("no active deployment found at %s", composePath)
 	}
 
-	// Execute: docker compose -f honeywire-compose.yml -p honeywire down -v --remove-orphans
-	args := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "down", "-v", "--remove-orphans")
+	args := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "down", "-v", "--remove-orphans", "--rmi", "all")
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = DeployDir
 
@@ -221,5 +260,13 @@ func Uninstall() error {
 		return fmt.Errorf("failed to tear down sensors: %s\nOutput: %s", err, string(output))
 	}
 
-	return os.Remove(composePath)
+	// Clean up compose file
+	os.Remove(composePath)
+
+	// Clean up DeployDir if it's empty
+	if entries, _ := os.ReadDir(DeployDir); len(entries) == 0 {
+		os.Remove(DeployDir)
+	}
+
+	return nil
 }

@@ -38,21 +38,24 @@ const generateToken = async () => {
     } = useSentinel()
 
     const handleNodeSelect = (nodeId) => { 
-        if (selectedNode.value === nodeId) {
+        // State toggle: if clicking the active node, clear everything
+        if (selectedNode.value === nodeId && !selectedSensor.value) {
             selectedNode.value = null
             selectedSensor.value = null
         } else {
             selectedNode.value = nodeId
-            selectedSensor.value = null
+            selectedSensor.value = null // Clear sensor focus when clicking a node pill
         }
     }
 
     const handleSensorSelect = (sensorId, nodeId) => { 
-        if (selectedSensor.value === sensorId) {
+        // State toggle: if clicking the active sensor, clear everything
+        if (selectedSensor.value === sensorId && selectedNode.value === nodeId) {
             selectedSensor.value = null
+            selectedNode.value = null
         } else {
             selectedSensor.value = sensorId
-            selectedNode.value = null
+            selectedNode.value = nodeId 
         }
     }
 </script>
@@ -100,8 +103,8 @@ const generateToken = async () => {
                     :selectedNode="selectedNode"
                     :selectedSensor="selectedSensor"
                     @update:timeframe="t => activeTimeframe = t"
-                    @select-sensor="handleSensorSelect"
-                    @select-node="handleNodeSelect" 
+                    @select-sensor="(sId, nId) => { selectedSensor = sId; selectedNode = nId }" 
+                    @select-node="(nId) => { selectedNode = nId; selectedSensor = null }"
                     @toggle-silence="toggleSilence"
                     @forget-sensor="forgetSensor"
                 />

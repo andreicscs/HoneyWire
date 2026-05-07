@@ -52,10 +52,12 @@ export function useSentinel() {
             const url = new URL('/api/v1/events', window.location.origin)
             url.searchParams.append('archived', viewingArchive.value)
             
+            if (selectedNode.value) {
+                url.searchParams.append('node_id', selectedNode.value)
+            }
+            
             if (selectedSensor.value) {
                 url.searchParams.append('sensor_id', selectedSensor.value)
-            } else if (selectedNode.value) {
-                url.searchParams.append('node_id', selectedNode.value)
             }
 
             const res = await fetch(url.toString()).then(r => r.json())
@@ -129,23 +131,43 @@ export function useSentinel() {
                 if (data.type === 'NEW_EVENT') {
                     unreadCount.value++; 
                     if (!viewingArchive.value) {
-                        const matchNoFilter = !selectedSensor.value && !selectedNode.value;
-                        const matchSensorFilter = selectedSensor.value === data.payload.sensor_id;
-                        const matchNodeFilter = !selectedSensor.value && selectedNode.value === data.payload.node_id;
+                        const event = data.payload;
+                        
+                        // 1. If no filter is active, show everything
+                        const noFilter = !selectedNode.value && !selectedSensor.value;
+                        
+                        // 2. If node is selected but no sensor, match node only
+                        const nodeOnlyMatch = selectedNode.value && !selectedSensor.value && event.node_id === selectedNode.value;
+                        
+                        // 3. If specific sensor is selected, match BOTH (Composite Key)
+                        const sensorMatch = selectedSensor.value && selectedNode.value && 
+                                        event.node_id === selectedNode.value && 
+                                        event.sensor_id === selectedSensor.value;
 
-                        if (matchNoFilter || matchSensorFilter || matchNodeFilter) {
-                            events.value.unshift(data.payload);
+                        if (noFilter || nodeOnlyMatch || sensorMatch) {
+                            events.value.unshift(event);
                         }
                     }
-                } else if (data.type === 'NEW_SENSOR') {
+                }
+                else if (data.type === 'SENSOR_HEARTBEAT') {
+                    const exists = fleet.value.some(s => s.node_id === data.payload.node_id && s.sensor_id === data.payload.sensor_id);
+                    if (!exists) {
+                        fetchFleet();
+                        fetchUptime();
+                    }
+                }
+                else if (data.type === 'NEW_SENSOR') {
                     fetchFleet();
                     fetchUptime();
                 } else if (data.type === 'DELETE_SENSOR') {
-                    fleet.value = fleet.value.filter(s => s.sensor_id !== data.payload.sensor_id);
-                    uptimeData.value = uptimeData.value.filter(s => s.id !== data.payload.sensor_id);
-                    if (selectedSensor.value === data.payload.sensor_id) selectedSensor.value = null;
+                    fleet.value = fleet.value.filter(s => !(s.node_id === data.payload.node_id && s.sensor_id === data.payload.sensor_id));
+                    uptimeData.value = uptimeData.value.filter(s => !(s.node_id === data.payload.node_id && s.id === data.payload.sensor_id));
+                    if (selectedSensor.value === data.payload.sensor_id && selectedNode.value === data.payload.node_id) {
+                        selectedSensor.value = null;
+                        selectedNode.value = null;
+                    }
                 } else if (data.type === 'SILENCE_SENSOR') {
-                    const s = fleet.value.find(s => s.sensor_id === data.payload.sensor_id);
+                    const s = fleet.value.find(s => s.node_id === data.payload.node_id && s.sensor_id === data.payload.sensor_id);
                     if (s) s.is_silenced = data.payload.is_silenced;
                 }
             } catch (e) {
@@ -249,43 +271,45 @@ export function useSentinel() {
         }
     }
 
-    const forgetSensor = async (sensorId) => {
+    const forgetSensor = async (nodeId, sensorId) => {
         const originalFleet = [...fleet.value]
         const originalUptime = [...uptimeData.value]
-        const originalSelected = selectedSensor.value
         
-        fleet.value = fleet.value.filter(s => s.sensor_id !== sensorId)
-        uptimeData.value = uptimeData.value.filter(s => s.id !== sensorId)
-        if (selectedSensor.value === sensorId) selectedSensor.value = null
+        fleet.value = fleet.value.filter(s => !(s.node_id === nodeId && s.sensor_id === sensorId))
+        uptimeData.value = uptimeData.value.filter(s => !(s.node_id === nodeId && s.id === sensorId))
+        
+        if (selectedSensor.value === sensorId && selectedNode.value === nodeId) {
+            selectedSensor.value = null;
+            selectedNode.value = null;
+        }
         
         try {
-            const response = await fetch(`/api/v1/sensors/${sensorId}`, { method: 'DELETE' })
+            const response = await fetch(`/api/v1/sensors/${sensorId}?node_id=${nodeId}`, { method: 'DELETE' })
             if (!response.ok) throw new Error(`Server error: ${response.status}`)
         } catch (err) {
             console.error('Failed to forget sensor:', err)
             fleet.value = originalFleet
             uptimeData.value = originalUptime
-            selectedSensor.value = originalSelected
             alert('Failed to remove sensor. Please try again.')
         }
     }
 
-    // NEW: Forget entire Node
     const forgetNode = async (nodeId) => {
         if (!confirm(`Are you sure you want to delete Node "${nodeId}" and ALL of its underlying sensors?`)) return;
         
         const nodeSensors = fleet.value.filter(s => s.node_id === nodeId);
         for (const s of nodeSensors) {
-            await forgetSensor(s.sensor_id);
+            await forgetSensor(s.node_id, s.sensor_id);
         }
         
         if (selectedNode.value === nodeId) {
             selectedNode.value = null;
+            selectedSensor.value = null;
         }
     }
 
-    const toggleSilence = async (sensorId) => {
-        const sensor = fleet.value.find(s => s.sensor_id === sensorId)
+    const toggleSilence = async (nodeId, sensorId) => {
+        const sensor = fleet.value.find(s => s.node_id === nodeId && s.sensor_id === sensorId)
         if (sensor) {
             const previousState = sensor.is_silenced
             sensor.is_silenced = !sensor.is_silenced
@@ -293,7 +317,10 @@ export function useSentinel() {
                 const response = await fetch(`/api/v1/sensors/${sensorId}/silence`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_silenced: sensor.is_silenced })
+                    body: JSON.stringify({ 
+                        node_id: sensor.node_id, 
+                        is_silenced: sensor.is_silenced 
+                    })
                 })
                 if (!response.ok) throw new Error(`Server error: ${response.status}`)
             } catch (err) {
@@ -304,18 +331,16 @@ export function useSentinel() {
         }
     }
 
-    // NEW: Silence entire Node
     const silenceNode = async (nodeId) => {
         const nodeSensors = fleet.value.filter(s => s.node_id === nodeId);
         if (!nodeSensors.length) return;
         
-        // If all are silenced, target is Unsilence. Otherwise, Silence all.
         const allSilenced = nodeSensors.every(s => s.is_silenced);
         const targetState = !allSilenced;
         
         for (const s of nodeSensors) {
             if (s.is_silenced !== targetState) {
-                await toggleSilence(s.sensor_id);
+                await toggleSilence(s.node_id, s.sensor_id);
             }
         }
     }
@@ -345,6 +370,6 @@ export function useSentinel() {
         events, fleet, uptimeData, isArmed, version, viewingArchive, selectedNode, selectedSensor, activeTimeframe, velocityTimeframe,
         unreadCount, overallUptime, isFetching,
         logout, startRealtimeSync, stopRealtimeSync, toggleArmed, markAllRead, archiveAll, archiveEvent, toggleSilence, forgetSensor, markEventRead,
-        activeEvent, isActiveSensorSilenced, purgeEvents, silenceNode, forgetNode // <-- Exposed
+        activeEvent, isActiveSensorSilenced, purgeEvents, silenceNode, forgetNode
     }
 }

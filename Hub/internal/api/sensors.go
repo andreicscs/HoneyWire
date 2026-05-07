@@ -34,7 +34,7 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	nowStr := now.Format(time.RFC3339)
-	minuteBucket := now.Format("2006-01-02 15:04:00")
+	minuteBucket := now.Truncate(time.Minute).Format(time.RFC3339)
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
 	// Update sensor last_seen and metadata with composite key (node_id, sensor_id)
@@ -107,7 +107,7 @@ func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
 
 		s.IsSilenced = isSilencedInt == 1
 
-		lastSeenTime, err := time.Parse("2006-01-02 15:04:05", s.LastSeen)
+		lastSeenTime, err := time.Parse(time.RFC3339, s.LastSeen)
 		if err == nil && time.Now().UTC().Sub(lastSeenTime) < 90*time.Second {
 			s.Status = "online"
 		} else {
@@ -151,10 +151,10 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 		numBlocks, delta, expectedPings = 24, time.Hour, 60
 	}
 
-	cutoff := now.Add(-delta * time.Duration(numBlocks))
-	cutoffStr := cutoff.Format("2006-01-02 15:04:05")
+	cutoff := now.Add(-delta * time.Duration(numBlocks)).Truncate(time.Minute)
+	cutoffStr := cutoff.Format(time.RFC3339)
 
-	sensorRows, err := h.Store.DB.Query("SELECT sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY sensor_id", now.Format("2006-01-02 15:04:05"))
+	sensorRows, err := h.Store.DB.Query("SELECT node_id, sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY node_id, sensor_id", now.Format(time.RFC3339))
 	if err != nil {
 		http.Error(w, "Database error fetching sensors", http.StatusInternalServerError)
 		return
@@ -162,7 +162,8 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	defer sensorRows.Close()
 
 	type SensorData struct {
-		ID        string
+		NodeID    string
+		SensorID  string
 		LastSeen  time.Time
 		FirstSeen string
 	}
@@ -172,13 +173,17 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	for sensorRows.Next() {
 		var s SensorData
 		var lastSeenStr string
-		sensorRows.Scan(&s.ID, &lastSeenStr, &s.FirstSeen)
-		s.LastSeen, _ = time.Parse("2006-01-02 15:04:05", lastSeenStr)
+		sensorRows.Scan(&s.NodeID, &s.SensorID, &lastSeenStr, &s.FirstSeen)
+		s.LastSeen, _ = time.Parse(time.RFC3339, lastSeenStr)
 		sensors = append(sensors, s)
-		history[s.ID] = make([]float64, numBlocks)
+		
+		// Create a unique key combining Node and Sensor
+		historyKey := s.NodeID + ":" + s.SensorID
+		history[historyKey] = make([]float64, numBlocks)
 	}
 
-	hbRows, err := h.Store.DB.Query("SELECT sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+
+	hbRows, err := h.Store.DB.Query("SELECT node_id, sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
 	if err != nil {
 		http.Error(w, "Database error fetching heartbeats", http.StatusInternalServerError)
 		return
@@ -186,10 +191,11 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	defer hbRows.Close()
 
 	for hbRows.Next() {
-		var sID, tBucket string
-		hbRows.Scan(&sID, &tBucket)
-		parsedBucket, _ := time.Parse("2006-01-02 15:04:00", tBucket)
-
+		var nID, sID, tBucket string
+		hbRows.Scan(&nID, &sID, &tBucket)
+		parsedBucket, err := time.Parse(time.RFC3339, tBucket)
+		if err != nil { continue }
+		
 		if parsedBucket.Before(cutoff) {
 			continue
 		}
@@ -199,15 +205,18 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 			idx = numBlocks - 1
 		}
 
-		if idx >= 0 && history[sID] != nil {
-			history[sID][idx]++
+		historyKey := nID + ":" + sID
+		if idx >= 0 && history[historyKey] != nil {
+			history[historyKey][idx]++
 		}
 	}
 
 	var result []map[string]interface{}
 	for _, s := range sensors {
-		firstSeenParsed, _ := time.Parse("2006-01-02 15:04:05", s.FirstSeen)
+		firstSeenParsed, _ := time.Parse(time.RFC3339, s.FirstSeen)
 		var blocks []map[string]string
+		
+		historyKey := s.NodeID + ":" + s.SensorID
 
 		for i := 0; i < numBlocks; i++ {
 			blockStart := cutoff.Add(time.Duration(i) * delta)
@@ -233,7 +242,7 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 			if blockEnd.Before(firstSeenParsed) {
 				status, label = "nodata", "No Data (Not Deployed Yet)"
 			} else {
-				pings := history[s.ID][i]
+				pings := history[historyKey][i]
 				targetPings := expectedPings
 
 				if firstSeenParsed.After(blockStart) && firstSeenParsed.Before(blockEnd) {
@@ -282,8 +291,9 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 		}
 
 		result = append(result, map[string]interface{}{
-			"id":       s.ID,
-			"name":     s.ID,
+			"id":       s.SensorID,
+			"node_id":  s.NodeID,
+			"name":     s.SensorID,
 			"isOnline": isLive,
 			"blocks":   blocks,
 		})
@@ -297,11 +307,19 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	sensorID := chi.URLParam(r, "sensor_id")
+	
+	// Add NodeID to the expected JSON payload
 	var req struct {
-		IsSilenced bool `json:"is_silenced"`
+		NodeID     string `json:"node_id"`
+		IsSilenced bool   `json:"is_silenced"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.NodeID == "" {
+		http.Error(w, "node_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -310,19 +328,21 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 		silenceVal = 1
 	}
 
-	_, err := h.Store.DB.Exec("UPDATE sensors SET is_silenced = ? WHERE sensor_id = ?", silenceVal, sensorID)
+	_, err := h.Store.DB.Exec("UPDATE sensors SET is_silenced = ? WHERE node_id = ? AND sensor_id = ?", silenceVal, req.NodeID, sensorID)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	h.broadcastWS("SILENCE_SENSOR", map[string]interface{}{
+		"node_id":     req.NodeID,
 		"sensor_id":   sensorID,
 		"is_silenced": req.IsSilenced,
 	})
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"status":      "success",
+		"node_id":     req.NodeID,
 		"sensor_id":   sensorID,
 		"is_silenced": req.IsSilenced,
 	})
@@ -330,9 +350,17 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
 	sensorID := chi.URLParam(r, "sensor_id")
-	h.Store.DB.Exec("DELETE FROM sensor_heartbeats WHERE sensor_id = ?", sensorID)
+	// Use a URL query parameter for DELETE requests (e.g., ?node_id=1234)
+	nodeID := r.URL.Query().Get("node_id")
 
-	result, err := h.Store.DB.Exec("DELETE FROM sensors WHERE sensor_id = ?", sensorID)
+	if nodeID == "" {
+		http.Error(w, "node_id query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Note: Because of 'ON DELETE CASCADE' in the schema, SQLite will automatically 
+	// delete all events and heartbeats tied to this sensor!
+	result, err := h.Store.DB.Exec("DELETE FROM sensors WHERE node_id = ? AND sensor_id = ?", nodeID, sensorID)
 	if err != nil {
 		http.Error(w, "Database error while deleting sensor", http.StatusInternalServerError)
 		return
@@ -344,13 +372,17 @@ func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.broadcastWS("DELETE_SENSOR", map[string]string{"sensor_id": sensorID})
+	h.broadcastWS("DELETE_SENSOR", map[string]string{
+		"node_id":   nodeID,
+		"sensor_id": sensorID,
+	})
 
 	SendJSON(w, http.StatusOK, map[string]string{
 		"status":  "success",
 		"message": "Sensor forgotten successfully",
 	})
 }
+
 
 // GetManifests fetches the sensor manifest JSON.
 // It proxies the request through the Hub to bypass browser CORS restrictions.

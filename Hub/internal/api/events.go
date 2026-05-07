@@ -107,13 +107,17 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	query := "SELECT id, timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
 	args := []interface{}{isArchived}
 
+	// Apply Node Filter if present
 	if nodeID := r.URL.Query().Get("node_id"); nodeID != "" {
-		query += " AND node_id = ?"
-		args = append(args, nodeID)
-	} else if sensorID := r.URL.Query().Get("sensor_id"); sensorID != "" {
-		query += " AND sensor_id = ?"
-		args = append(args, sensorID)
-	}
+        query += " AND node_id = ?"
+        args = append(args, nodeID)
+    }
+
+    // Apply Sensor Filter if present (Works WITH node_id now!)
+    if sensorID := r.URL.Query().Get("sensor_id"); sensorID != "" {
+        query += " AND sensor_id = ?"
+        args = append(args, sensorID)
+    }
 
 	query += " ORDER BY id DESC"
 
