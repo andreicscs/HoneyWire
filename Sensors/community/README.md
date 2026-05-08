@@ -40,6 +40,7 @@ You only need to define your sensor in a `SensorManifest` JSON object. This sing
   "deployment": {
     "image": "ghcr.io/yourname/custom-trap:latest",
     "network_mode": "bridge",
+    "user": "0:0",
     "env_vars": [
       {
         "name": "CUSTOM_VAR",
