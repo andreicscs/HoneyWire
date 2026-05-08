@@ -19,15 +19,27 @@ export function useConfig() {
             const res = await fetch('/api/v1/config')
             if (res.ok) {
                 const data = await res.json()
+                
                 state.hubEndpoint = data.hub_endpoint || window.location.origin
                 state.hubKey = data.hub_key || ''
-                state.autoArchiveDays = data.auto_archive_days || 0
-                state.autoPurgeDays = data.auto_purge_days || 0
+                
+                // STRICT CHECKS: 0 is valid for 'Keep Forever'
+                state.autoArchiveDays = data.auto_archive_days != null ? data.auto_archive_days : 0
+                state.autoPurgeDays = data.auto_purge_days != null ? data.auto_purge_days : 0
+                
                 state.webhookType = data.webhook_type || 'ntfy'
                 state.webhookUrl = data.webhook_url || ''
-                state.webhookEvents = data.webhook_events || []
+                
+                // ARRAY CHECKS: Force default if DB returns empty array []
+                if (data.webhook_events && data.webhook_events.length > 0) {
+                    state.webhookEvents = data.webhook_events
+                } else {
+                    state.webhookEvents = ['critical', 'high', 'medium', 'low', 'info']
+                }
+                
                 state.siemAddress = data.siem_address || ''
                 state.siemProtocol = data.siem_protocol || 'tcp'
+                
                 state.isLoaded = true
             }
         } catch (error) {

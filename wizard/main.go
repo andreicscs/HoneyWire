@@ -141,7 +141,7 @@ func run() error {
 		return nil
 	}
 
-	return executeDeployment(recommendations, dockerMap, systemState)
+	return executeDeployment(recommendations, dockerMap, systemState, nodeConfig)
 }
 
 // --- PHASE 1: CORE ACTIONS ---
@@ -304,8 +304,8 @@ func buildStrategy(hostState *scanner.HostState, systemState *state.SystemState,
 
 // --- PHASE 4: EXECUTION ---
 
-func executeDeployment(recs []*autodiscovery.Recommendation, dockerMap map[int]string, systemState *state.SystemState) error {
-	printDeploymentPlan(recs)
+func executeDeployment(recs []*autodiscovery.Recommendation, dockerMap map[int]string, systemState *state.SystemState, nodeConfig *NodeConfig) error {
+		printDeploymentPlan(recs)
 
 	if len(systemState.DeployedImages) > 0 {
 		fmt.Printf("    %s↳ Note: %d sensors are already actively managed. (Skipped)%s\n\n", Green, len(systemState.DeployedImages), Reset)
@@ -332,9 +332,9 @@ func executeDeployment(recs []*autodiscovery.Recommendation, dockerMap map[int]s
 			}
 
 			fmt.Printf("\n    %sExecuting Infrastructure-as-Code...%s\n", Cyan, Reset)
-			if err := generator.Apply(recs); err != nil {
-				return fmt.Errorf("Deployment failed: %w", err)
-			}
+			if err := generator.Apply(recs, nodeConfig.NodeID, nodeConfig.HubURL, nodeConfig.NodeKey); err != nil {
+            return fmt.Errorf("Deployment failed: %w", err)
+        }
 			
 			fmt.Printf("    %s✅ Deployment complete! Run 'docker compose -f %s -p %s ps' to view sensors.%s\n\n", Green, filepath.Join(generator.DeployDir, generator.ComposeFile), generator.ProjectName, Reset)
 			break

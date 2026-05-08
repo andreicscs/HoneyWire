@@ -25,11 +25,15 @@ watch(() => config.isLoaded, (loaded) => {
         const loadedSettings = {
             hubEndpoint: config.hubEndpoint || window.location.origin,
             hubKey: config.hubKey || '',
-            autoArchiveDays: config.autoArchiveDays || 0,
-            autoPurgeDays: config.autoPurgeDays || 0,
+            // Use strict undefined checks to allow 0 (Keep Forever)
+            autoArchiveDays: config.autoArchiveDays !== undefined ? config.autoArchiveDays : 0,
+            autoPurgeDays: config.autoPurgeDays !== undefined ? config.autoPurgeDays : 0,
             webhookType: config.webhookType || 'ntfy',
             webhookUrl: config.webhookUrl || '',
-            webhookEvents: [...(config.webhookEvents || [])],
+            // Enforce array defaults if empty
+            webhookEvents: config.webhookEvents && config.webhookEvents.length > 0 
+                ? [...config.webhookEvents] 
+                : ['critical', 'high', 'medium', 'low', 'info'],
             siemAddress: config.siemAddress || '',
             siemProtocol: config.siemProtocol || 'tcp'
         }

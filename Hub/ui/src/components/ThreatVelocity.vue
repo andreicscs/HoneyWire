@@ -1,13 +1,16 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick, toRaw } from 'vue'
+import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
+import { useAppStore } from '../stores/app'
+import { useEventsStore } from '../stores/events'
 
-const props = defineProps({
-    events: { type: Array, required: true },
-    activeTimeframe: { type: String, required: true }
-})
+const appStore = useAppStore()
+const eventsStore = useEventsStore()
 
-const emit = defineEmits(['update:timeframe'])
+// Pull reactive state directly from the stores
+const { velocityTimeframe } = storeToRefs(appStore)
+const { filteredEvents: events } = storeToRefs(eventsStore)
 
 const chartCanvas = ref(null)
 const recentEventCount = ref(0)
@@ -18,11 +21,11 @@ let liveTicker = null
 const severities = ['critical', 'high', 'medium', 'low', 'info']
 
 const solidColors = { 
-    critical: '244, 63, 94',  // #f43f5e
-    high: '251, 146, 60',     // #fb923c
-    medium: '234, 179, 8',    // #eab308
-    low: '59, 130, 246',      // #3b82f6
-    info: '100, 116, 139'     // #64748b
+    critical: '244, 63, 94',  
+    high: '251, 146, 60',     
+    medium: '234, 179, 8',    
+    low: '59, 130, 246',      
+    info: '100, 116, 139'     
 }
 
 let exactTimesList = [] 
@@ -76,9 +79,9 @@ const updateData = () => {
     let buckets = 30
     let bucketSizeMs = 120000
 
-    if (props.activeTimeframe === '24H') { buckets = 24; bucketSizeMs = 3600000 } 
-    else if (props.activeTimeframe === '7D') { buckets = 14; bucketSizeMs = 43200000 } 
-    else if (props.activeTimeframe === '30D') { buckets = 30; bucketSizeMs = 86400000 }
+    if (velocityTimeframe.value === '24H') { buckets = 24; bucketSizeMs = 3600000 } 
+    else if (velocityTimeframe.value === '7D') { buckets = 14; bucketSizeMs = 43200000 } 
+    else if (velocityTimeframe.value === '30D') { buckets = 30; bucketSizeMs = 86400000 }
 
     const labels = new Array(buckets).fill('')
     exactTimesList = new Array(buckets).fill('')
@@ -90,18 +93,17 @@ const updateData = () => {
         
         if (stepsAgo === 0) labels[i] = 'Now'
         else {
-            if (props.activeTimeframe === '1H') labels[i] = `-${stepsAgo * 2}m`
-            else if (props.activeTimeframe === '24H') labels[i] = `-${stepsAgo}h`
-            else if (props.activeTimeframe === '7D') labels[i] = `-${stepsAgo * 12}h`
-            else if (props.activeTimeframe === '30D') labels[i] = `-${stepsAgo}d`
+            if (velocityTimeframe.value === '1H') labels[i] = `-${stepsAgo * 2}m`
+            else if (velocityTimeframe.value === '24H') labels[i] = `-${stepsAgo}h`
+            else if (velocityTimeframe.value === '7D') labels[i] = `-${stepsAgo * 12}h`
+            else if (velocityTimeframe.value === '30D') labels[i] = `-${stepsAgo}d`
         }
     }
 
     const data = { critical: new Array(buckets).fill(0), high: new Array(buckets).fill(0), medium: new Array(buckets).fill(0), low: new Array(buckets).fill(0), info: new Array(buckets).fill(0) }
     let count = 0
 
-    // FIX 1: Strip Vue Reactivity for 10x faster looping
-    const rawEvents = toRaw(props.events)
+    const rawEvents = toRaw(events.value)
 
     rawEvents.forEach(e => {
         if (!e.timestamp) return
@@ -132,7 +134,6 @@ const updateTheme = () => {
     const isDark = document.documentElement.classList.contains('dark')
     const ctx = chartCanvas.value.getContext('2d')
     
-    // FIX 2: Read height from Chart.js memory, NOT the DOM. Kills Layout Thrashing!
     const chartHeight = chartInstance.value.chartArea?.bottom || chartInstance.value.height || 200
 
     chartInstance.value.data.datasets.forEach((dataset, index) => {
@@ -178,7 +179,7 @@ onMounted(async () => {
     liveTicker = setInterval(() => { updateData() }, 2000)
 })
 
-watch([() => props.events[0]?.id, () => props.activeTimeframe, () => props.events.length], () => {
+watch([() => events.value[0]?.id, velocityTimeframe, () => events.value.length], () => {
     updateData()
 })
 
@@ -204,9 +205,9 @@ onUnmounted(() => {
             
             <div class="flex bg-slate-50 border border-slate-100 dark:border-transparent dark:bg-zinc-800 p-0.5 rounded-md text-[11px] font-medium text-slate-500 dark:text-zinc-400">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
-                        @click="$emit('update:timeframe', time)"
+                        @click="appStore.velocityTimeframe = time"
                         class="px-2.5 py-1 rounded transition-colors"
-                        :class="activeTimeframe === time ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm border border-slate-200 dark:border-transparent' : 'hover:text-slate-700 dark:hover:text-zinc-200'">
+                        :class="velocityTimeframe === time ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm border border-slate-200 dark:border-transparent' : 'hover:text-slate-700 dark:hover:text-zinc-200'">
                     {{ time }}
                 </button>
             </div>

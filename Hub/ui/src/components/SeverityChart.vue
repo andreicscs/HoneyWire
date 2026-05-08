@@ -1,10 +1,11 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
+import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
+import { useEventsStore } from '../stores/events'
 
-const props = defineProps({
-    events: { type: Array, required: true }
-})
+const eventsStore = useEventsStore()
+const { filteredEvents: events } = storeToRefs(eventsStore)
 
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -34,8 +35,7 @@ const updateData = () => {
     if (!chartInstance) return;
     const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
     
-    // FIX: Strip Vue Reactivity before looping
-    const rawEvents = toRaw(props.events);
+    const rawEvents = toRaw(events.value);
     
     rawEvents.forEach(e => {
         const s = e.severity ? e.severity.toLowerCase() : 'info';
@@ -109,7 +109,7 @@ onMounted(() => {
     themeObserver.observe(document.documentElement, { attributes: true });
 })
 
-watch([() => props.events.length, () => props.events[0]?.id], updateData)
+watch([() => events.value.length, () => events.value[0]?.id], updateData)
 
 onUnmounted(() => {
     if (chartInstance) chartInstance.destroy()

@@ -1,13 +1,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useFleetStore } from '../stores/fleet'
 
-const props = defineProps({
-    fleet: { type: Array, required: true },
-    selectedNode: { type: String, default: null },
-    selectedSensor: { type: String, default: null } 
-})
-
-const emit = defineEmits(['select-node', 'silence-node', 'forget-node'])
+const fleetStore = useFleetStore()
+const { sensors, selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const showOfflineWarning = ref(false)
@@ -20,20 +17,19 @@ const activeNodeData = computed(() => activeNodes.value.find(n => n.node_id === 
 
 const isNodeSilenced = computed(() => {
     if (!activeNodeData.value) return false;
-    // We consider the node "silenced" if ALL its sensors are currently silenced.
     return activeNodeData.value.sensors.every(s => s.is_silenced);
 })
 
 const highlightedNodeId = computed(() => {
-    if (!props.selectedSensor) return null;
-    const sensor = props.fleet.find(s => s.sensor_id === props.selectedSensor);
+    if (!selectedSensor.value) return null;
+    const sensor = sensors.value.find(s => s.sensor_id === selectedSensor.value);
     return sensor ? sensor.node_id : null;
 });
 
 const activeNodes = computed(() => {
     const nodesMap = {};
     
-    props.fleet.forEach(s => {
+    sensors.value.forEach(s => {
         if (!s.node_id) return;
         
         if (!nodesMap[s.node_id]) {
@@ -71,12 +67,12 @@ const toggleMenu = (e, id) => {
 }
 
 const handleSilenceNode = (nodeId) => {
-    emit('silence-node', nodeId)
+    fleetStore.silenceNode(nodeId)
     activeMenu.value = null
 }
 
 const handleForgetNode = (nodeId) => {
-    emit('forget-node', nodeId)
+    fleetStore.forgetNode(nodeId)
     activeMenu.value = null
 }
 
@@ -92,16 +88,16 @@ const checkScroll = () => {
     showOfflineWarning.value = lastOffline.getBoundingClientRect().right > (container.getBoundingClientRect().right + 5)
 }
 
-watch(() => props.selectedNode, (newVal) => {
+watch(() => selectedNode.value, (newVal) => {
     nextTick(() => {
         const el = document.getElementById(newVal ? `pill-${newVal}` : 'pill-all')
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     })
 })
 
-watch(() => props.selectedSensor, (newVal) => {
+watch(() => selectedSensor.value, (newVal) => {
     nextTick(() => {
-        const elId = newVal && props.selectedNode ? `pill-${props.selectedNode}` : 'pill-all'
+        const elId = newVal && selectedNode.value ? `pill-${selectedNode.value}` : 'pill-all'
         const el = document.getElementById(elId)
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     })
@@ -129,7 +125,7 @@ onUnmounted(() => {
                     <div ref="scrollArea" @scroll.passive="checkScroll" class="flex overflow-x-auto whitespace-nowrap gap-2 items-center custom-scroll pb-3 pr-2 relative">
                         
                         <div class="sticky left-0 z-20 pr-2 bg-slate-200 dark:bg-[#0a0a0c] flex items-center border-r border-slate-300 dark:border-zinc-800 transition-all duration-200">
-                            <button id="pill-all" @click="$emit('select-node', null)" 
+                            <button id="pill-all" @click="fleetStore.selectTarget(null, null)" 
                                     class="shrink-0 px-3.5 py-1.5 rounded-md border text-sm font-bold transition-all duration-300 shadow-sm"
                                     :class="!selectedNode && !selectedSensor ? 'bg-slate-800 text-white dark:bg-zinc-200 dark:text-black border-slate-800 dark:border-zinc-200' : 'bg-white dark:bg-zinc-900 border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800'">
                                 All Traffic
@@ -153,11 +149,11 @@ onUnmounted(() => {
                                  n.status === 'degraded' ? 'is-degraded' : '',
                                  
                                  /* Dimming logic: Dim if ANY node is selected, and it's NOT this specific node */
-                                 (selectedNode && selectedNode !== n.node_id) ? 'opacity-40 grayscale-[50%]' : ''
+                                 (selectedNode && selectedNode !== n.node_id) ? 'opacity-70 grayscale-[50%]' : ''
                              ]">
                              
                             <!-- Clickable Filter Area -->
-                            <div @click="$emit('select-node', n.node_id)" class="flex items-center gap-2 pl-3 pr-1 py-1.5 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">
+                            <div @click="fleetStore.selectTarget(n.node_id, null)" class="flex items-center gap-2 pl-3 pr-1 py-1.5 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">
                                 <span class="w-1.5 h-1.5 rounded-full" 
                                       :class="{
                                           'bg-emerald-500': n.status === 'online',

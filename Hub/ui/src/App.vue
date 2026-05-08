@@ -1,36 +1,49 @@
 <script setup>
-  import { ref, onMounted, onUnmounted } from 'vue'
-  import Sidebar from './components/Sidebar.vue'
-  import Header from './components/Header.vue'
-  import Dashboard from './views/Dashboard.vue'
-  import Login from './views/Login.vue'
-  import { useSentinel } from './api/useSentinel'
-  import Store from './views/Store.vue'
-  import Settings from './views/Settings.vue'
-  import { useConfig } from './api/useConfig'
-  import Setup from './views/Setup.vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 
-  const { 
-    version, 
-    isArmed, 
-    unreadCount, 
-    viewingArchive, 
-    startRealtimeSync, 
-    stopRealtimeSync,
-    toggleArmed, 
-    markAllRead,
-    events,
-    logout,
-    purgeEvents
-  } = useSentinel()
-  const { fetchConfig } = useConfig()
+// Components
+import Sidebar from './components/Sidebar.vue'
+import Header from './components/Header.vue'
+import Dashboard from './views/Dashboard.vue'
+import Login from './views/Login.vue'
+import Store from './views/Store.vue'
+import Settings from './views/Settings.vue'
+import Setup from './views/Setup.vue'
 
-  const requiresSetup = ref(false)
-  const isAuthenticated = ref(false)
-  const currentView = ref('dashboard')
-  const sidebarOpen = ref(true)
- 
-  const checkAuthAndInit = async () => {
+// Services & Stores
+import { useConfig } from './api/useConfig'
+import { useAppStore } from './stores/app'
+import { useFleetStore } from './stores/fleet'
+import { useEventsStore } from './stores/events'
+import { HoneyWireWS } from './services/ws' // <-- Import the new class!
+
+const { fetchConfig } = useConfig()
+const appStore = useAppStore()
+const fleetStore = useFleetStore()
+const eventsStore = useEventsStore()
+
+const { currentView, viewingArchive } = storeToRefs(appStore)
+
+// 1. When Archive view toggles, or Node/Sensor is clicked -> Refetch Events
+watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor], 
+  ([isArchived, node, sensor]) => {
+    eventsStore.fetchEvents(isArchived, node, sensor)
+})
+
+// 2. When '7D', '30D' buttons are clicked -> Refetch Uptime
+watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
+    fleetStore.fetchUptime(newTimeframe)
+})
+
+const requiresSetup = ref(false)
+const isAuthenticated = ref(false)
+
+// Instantiate the WebSocket service
+const wsService = new HoneyWireWS()
+let healthSyncInterval = null
+
+const checkAuthAndInit = async () => {
     try {
         const setupRes = await fetch('/api/v1/setup/status')
         if (setupRes.ok) {
@@ -49,7 +62,29 @@
             isAuthenticated.value = true
             await fetchConfig() 
             
-            startRealtimeSync()
+            // 1. Initial Data Fetch
+            await Promise.all([
+                fleetStore.fetchFleet(),
+                fleetStore.fetchUptime(),
+                eventsStore.fetchEvents()
+            ])
+
+            // 2. Wire the WebSocket directly to the Pinia stores
+            wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
+            wsService.on('onNewSensor', (payload) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
+            wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
+            wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
+            wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
+
+            // 3. Connect the socket
+            wsService.connect()
+            
+            // 4. Fallback background sync (just in case)
+            healthSyncInterval = setInterval(() => { 
+                fleetStore.fetchFleet()
+                fleetStore.fetchUptime() 
+            }, 30000)
+
         } else {
             isAuthenticated.value = false
         }
@@ -57,9 +92,9 @@
         console.error("Hub connection error:", e)
         isAuthenticated.value = false
     }
-  }
+}
   
-  const toggleTheme = () => {
+const toggleTheme = () => {
     const html = document.documentElement
     if (html.classList.contains('dark')) {
         html.classList.remove('dark')
@@ -68,65 +103,22 @@
         html.classList.add('dark')
         localStorage.setItem('theme', 'dark')
     }
-  }
+}
 
-  // --- DRYRUN PURGE LOGIC ---
-  const clearLogs = async () => {
-    try {
-        //Perform the Dry Run to get the exact count
-        const dryRes = await fetch('/api/v1/events?dryrun=true', { method: 'DELETE' })
-        if (!dryRes.ok) throw new Error("Failed to fetch dryrun data")
-        
-        const dryData = await dryRes.json()
-        const count = dryData.would_delete || 0
-
-        if (count === 0) {
-            alert("The database is already empty.")
-            return
-        }
-
-        //Ask user with the specific count
-        if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
-            try {
-                //The actual deletion
-                const response = await fetch('/api/v1/events?dryrun=false', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`)
-                }
-                
-                // Only update UI after successful server deletion
-                purgeEvents()
-                console.log("Database purged successfully.")
-                alert("Database purged successfully.")
-            } catch(error) {
-                console.error("Failed to purge logs:", error)
-                alert("Failed to purge logs. The database remains unchanged.")
-            }
-        }
-    } catch (error) {
-        console.error("Network error while purging logs:", error)
-        alert("Network error. Could not reach the Hub.")
-    }
-  }
-
-  onMounted(() => {
+onMounted(() => {
     checkAuthAndInit()
-  })
+})
 
-  onUnmounted(() => {
-    stopRealtimeSync()
-  })
+onUnmounted(() => {
+    if (healthSyncInterval) clearInterval(healthSyncInterval)
+    wsService.disconnect() // Safely kill the socket on unmount
+})
 </script>
 
 <script>
-  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && 
-      window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     document.documentElement.classList.add('dark')
-  }
+}
 </script>
 
 <template>
@@ -135,51 +127,17 @@
   </div>
   
   <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
-    <Login 
-      @login-success="checkAuthAndInit" 
-      @toggle-theme="toggleTheme"
-    /> 
+    <Login @login-success="checkAuthAndInit" @toggle-theme="toggleTheme" /> 
   </div>
 
   <div v-else class="flex h-screen overflow-hidden bg-slate-200/60 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
-    
-    <Sidebar 
-      :isOpen="sidebarOpen" 
-      :currentView="currentView" 
-      :version="version" 
-      :viewingArchive="viewingArchive"
-      @change-view="v => currentView = v" 
-      @toggle-archive="viewingArchive = !viewingArchive" 
-      @clear-logs="clearLogs"
-      @toggle-sidebar="sidebarOpen = !sidebarOpen" 
-    />
-
+    <Sidebar />
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
-      
-      <Header 
-        :currentView="currentView" 
-        :isArmed="isArmed" 
-        :unreadCount="unreadCount" 
-        @toggle-theme="toggleTheme" 
-        @toggle-armed="toggleArmed" 
-        @mark-all-read="markAllRead" 
-        @logout="logout" 
-      />
-      
+      <Header />
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
-        
-        <div v-if="currentView === 'dashboard'">
-          <Dashboard /> 
-        </div>
-
-        <div v-else-if="currentView === 'store'">
-          <Store />
-        </div>
-
-        <div v-else-if="currentView === 'settings'">
-          <Settings />
-        </div>
-
+        <Dashboard v-if="currentView === 'dashboard'" />
+        <Store v-else-if="currentView === 'store'" />
+        <Settings v-else-if="currentView === 'settings'" />
       </div>
     </main>
   </div>

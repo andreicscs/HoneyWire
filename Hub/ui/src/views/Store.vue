@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useConfig } from '../api/useConfig'
 
 const { config } = useConfig()
@@ -12,6 +12,9 @@ const activeEnvVar = ref(null)
 const sensors = ref([])
 const isLoading = ref(true)
 const fetchError = ref(false) // Replaces offline fallback flag
+
+const rawCompose = ref('')
+const highlightedCompose = ref('')
 
 onMounted(async () => {
     try {
@@ -43,6 +46,11 @@ const getUIDefault = (def) => {
     return '';
 }
 
+// Watch for changes in input fields and refetch the YAML automatically
+watch([selectedSensor, envVarValues, activeEnvVar], () => {
+    fetchYamlFromHub();
+}, { deep: true });
+
 const openSensor = (sensor) => {
     selectedSensor.value = sensor
     activeTab.value = 'readme'
@@ -51,6 +59,7 @@ const openSensor = (sensor) => {
         envVarValues.value[env.name] = getUIDefault(env.default)
     })
     document.body.style.overflow = 'hidden'
+    fetchYamlFromHub(); // Initial fetch
 }
 
 const closeSensor = () => {
@@ -60,112 +69,47 @@ const closeSensor = () => {
     document.body.style.overflow = ''
 }
 
-const rawCompose = computed(() => {
-    if (!selectedSensor.value) return ''
-    return generateYaml(selectedSensor.value, envVarValues.value, false)
-})
+const fetchYamlFromHub = async () => {
+    if (!selectedSensor.value) return;
 
-const highlightedCompose = computed(() => {
-    if (!selectedSensor.value) return ''
-    return generateYaml(selectedSensor.value, envVarValues.value, true)
-})
+    const payload = {
+        node_id: "${HW_NODE_ID}",
+        hub_endpoint: config.hubEndpoint || window.location.origin,
+        hub_key: config.hubKey || '<YOUR_HW_HUB_KEY>',
+        sensors: [{
+            sensor_id: selectedSensor.value.id,
+            env_values: envVarValues.value,
+            manifest: selectedSensor.value
+        }]
+    };
 
-const resolveTemplateValue = (text, envValues) => {
-    if (!text) return ''
-    return text.replace(/{{\s*\.([A-Za-z0-9_]+)\s*}}/g, (_, key) => {
-        const toEnv = (name) => {
-            const snake = name.replace(/([A-Z])/g, '_$1').toUpperCase().replace(/^_/, '')
-            if (envValues[snake] !== undefined) return snake
-            if (envValues[`HW_${snake}`] !== undefined) return `HW_${snake}`
-            return null
-        }
-        const envKey = toEnv(key)
-        return envKey && envValues[envKey] !== undefined ? envValues[envKey] : getUIDefault(text)
-    })
-}
-
-
-const generateYaml = (sensor, envValues, isHtml) => {
-    // 1. Pull the reactive config state locally
-    const endpoint = config.hubEndpoint || window.location.origin
-    const key = config.hubKey || '<YOUR_HW_HUB_KEY>'
-
-    let yaml = `services:\n`
-
-    if (sensor.deployment.init_containers && sensor.deployment.init_containers.length > 0) {
-        sensor.deployment.init_containers.forEach(init => {
-            yaml += `  ${init.name}:\n`
-            yaml += `    image: ${init.image}\n`
-            if (init.command) yaml += `    command: ${init.command}\n`
-            if (init.volume_mounts && init.volume_mounts.length > 0) {
-                yaml += `    volumes:\n`
-                init.volume_mounts.forEach(v => {
-                    const sourcePath = envValues['TRAP_PATH'] || getUIDefault(v.source)
-                    yaml += `      - type: ${v.type}\n        source: ${sourcePath}\n        target: ${v.target}\n`
-                    if (v.read_only) yaml += `        read_only: true\n`
-                })
-            }
-        })
-    }
-
-    yaml += `  ${sensor.id}:\n`
-    yaml += `    image: ${sensor.deployment.image}\n`
-    yaml += `    container_name: hw-${sensor.id}\n`
-    yaml += `    restart: unless-stopped\n`
-    yaml += `    network_mode: "${sensor.deployment.network_mode}"\n`
-    if (sensor.deployment.user) yaml += `    user: "${sensor.deployment.user}"\n`
-
-    yaml += `    cap_drop: ["ALL"]\n`
-    if (sensor.deployment.cap_add && sensor.deployment.cap_add.length > 0) {
-        yaml += `    cap_add: [${sensor.deployment.cap_add.map(c => `"${c}"`).join(', ')}]\n`
-    }
-    yaml += `    security_opt: ["no-new-privileges:true"]\n`
-
-    if (sensor.deployment.init_containers && sensor.deployment.init_containers.length > 0) {
-        yaml += `    depends_on:\n`
-        sensor.deployment.init_containers.forEach(init => {
-            yaml += `      ${init.name}:\n        condition: service_completed_successfully\n`
-        })
-    }
-
-    if (sensor.deployment.volume_mounts && sensor.deployment.volume_mounts.length > 0) {
-        yaml += `    volumes:\n`
-        sensor.deployment.volume_mounts.forEach(v => {
-            const sourcePath = envValues['TRAP_PATH'] || getUIDefault(v.source)
-            yaml += `      - type: ${v.type}\n        source: ${sourcePath}\n        target: ${v.target}\n`
-            if (v.read_only) yaml += `        read_only: true\n`
-        })
-    }
-
-    if (sensor.deployment.env_vars && sensor.deployment.env_vars.length > 0) {
-        yaml += `    environment:\n`
-        sensor.deployment.env_vars.forEach(env => {
-            let value = envValues[env.name] !== undefined ? envValues[env.name] : getUIDefault(env.default)
-            
-            // --- THE FIX: Auto-inject config for hidden core variables ---
-            if (env.name === 'HW_HUB_ENDPOINT') value = endpoint
-            if (env.name === 'HW_HUB_KEY') value = key
-            // -------------------------------------------------------------
-
-            let line = `      - ${env.name}=${value}\n`
-            
-            if (isHtml && activeEnvVar.value === env.name && value) {
-                const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                const regex = new RegExp(`(${escapedValue})`, 'g')
-                line = line.replace(regex, `<span class="bg-blue-100 text-blue-800 dark:bg-zinc-700/80 dark:text-white font-bold px-1 rounded transition-colors duration-200">$1</span>`)
-            }
-            yaml += line
-        })
+    try {
+        const response = await fetch('/api/v1/compose/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
         
-        if (isHtml && activeEnvVar.value === 'TRAP_PATH' && envValues['TRAP_PATH']) {
-             const value = envValues['TRAP_PATH'];
-             const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-             const regex = new RegExp(`(?<!>)${escapedValue}(?!<)`, 'g')
-             yaml = yaml.replace(regex, `<span class="bg-blue-100 text-blue-800 dark:bg-zinc-700/80 dark:text-white font-bold px-1 rounded transition-colors duration-200">${value}</span>`)
-        }
-    }
+        if (!response.ok) throw new Error("Failed to compile YAML");
+        
+        const yamlString = await response.text();
+        rawCompose.value = yamlString;
 
-    return yaml
+        // Apply HTML Highlighting
+        let htmlYaml = yamlString;
+        if (activeEnvVar.value && envVarValues.value[activeEnvVar.value]) {
+            const valToHighlight = envVarValues.value[activeEnvVar.value];
+            const escaped = valToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(?<!>)${escaped}(?!<)`, 'g');
+            htmlYaml = htmlYaml.replace(regex, `<span class="bg-blue-100 text-blue-800 dark:bg-zinc-700/80 dark:text-white font-bold px-1 rounded transition-colors duration-200">${valToHighlight}</span>`);
+        }
+        highlightedCompose.value = htmlYaml;
+
+    } catch (e) {
+        console.error("YAML Generation Error:", e);
+        rawCompose.value = "services:\n  error:\n    image: error_generating_yaml";
+        highlightedCompose.value = rawCompose.value;
+    }
 }
 
 const copyToClipboard = () => {

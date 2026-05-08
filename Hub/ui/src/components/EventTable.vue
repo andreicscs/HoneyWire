@@ -1,143 +1,134 @@
 <script setup>
-    import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAppStore } from '../stores/app'
+import { useEventsStore } from '../stores/events'
 
-    const props = defineProps({
-        events: { type: Array, required: true },
-        viewingArchive: { type: Boolean, required: true },
-        isFetching: { type: Boolean, default: false }
-    })
+const appStore = useAppStore()
+const eventsStore = useEventsStore()
 
-    const emit = defineEmits(['archive-all', 'archive-event', 'mark-read'])
+const { viewingArchive, isFetching } = storeToRefs(appStore)
+const { filteredEvents: events } = storeToRefs(eventsStore)
 
-    const sortCol = ref('timestamp')
-    const sortDesc = ref(true)
-    const expandedRows = ref(new Set())
+const sortCol = ref('timestamp')
+const sortDesc = ref(true)
+const expandedRows = ref(new Set())
 
-    // Local Pagination State
-    const currentPage = ref(1)
-    const itemsPerPage = ref(50)
+const currentPage = ref(1)
+const itemsPerPage = ref(50)
 
-    watch([() => props.viewingArchive, sortCol, sortDesc, () => props.events.length], () => {
-        if (props.events.length === 0) currentPage.value = 1
-        expandedRows.value = new Set()
-    })
+watch([viewingArchive, sortCol, sortDesc, () => events.value.length], () => {
+    if (events.value.length === 0) currentPage.value = 1
+    expandedRows.value = new Set()
+})
 
-    const toggleSort = (col) => {
-        if (sortCol.value === col) sortDesc.value = !sortDesc.value
-        else { sortCol.value = col; sortDesc.value = ['timestamp', 'severity'].includes(col) }
+const toggleSort = (col) => {
+    if (sortCol.value === col) sortDesc.value = !sortDesc.value
+    else { sortCol.value = col; sortDesc.value = ['timestamp', 'severity'].includes(col) }
+}
+
+const toggleRow = async (id) => {
+    const newSet = new Set(expandedRows.value)
+    const isExpanding = !newSet.has(id)
+    
+    if (isExpanding) {
+        newSet.add(id)
+        const eventTarget = events.value.find(e => e.id === id)
+        if (eventTarget && !eventTarget.is_read) eventsStore.markEventRead(id)
+    } else {
+        newSet.delete(id)
     }
+    expandedRows.value = newSet
 
-    const toggleRow = async (id) => {
-        const newSet = new Set(expandedRows.value)
-        const isExpanding = !newSet.has(id)
-        
-        if (isExpanding) {
-            newSet.add(id)
-            const eventTarget = props.events.find(e => e.id === id)
-            if (eventTarget && !eventTarget.is_read) emit('mark-read', id)
-        } else {
-            newSet.delete(id)
+    if (isExpanding) {
+        await nextTick()
+        const detailsRow = document.getElementById(`details-${id}`)
+        if (detailsRow) detailsRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+}
+
+const isDownArrow = (col) => {
+    if (sortCol.value !== col) return true; 
+    return ['timestamp', 'severity'].includes(col) ? sortDesc.value : !sortDesc.value;
+}
+
+const getSeverityColor = (sev) => {
+    const colors = { critical: '#f43f5e', high: '#fb923c', medium: '#eab308', low: '#3b82f6', info: '#64748b' }
+    return colors[sev?.toLowerCase()] || 'transparent'
+}
+
+const sortedEvents = computed(() => {
+    return [...events.value].sort((a, b) => {
+        let valA = a[sortCol.value] || ''
+        let valB = b[sortCol.value] || ''
+        if (sortCol.value === 'severity') {
+            const scores = { critical: 5, high: 4, medium: 3, low: 2, info: 1 }
+            valA = scores[valA.toLowerCase()] || 0
+            valB = scores[valB.toLowerCase()] || 0
         }
-        expandedRows.value = newSet
-
-        if (isExpanding) {
-            await nextTick()
-            const detailsRow = document.getElementById(`details-${id}`)
-            if (detailsRow) detailsRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-        }
-    }
-
-    const isDownArrow = (col) => {
-        if (sortCol.value !== col) return true; 
-        return ['timestamp', 'severity'].includes(col) ? sortDesc.value : !sortDesc.value;
-    }
-
-    const getSeverityColor = (sev) => {
-        const colors = { critical: '#f43f5e', high: '#fb923c', medium: '#eab308', low: '#3b82f6', info: '#64748b' }
-        return colors[sev?.toLowerCase()] || 'transparent'
-    }
-
-    const sortedEvents = computed(() => {
-        return [...props.events].sort((a, b) => {
-            let valA = a[sortCol.value] || ''
-            let valB = b[sortCol.value] || ''
-            if (sortCol.value === 'severity') {
-                const scores = { critical: 5, high: 4, medium: 3, low: 2, info: 1 }
-                valA = scores[valA.toLowerCase()] || 0
-                valB = scores[valB.toLowerCase()] || 0
-            }
-            if (valA < valB) return sortDesc.value ? 1 : -1
-            if (valA > valB) return sortDesc.value ? -1 : 1
-            return 0
-        })
+        if (valA < valB) return sortDesc.value ? 1 : -1
+        if (valA > valB) return sortDesc.value ? -1 : 1
+        return 0
     })
+})
 
-    // --- DOM PROTECTION: SLICE TO 50 ITEMS ---
-    const totalPages = computed(() => Math.ceil(sortedEvents.value.length / itemsPerPage.value) || 1)
+const totalPages = computed(() => Math.ceil(sortedEvents.value.length / itemsPerPage.value) || 1)
 
-    const paginatedEvents = computed(() => {
-        const start = (currentPage.value - 1) * itemsPerPage.value
-        const end = start + itemsPerPage.value
-        return sortedEvents.value.slice(start, end)
-    })
+const paginatedEvents = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value
+    const end = start + itemsPerPage.value
+    return sortedEvents.value.slice(start, end)
+})
 
-    const visiblePages = computed(() => {
-        const total = totalPages.value;
-        const current = currentPage.value;
-        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-        if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
-        if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
-        return [1, '...', current - 1, current, current + 1, '...', total];
-    });
+const visiblePages = computed(() => {
+    const total = totalPages.value;
+    const current = currentPage.value;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 4) return [1, 2, 3, 4, 5, '...', total];
+    if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, '...', current - 1, current, current + 1, '...', total];
+});
 
-    const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
-    const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
+const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
+const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 
-    // Helpers
-    const formatEventType = (type) => type ? type.replace(/_/g, ' ') : ''
-    const formatString = (str) => str ? str.replace(/_/g, ' ') : ''
-    const formatJson = (val) => {
-        if (val === null) return 'null'
-        if (val === undefined) return 'undefined'
-        return typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)
+// Formatters
+const formatEventType = (type) => type ? type.replace(/_/g, ' ') : ''
+const formatString = (str) => str ? str.replace(/_/g, ' ') : ''
+const formatJson = (val) => {
+    if (val === null) return 'null'
+    if (val === undefined) return 'undefined'
+    return typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)
+}
+const getDataType = (val) => {
+    if (val === null || val === undefined) return 'primitive'
+    if (Array.isArray(val)) {
+        if (val.length > 0 && typeof val[0] === 'object' && val[0] !== null) return 'object_array'
+        return 'primitive_array'
     }
-    const getDataType = (val) => {
-        if (val === null || val === undefined) return 'primitive'
-        if (Array.isArray(val)) {
-            if (val.length > 0 && typeof val[0] === 'object' && val[0] !== null) return 'object_array'
-            return 'primitive_array'
-        }
-        if (typeof val === 'object') return 'object'
-        return 'primitive'
-    }
-    const formatTime = (timestamp) => {
-        if (!timestamp) return ''
-        const dateObj = new Date(timestamp)
-        const now = new Date()
+    if (typeof val === 'object') return 'object'
+    return 'primitive'
+}
+const formatTime = (timestamp) => {
+    if (!timestamp) return ''
+    const dateObj = new Date(timestamp)
+    const now = new Date()
 
-        const isToday = 
-            dateObj.getDate() === now.getDate() && 
-            dateObj.getMonth() === now.getMonth() && 
-            dateObj.getFullYear() === now.getFullYear()
+    const isToday = 
+        dateObj.getDate() === now.getDate() && 
+        dateObj.getMonth() === now.getMonth() && 
+        dateObj.getFullYear() === now.getFullYear()
 
-        if (isToday) {
-            return new Intl.DateTimeFormat('default', {
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit', 
-                hour12: false 
-            }).format(dateObj)
-        }
-
+    if (isToday) {
         return new Intl.DateTimeFormat('default', {
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit', 
-            second: '2-digit', 
-            hour12: false 
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
         }).format(dateObj)
     }
+
+    return new Intl.DateTimeFormat('default', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
+    }).format(dateObj)
+}
 </script>
 
 <template>
@@ -152,7 +143,7 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse dark:shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
                     <span class="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-zinc-400">Live</span>
                 </div>
-                <button v-show="!viewingArchive && events.length > 0" @click="$emit('archive-all')"
+                <button v-show="!viewingArchive && events.length > 0" @click="eventsStore.archiveAll()"
                         type="button"
                         aria-label="Archive all active events"
                         class="px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-700 dark:hover:text-amber-400 transition-colors border border-slate-200 dark:border-zinc-700 hover:border-amber-300 dark:hover:border-amber-800/50 shadow-sm">
@@ -237,7 +228,7 @@
                             <td class="px-5 py-3 text-sm text-right text-slate-500 dark:text-zinc-500 mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-200 dark:border-zinc-800/50'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             
                             <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-slate-200 dark:border-zinc-800/50'">
-                                <button @click.stop="$emit('archive-event', event.id)"                                    type="button"
+                                <button @click.stop="eventsStore.archiveEvent(event.id)"                                    type="button"
                                     aria-label="Archive this event"                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md bg-white dark:bg-[#1f1f22] border border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-300 dark:hover:border-amber-700/50 hover:text-amber-600 dark:hover:text-amber-400 transition-all duration-200 shadow-sm active:scale-95"
                                         title="Archive Event">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -348,6 +339,5 @@
                 </div>
             </div>
         </div>
-
     </div>
 </template>

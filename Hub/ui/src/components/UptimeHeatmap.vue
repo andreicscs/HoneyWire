@@ -1,28 +1,21 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useFleetStore } from '../stores/fleet'
 
-const props = defineProps({
-    uptimeData: { type: Array, required: true },
-    overallUptime: { type: String, required: true },
-    activeTimeframe: { type: String, required: true },
-    fleet: { type: Array, required: true },
-    selectedNode: { type: String, default: null },
-    selectedSensor: { type: String, default: null }
-})
-
-const emit = defineEmits(['update:timeframe', 'select-sensor', 'select-node', 'toggle-silence', 'forget-sensor'])
+const fleetStore = useFleetStore()
+const { sensors: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const canScrollDown = ref(false)
 
-// activeMenu now uses a composite string "nodeId|sensorId"
 const activeMenu = ref(null)
 const menuPos = ref({ top: '0px', left: '0px' })
 
 const activeSensorData = computed(() => {
     if (!activeMenu.value) return null
     const [nId, sId] = activeMenu.value.split('|')
-    return props.fleet.find(s => s.node_id === nId && s.sensor_id === sId)
+    return fleet.value.find(s => s.node_id === nId && s.sensor_id === sId)
 })
 
 const toggleMenu = (e, nodeId, sensorId) => {
@@ -37,12 +30,12 @@ const toggleMenu = (e, nodeId, sensorId) => {
 }
 
 const handleSilence = (nodeId, sensorId) => {
-    emit('toggle-silence', nodeId, sensorId)
+    fleetStore.toggleSilence(nodeId, sensorId)
     activeMenu.value = null
 }
 
 const handleForget = (nodeId, sensorId) => {
-    emit('forget-sensor', nodeId, sensorId)
+    fleetStore.forgetSensor(nodeId, sensorId)
     activeMenu.value = null
 }
 
@@ -61,14 +54,14 @@ const scrollToBottom = () => {
 }
 
 const isSilenced = (nodeId, sensorId) => {
-    const sensor = props.fleet.find(f => f.node_id === nodeId && f.sensor_id === sensorId)
+    const sensor = fleet.value.find(f => f.node_id === nodeId && f.sensor_id === sensorId)
     return sensor ? sensor.is_silenced : false
 }
 
 const groupedUptime = computed(() => {
     const groupsMap = new Map();
     
-    props.uptimeData.forEach(sensor => {
+    uptimeData.value.forEach(sensor => {
         const nId = sensor.node_id || 'unassigned';
         if (!groupsMap.has(nId)) {
             groupsMap.set(nId, { nodeId: nId, sensors: [] });
@@ -87,17 +80,16 @@ const groupedUptime = computed(() => {
     return groups;
 });
 
-watch(() => props.selectedSensor, (newVal) => {
-    // If we have a selected node and sensor, scroll to it uniquely
-    if (newVal && props.selectedNode) {
+watch(selectedSensor, (newVal) => {
+    if (newVal && selectedNode.value) {
         nextTick(() => {
-            const el = document.getElementById(`row-${props.selectedNode}-${newVal}`)
+            const el = document.getElementById(`row-${selectedNode.value}-${newVal}`)
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
         })
     }
 })
 
-watch(() => props.selectedNode, (newVal) => {
+watch(selectedNode, (newVal) => {
     if (newVal) {
         nextTick(() => {
             const el = document.getElementById(`group-${newVal}`)
@@ -106,7 +98,7 @@ watch(() => props.selectedNode, (newVal) => {
     }
 })
 
-watch(() => props.uptimeData, () => nextTick(checkScroll), { deep: true })
+watch(uptimeData, () => nextTick(checkScroll), { deep: true })
 
 onMounted(() => { 
     nextTick(checkScroll)
@@ -139,7 +131,7 @@ onUnmounted(() => {
             
             <div class="flex bg-slate-50 border border-slate-100 dark:border-transparent dark:bg-zinc-800 p-0.5 rounded-md text-[11px] font-medium text-slate-500 dark:text-zinc-400">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
-                        @click="$emit('update:timeframe', time)"
+                        @click="fleetStore.activeTimeframe = time"
                         class="px-2.5 py-1 rounded transition-colors"
                         :class="activeTimeframe === time ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm border border-slate-200 dark:border-transparent' : 'hover:text-slate-700 dark:hover:text-zinc-200'">
                     {{ time }}
@@ -154,16 +146,14 @@ onUnmounted(() => {
                 <div v-for="group in groupedUptime" :key="group.nodeId" :id="'group-' + group.nodeId"
                      class="transition-all duration-300 rounded-lg p-1 mb-1.5 border"
                      :class="{
-                         /* Highlight ONLY if Node is selected and NO specific sensor is selected */
                          'border-slate-300 dark:border-zinc-600 bg-slate-50/50 dark:bg-white/5': selectedNode === group.nodeId && !selectedSensor,
                          'border-transparent': selectedNode !== group.nodeId || selectedSensor,
-                         /* Dim if ANY node/sensor is selected, but it belongs to a different node */
-                         'opacity-30 grayscale-[40%]': (selectedNode || selectedSensor) && selectedNode !== group.nodeId
+                         'opacity-50 grayscale-[40%]': (selectedNode || selectedSensor) && selectedNode !== group.nodeId
                      }">
                      
                     <div class="px-1 mb-1 flex items-center gap-2 group/header"
                         :class="group.nodeId !== 'unassigned' ? 'cursor-pointer' : ''"
-                        @click="group.nodeId !== 'unassigned' ? ((selectedNode === group.nodeId && !selectedSensor) ? $emit('select-node', null) : $emit('select-node', group.nodeId)) : null">
+                        @click="group.nodeId !== 'unassigned' ? fleetStore.selectTarget(group.nodeId) : null">
                                             
                         <span class="text-[8.5px] uppercase tracking-wider font-bold transition-colors"
                               :class="group.nodeId !== 'unassigned' ? 'text-slate-400 dark:text-zinc-500 group-hover/header:text-slate-700 dark:group-hover/header:text-zinc-300' : 'text-slate-400 dark:text-zinc-500'">
@@ -177,9 +167,7 @@ onUnmounted(() => {
                     <div v-for="sensor in group.sensors" :key="sensor.node_id + '-' + sensor.id" :id="'row-' + sensor.node_id + '-' + sensor.id" 
                          class="flex items-center w-full transition-all duration-300 px-2 py-0.5 mt-px rounded-md border"
                          :class="{
-                             /* Dim sensors if a specific sensor is selected, and this is NOT it */
-                             'opacity-30 grayscale-[40%]': selectedSensor && (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
-                             /* Highlight ONLY this exact sensor on this exact node */
+                             'opacity-50 grayscale-[40%]': selectedSensor && (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
                              'bg-slate-100 dark:bg-zinc-800 border-slate-300 dark:border-zinc-500 shadow-sm': selectedSensor === sensor.id && selectedNode === sensor.node_id,
                              'border-transparent': !selectedSensor || (selectedSensor !== sensor.id || selectedNode !== sensor.node_id)
                          }">
@@ -198,7 +186,7 @@ onUnmounted(() => {
 
                             <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="sensor.isOnline ? 'bg-emerald-500' : 'bg-rose-500'"></span>
                             
-                            <button @click="(selectedSensor === sensor.id && selectedNode === sensor.node_id) ? $emit('select-sensor', null, null) : $emit('select-sensor', sensor.id, sensor.node_id)"
+                            <button @click="fleetStore.selectTarget(sensor.node_id, sensor.id)"
                                 class="text-[11px] mono text-left transition-colors cursor-pointer px-1 py-0.5 rounded-md flex items-center gap-1.5 max-w-[calc(100%-28px)]"
                                 :class="selectedSensor === sensor.id && selectedNode === sensor.node_id ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-600 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-200'"
                                 :title="`Node: ${sensor.node_id || 'Unassigned'}`">

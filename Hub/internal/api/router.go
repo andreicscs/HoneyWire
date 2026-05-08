@@ -88,6 +88,7 @@ func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionS
 	// Therefore, auth is checked inside the handler immediately AFTER the JSON is parsed.
 	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
 	r.Post("/api/v1/event", h.ReceiveEvent)
+	r.Post("/api/v1/compose/generate", h.GenerateCompose) // Dual Auth, both UI sessions and Nodes can generate compose files, so auth is checked inside the handler after JSON parsing.
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

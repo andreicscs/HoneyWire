@@ -1,11 +1,25 @@
 <script setup>
-defineProps({
-    currentView: String,
-    isArmed: Boolean,
-    unreadCount: Number
-})
+import { storeToRefs } from 'pinia'
+import { useAppStore } from '../stores/app'
+import { useEventsStore } from '../stores/events'
 
-defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
+const appStore = useAppStore()
+const eventsStore = useEventsStore()
+
+const { currentView, isArmed } = storeToRefs(appStore)
+const { unreadCount } = storeToRefs(eventsStore)
+
+// Keep local toggle theme if you want, or move to appStore.
+const toggleTheme = () => {
+    const html = document.documentElement
+    if (html.classList.contains('dark')) {
+        html.classList.remove('dark')
+        localStorage.setItem('theme', 'light')
+    } else {
+        html.classList.add('dark')
+        localStorage.setItem('theme', 'dark')
+    }
+}
 </script>
 
 <template>
@@ -36,7 +50,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
         </div>
         
         <div class="flex items-center gap-3">
-            <button v-show="unreadCount > 0" @click="$emit('mark-all-read')"
+            <button v-show="unreadCount > 0" @click="eventsStore.markAllRead()"
                     type="button"
                     aria-label="Mark all events as read"
                     class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-semibold mr-1 border border-rose-200 dark:border-rose-800/30">
@@ -44,7 +58,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
                 <span>{{ unreadCount }} Unread</span>
             </button>
 
-            <button @click="$emit('toggle-armed')" 
+            <button @click="appStore.toggleArmed()" 
                     type="button"
                     :aria-label="isArmed ? 'Disarm system' : 'Arm system'"
                     class="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border"
@@ -52,7 +66,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
                 <span>{{ isArmed ? 'Armed' : 'Passive' }}</span>
             </button>
 
-            <button @click="$emit('toggle-theme')" 
+            <button @click="appStore.toggleTheme()" 
                     type="button"
                     aria-label="Toggle light and dark theme"
                     class="w-8 h-8 rounded-md bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 transition-colors flex items-center justify-center group overflow-hidden">
@@ -65,7 +79,7 @@ defineEmits(['toggle-theme', 'toggle-armed', 'mark-all-read', 'logout'])
             </button>
             
             <div class="w-px h-4 bg-slate-300 dark:bg-zinc-700 mx-1"></div>
-            <button @click="$emit('logout')" 
+            <button @click="appStore.logout()" 
                     type="button"
                     aria-label="Logout and exit the system"
                     class="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">Exit</button>

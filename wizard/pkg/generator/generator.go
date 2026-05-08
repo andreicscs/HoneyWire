@@ -1,6 +1,10 @@
 package generator
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
 	"bufio"
 	"fmt"
 	"os"
@@ -8,9 +12,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/honeywire/wizard/pkg/autodiscovery"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -24,6 +28,20 @@ const (
 const DeployDir = "/opt/honeywire/sensors"
 const ComposeFile = "honeywire-compose.yml"
 const ProjectName = "honeywire"
+
+// Match the Hub payload
+type DeployableSensor struct {
+	SensorID  string                 `json:"sensor_id"`
+	EnvValues map[string]string      `json:"env_values"`
+	Manifest  map[string]interface{} `json:"manifest"` 
+}
+
+type ComposeReq struct {
+	NodeID      string             `json:"node_id"`
+	HubEndpoint string             `json:"hub_endpoint"`
+	HubKey      string             `json:"hub_key"`
+	Sensors     []DeployableSensor `json:"sensors"`
+}
 
 // DockerCompose represents the structure of a modern Compose file.
 // Note: 'Version' is intentionally omitted as it is obsolete in Compose V2.
@@ -169,59 +187,56 @@ func handleMissingDocker() ([]string, error) {
 
 // --- CORE ACTIONS ---
 
-// Apply writes the compartmentalized compose file and spins the containers up.
-func Apply(recs []*autodiscovery.Recommendation) error {
+// Apply fetches the compartmentalized compose file, modifies it with it's environment based generated values, and spins the containers up.
+func Apply(recs []*autodiscovery.Recommendation, nodeID, hubURL, nodeKey string) error {
 	cmdBase, err := GetDockerCommand()
 	if err != nil {
 		return err
 	}
 
-	compose := DockerCompose{
-		Services: make(map[string]Service),
+	payload := ComposeReq{
+		NodeID:      nodeID,
+		HubEndpoint: hubURL,
+		HubKey:      nodeKey,
+		Sensors:     []DeployableSensor{},
 	}
 
 	for _, rec := range recs {
-		svc := Service{
-			Image:         rec.DeploymentTemplate.Image,
-			ContainerName: rec.SensorID,
-			Restart:       "unless-stopped",
-			NetworkMode:   rec.DeploymentTemplate.NetworkMode,
-			CapAdd:        rec.DeploymentTemplate.CapAdd,
-		}
+		manifestMap := make(map[string]interface{})
+		manifestBytes, _ := json.Marshal(rec.Manifest)
+		json.Unmarshal(manifestBytes, &manifestMap)
 
+		envVals := make(map[string]string)
 		for _, env := range rec.DeploymentTemplate.EnvVars {
-			val := strings.TrimSpace(env.Default)
-			if val != "" {
-				svc.Environment = append(svc.Environment, fmt.Sprintf("%s=%s", env.Name, val))
-			}
+			envVals[env.Name] = env.Default // Use default as starting point
 		}
 
-		for _, vol := range rec.DeploymentTemplate.VolumeMounts {
-			mount := fmt.Sprintf("%s:%s", vol.Source, vol.Target)
-			if vol.ReadOnly {
-				mount += ":ro"
-			}
-			svc.Volumes = append(svc.Volumes, mount)
-		}
-
-		if svc.NetworkMode != "host" {
-			for _, p := range rec.DeploymentTemplate.PortAssignments {
-				svc.Ports = append(svc.Ports, fmt.Sprintf("%d:%d", p.Default, p.Default))
-			}
-		}
-
-		compose.Services[rec.SensorID] = svc
+		payload.Sensors = append(payload.Sensors, DeployableSensor{
+			SensorID:  rec.SensorID,
+			EnvValues: envVals,
+			Manifest:  manifestMap,
+		})
 	}
 
-	yamlData, err := yaml.Marshal(&compose)
-	if err != nil {
-		return fmt.Errorf("failed to marshal compose data: %w", err)
+	bodyBytes, _ := json.Marshal(payload)
+	endpoint := strings.TrimRight(hubURL, "/") + "/api/v1/compose/generate"
+	
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+nodeKey) // Inject Node Auth
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to compile deployment script from hub (Status %d): %v", resp.StatusCode, err)
 	}
+	defer resp.Body.Close()
+
+	yamlData, _ := io.ReadAll(resp.Body)
 
 	if err := os.MkdirAll(DeployDir, 0750); err != nil {
 		return fmt.Errorf("failed to create deployment directory: %w", err)
 	}
-
 	composePath := filepath.Join(DeployDir, ComposeFile)
 	if err := os.WriteFile(composePath, yamlData, 0600); err != nil {
 		return fmt.Errorf("failed to write %s: %w", ComposeFile, err)
