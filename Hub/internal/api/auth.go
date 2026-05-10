@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
+
 	"github.com/honeywire/hub/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,23 +18,18 @@ type loginState struct {
 	lockedUntil time.Time
 }
 
-var (
-	authTracker = make(map[string]*loginState)
-	authMutex   sync.Mutex
-)
-
 // Background routine to prevent memory leaks from abandoned IPs
 func (h *Handler) cleanupAuthTracker() {
 	for {
 		time.Sleep(5 * time.Minute)
-		authMutex.Lock()
+		h.authMutex.Lock()
 		now := time.Now()
-		for ip, state := range authTracker {
+		for ip, state := range h.authTracker {
 			if now.After(state.lockedUntil) {
-				delete(authTracker, ip)
+				delete(h.authTracker, ip)
 			}
 		}
-		authMutex.Unlock()
+		h.authMutex.Unlock()
 	}
 }
 
@@ -42,26 +37,26 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	ip := h.getRealIP(r)
 
 	// Rate Limiter Pre-Check
-	authMutex.Lock()
-	if state, exists := authTracker[ip]; exists {
+	h.authMutex.Lock()
+	if state, exists := h.authTracker[ip]; exists {
 		if state.attempts >= 10 {
 			if time.Now().Before(state.lockedUntil) {
-				authMutex.Unlock()
-				http.Error(w, "Too many failed attempts. Try again later.", http.StatusTooManyRequests)
+				h.authMutex.Unlock()
+				RespondError(w, "Too many failed attempts. Try again later.", http.StatusTooManyRequests)
 				return
 			}
 			// Lockout expired, wipe the slate clean
-			delete(authTracker, ip)
+			delete(h.authTracker, ip)
 		}
 	}
-	authMutex.Unlock()
+	h.authMutex.Unlock()
 
 	// Parse Request
 	var req struct {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		RespondError(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
@@ -73,8 +68,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		isAuthorized = subtle.ConstantTimeCompare([]byte(req.Password), []byte(h.Cfg.DashboardPassword)) == 1
 	} else {
 		// Layer B: Runtime Database Hash (Setup UI)
-		var dbHash string
-		err := h.Store.DB.QueryRow("SELECT value FROM config WHERE key='admin_hash'").Scan(&dbHash)
+		dbHash, err := h.Store.GetConfigValue("admin_hash")
 		if err == nil {
 			err = bcrypt.CompareHashAndPassword([]byte(dbHash), []byte(req.Password))
 			isAuthorized = (err == nil)
@@ -83,13 +77,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if isAuthorized {
 		// Clear failed attempts for this IP on successful login
-		authMutex.Lock()
-		delete(authTracker, ip)
-		authMutex.Unlock()
+		h.authMutex.Lock()
+		delete(h.authTracker, ip)
+		h.authMutex.Unlock()
 
 		token, err := h.SessionStore.Create()
 		if err != nil {
-			http.Error(w, "Session creation failed", http.StatusInternalServerError)
+			RespondError(w, "Session creation failed", http.StatusInternalServerError)
 			return
 		}
 
@@ -109,19 +103,19 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle Failure & Increment Rate Limiter
-	authMutex.Lock()
-	if _, exists := authTracker[ip]; !exists {
-		authTracker[ip] = &loginState{}
+	h.authMutex.Lock()
+	if _, exists := h.authTracker[ip]; !exists {
+		h.authTracker[ip] = &loginState{}
 	}
-	authTracker[ip].attempts++
-	
-	if authTracker[ip].attempts >= 10 {
-		authTracker[ip].lockedUntil = time.Now().Add(15 * time.Minute)
+	h.authTracker[ip].attempts++
+
+	if h.authTracker[ip].attempts >= 10 {
+		h.authTracker[ip].lockedUntil = time.Now().Add(15 * time.Minute)
 		log.Printf("[!] AUDIT: IP %s locked out of dashboard for 15 minutes due to brute-force", ip)
 	}
-	authMutex.Unlock()
+	h.authMutex.Unlock()
 
-	http.Error(w, "Invalid Password", http.StatusUnauthorized)
+	RespondError(w, "Invalid Password", http.StatusUnauthorized)
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -143,12 +137,11 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // --- Per-Node Authentication ---
 // nodeAuthCache stores per-node keys in memory for fast validation
 // Key: node_id, Value: node_key (64-char hex string)
-var nodeAuthCache sync.Map
 
 // validateNodeAuth checks if a request is authenticated for a given node
 // Extracts Bearer token from Authorization header and compares against node_key
 func (h *Handler) validateNodeAuth(r *http.Request, nodeID string) bool {
-    authHeader := r.Header.Get("Authorization")
+	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return false
 	}
@@ -161,19 +154,18 @@ func (h *Handler) validateNodeAuth(r *http.Request, nodeID string) bool {
 	token := parts[1]
 
 	// Check cache first
-	if cachedKey, ok := nodeAuthCache.Load(nodeID); ok {
+	if cachedKey, ok := h.nodeAuthCache.Load(nodeID); ok {
 		return subtle.ConstantTimeCompare([]byte(token), []byte(cachedKey.(string))) == 1
 	}
 
 	// Cache miss - query database
-	var nodeKey string
-	err := h.Store.DB.QueryRow("SELECT node_key FROM nodes WHERE node_id = ?", nodeID).Scan(&nodeKey)
+	nodeKey, err := h.Store.GetNodeKey(nodeID)
 	if err != nil {
 		return false
 	}
 
 	// Cache the key for future requests
-	nodeAuthCache.Store(nodeID, nodeKey)
+	h.nodeAuthCache.Store(nodeID, nodeKey)
 
 	// Validate token
 	return subtle.ConstantTimeCompare([]byte(token), []byte(nodeKey)) == 1
@@ -181,6 +173,6 @@ func (h *Handler) validateNodeAuth(r *http.Request, nodeID string) bool {
 
 // invalidateNodeCache removes a node from the auth cache
 // Called after node deletion or key rotation
-func invalidateNodeCache(nodeID string) {
-	nodeAuthCache.Delete(nodeID)
+func (h *Handler) invalidateNodeCache(nodeID string) {
+	h.nodeAuthCache.Delete(nodeID)
 }

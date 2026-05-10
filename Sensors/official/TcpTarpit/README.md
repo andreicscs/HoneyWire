@@ -17,7 +17,7 @@ All configuration is handled via Environment Variables. Copy the `.env.example` 
 | Variable | Description | Example |
 |---|---|---|
 | `HW_HUB_ENDPOINT` | The URL of your central HoneyWire Hub. | `http://127.0.0.1:8080` |
-| `HW_HUB_KEY` | The shared secret API key to authenticate with the Hub. | `super_secret_key_123` |
+| `HW_HUB_KEY` | The Node Key to authenticate with the Hub. | `super_secret_key_123` |
 | `HW_SENSOR_ID` | A unique identifier for this specific trap. | `ssh-tarpit-01` |
 | `HW_SEVERITY` | Alert severity sent to the Hub (`info` to `critical`). | `high` |
 

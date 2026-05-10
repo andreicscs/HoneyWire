@@ -29,7 +29,7 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 	})
 }
 
-func SetupRouter(cfg *config.Config, s *store.Store, sessionStore *auth.SessionStore) *chi.Mux {
+func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.SessionStore) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(ErrorOnlyLogger)

@@ -54,7 +54,7 @@ To keep the ecosystem stable, all community-submitted sensors must adhere to a s
 ### The Golden Rules of Sensors
 1. **Strict Sandboxing (Docker Only):** Every sensor must include a `Dockerfile`. We strongly enforce the use of minimal, hardened base images (like Distroless) running as non-root users (`UID 65532`) with all Linux kernel capabilities dropped (`cap_drop: ALL`).
 2. **Zero Blast Radius:** Your sensor must not crash or overwhelm the main Hub. All communication must happen asynchronously via HTTP POST requests containing JSON.
-3. **No Hardcoding:** All configurations (Ports, API keys, file paths, thresholds) must be handled dynamically via environment variables.
+3. **No Hardcoding:** All configurations (Ports, Node keys, file paths, thresholds) must be handled dynamically via environment variables.
 
 ### How to Submit
 1. **Use the Official Template:** Copy the [`Sensors/templates/go-sensor-template/`](./Sensors/templates/go-sensor-template/) folder and rename it to your sensor's name inside the [`Sensors/community/`](./Sensors/community/) directory. 

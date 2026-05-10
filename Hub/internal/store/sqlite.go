@@ -81,12 +81,12 @@ CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket)
 CREATE INDEX IF NOT EXISTS idx_pairing_tokens_expires ON pairing_tokens(expires_at);
 `
 
-type Store struct {
+type SQLiteStore struct {
 	DB *sql.DB
 }
 
 // NewStore initializes the SQLite database with the v2.0.0 schema
-func NewStore(dbPath string) (*Store, error) {
+func NewStore(dbPath string) (*SQLiteStore, error) {
 	// Enable WAL mode, set a 5-second busy timeout to prevent locking, and enable Foreign Keys
 	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)", dbPath)
 	
@@ -110,7 +110,7 @@ func NewStore(dbPath string) (*Store, error) {
 	}
 
 	log.Println("[DB] Database v2.0.0 initialized successfully in WAL mode.")
-	return &Store{DB: db}, nil
+	return &SQLiteStore{DB: db}, nil
 }
 
 func InitializeDefaultConfig(db *sql.DB) error {

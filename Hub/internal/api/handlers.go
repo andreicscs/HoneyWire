@@ -21,26 +21,34 @@ var upgrader = websocket.Upgrader{
 }
 
 type Handler struct {
-	Store        *store.Store
+	Store        *store.SQLiteStore
 	Cfg          *config.Config
 	SessionStore *auth.SessionStore
 
-	clients   map[*websocket.Conn]bool
-	clientsMu sync.Mutex
+	clients       map[*websocket.Conn]bool
+	clientsMu     sync.Mutex
+	authTracker   map[string]*loginState
+	authMutex     sync.Mutex
+	nodeAuthCache sync.Map
 }
 
-func NewHandler(s *store.Store, cfg *config.Config, sess *auth.SessionStore) *Handler {
+func NewHandler(s *store.SQLiteStore, cfg *config.Config, sess *auth.SessionStore) *Handler {
 	h := &Handler{
 		Store:        s,
 		Cfg:          cfg,
 		SessionStore: sess,
 		clients:      make(map[*websocket.Conn]bool),
+		authTracker:  make(map[string]*loginState),
 	}
 	go h.cleanupAuthTracker()
 	return h
 }
 
 // --- Helpers ---
+
+func RespondError(w http.ResponseWriter, message string, code int) {
+	SendJSON(w, code, map[string]string{"error": message})
+}
 
 func SendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

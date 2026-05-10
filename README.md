@@ -64,6 +64,7 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
   "event_trigger": "malformed_jwt_detected",
   "source": "104.28.19.12",
   "target": "Auth Gateway",
+  "node_id": "node-12345678",
   "sensor_id": "core-dpi-engine",  
   "details": {
     "protocol": "TCP",
@@ -82,7 +83,7 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 ## Features
 
 - **The Sentinel Hub UI:** A fully responsive, Vue 3-powered dashboard featuring Dark/Light mode, live WebSocket event streaming, and dynamic forensic payload inspection.
-- **In-Browser Configuration:** Manage Master Passwords, Hub API Keys, Data Retention policies, and Webhooks directly from the UI. No need to touch `.env` files or restart containers to update alert targets.
+- **In-Browser Configuration:** Manage Master Passwords, Node Keys, Data Retention policies, and Webhooks directly from the UI. No need to touch `.env` files or restart containers to update alert targets.
 - **Universal Push Notifications:** Native, zero-dependency integration for routing critical alerts to **Discord, Slack, Ntfy, and Gotify**.
 - **Enterprise SIEM Integration:** Native RFC 3164 Syslog forwarding (TCP/UDP) for seamlessly pushing structured telemetry to Splunk, Elastic, Wazuh, or Vector.
 - **Suite of Official Sensors:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
@@ -147,11 +148,11 @@ docker compose up -d
 Navigate to `http://<your-server-ip>:8080` in your browser. You will be greeted by the **Initialize Sentinel** screen.
 1. Create your Master Password.
 2. Verify your Hub Endpoint URL (the IP/URL where sensors will reach the Hub).
-3. Generate your secure Sensor Secret Key.
+3. Provision a Node and generate its secure Node Key.
 4. Click "Initialize Hub".
 
 ### 3. Deploy Sensors
-Inside the Dashboard, navigate to the **Sensor Store**. Click on any sensor (e.g., the TCP Tarpit) to view its documentation. The Hub will automatically generate a ready-to-use `docker-compose.yml` script pre-filled with your Hub's IP and API Key. Copy that script, drop it on your target machine, and run `docker compose up -d`!
+Inside the Dashboard, navigate to the **Sensor Store**. Click on any sensor (e.g., the TCP Tarpit) to view its documentation. The Hub will automatically generate a ready-to-use `docker-compose.yml` script pre-filled with your Hub\'s IP and Node Key. Copy that script, drop it on your target machine, and run `docker compose up -d`!
 
 
 ### 4. Testing the Trap
@@ -176,11 +177,11 @@ nc localhost 2222
 ---
 
 ## Security Notes
-* **API Secret:** Ensure your `Hub Secret Key` is strong and identical on both the Hub and the Sensors. The Hub will reject any payloads with mismatched keys.
+* **Node Keys:** Ensure your sensors use their unique `Node Key` to communicate with the Hub. The Hub will reject any payloads with mismatched or invalid keys.
 * **System Arming:** You can toggle the "System Armed" button in the Hub UI to temporarily disable push notifications while doing internal network maintenance or vulnerability scanning.
 * **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. We follow the principle of least privilege to make sure that if a container is compromised, the blast is contained.
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
-* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your `Hub Secret Key` and Dashboard password to network sniffing.
+* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your Dashboard password and Node Keys to network sniffing.
 
 
 ## Tech Stack
@@ -201,6 +202,7 @@ nc localhost 2222
 
 ## Operational Checklist
 - [x] Complete the Web UI Initial Setup to set the Master Password.
-- [x] Retrieve the generated `Hub Secret Key` from Settings and apply it to your sensors.
+- [x] Provision a Node and retrieve the generated `Node Key` to apply it to your sensors.
 - [x] Configure your push notification webhooks via the Settings UI.
-- [x] Rebuild/redeploy containers after any version bump in `VERSION` or environment variable changes.
+
+- [x] Rebuild/redeploy containers after any version bump in `VERSION` or e

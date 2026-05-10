@@ -17,21 +17,17 @@ func (h *Handler) GenerateToken(w http.ResponseWriter, r *http.Request) {
 	// Generate a random 32-character hex token
 	tokenBytes := make([]byte, 16)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		http.Error(w, "Token generation failed", http.StatusInternalServerError)
+		RespondError(w, "Token generation failed", http.StatusInternalServerError)
 		return
 	}
 	token := hex.EncodeToString(tokenBytes)
 
 	// Token expires in 15 minutes
-	expiresAt := time.Now().Add(15 * time.Minute)
+	now := time.Now()
+	expiresAt := now.Add(15 * time.Minute)
 
-	// Insert into pairing_tokens table
-	_, err := h.Store.DB.Exec(
-		"INSERT INTO pairing_tokens (token, expires_at, created_at) VALUES (?, ?, ?)",
-		token, expiresAt.Format(time.RFC3339), time.Now().Format(time.RFC3339),
-	)
-	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+	if err := h.Store.InsertPairingToken(token, expiresAt, now); err != nil {
+		RespondError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
@@ -49,34 +45,27 @@ func (h *Handler) WizardLink(w http.ResponseWriter, r *http.Request) {
 		Alias string `json:"alias"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		RespondError(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
 	if req.Token == "" {
-		http.Error(w, "Token is required", http.StatusBadRequest)
+		RespondError(w, "Token is required", http.StatusBadRequest)
 		return
 	}
 
 	// Validate token exists and is not expired
-	var createdAt string
-	err := h.Store.DB.QueryRow(
-		"SELECT created_at FROM pairing_tokens WHERE token = ? AND expires_at > datetime('now')",
-		req.Token,
-	).Scan(&createdAt)
-	if err != nil {
-		http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+	isValid, err := h.Store.ValidatePairingToken(req.Token)
+	if err != nil || !isValid {
+		RespondError(w, "Invalid or expired token", http.StatusUnauthorized)
 		return
 	}
-
-	// Delete token immediately (single-use)
-	h.Store.DB.Exec("DELETE FROM pairing_tokens WHERE token = ?", req.Token)
 
 	// Generate node credentials
 	nodeID := uuid.New().String()
 	nodeKeyBytes := make([]byte, 32)
 	if _, err := rand.Read(nodeKeyBytes); err != nil {
-		http.Error(w, "Node key generation failed", http.StatusInternalServerError)
+		RespondError(w, "Node key generation failed", http.StatusInternalServerError)
 		return
 	}
 	nodeKey := hex.EncodeToString(nodeKeyBytes)
@@ -90,12 +79,8 @@ func (h *Handler) WizardLink(w http.ResponseWriter, r *http.Request) {
 
 	// Insert new node
 	now := time.Now().Format(time.RFC3339)
-	_, err = h.Store.DB.Exec(
-		"INSERT INTO nodes (node_id, alias, node_key, ip_address, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)",
-		nodeID, req.Alias, nodeKey, clientIP, now, now,
-	)
-	if err != nil {
-		http.Error(w, "Failed to create node", http.StatusInternalServerError)
+	if err := h.Store.CreateNode(nodeID, req.Alias, nodeKey, clientIP, now); err != nil {
+		RespondError(w, "Failed to create node", http.StatusInternalServerError)
 		return
 	}
 

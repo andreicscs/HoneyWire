@@ -138,7 +138,7 @@ func (s *Sensor) sendHeartbeat() {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		log.Printf("[-] Hub rejected heartbeat (HTTP %d). Check API keys or Node status.", resp.StatusCode)
+		log.Printf("[-] Hub rejected heartbeat (HTTP %d). Check Node Keys or Node status.", resp.StatusCode)
 	}
 }
 

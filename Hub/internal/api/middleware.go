@@ -25,11 +25,10 @@ func UIAuthMiddleware(sessionStore *auth.SessionStore) func(http.Handler) http.H
 }
 
 // AgentAuthMiddleware securely validates sensor heartbeats/events against the DB Config
-func AgentAuthMiddleware(s *store.Store) func(http.Handler) http.Handler {
+func AgentAuthMiddleware(s *store.SQLiteStore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var configuredKey string
-			err := s.DB.QueryRow("SELECT value FROM config WHERE key='hub_key'").Scan(&configuredKey)
+			configuredKey, err := s.GetConfigValue("hub_key")
 			if err != nil || configuredKey == "" {
 				http.Error(w, "Hub is not fully configured.", http.StatusServiceUnavailable)
 				return

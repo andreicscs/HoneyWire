@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -18,19 +17,19 @@ import (
 func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	var e models.Event
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		RespondError(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
 	if e.NodeID == "" || e.SensorID == "" {
-		http.Error(w, "node_id and sensor_id are required", http.StatusBadRequest)
+		RespondError(w, "node_id and sensor_id are required", http.StatusBadRequest)
 		return
 	}
 
 	// Per-node authentication
 	if !h.validateNodeAuth(r, e.NodeID) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -38,7 +37,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	hubMajor := strings.Split(h.Cfg.Version, ".")[0]
 	agentMajor := strings.Split(e.ContractVersion, ".")[0]
 	if agentMajor == "" || hubMajor != agentMajor {
-		http.Error(w, "Upgrade Required", http.StatusUpgradeRequired)
+		RespondError(w, "Upgrade Required", http.StatusUpgradeRequired)
 		return
 	}
 
@@ -46,41 +45,28 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	detailsJSON, _ := json.Marshal(e.Details)
 
 	// Insert event with composite key reference (node_id, sensor_id)
-	result, err := h.Store.DB.Exec(`
-		INSERT INTO events (node_id, sensor_id, timestamp, contract_version, event_trigger, severity, source, target, details, is_read, is_archived)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		e.NodeID, e.SensorID, nowStr, e.ContractVersion, e.EventTrigger, e.Severity, e.Source, e.Target, string(detailsJSON),
-	)
+	lastInsertID, err := h.Store.InsertEvent(&e, nowStr, string(detailsJSON))
 	if err != nil {
 		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	lastInsertID, _ := result.LastInsertId()
-	e.ID = int(lastInsertID)
+	e.ID = lastInsertID
 	e.Timestamp = nowStr
 
 	// Update node last_seen
-	_, err = h.Store.DB.Exec(`
-		UPDATE nodes SET last_seen = ? WHERE node_id = ?`,
-		nowStr, e.NodeID,
-	)
-	if err != nil {
+	if err := h.Store.UpdateNodeLastSeen(e.NodeID, nowStr); err != nil {
 		log.Printf("[WARNING] Failed to update node %s last_seen: %v", e.NodeID, err)
 	}
 
 	// Check if sensor is silenced
-	var isSilencedInt int
-	err = h.Store.DB.QueryRow(
-		"SELECT is_silenced FROM sensors WHERE node_id = ? AND sensor_id = ?",
-		e.NodeID, e.SensorID,
-	).Scan(&isSilencedInt)
-	if err != nil && err != sql.ErrNoRows {
+	isSilenced, err := h.Store.IsSensorSilenced(e.NodeID, e.SensorID)
+	if err != nil {
 		log.Printf("[WARNING] Failed to check silence status for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
 	}
 
-	if isSilencedInt == 0 {
+	if !isSilenced {
 		title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
 		message := fmt.Sprintf("Trigger: %s\nSource: %s\nTarget: %s", e.EventTrigger, e.Source, e.Target)
 		notify.Dispatch(title, message, e.Severity)
@@ -104,65 +90,20 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		isArchived = 1
 	}
 
-	query := "SELECT id, timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
-	args := []interface{}{isArchived}
+	nodeID := r.URL.Query().Get("node_id")
+	sensorID := r.URL.Query().Get("sensor_id")
 
-	// Apply Node Filter if present
-	if nodeID := r.URL.Query().Get("node_id"); nodeID != "" {
-        query += " AND node_id = ?"
-        args = append(args, nodeID)
-    }
-
-    // Apply Sensor Filter if present (Works WITH node_id now!)
-    if sensorID := r.URL.Query().Get("sensor_id"); sensorID != "" {
-        query += " AND sensor_id = ?"
-        args = append(args, sensorID)
-    }
-
-	query += " ORDER BY id DESC"
-
-	rows, err := h.Store.DB.Query(query, args...)
+	events, err := h.Store.GetEvents(isArchived, nodeID, sensorID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	defer rows.Close()
-
-	var events []models.Event
-	for rows.Next() {
-		var e models.Event
-		var detailsStr string
-		var isReadInt, isArchivedInt int
-		var dbNodeID *string // Use pointer to handle SQL NULL safely
-
-		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID, &dbNodeID,
-			&e.EventTrigger, &e.Severity, &e.Source, &e.Target,
-			&detailsStr, &isReadInt, &isArchivedInt,
-		); err != nil {
-			continue
-		}
-
-		if dbNodeID != nil {
-			e.NodeID = *dbNodeID
-		}
-
-		e.IsRead = isReadInt == 1
-		e.IsArchived = isArchivedInt == 1
-		json.Unmarshal([]byte(detailsStr), &e.Details)
-		events = append(events, e)
-	}
-
-	if events == nil {
-		events = []models.Event{}
 	}
 
 	SendJSON(w, http.StatusOK, events)
 }
 
 func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
-	var count int
-	err := h.Store.DB.QueryRow("SELECT COUNT(*) FROM events WHERE is_read = 0 AND is_archived = 0").Scan(&count)
+	count, err := h.Store.GetUnreadEventCount()
 	if err != nil {
 		count = 0
 	}
@@ -171,23 +112,35 @@ func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) MarkSingleEventRead(w http.ResponseWriter, r *http.Request) {
 	eventID := chi.URLParam(r, "event_id")
-	h.Store.DB.Exec("UPDATE events SET is_read = 1 WHERE id = ?", eventID)
+	if err := h.Store.MarkEventRead(eventID); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
-	h.Store.DB.Exec("UPDATE events SET is_read = 1 WHERE is_read = 0")
+	if err := h.Store.MarkAllEventsRead(); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) ArchiveEvent(w http.ResponseWriter, r *http.Request) {
 	eventID := chi.URLParam(r, "event_id")
-	h.Store.DB.Exec("UPDATE events SET is_archived = 1, is_read = 1 WHERE id = ?", eventID)
+	if err := h.Store.ArchiveEvent(eventID); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
 func (h *Handler) ArchiveAll(w http.ResponseWriter, r *http.Request) {
-	h.Store.DB.Exec("UPDATE events SET is_archived = 1, is_read = 1 WHERE is_archived = 0")
+	if err := h.Store.ArchiveAllEvents(); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -195,8 +148,7 @@ func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 	dryrun := r.URL.Query().Get("dryrun") == "true"
 
 	if dryrun {
-		var count int
-		h.Store.DB.QueryRow("SELECT COUNT(*) FROM events").Scan(&count)
+		count, _ := h.Store.GetEventCount()
 		SendJSON(w, http.StatusOK, map[string]interface{}{
 			"status":       "success",
 			"dryrun":       true,
@@ -208,7 +160,11 @@ func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 	ip := h.getRealIP(r)
 	log.Printf("[!] AUDIT: Database purged by IP %s", ip)
 
-	h.Store.DB.Exec("DELETE FROM events")
+	if err := h.Store.ClearAllEvents(); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"dryrun": false,

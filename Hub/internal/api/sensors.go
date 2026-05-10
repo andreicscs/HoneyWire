@@ -2,13 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"time"
-	"io"
 	"os"
-		
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
 )
@@ -16,19 +15,19 @@ import (
 func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	var hb models.Heartbeat
 	if err := json.NewDecoder(r.Body).Decode(&hb); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		RespondError(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
 	if hb.NodeID == "" || hb.SensorID == "" {
-		http.Error(w, "node_id and sensor_id are required", http.StatusBadRequest)
+		RespondError(w, "node_id and sensor_id are required", http.StatusBadRequest)
 		return
 	}
 
 	// Per-node authentication
 	if !h.validateNodeAuth(r, hb.NodeID) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -38,33 +37,19 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
 	// Update sensor last_seen and metadata with composite key (node_id, sensor_id)
-	_, err := h.Store.DB.Exec(`
-		INSERT INTO sensors (node_id, sensor_id, first_seen, last_seen, metadata, is_silenced)
-		VALUES (?, ?, ?, ?, ?, 0)
-		ON CONFLICT(node_id, sensor_id) DO UPDATE SET last_seen = ?, metadata = ?`,
-		hb.NodeID, hb.SensorID, nowStr, nowStr, string(metadataJSON), nowStr, string(metadataJSON),
-	)
-	if err != nil {
+	if err := h.Store.UpsertSensor(&hb, nowStr, string(metadataJSON)); err != nil {
 		log.Printf("[ERROR] Heartbeat DB Upsert failed for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	// Update node last_seen
-	_, err = h.Store.DB.Exec(`
-		UPDATE nodes SET last_seen = ? WHERE node_id = ?`,
-		nowStr, hb.NodeID,
-	)
-	if err != nil {
+	if err := h.Store.UpdateNodeLastSeen(hb.NodeID, nowStr); err != nil {
 		log.Printf("[WARNING] Failed to update node %s last_seen: %v", hb.NodeID, err)
 	}
 
 	// Log heartbeat bucket with composite key
-	_, err = h.Store.DB.Exec(
-		"INSERT OR IGNORE INTO sensor_heartbeats (node_id, sensor_id, time_bucket) VALUES (?, ?, ?)",
-		hb.NodeID, hb.SensorID, minuteBucket,
-	)
-	if err != nil {
+	if err := h.Store.InsertHeartbeat(hb.NodeID, hb.SensorID, minuteBucket); err != nil {
 		log.Printf("[WARNING] Failed to log heartbeat bucket for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
 	}
 
@@ -78,52 +63,12 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetSensors(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.Store.DB.Query(`
-		SELECT sensor_id, node_id, first_seen, last_seen, metadata, is_silenced 
-		FROM sensors 
-		ORDER BY COALESCE(node_id, 'ZZZ') ASC, sensor_id ASC
-	`) // Note: COALESCE(node_id, 'ZZZ') ensures orphan sensors drop to the bottom of the list.
+	fleet, err := h.Store.GetAllSensors()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	var fleet []models.Sensor
-	for rows.Next() {
-		var s models.Sensor
-		var metadataStr string
-		var isSilencedInt int
-		var dbNodeID *string
-
-		if err := rows.Scan(&s.SensorID, &dbNodeID, &s.FirstSeen, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
-			log.Printf("Error scanning sensor: %v", err)
-			continue
-		}
-
-		if dbNodeID != nil {
-			s.NodeID = *dbNodeID
-		}
-
-		s.IsSilenced = isSilencedInt == 1
-
-		lastSeenTime, err := time.Parse(time.RFC3339, s.LastSeen)
-		if err == nil && time.Now().UTC().Sub(lastSeenTime) < 90*time.Second {
-			s.Status = "online"
-		} else {
-			s.Status = "offline"
-		}
-
-		var metadata map[string]interface{}
-		json.Unmarshal([]byte(metadataStr), &metadata)
-		s.Metadata = metadata
-
-		fleet = append(fleet, s)
-	}
-
-	if fleet == nil {
-		fleet = []models.Sensor{}
-	}
 	SendJSON(w, http.StatusOK, fleet)
 }
 
@@ -134,174 +79,21 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	var numBlocks int
-	var delta time.Duration
-	var expectedPings float64
+	params := CalculateUptimeParams(timeframe, now)
 
-	switch timeframe {
-	case "1H":
-		numBlocks, delta, expectedPings = 30, 2*time.Minute, 2
-	case "7D":
-		numBlocks, delta, expectedPings = 7, 24*time.Hour, 1440
-	case "30D":
-		numBlocks, delta, expectedPings = 30, 24*time.Hour, 1440
-	case "24H":
-		fallthrough
-	default:
-		numBlocks, delta, expectedPings = 24, time.Hour, 60
-	}
-
-	cutoff := now.Add(-delta * time.Duration(numBlocks)).Truncate(time.Minute)
-	cutoffStr := cutoff.Format(time.RFC3339)
-
-	sensorRows, err := h.Store.DB.Query("SELECT node_id, sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY node_id, sensor_id", now.Format(time.RFC3339))
+	sensors, err := h.Store.GetSensorsForUptime(now.Format(time.RFC3339))
 	if err != nil {
-		http.Error(w, "Database error fetching sensors", http.StatusInternalServerError)
+		RespondError(w, "Database error fetching sensors", http.StatusInternalServerError)
 		return
 	}
-	defer sensorRows.Close()
 
-	type SensorData struct {
-		NodeID    string
-		SensorID  string
-		LastSeen  time.Time
-		FirstSeen string
-	}
-	var sensors []SensorData
-	history := make(map[string][]float64)
-
-	for sensorRows.Next() {
-		var s SensorData
-		var lastSeenStr string
-		sensorRows.Scan(&s.NodeID, &s.SensorID, &lastSeenStr, &s.FirstSeen)
-		s.LastSeen, _ = time.Parse(time.RFC3339, lastSeenStr)
-		sensors = append(sensors, s)
-		
-		// Create a unique key combining Node and Sensor
-		historyKey := s.NodeID + ":" + s.SensorID
-		history[historyKey] = make([]float64, numBlocks)
-	}
-
-
-	hbRows, err := h.Store.DB.Query("SELECT node_id, sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+	hbs, err := h.Store.GetHeartbeatsSince(params.CutoffStr)
 	if err != nil {
-		http.Error(w, "Database error fetching heartbeats", http.StatusInternalServerError)
+		RespondError(w, "Database error fetching heartbeats", http.StatusInternalServerError)
 		return
 	}
-	defer hbRows.Close()
 
-	for hbRows.Next() {
-		var nID, sID, tBucket string
-		hbRows.Scan(&nID, &sID, &tBucket)
-		parsedBucket, err := time.Parse(time.RFC3339, tBucket)
-		if err != nil { continue }
-		
-		if parsedBucket.Before(cutoff) {
-			continue
-		}
-
-		idx := int(parsedBucket.Sub(cutoff) / delta)
-		if idx >= numBlocks {
-			idx = numBlocks - 1
-		}
-
-		historyKey := nID + ":" + sID
-		if idx >= 0 && history[historyKey] != nil {
-			history[historyKey][idx]++
-		}
-	}
-
-	var result []map[string]interface{}
-	for _, s := range sensors {
-		firstSeenParsed, _ := time.Parse(time.RFC3339, s.FirstSeen)
-		var blocks []map[string]string
-		
-		historyKey := s.NodeID + ":" + s.SensorID
-
-		for i := 0; i < numBlocks; i++ {
-			blockStart := cutoff.Add(time.Duration(i) * delta)
-			blockEnd := blockStart.Add(delta)
-
-			stepsAgo := numBlocks - 1 - i
-			timeLabel := "Current"
-			if stepsAgo > 0 {
-				switch timeframe {
-				case "1H":
-					timeLabel = fmt.Sprintf("%d mins ago", stepsAgo*int(delta.Minutes()))
-				case "24H":
-					timeLabel = fmt.Sprintf("%d hours ago", stepsAgo)
-				case "7D", "30D":
-					timeLabel = fmt.Sprintf("%d days ago", stepsAgo)
-				default:
-					timeLabel = fmt.Sprintf("%d ago", stepsAgo)
-				}
-			}
-
-			status, label := "", ""
-
-			if blockEnd.Before(firstSeenParsed) {
-				status, label = "nodata", "No Data (Not Deployed Yet)"
-			} else {
-				pings := history[historyKey][i]
-				targetPings := expectedPings
-
-				if firstSeenParsed.After(blockStart) && firstSeenParsed.Before(blockEnd) {
-					activeDuration := blockEnd.Sub(firstSeenParsed)
-					targetPings = activeDuration.Minutes()
-					if targetPings > expectedPings {
-						targetPings = expectedPings
-					}
-					if targetPings < 1 && activeDuration > 0 {
-						targetPings = 1
-					}
-				} else if i == numBlocks-1 {
-					activeDuration := now.Sub(blockStart)
-					targetPings = activeDuration.Minutes()
-					if targetPings > expectedPings {
-						targetPings = expectedPings
-					}
-					if targetPings < 1 && activeDuration > 0 {
-						targetPings = 1
-					}
-				}
-
-				if pings == 0 && targetPings >= 1 {
-					status, label = "down", "Offline"
-				} else if targetPings > 0 && pings < (targetPings*0.85) {
-					status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
-				} else {
-					status, label = "up", "Online"
-				}
-			}
-
-			blocks = append(blocks, map[string]string{
-				"status":    status,
-				"timeLabel": timeLabel,
-				"label":     label,
-			})
-		}
-
-		isLive := now.Sub(s.LastSeen) < 90*time.Second
-		if isLive {
-			blocks[len(blocks)-1]["status"] = "up"
-			blocks[len(blocks)-1]["label"] = "Online (Live)"
-		} else {
-			blocks[len(blocks)-1]["status"] = "down"
-			blocks[len(blocks)-1]["label"] = "Offline (Live)"
-		}
-
-		result = append(result, map[string]interface{}{
-			"id":       s.SensorID,
-			"node_id":  s.NodeID,
-			"name":     s.SensorID,
-			"isOnline": isLive,
-			"blocks":   blocks,
-		})
-	}
-
-	if result == nil {
-		result = []map[string]interface{}{}
-	}
+	result := GenerateUptimeResult(timeframe, now, params, sensors, hbs)
 	SendJSON(w, http.StatusOK, result)
 }
 
@@ -314,12 +106,12 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 		IsSilenced bool   `json:"is_silenced"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		RespondError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	if req.NodeID == "" {
-		http.Error(w, "node_id is required", http.StatusBadRequest)
+		RespondError(w, "node_id is required", http.StatusBadRequest)
 		return
 	}
 
@@ -328,9 +120,8 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 		silenceVal = 1
 	}
 
-	_, err := h.Store.DB.Exec("UPDATE sensors SET is_silenced = ? WHERE node_id = ? AND sensor_id = ?", silenceVal, req.NodeID, sensorID)
-	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+	if err := h.Store.UpdateSensorSilence(req.NodeID, sensorID, silenceVal); err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
@@ -354,21 +145,18 @@ func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.URL.Query().Get("node_id")
 
 	if nodeID == "" {
-		http.Error(w, "node_id query parameter is required", http.StatusBadRequest)
+		RespondError(w, "node_id query parameter is required", http.StatusBadRequest)
 		return
 	}
 
-	// Note: Because of 'ON DELETE CASCADE' in the schema, SQLite will automatically 
-	// delete all events and heartbeats tied to this sensor!
-	result, err := h.Store.DB.Exec("DELETE FROM sensors WHERE node_id = ? AND sensor_id = ?", nodeID, sensorID)
+	rowsAffected, err := h.Store.DeleteSensor(nodeID, sensorID)
 	if err != nil {
-		http.Error(w, "Database error while deleting sensor", http.StatusInternalServerError)
+		RespondError(w, "Database error while deleting sensor", http.StatusInternalServerError)
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Sensor not found", http.StatusNotFound)
+		RespondError(w, "Sensor not found", http.StatusNotFound)
 		return
 	}
 
@@ -383,7 +171,6 @@ func (h *Handler) ForgetSensor(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 // GetManifests fetches the sensor manifest JSON.
 // It proxies the request through the Hub to bypass browser CORS restrictions.
 func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
@@ -397,13 +184,13 @@ func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
 	// 2. Fetch the manifest
 	resp, err := http.Get(manifestURL)
 	if err != nil {
-		http.Error(w, `{"error": "Failed to reach manifest registry"}`, http.StatusBadGateway)
+		RespondError(w, "Failed to reach manifest registry", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		http.Error(w, `{"error": "Manifest registry returned an error"}`, http.StatusBadGateway)
+		RespondError(w, "Manifest registry returned an error", http.StatusBadGateway)
 		return
 	}
 
