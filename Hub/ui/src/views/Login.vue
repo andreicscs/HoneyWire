@@ -37,11 +37,11 @@ const doLogin = async () => {
 </script>
 
 <template>
-    <div class="h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#09090b] transition-colors duration-300 p-6 relative">
+    <div class="h-screen flex flex-col items-center justify-center bg-bg-base transition-colors duration-300 p-6 relative">
         
         <div class="absolute top-6 right-6">
             <button @click="$emit('toggle-theme')" 
-                    class="w-10 h-10 rounded-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors flex items-center justify-center group overflow-hidden shadow-sm">
+                    class="w-10 h-10 rounded-md bg-bg-surface border border-border-default text-text-muted hover:bg-button-hover hover:text-text-main transition-colors flex items-center justify-center group overflow-hidden shadow-sm">
                 <svg class="w-4 h-4 transition-transform duration-300 ease-out group-hover:rotate-45 group-hover:scale-110 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
                 </svg>
@@ -53,9 +53,8 @@ const doLogin = async () => {
 
         <div class="w-full max-w-100 space-y-8 z-10">
             <div class="flex flex-col items-center">
-                <div class="w-16 h-16 flex items-center justify-center rounded-lg bg-white dark:bg-[#121215] border border-slate-200 dark:border-zinc-800/80 shadow-sm mb-5 p-3">
-                    
-                    <svg class="w-full h-full text-slate-900 dark:text-white fill-current shrink-0" viewBox="188 0 708 708" xmlns="http://www.w3.org/2000/svg">
+                <div class="w-16 h-16 flex items-center justify-center rounded-lg bg-bg-surface border border-border-default shadow-sm mb-5 p-3">
+                    <svg class="w-full h-full text-text-main fill-current shrink-0" viewBox="188 0 708 708" xmlns="http://www.w3.org/2000/svg">
                         <path d="M 489.44 72.62 C 461.39 89.14 437.931 103.19 437.309 103.841 C 436.687 104.491 434.301 117.849 432.007 133.524 C 429.713 149.199 427.643 162.6 427.408 163.304 C 427.081 164.281 426.085 164.13 423.21 162.667 C 421.136 161.613 408.679 156.419 395.526 151.127 L 371.613 141.504 L 355.526 150.975 C 337.824 161.415 320.128 171.867 302.44 182.331 L 265.44 204.216 L 265.182 261.658 L 264.924 319.1 L 278.688 332.562 C 286.685 340.382 294.703 348.18 302.741 355.956 L 313.03 365.888 L 310.735 368.032 C 309.473 369.211 304.165 374.162 298.94 379.034 C 293.715 383.905 283.924 393.286 277.182 399.879 L 264.924 411.867 L 265.182 469.359 L 265.44 526.852 L 273.94 532.018 C 287.477 540.246 355.07 580.092 365.94 586.251 C 371.264 589.268 371.552 589.319 374.94 587.839 C 377.617 586.669 402.655 576.023 426.617 565.865 C 427.374 565.544 427.993 566.912 428.351 569.695 C 431.249 592.194 436.288 624.238 437.078 625.19 C 437.982 626.279 460.375 639.711 505.94 666.495 C 515.565 672.152 527.603 679.243 532.692 682.251 L 541.943 687.721 L 578.192 666.311 C 598.128 654.536 621.762 640.654 630.711 635.463 C 645.691 626.773 647.052 625.746 647.866 622.524 C 648.351 620.599 650.444 607.099 652.516 592.524 C 654.588 577.949 656.364 565.904 656.462 565.757 C 656.561 565.61 669.274 570.877 684.713 577.463 L 712.786 589.436 L 721.613 584.178 C 735 576.204 755.303 564.205 788.44 544.685 L 818.44 527.013 L 818.733 469.518 L 819.025 412.024 L 795.483 388.999 C 782.534 376.335 771.94 365.675 771.94 365.31 C 771.94 364.945 776.777 360.009 782.69 354.342 C 790.556 346.784 798.392 339.194 806.198 331.573 L 818.956 319.107 L 818.698 261.662 L 818.44 204.217 L 803.94 195.51 C 795.965 190.721 780.44 181.517 769.44 175.057 C 758.44 168.598 741.477 158.635 731.745 152.918 C 722.012 147.201 713.172 142.524 712.101 142.524 C 711.029 142.524 698.462 147.249 684.175 153.024 C 669.887 158.799 657.797 163.524 657.306 163.524 C 656.816 163.524 654.466 150.811 652.084 135.274 C 649.702 119.737 647.55 106.271 647.303 105.351 C 646.756 103.314 643.702 101.358 614.44 84.303 C 598.711 75.129 582.995 65.932 567.293 56.711 C 554.012 48.908 542.537 42.537 541.793 42.554 C 541.049 42.57 517.49 56.1 489.44 72.62 M 529.94 82.376 C 523.615 86.142 506.74 96.106 492.44 104.518 C 478.14 112.931 465.672 120.536 464.734 121.419 C 463.464 122.614 462.118 129.031 459.467 146.524 C 457.509 159.449 455.43 172.396 454.848 175.295 L 453.789 180.566 L 468.976 206.795 C 477.328 221.221 486.587 237.152 489.551 242.197 C 492.515 247.242 494.94 251.756 494.94 252.227 C 494.94 252.877 474.618 265.574 470.762 267.333 C 470.002 267.68 463.741 257.243 443.378 221.683 C 432.933 203.443 428.726 196.97 426.59 195.856 C 422.998 193.982 375.025 174.524 373.998 174.524 C 373.17 174.524 297.233 219.056 295.19 220.739 C 294.226 221.534 293.94 231.501 293.94 264.35 L 293.94 306.931 L 312.69 325.047 C 323.003 335.011 333.363 344.881 335.712 346.98 L 339.985 350.797 L 376.712 351.107 C 396.913 351.278 415.365 351.441 417.717 351.471 L 421.995 351.524 L 421.717 365.774 L 421.44 380.024 L 380.532 380.285 L 339.623 380.547 L 334.532 385.219 C 331.731 387.788 321.448 397.505 311.679 406.811 L 293.919 423.732 L 294.179 466.862 L 294.44 509.992 L 311.44 520.11 C 324.581 527.914 337.743 535.685 350.923 543.423 L 373.406 556.618 L 377.577 555.025 C 379.87 554.149 392.456 548.761 405.544 543.051 L 429.342 532.67 L 433.026 526.347 C 435.052 522.869 444.005 507.424 452.921 492.024 C 461.837 476.624 469.511 463.623 469.976 463.134 C 470.788 462.278 494.94 476.122 494.94 477.443 C 494.94 478.551 482.028 501.335 467.799 525.333 L 453.969 548.658 L 455.881 560.841 C 456.933 567.542 459.001 580.731 460.477 590.152 L 463.16 607.279 L 467.3 609.585 C 469.577 610.853 487.129 621.258 506.304 632.707 C 525.48 644.156 541.514 653.524 541.935 653.524 C 542.357 653.524 554.343 646.611 568.571 638.162 C 582.799 629.713 600.389 619.327 607.66 615.082 C 619.545 608.143 620.933 607.044 621.409 604.194 C 621.7 602.451 623.536 590.224 625.489 577.024 C 627.441 563.824 629.255 552.124 629.52 551.024 C 629.84 549.693 625.778 541.836 617.37 527.524 C 599.321 496.801 588.94 478.538 588.94 477.509 C 588.94 476.025 612.961 462.136 613.827 463.119 C 614.68 464.088 635.394 499.473 646.309 518.609 C 649.943 524.98 653.71 530.905 654.679 531.775 C 656.178 533.121 676.389 542.218 703.523 553.76 L 710.605 556.773 L 726.523 547.287 C 737.132 540.979 747.771 534.722 758.44 528.515 C 767.24 523.407 777.815 517.14 781.94 514.588 L 789.44 509.948 L 789.718 468.486 C 789.871 445.682 789.754 426.027 789.457 424.808 C 789.161 423.589 778.943 413.131 766.751 401.569 L 744.583 380.546 L 703.512 380.285 L 662.44 380.024 L 662.798 366.024 C 662.995 358.324 663.345 351.824 663.577 351.579 C 663.808 351.333 682.247 350.938 704.553 350.7 L 745.108 350.267 L 766.949 329.313 C 778.961 317.788 789.048 307.684 789.365 306.86 C 789.681 306.035 789.94 286.499 789.94 263.446 L 789.94 221.531 L 784.19 217.974 C 781.027 216.018 767.64 208.081 754.44 200.337 C 741.24 192.592 726.017 183.616 720.61 180.39 C 715.204 177.164 710.446 174.524 710.038 174.524 C 708.697 174.524 659.563 194.559 656.606 196.312 C 654.564 197.523 650.581 203.587 643.004 217.024 C 630.863 238.553 614.756 266.832 614.306 267.408 C 613.848 267.994 588.94 253.243 588.94 252.386 C 588.94 251.972 598.161 235.698 609.431 216.22 L 629.922 180.806 L 627.009 162.415 C 625.484 152.784 623.955 143.154 622.423 133.524 C 621.362 126.867 620.144 122.44 619.095 121.428 C 618.185 120.55 602.59 111.128 584.44 100.491 C 566.29 89.854 549.439 79.885 546.994 78.337 C 544.549 76.79 542.299 75.525 541.994 75.527 C 541.689 75.529 536.265 78.611 529.94 82.376" fill-rule="evenodd" style=""/>
                         
                         <g>
@@ -72,34 +71,34 @@ const doLogin = async () => {
                         </g>
                     </svg>
                 </div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">HoneyWire Sentinel</h1>
-                <p class="text-sm text-slate-500 dark:text-zinc-500 mt-1">Authorized personnel only</p>
+                <h1 class="text-2xl font-bold text-text-main tracking-tight">HoneyWire Sentinel</h1>
+                <p class="text-sm text-text-muted mt-1">Authorized personnel only</p>
             </div>
 
-            <div class="bg-white dark:bg-[#0c0c0e] border border-slate-200 dark:border-zinc-800/80 rounded-lg shadow-xl shadow-slate-200/50 dark:shadow-black/50 p-8 transition-colors duration-300 relative overflow-hidden">
+            <div class="bg-bg-surface border border-border-default rounded-lg shadow-sm p-8 transition-colors duration-300 relative overflow-hidden">
                 
-                <div class="absolute top-0 left-0 right-0 h-1 opacity-90 bg-[linear-gradient(to_right,#64748b,#3b82f6,#eab308,#fb923c,#f43f5e)]"></div>
+                <div class="absolute top-0 left-0 right-0 h-1 opacity-90" style="background: linear-gradient(to right, var(--sev-info), var(--sev-low), var(--sev-medium), var(--sev-high), var(--sev-critical))"></div>
 
                 <form @submit.prevent="doLogin" class="space-y-6 mt-2">
                     <div class="space-y-2">
-                        <label for="pwd" class="text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-zinc-500">Authentication Key</label>
+                        <label for="pwd" class="text-[11px] uppercase tracking-wider font-bold text-text-muted">Authentication Key</label>
                         <input type="password" id="pwd" v-model="password" placeholder="••••••••••••"
-                            class="w-full px-4 py-2.5 rounded-md bg-slate-50 dark:bg-[#121215] border border-slate-200 dark:border-zinc-800 text-sm mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:border-slate-400 focus:ring-slate-400/50 dark:focus:border-zinc-600 dark:focus:ring-zinc-600/50 transition-all placeholder-slate-400 dark:placeholder-zinc-700 shadow-inner" required>
+                            class="w-full px-4 py-2.5 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring transition-all placeholder:text-text-muted/50 shadow-inner" required>
                     </div>
                     
                     <button type="submit" :disabled="loading || rateLimited"
                             class="w-full py-2.5 rounded-md text-sm font-bold transition-all duration-200 shadow-md active:scale-[0.98]"
-                            :class="(loading || rateLimited) ? 'bg-slate-400 dark:bg-zinc-800 text-slate-100 dark:text-zinc-500 cursor-not-allowed' : 'bg-slate-900 dark:bg-zinc-300 text-white dark:text-zinc-900 hover:bg-slate-800 dark:hover:bg-white hover:shadow-lg'">
+                            :class="(loading || rateLimited) ? 'bg-bg-inset text-text-muted cursor-not-allowed border border-border-default' : 'bg-text-main text-bg-surface hover:opacity-90 hover:shadow-lg'">
                         {{ loading ? 'Authenticating...' : 'Sign in' }}
                     </button>
                 </form>
 
-                <div v-if="error" class="mt-6 p-3 rounded-md bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-center animate-bounce-subtle">
-                    <p class="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Access Denied: Invalid Key</p>
+                <div v-if="error" class="mt-6 p-3 rounded-md bg-danger-bg-subtle border border-danger-border text-center animate-bounce-subtle">
+                    <p class="text-xs font-bold uppercase tracking-wider text-danger-text">Access Denied: Invalid Key</p>
                 </div>
                 
-                <div v-if="rateLimited" class="mt-6 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-center">
-                    <p class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Too many attempts.<br/>Please try again in 15 minutes.</p>
+                <div v-if="rateLimited" class="mt-6 p-3 rounded-md bg-archive-bg-subtle border border-archive-border text-center">
+                    <p class="text-xs font-bold uppercase tracking-wider text-archive-text">Too many attempts.<br/>Please try again in 15 minutes.</p>
                 </div>
             </div>
             

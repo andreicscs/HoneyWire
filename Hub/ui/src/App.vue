@@ -16,7 +16,7 @@ import { useConfig } from './api/useConfig'
 import { useAppStore } from './stores/app'
 import { useFleetStore } from './stores/fleet'
 import { useEventsStore } from './stores/events'
-import { HoneyWireWS } from './services/ws' // <-- Import the new class!
+import { HoneyWireWS } from './services/ws' 
 
 const { fetchConfig } = useConfig()
 const appStore = useAppStore()
@@ -25,13 +25,11 @@ const eventsStore = useEventsStore()
 
 const { currentView, viewingArchive } = storeToRefs(appStore)
 
-// 1. When Archive view toggles, or Node/Sensor is clicked -> Refetch Events
 watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor], 
   ([isArchived, node, sensor]) => {
     eventsStore.fetchEvents(isArchived, node, sensor)
 })
 
-// 2. When '7D', '30D' buttons are clicked -> Refetch Uptime
 watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
     fleetStore.fetchUptime(newTimeframe)
 })
@@ -39,11 +37,21 @@ watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
 const requiresSetup = ref(false)
 const isAuthenticated = ref(false)
 
-// Instantiate the WebSocket service
 const wsService = new HoneyWireWS()
 let healthSyncInterval = null
 
 const checkAuthAndInit = async () => {
+    // ----------------------------------------------------
+    // TODO DEBUG OVERRIDE: 
+    // Access http://localhost:8080/?debug=setup to force UI rendering
+    // ----------------------------------------------------
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('debug') === 'setup') {
+        requiresSetup.value = true;
+        isAuthenticated.value = false;
+        return;
+    }
+
     try {
         const setupRes = await fetch('/api/v1/setup/status')
         if (setupRes.ok) {
@@ -62,27 +70,23 @@ const checkAuthAndInit = async () => {
             isAuthenticated.value = true
             await fetchConfig() 
             
-            // 1. Initial Data Fetch
             await Promise.all([
                 fleetStore.fetchFleet(),
-                fleetStore.fetchUptime(),
+                fleetStore.fetchUptime(fleetStore.activeTimeframe),
                 eventsStore.fetchEvents()
             ])
 
-            // 2. Wire the WebSocket directly to the Pinia stores
             wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
             wsService.on('onNewSensor', (payload) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
             wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
             wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
             wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
 
-            // 3. Connect the socket
             wsService.connect()
             
-            // 4. Fallback background sync (just in case)
             healthSyncInterval = setInterval(() => { 
                 fleetStore.fetchFleet()
-                fleetStore.fetchUptime() 
+                fleetStore.fetchUptime(fleetStore.activeTimeframe) 
             }, 30000)
 
         } else {
@@ -111,7 +115,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     if (healthSyncInterval) clearInterval(healthSyncInterval)
-    wsService.disconnect() // Safely kill the socket on unmount
+    wsService.disconnect()
 })
 </script>
 
@@ -122,15 +126,15 @@ if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.match
 </script>
 
 <template>
-  <div v-if="requiresSetup" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
+  <div v-if="requiresSetup" class="h-screen bg-bg">
     <Setup @setup-complete="checkAuthAndInit" @toggle-theme="toggleTheme" />
   </div>
   
-  <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
+  <div v-else-if="!isAuthenticated" class="h-screen bg-bg">
     <Login @login-success="checkAuthAndInit" @toggle-theme="toggleTheme" /> 
   </div>
 
-  <div v-else class="flex h-screen overflow-hidden bg-slate-200/60 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
+  <div v-else class="flex h-screen overflow-hidden bg-bg text-text-main transition-colors duration-200">
     <Sidebar />
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
       <Header />

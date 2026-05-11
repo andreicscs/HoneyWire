@@ -1,6 +1,171 @@
 @import "tailwindcss";
 @variant dark (&:where(.dark, .dark *)); /* <-- ADD THIS LINE */
 
+/* -- Design System: CSS Variables -- */
+:root {
+  --bg: #e7e7e7;
+  --bg-base: #f0f0f0;
+  --bg-surface: #ffffff;
+  --bg-inset: #d6dbe0;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-default: #d2d9e2;
+  --button-selected: rgb(209, 212, 219);
+  --button-hover: #e1e4e9;
+
+  /* Alert Severities */
+  --sev-critical: #f43f5e;
+  --sev-high: #fb923c;
+  --sev-medium: #eab308;
+  --sev-low: #3b82f6;
+  --sev-info: #64748b;
+
+  /* Danger Actions (System Resets, Purges) */
+  --danger-main: #e11d48;       /* Solid buttons*/
+  --danger-hover: #be123c;      /* Solid button hover*/
+  --danger-text: #3f0f1c;       /* Text accents*/
+  --danger-bg: #ffcbcd;         /* Panel background*/
+  --danger-bg-subtle: #ffe4e6;  /* Badge/Subtle button bg*/
+  --danger-bg-hover: #f8aeb7;   /* Subtle button hover*/
+  --danger-border: #ff8393;     /* Borders*/
+
+  /* Archive Actions (Amber) */
+  --archive-text: #92400e;       /* Text accents*/
+  --archive-bg: #fef3c7;         /* Active/Selected bg*/
+  --archive-bg-subtle: #fffbeb;  /* Hover bg subtle*/
+  --archive-border: #fcd34d;     /* Borders*/
+
+  /* Success Actions (Armed, Online, OK) */
+  --success-main: #10b981;       /* Solid elements*/
+  --success-selected: #68cc98;   /* Selected/Active elements*/
+  --success-text: #033a2a;       /* Text accents*/
+  --success-bg: #83e9b4;         /* Active/Selected bg*/
+  --success-border: #6ec29b;     /* Borders*/
+
+  /* Highlight Actions (Secondary selections, e.g., Node pill when sensor is clicked) */
+  --highlight-bg: #eff6ff;
+  --highlight-border: #60a5fa;
+  --highlight-text: #1e3a8a;
+  --highlight-ring: rgba(59, 130, 246, 0.3);
+
+  /* Selection Layers (Node Pills, Uptime Groups/Rows) */
+  --select-solid-bg: #1e293b;
+  --select-solid-text: #ffffff;
+  --select-group-bg: rgba(248, 250, 252, 0.5);
+  --select-group-border: #cbd5e1;
+  --select-row-bg: #f1f5f9;
+  --select-row-border: #cbd5e1;
+}
+
+.dark {
+  --bg: #030303;
+  --bg-base: #09090b;
+  --bg-surface: #18181b;
+  --bg-inset: #09090b;
+  --text-main: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --border-default: #2c2c30;
+  --button-selected: #2f2f33;
+  --button-hover: #202024;
+
+  /* Alert Severities */
+  --sev-critical: #f43f5e;
+  --sev-high: #fb923c;
+  --sev-medium: #facc15;
+  --sev-low: #3b82f6;
+  --sev-info: #94a3b8;
+
+  /* Danger Actions (System Resets, Purges) */
+  --danger-main: #f43f5e;       /* Solid buttons*/
+  --danger-hover: #e11d48;      /* Solid button hover*/
+  --danger-text: #fb7185;       /* Text accents*/
+  --danger-bg: #150a0a;         /* Panel background*/
+  --danger-bg-subtle: #241114;  /* Badge/Subtle button bg*/
+  --danger-bg-hover: #38151d;   /* Subtle button hover */
+  --danger-border: #3f0f1c;     /* Borders*/
+
+  /* Archive Actions (Amber) */
+  --archive-text: #fbbf24;       /* Text accents*/
+  --archive-bg: rgba(245, 158, 11, 0.2);       /* Active/Selected bg*/
+  --archive-bg-subtle: rgba(120, 53, 15, 0.2); /* Hover bg subtle*/
+  --archive-border: rgba(245, 158, 11, 0.3);   /* Borders*/
+
+  /* Success Actions (Armed, Online, OK) */
+  --success-main: #10b981;               /* Solid elements*/
+  --success-selected: rgba(45, 182, 145, 0.3);   /* Selected/Active elements*/
+  --success-text: #34d399;               /* Text accents*/
+  --success-bg: rgba(10, 136, 102, 0.18);    /* Active bg*/
+  --success-border: rgba(6, 78, 59, 0.5);/* Borders*/
+
+  /* Highlight Actions */
+  --highlight-bg: transparent;
+  --highlight-border: #a1a1aa;
+  --highlight-text: #e4e4e7;
+  --highlight-ring: rgba(161, 161, 170, 0.5);
+
+  /* Selection Layers */
+  --select-solid-bg: #e4e4e7;
+  --select-solid-text: #000000;
+  --select-group-bg: rgba(255, 255, 255, 0.05);
+  --select-group-border: #52525b;
+  --select-row-bg: #27272a;
+  --select-row-border: #71717a;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-inset: var(--bg-inset);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-border-default: var(--border-default);
+  --color-button-selected: var(--button-selected);
+  --color-button-hover: var(--button-hover);
+
+  --color-critical: var(--sev-critical);
+  --color-high: var(--sev-high);
+  --color-medium: var(--sev-medium);
+  --color-low: var(--sev-low);
+  --color-info: var(--sev-info);
+
+  /* Inject Danger Palette */
+  --color-danger-main: var(--danger-main);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-text: var(--danger-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-bg-subtle: var(--danger-bg-subtle);
+  --color-danger-bg-hover: var(--danger-bg-hover);
+  --color-danger-border: var(--danger-border);
+
+  /* Inject Archive Palette */
+  --color-archive-text: var(--archive-text);
+  --color-archive-bg: var(--archive-bg);
+  --color-archive-bg-subtle: var(--archive-bg-subtle);
+  --color-archive-border: var(--archive-border);
+
+  /* Inject Success Palette */
+  --color-success-main: var(--success-main);
+  --color-success-selected: var(--success-selected);
+  --color-success-text: var(--success-text);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+
+  /* Inject Highlight Palette */
+  --color-highlight-bg: var(--highlight-bg);
+  --color-highlight-border: var(--highlight-border);
+  --color-highlight-text: var(--highlight-text);
+  --color-highlight-ring: var(--highlight-ring);
+
+  /* Inject Selection Palette */
+  --color-select-solid-bg: var(--select-solid-bg);
+  --color-select-solid-text: var(--select-solid-text);
+  --color-select-group-bg: var(--select-group-bg);
+  --color-select-group-border: var(--select-group-border);
+  --color-select-row-bg: var(--select-row-bg);
+  --color-select-row-border: var(--select-row-border);
+}
+
 /* -- HoneyWire Custom Styles -- */
 [x-cloak] { display: none !important; }
 body { font-family: 'Inter', sans-serif; }

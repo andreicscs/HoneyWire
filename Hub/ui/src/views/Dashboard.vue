@@ -27,14 +27,33 @@ const generateToken = async () => {
         isGeneratingToken.value = false
     }
 }
+
+// Added Quick-Copy functionality for the provision command
+const copyCommand = () => {
+    const cmd = `./wizard --link http://${currentHost.value} ${provisionToken.value}`
+    navigator.clipboard.writeText(cmd)
+
+    const btn = document.getElementById('copy-cmd-btn')
+    const originalText = btn.innerHTML
+    
+    btn.innerHTML = 'Copied!'
+    btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
+    btn.classList.remove('bg-bg-surface', 'text-text-main', 'border-border-default', 'hover:bg-button-hover')
+    
+    setTimeout(() => { 
+        btn.innerHTML = originalText 
+        btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
+        btn.classList.add('bg-bg-surface', 'text-text-main', 'border-border-default', 'hover:bg-button-hover')
+    }, 2000)
+}
 </script>
 
 <template>
-    <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6">
+    <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6 ">
         
         <div class="flex justify-end w-full mb-4 px-2 sm:px-4 lg:px-6">
             <button @click="generateToken" :disabled="isGeneratingToken"
-                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
+                    class="bg-text-main text-bg-surface hover:opacity-90 text-xs font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 {{ isGeneratingToken ? 'Generating...' : 'Add Node' }}
             </button>
@@ -62,33 +81,39 @@ const generateToken = async () => {
     </div>
 
     <Teleport to="body">
-        <div v-if="showProvisionModal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
-                <div class="p-5 border-b border-slate-100 dark:border-zinc-800 flex justify-between items-center">
-                    <h3 class="font-bold text-slate-800 dark:text-zinc-100">Provision New Node</h3>
-                    <button @click="showProvisionModal = false" class="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                </div>
-                
-                <div class="p-5 space-y-4">
-                    <p class="text-sm text-slate-600 dark:text-zinc-400">
-                        Run the following command on the server you want to monitor. This token is single-use and expires in 15 minutes.
-                    </p>
+        <transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showProvisionModal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div class="bg-bg-surface border border-border-default rounded-lg shadow-2xl max-w-lg w-full overflow-hidden flex flex-col transform transition-all">
+                    <div class="p-5 border-b border-border-default flex justify-between items-center">
+                        <h3 class="font-bold text-text-main">Provision New Node</h3>
+                        <button @click="showProvisionModal = false" class="text-text-muted hover:text-text-main transition-colors hover:bg-button-hover rounded-full p-1 -mr-1">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
                     
-                    <div class="bg-slate-900 rounded-md p-3 relative group">
-                        <code class="text-emerald-400 text-xs font-mono break-all">
-                            ./wizard --link http://{{ currentHost }} {{ provisionToken }}
-                        </code>
+                    <div class="p-5 space-y-4">
+                        <p class="text-sm text-text-muted">
+                            Run the following command on the server you want to monitor. This token is single-use and expires in 15 minutes.
+                        </p>
+                        
+                        <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
+                            <code class="text-success-main text-xs font-mono break-all leading-relaxed">
+                                ./wizard --link http://{{ currentHost }} {{ provisionToken }}
+                            </code>
+                            <button id="copy-cmd-btn" @click="copyCommand"
+                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-main text-[11px] font-bold uppercase tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-bg-base border-t border-border-default flex justify-end">
+                        <button @click="showProvisionModal = false" class="px-4 py-2 bg-bg-surface hover:bg-button-hover text-text-main border border-border-default text-sm font-semibold rounded-md transition-colors shadow-sm">
+                            Close
+                        </button>
                     </div>
                 </div>
-
-                <div class="p-4 bg-slate-50 dark:bg-zinc-800/50 flex justify-end">
-                    <button @click="showProvisionModal = false" class="px-4 py-2 bg-slate-200 dark:bg-zinc-700 hover:bg-slate-300 dark:hover:bg-zinc-600 text-slate-800 dark:text-zinc-200 text-sm font-semibold rounded transition-colors">
-                        Close
-                    </button>
-                </div>
             </div>
-        </div>
+        </transition>
     </Teleport>
 </template>

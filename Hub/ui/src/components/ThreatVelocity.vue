@@ -4,11 +4,11 @@ import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useAppStore } from '../stores/app'
 import { useEventsStore } from '../stores/events'
+import { getCssVariable, hexToRgb } from '../utils/theme' // Ensure hexToRgb is imported if used for the lines
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
 
-// Pull reactive state directly from the stores
 const { velocityTimeframe } = storeToRefs(appStore)
 const { filteredEvents: events } = storeToRefs(eventsStore)
 
@@ -20,12 +20,9 @@ let liveTicker = null
 
 const severities = ['critical', 'high', 'medium', 'low', 'info']
 
-const solidColors = { 
-    critical: '244, 63, 94',  
-    high: '251, 146, 60',     
-    medium: '234, 179, 8',    
-    low: '59, 130, 246',      
-    info: '100, 116, 139'     
+const getSeverityRgb = (sev) => {
+    const hex = getCssVariable(`--sev-${sev}`);
+    return hexToRgb(hex);
 }
 
 let exactTimesList = [] 
@@ -57,8 +54,7 @@ const initChart = () => {
                     callbacks: {
                         title: (context) => exactTimesList[context[0].dataIndex],
                         labelColor: (context) => {
-                            const sev = severities[context.datasetIndex]
-                            return { borderColor: `rgb(${solidColors[sev]})`, backgroundColor: `rgb(${solidColors[sev]})` }
+                            return { borderColor: context.dataset.borderColor, backgroundColor: context.dataset.borderColor }
                         }
                     }
                 } 
@@ -138,20 +134,29 @@ const updateTheme = () => {
 
     chartInstance.value.data.datasets.forEach((dataset, index) => {
         const sev = severities[index]
+        const rgb = getSeverityRgb(sev);
         const gradient = ctx.createLinearGradient(0, 0, 0, chartHeight)
-        gradient.addColorStop(0, `rgba(${solidColors[sev]}, ${isDark ? '0.3' : '0.15'})`)
-        gradient.addColorStop(1, `rgba(${solidColors[sev]}, 0)`)
+        const rgbStr = typeof rgb === 'object' ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : rgb;
         
-        dataset.borderColor = `rgb(${solidColors[sev]})`
+        gradient.addColorStop(0, `rgba(${rgbStr}, ${isDark ? '0.3' : '0.15'})`)
+        gradient.addColorStop(1, `rgba(${rgbStr}, 0)`)
+        
+        dataset.borderColor = `rgb(${rgbStr})`
         dataset.backgroundColor = gradient
-        dataset.pointHoverBackgroundColor = `rgb(${solidColors[sev]})`
+        dataset.pointHoverBackgroundColor = `rgb(${rgbStr})`
     })
 
-    chartInstance.value.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(24, 24, 27, 0.95)' : 'rgba(255, 255, 255, 0.95)'
-    chartInstance.value.options.plugins.tooltip.titleColor = isDark ? '#a1a1aa' : '#64748b'
-    chartInstance.value.options.plugins.tooltip.bodyColor = isDark ? '#f4f4f5' : '#0f172a'
-    chartInstance.value.options.plugins.tooltip.borderColor = isDark ? '#3f3f46' : '#e2e8f0'
-    chartInstance.value.options.scales.x.ticks.color = isDark ? '#52525b' : '#94a3b8'
+    // Fixed Tooltip Logic: Now dynamically pulling from CSS variables instead of hardcoded hexes
+    // Fallbacks provided just in case getCssVariable fails on initial render
+    const bgHex = getCssVariable('--bg-surface') || (isDark ? '#18181b' : '#ffffff');
+    const bgRgb = hexToRgb(bgHex);
+    const bgRgbStr = typeof bgRgb === 'object' ? `${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}` : (bgRgb || (isDark ? '24, 24, 27' : '255, 255, 255'));
+
+    chartInstance.value.options.plugins.tooltip.backgroundColor = `rgba(${bgRgbStr}, 0.95)`
+    chartInstance.value.options.plugins.tooltip.titleColor = getCssVariable('--text-muted') || (isDark ? '#a1a1aa' : '#64748b')
+    chartInstance.value.options.plugins.tooltip.bodyColor = getCssVariable('--text-main') || (isDark ? '#f4f4f5' : '#0f172a')
+    chartInstance.value.options.plugins.tooltip.borderColor = getCssVariable('--border-default') || (isDark ? '#3f3f46' : '#e2e8f0')
+    chartInstance.value.options.scales.x.ticks.color = getCssVariable('--text-muted') || (isDark ? '#52525b' : '#94a3b8')
 
     chartInstance.value.update('none')
 }
@@ -191,41 +196,41 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
+    <div class="bg-bg-surface border border-border-default rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
         
         <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
 
             <div>
-                <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-200">Events velocity</h3>
+                <h3 class="text-sm font-semibold text-text-main">Events velocity</h3>
                 <div class="flex items-center gap-2 mt-1 leading-none">
-                    <span class="text-xs font-bold" :class="recentEventCount > 0 ? 'text-rose-500 dark:text-rose-400'  : 'text-emerald-500'">{{ recentEventCount }}</span>
-                    <span class="text-xs font-medium text-slate-500 dark:text-zinc-400">Events Recorded</span>
+                    <span class="text-xs font-semibold" :class="recentEventCount > 0 ? 'text-critical' : 'text-success-main'">{{ recentEventCount }}</span>
+                    <span class="text-xs font-medium text-text-muted">Events Recorded</span>
                 </div>
             </div>
             
-            <div class="flex bg-slate-50 border border-slate-100 dark:border-transparent dark:bg-zinc-800 p-0.5 rounded-md text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+            <div class="flex bg-bg-inset p-0.5 rounded-md  text-[11px] font-medium text-text-muted border border-border-default/50">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
                         @click="appStore.velocityTimeframe = time"
                         class="px-2.5 py-1 rounded transition-colors"
-                        :class="velocityTimeframe === time ? 'bg-white dark:bg-zinc-700 text-slate-800 dark:text-zinc-100 shadow-sm border border-slate-200 dark:border-transparent' : 'hover:text-slate-700 dark:hover:text-zinc-200'">
+                        :class="velocityTimeframe === time ? 'bg-bg-surface text-text-main shadow-sm border border-border-default' : 'hover:text-text-main hover:bg-bg-surface/50'">
                     {{ time }}
                 </button>
             </div>
         </div>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full -mx-2">
-            <div v-if="events.length === 0" class="absolute inset-0 flex items-center justify-center text-xs text-slate-400 dark:text-zinc-500 z-20">
+            <div v-if="recentEventCount === 0" class="absolute inset-0 flex items-center justify-center text-xs text-text-muted z-20">
                 Awaiting telemetry...
             </div>
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
         </div>
 
-        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 border-t border-transparent">
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#f43f5e]"></span>Crit</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#fb923c]"></span>High</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#eab308]"></span>Med</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#3b82f6]"></span>Low</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#64748b]"></span>Info</div>
+        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-text-muted uppercase tracking-wider shrink-0 border-t border-transparent">
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-critical"></span>Crit</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-high"></span>High</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-medium"></span>Med</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-low"></span>Low</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-info"></span>Info</div>
         </div>
 
     </div>

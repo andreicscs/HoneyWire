@@ -68,19 +68,19 @@ export const useFleetStore = defineStore('fleet', () => {
   }
 
   /**
-   * Fetch uptime data for the given timeframe
-   * @param {string} timeframe - e.g., '24H', '7D', '30D'
-   */
-  const fetchUptime = async (timeframe = '24H') => {
+  * Fetch uptime data for the given timeframe
+  * @param {string|null} timeframe - e.g., '24H', '7D', '30D'
+  */
+  const fetchUptime = async (timeframe) => {
+    // If absolutely nothing is passed, fallback to the ref just in case
+    const target = timeframe || activeTimeframe.value; 
     try {
-      const data = await fetch(
-        `/api/v1/uptime?timeframe=${timeframe}`
-      ).then(r => r.json())
-      uptimeData.value = data || []
+        const data = await fetch(`/api/v1/uptime?timeframe=${target}`).then(r => r.json())
+        uptimeData.value = data || []
     } catch (e) {
-      console.error('Failed to fetch uptime', e)
+        console.error('Failed to fetch uptime', e)
     }
-  }
+}
 
   /**
    * Select a target node and sensor (or deselect if already selected)

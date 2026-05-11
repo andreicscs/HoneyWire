@@ -3,6 +3,7 @@ import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useEventsStore } from '../stores/events'
+import { getCssVariable, hexToRgb } from '../utils/theme'
 
 const eventsStore = useEventsStore()
 const { filteredEvents: events } = storeToRefs(eventsStore)
@@ -31,6 +32,14 @@ const neonGlowPlugin = {
 
 Chart.register(neonGlowPlugin)
 
+const getChartColors = () => [
+    getCssVariable('--sev-critical') || '#f43f5e',
+    getCssVariable('--sev-high') || '#fb923c',
+    getCssVariable('--sev-medium') || '#eab308',
+    getCssVariable('--sev-low') || '#3b82f6',
+    getCssVariable('--sev-info') || '#64748b'
+]
+
 const updateData = () => {
     if (!chartInstance) return;
     const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
@@ -56,11 +65,19 @@ const updateTheme = () => {
     if (!chartInstance) return;
     
     const isDark = document.documentElement.classList.contains('dark')
-    chartInstance.options.plugins.tooltip.backgroundColor = isDark ? 'rgba(24, 24, 27, 0.95)' : 'rgba(255, 255, 255, 0.95)'
-    chartInstance.options.plugins.tooltip.titleColor = isDark ? '#a1a1aa' : '#64748b'
-    chartInstance.options.plugins.tooltip.bodyColor = isDark ? '#f4f4f5' : '#0f172a'
-    chartInstance.options.plugins.tooltip.borderColor = isDark ? '#3f3f46' : '#e2e8f0'
+
+    // FIXED: Dynamically pull tooltip colors from CSS variables
+    const bgHex = getCssVariable('--bg-surface') || (isDark ? '#18181b' : '#ffffff');
+    const bgRgb = hexToRgb(bgHex);
+    const bgRgbStr = typeof bgRgb === 'object' ? `${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}` : (bgRgb || (isDark ? '24, 24, 27' : '255, 255, 255'));
+
+    chartInstance.options.plugins.tooltip.backgroundColor = `rgba(${bgRgbStr}, 0.95)`
+    chartInstance.options.plugins.tooltip.titleColor = getCssVariable('--text-muted') || (isDark ? '#a1a1aa' : '#64748b')
+    chartInstance.options.plugins.tooltip.bodyColor = getCssVariable('--text-main') || (isDark ? '#f4f4f5' : '#0f172a')
+    chartInstance.options.plugins.tooltip.borderColor = getCssVariable('--border-default') || (isDark ? '#3f3f46' : '#e2e8f0')
     
+    chartInstance.data.datasets[0].backgroundColor = getChartColors();
+
     chartInstance.update('none'); 
 }
 
@@ -72,7 +89,7 @@ onMounted(() => {
                 labels: ['critical', 'high', 'medium', 'low', 'info'],
                 datasets: [{
                     data: [0,0,0,0,0],
-                    backgroundColor: ['#f43f5e', '#fb923c', '#eab308', '#3b82f6', '#64748b'],
+                    backgroundColor: getChartColors(),
                     borderWidth: 0, spacing: 4, borderRadius: 2
                 }]
             },
@@ -87,7 +104,13 @@ onMounted(() => {
                         borderWidth: 1, padding: 10, boxPadding: 4, 
                         usePointStyle: true, boxWidth: 8, boxHeight: 8, 
                         titleFont: { size: 11, family: 'ui-monospace, monospace', weight: 'normal' }, 
-                        bodyFont: { size: 12, weight: 'bold' }
+                        bodyFont: { size: 12, weight: 'bold' },
+                        callbacks: {
+                            labelColor: (context) => {
+                                const color = context.dataset.backgroundColor[context.dataIndex];
+                                return { borderColor: color, backgroundColor: color }
+                            }
+                        }
                     }
                 } 
             }
@@ -118,11 +141,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
+    <div class="bg-bg-surface border border-border-default rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
         <div>
-            <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-200">Severity Distribution</h3>
+            <h3 class="text-sm font-semibold text-text-main">Severity Distribution</h3>
             <div class="flex items-center gap-4 mt-1">
-                <p class="text-xs text-slate-500 dark:text-zinc-400">Active Threat Breakdown</p>
+                <p class="text-xs text-text-muted">Active Threat Breakdown</p>
             </div>
         </div>
         
@@ -130,19 +153,19 @@ onUnmounted(() => {
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
                 <span class="text-3xl font-bold transition-colors leading-none"
-                      :class="events.length === 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-500'">
+                      :class="events.length === 0 ? 'text-success-main' : 'text-critical'">
                     {{ events.length }}
                 </span>
-                <span class="text-xs font-medium text-slate-500 dark:text-zinc-400 mt-1 leading-none">Events</span>
+                <span class="text-xs font-medium text-text-muted mt-1 leading-none">Events</span>
             </div>
         </div>
 
-        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider shrink-0 border-t border-transparent">
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#f43f5e]"></span>Crit</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#fb923c]"></span>High</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#eab308]"></span>Med</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#3b82f6]"></span>Low</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#64748b]"></span>Info</div>
+        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-text-muted uppercase tracking-wider shrink-0 border-t border-transparent">
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-critical"></span>Crit</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-high"></span>High</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-medium"></span>Med</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-low"></span>Low</div>
+            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-info"></span>Info</div>
         </div>
 
     </div>

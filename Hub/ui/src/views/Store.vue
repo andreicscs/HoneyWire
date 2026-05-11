@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useConfig } from '../api/useConfig'
 
 const { config } = useConfig()
@@ -11,18 +11,18 @@ const activeEnvVar = ref(null)
 
 const sensors = ref([])
 const isLoading = ref(true)
-const fetchError = ref(false) // Replaces offline fallback flag
+const fetchError = ref(false)
 
 const rawCompose = ref('')
 const highlightedCompose = ref('')
+const baseYaml = ref('') 
+const composePre = ref(null) 
 
 onMounted(async () => {
     try {
         isLoading.value = true;
         const response = await fetch("/api/v1/manifests", { cache: "no-store" });
-        
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
         sensors.value = await response.json();
     } catch (error) {
         console.error("HoneyWire: Failed to fetch sensor registry.", error);
@@ -32,34 +32,58 @@ onMounted(async () => {
     }
 });
 
-// Intelligently extracts a clean default value from Go Templates for the UI
 const getUIDefault = (def) => {
-    if (!def || !def.includes('{{')) return def;
-    // 1. Try to extract the final fallback from an {{ else }} block
+    if (!def) return '';
+    if (!def.includes('{{')) return def; 
     const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/);
     if (elseMatch) return elseMatch[1].trim();
-    
-    // 2. Try to extract simple function defaults (e.g., {{ availablePort 8080 }})
     const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/);
     if (funcMatch) return funcMatch[1].trim();
-    
     return '';
 }
 
-// Watch for changes in input fields and refetch the YAML automatically
-watch([selectedSensor, envVarValues, activeEnvVar], () => {
-    fetchYamlFromHub();
+const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_NODE_ID', 'HW_NODE_ALIAS', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL'];
+
+const sortedEnvVars = computed(() => {
+    if (!selectedSensor.value?.deployment?.env_vars) return [];
+    
+    return [...selectedSensor.value.deployment.env_vars]
+        .filter(env => !env.hidden)
+        .sort((a, b) => {
+            const aIsCore = coreVars.includes(a.name);
+            const bIsCore = coreVars.includes(b.name);
+            if (aIsCore && !bIsCore) return -1;
+            if (!aIsCore && bIsCore) return 1;
+            if (aIsCore && bIsCore) return coreVars.indexOf(a.name) - coreVars.indexOf(b.name);
+            return a.name.localeCompare(b.name);
+        });
+});
+
+watch(envVarValues, () => {
+    applyLocalUpdates();
 }, { deep: true });
+
+watch(activeEnvVar, () => {
+    applyHighlighting();
+});
 
 const openSensor = (sensor) => {
     selectedSensor.value = sensor
     activeTab.value = 'readme'
     envVarValues.value = {}
+    
     sensor.deployment.env_vars?.forEach(env => {
-        envVarValues.value[env.name] = getUIDefault(env.default)
+        if (env.name === 'HW_HUB_ENDPOINT') {
+            envVarValues.value[env.name] = config.hubEndpoint || window.location.origin;
+        } else if (env.name === 'HW_HUB_KEY') {
+            envVarValues.value[env.name] = config.hubKey || '<YOUR_HW_HUB_KEY>';
+        } else {
+            envVarValues.value[env.name] = getUIDefault(env.default);
+        }
     })
+    
     document.body.style.overflow = 'hidden'
-    fetchYamlFromHub(); // Initial fetch
+    fetchYamlFromHub(); 
 }
 
 const closeSensor = () => {
@@ -72,13 +96,17 @@ const closeSensor = () => {
 const fetchYamlFromHub = async () => {
     if (!selectedSensor.value) return;
 
+    const safeEnvValues = Object.fromEntries(
+        Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : ''])
+    );
+
     const payload = {
         node_id: "${HW_NODE_ID}",
         hub_endpoint: config.hubEndpoint || window.location.origin,
         hub_key: config.hubKey || '<YOUR_HW_HUB_KEY>',
         sensors: [{
             sensor_id: selectedSensor.value.id,
-            env_values: envVarValues.value,
+            env_values: safeEnvValues,
             manifest: selectedSensor.value
         }]
     };
@@ -92,24 +120,158 @@ const fetchYamlFromHub = async () => {
         
         if (!response.ok) throw new Error("Failed to compile YAML");
         
-        const yamlString = await response.text();
-        rawCompose.value = yamlString;
-
-        // Apply HTML Highlighting
-        let htmlYaml = yamlString;
-        if (activeEnvVar.value && envVarValues.value[activeEnvVar.value]) {
-            const valToHighlight = envVarValues.value[activeEnvVar.value];
-            const escaped = valToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`(?<!>)${escaped}(?!<)`, 'g');
-            htmlYaml = htmlYaml.replace(regex, `<span class="bg-blue-100 text-blue-800 dark:bg-zinc-700/80 dark:text-white font-bold px-1 rounded transition-colors duration-200">${valToHighlight}</span>`);
-        }
-        highlightedCompose.value = htmlYaml;
+        const rawBackendYaml = await response.text();
+        baseYaml.value = formatComposeYaml(rawBackendYaml); 
+        applyLocalUpdates(); 
 
     } catch (e) {
         console.error("YAML Generation Error:", e);
         rawCompose.value = "services:\n  error:\n    image: error_generating_yaml";
         highlightedCompose.value = rawCompose.value;
     }
+}
+
+const formatComposeYaml = (yamlStr) => {
+    let lines = yamlStr.split('\n');
+    let parsedLines = [];
+    let inEnvBlock = false;
+    let envVars = [];
+    
+    // Pass 1: Reorder Environment Variables
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        if (line.match(/^ {4}environment:/) || line.match(/^ {2}environment:/)) {
+            inEnvBlock = true;
+            parsedLines.push(line);
+            continue;
+        }
+
+        if (inEnvBlock) {
+            if (line.trim().startsWith('- ')) {
+                envVars.push(line);
+                if (i === lines.length - 1) {
+                    // Flush if it's the very last line
+                    envVars.sort((a, b) => sortEnvVarsLogic(a, b));
+                    parsedLines.push(...envVars);
+                }
+            } else {
+                // We've hit the end of the environment block, sort and flush
+                envVars.sort((a, b) => sortEnvVarsLogic(a, b));
+                parsedLines.push(...envVars);
+                envVars = [];
+                inEnvBlock = false;
+                parsedLines.push(line);
+            }
+        } else {
+            parsedLines.push(line);
+        }
+    }
+
+    // Pass 2: Reorder Services to pull Helpers to the top
+    const finalYaml = [];
+    let servicesIndex = parsedLines.findIndex(l => l.startsWith('services:'));
+    
+    if (servicesIndex === -1) return parsedLines.join('\n'); // Failsafe
+
+    finalYaml.push(...parsedLines.slice(0, servicesIndex + 1));
+    
+    let servicesMap = [];
+    let currentService = null;
+    let currentBlock = [];
+
+    for (let i = servicesIndex + 1; i < parsedLines.length; i++) {
+        const line = parsedLines[i];
+        
+        // Match a new top-level service (e.g., '  hw-sensor-canary:')
+        if (line.match(/^ {2}[a-zA-Z0-9_-]+:/)) {
+            if (currentService) {
+                servicesMap.push({ name: currentService, lines: currentBlock });
+            }
+            currentService = line.trim().replace(':', '');
+            currentBlock = [line];
+        } 
+        // Match service contents (indented lines) or blank lines
+        else if (line.startsWith('    ') || line.startsWith('   ') || line === '') {
+            if (currentService) currentBlock.push(line);
+            else finalYaml.push(line);
+        } 
+        // Match out-of-scope blocks (e.g., 'volumes:', 'networks:' at root)
+        else if (!line.startsWith(' ')) {
+            if (currentService) {
+                servicesMap.push({ name: currentService, lines: currentBlock });
+                currentService = null;
+            }
+            finalYaml.push(...parsedLines.slice(i));
+            break;
+        }
+    }
+    
+    if (currentService) {
+        servicesMap.push({ name: currentService, lines: currentBlock });
+    }
+
+    // Pull any service that DOES NOT start with 'hw-sensor' to the top
+    servicesMap.sort((a, b) => {
+        const aIsSensor = a.name.startsWith('hw-sensor');
+        const bIsSensor = b.name.startsWith('hw-sensor');
+        if (aIsSensor && !bIsSensor) return 1;
+        if (!aIsSensor && bIsSensor) return -1;
+        return 0;
+    });
+
+    servicesMap.forEach(svc => {
+        finalYaml.push(...svc.lines);
+    });
+
+    return finalYaml.join('\n');
+}
+
+// Helper function to keep sorting logic clean
+const sortEnvVarsLogic = (a, b) => {
+    const aName = a.trim().replace('- ', '').split(/[:=]/)[0];
+    const bName = b.trim().replace('- ', '').split(/[:=]/)[0];
+    const aIsCore = coreVars.includes(aName);
+    const bIsCore = coreVars.includes(bName);
+    if (aIsCore && !bIsCore) return -1;
+    if (!aIsCore && bIsCore) return 1;
+    if (aIsCore && bIsCore) return coreVars.indexOf(aName) - coreVars.indexOf(bName);
+    return aName.localeCompare(bName);
+}
+
+const applyLocalUpdates = () => {
+    if (!baseYaml.value) return;
+    let updatedYaml = baseYaml.value;
+
+    for (const [key, val] of Object.entries(envVarValues.value)) {
+        const safeVal = val !== undefined && val !== null ? String(val) : '';
+        const regex = new RegExp(`^(\\s*(?:-\\s+)?${key}\\s*[:=]\\s*["']?)([^"\'\\r\\n]*)(["']?.*)$`, 'gm');
+        updatedYaml = updatedYaml.replace(regex, `$1${safeVal}$3`);
+    }
+
+    rawCompose.value = updatedYaml;
+    applyHighlighting();
+}
+
+const applyHighlighting = () => {
+    let htmlYaml = rawCompose.value;
+    
+    if (activeEnvVar.value) {
+        const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm');
+        htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring font-bold px-1 rounded transition-colors duration-200 active-highlight">$&</span>`);
+    }
+    
+    highlightedCompose.value = htmlYaml;
+
+    nextTick(() => {
+        if (composePre.value) {
+            const highlightEl = composePre.value.querySelector('.active-highlight');
+            if (highlightEl) {
+                const scrollPos = highlightEl.offsetTop - (composePre.value.clientHeight / 2) + (highlightEl.clientHeight / 2);
+                composePre.value.scrollTo({ top: Math.max(0, scrollPos), behavior: 'smooth' });
+            }
+        }
+    });
 }
 
 const copyToClipboard = () => {
@@ -119,15 +281,14 @@ const copyToClipboard = () => {
     const btn = document.getElementById('copy-btn')
     const originalText = btn.innerHTML
     
-    // Improved "Copied!" styling
     btn.innerHTML = 'Copied!'
-    btn.classList.add('bg-green-100', 'text-green-700', 'border-green-300', 'dark:bg-green-900/30', 'dark:text-green-400', 'dark:border-green-800/50')
-    btn.classList.remove('text-slate-600', 'dark:text-zinc-300', 'bg-white', 'dark:bg-[#1f1f22]')
+    btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
+    btn.classList.remove('text-text-muted', 'bg-bg-inset', 'border-border-default', 'hover:bg-button-hover', 'hover:text-text-main')
     
     setTimeout(() => { 
         btn.innerHTML = originalText 
-        btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-300', 'dark:bg-green-900/30', 'dark:text-green-400', 'dark:border-green-800/50')
-        btn.classList.add('text-slate-600', 'dark:text-zinc-300', 'bg-white', 'dark:bg-[#1f1f22]')
+        btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
+        btn.classList.add('text-text-muted', 'bg-bg-inset', 'border-border-default', 'hover:bg-button-hover', 'hover:text-text-main')
     }, 2000)
 }
 </script>
@@ -137,96 +298,95 @@ const copyToClipboard = () => {
         
         <div class="mb-6 shrink-0 mt-4 sm:mt-6 flex justify-between items-end">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Sensor Store</h1>
-                <p class="text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-3xl">Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations.</p>
+                <h1 class="text-2xl font-bold text-text-main">Sensor Store</h1>
+                <p class="text-sm text-text-muted mt-1 max-w-3xl">Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations.</p>
             </div>
         </div>
 
         <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
-            <div v-for="i in 4" :key="i" class="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/50 rounded-lg p-5 h-36 animate-pulse flex flex-col justify-between">
+            <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse flex flex-col justify-between">
                 <div class="flex justify-between items-start">
-                    <div class="w-12 h-12 rounded-md bg-slate-200 dark:bg-zinc-800"></div>
-                    <div class="w-20 h-5 rounded bg-slate-200 dark:bg-zinc-800"></div>
+                    <div class="w-12 h-12 rounded-md bg-bg-inset"></div>
+                    <div class="w-20 h-5 rounded bg-bg-inset"></div>
                 </div>
                 <div class="space-y-2 mt-4">
-                    <div class="h-4 bg-slate-200 dark:bg-zinc-800 rounded w-3/4"></div>
-                    <div class="h-3 bg-slate-200 dark:bg-zinc-800 rounded w-full"></div>
+                    <div class="h-4 bg-bg-inset rounded w-3/4"></div>
+                    <div class="h-3 bg-bg-inset rounded w-full"></div>
                 </div>
             </div>
         </div>
         
-        <!-- Error State -->
         <div v-else-if="fetchError" class="flex flex-col items-center justify-center py-20 text-center">
-            <svg class="w-12 h-12 text-slate-400 dark:text-zinc-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Unable to reach Sensor Registry</h3>
-            <p class="text-sm text-slate-500 dark:text-zinc-400 mt-2 max-w-md">Please ensure this Hub has internet access to pull the latest sensor manifests from GitHub.</p>
+            <svg class="w-12 h-12 text-danger-text mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <h3 class="text-lg font-bold text-text-main">Unable to reach Sensor Registry</h3>
+            <p class="text-sm text-text-muted mt-2 max-w-md">Please ensure this Hub has internet access to pull the latest sensor manifests from GitHub.</p>
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
             <div v-for="s in sensors" :key="s.id" 
                  @click="openSensor(s)"
-                 class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800/80 rounded-lg p-5 shadow-sm hover:border-blue-500 dark:hover:border-zinc-300/20 hover:shadow-md cursor-pointer transition-all group flex flex-col">
+                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-highlight-border hover:shadow-md cursor-pointer transition-all group flex flex-col">
                 
                 <div class="flex justify-between items-start mb-4">
-                    <div class="w-12 h-12 rounded-md bg-slate-50 dark:bg-[#151518] border border-slate-200 dark:border-zinc-800/80 text-blue-600 dark:text-zinc-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
+                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-highlight-text flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                     </div>
-                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700">
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-bg-inset text-text-muted border border-border-default/50">
                         {{ s.osi_layer }}
                     </span>
                 </div>
                 
-                <h3 class="text-base font-bold text-slate-900 dark:text-zinc-100 mb-1">{{ s.name }}</h3>
-                <p class="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed line-clamp-2">{{ s.description }}</p>
+                <h3 class="text-base font-bold text-text-main mb-1">{{ s.name }}</h3>
+                <p class="text-xs text-text-muted leading-relaxed line-clamp-2">{{ s.description }}</p>
             </div>
         </div>
 
         <Teleport to="body">
             <transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
-                <div v-if="selectedSensor" class="fixed inset-0 z-50 flex justify-center items-center p-4 sm:p-6 bg-slate-900/60 dark:bg-black/60 backdrop-blur-sm" @click.self="closeSensor">
+                <div v-if="selectedSensor" class="fixed inset-0 z-50 flex justify-center items-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm" @click.self="closeSensor">
                     
-                    <div class="bg-white dark:bg-[#0a0a0c] w-full max-w-4xl h-full max-h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-zinc-800/80 transform transition-all">
+                    <div class="bg-bg-base w-full max-w-4xl h-full max-h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
                         
-                        <div class="px-6 py-5 border-b border-slate-100 dark:border-zinc-800/80 flex justify-between items-start bg-slate-50/50 dark:bg-[#0c0c0e] shrink-0">
+                        <div class="px-6 py-5 border-b border-border-default flex justify-between items-start bg-bg-surface shrink-0">
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-md bg-white dark:bg-[#151518] border border-slate-200 dark:border-zinc-800/80 text-blue-600 dark:text-zinc-300 flex items-center justify-center shrink-0 shadow-sm">
+                                <div class="w-12 h-12 rounded-md bg-bg-inset border border-border-default/50 text-highlight-text flex items-center justify-center shrink-0 shadow-sm">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="selectedSensor.icon_svg"></path></svg>
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-3">
-                                        <h2 class="text-xl font-bold text-slate-900 dark:text-zinc-100">{{ selectedSensor.name }}</h2>
-                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300 dark:border-zinc-700 hidden sm:block">
+                                        <h2 class="text-xl font-bold text-text-main">{{ selectedSensor.name }}</h2>
+                                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-bg-inset text-text-muted border border-border-default/50 hidden sm:block">
                                             {{ selectedSensor.osi_layer }}
                                         </span>
                                     </div>
-                                    <p class="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">{{ selectedSensor.description }}</p>
+                                    <p class="text-sm text-text-muted mt-0.5">{{ selectedSensor.description }}</p>
                                 </div>
                             </div>
-                            <button @click="closeSensor" class="p-2 -mr-2 text-slate-400 hover:text-slate-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800/50">
+                            <button @click="closeSensor" class="p-2 -mr-2 text-text-muted hover:text-text-main transition-colors rounded-full hover:bg-button-hover">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
 
-                        <div class="flex border-b border-slate-200 dark:border-zinc-800/80 px-6 shrink-0 bg-white dark:bg-[#0a0a0c]">
+                        <div class="flex border-b border-border-default px-6 shrink-0 bg-bg-base">
                             <button @click="activeTab = 'readme'" 
                                     class="py-3 px-2 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'readme' ? 'border-blue-500 text-blue-600 dark:border-zinc-300 dark:text-zinc-300' : 'border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300'">
+                                    :class="activeTab === 'readme' ? 'border-highlight-border text-highlight-text' : 'border-transparent text-text-muted hover:text-text-main'">
                                 Overview
                             </button>
                             <button @click="activeTab = 'compose'" 
                                     class="py-3 px-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'compose' ? 'border-blue-500 text-blue-600 dark:border-zinc-300 dark:text-zinc-300' : 'border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300'">
+                                    :class="activeTab === 'compose' ? 'border-highlight-border text-highlight-text' : 'border-transparent text-text-muted hover:text-text-main'">
                                 Deployment Script
                             </button>
                         </div>
 
-                        <div class="flex-1 overflow-y-auto custom-scroll bg-white dark:bg-[#0a0a0c]">
+                        <div class="flex-1 overflow-y-auto custom-scroll bg-bg-base">
                             
-                            <div v-show="activeTab === 'readme'" class="p-6 md:p-8 readme-container text-slate-700 dark:text-zinc-300 text-sm">
-                                <p class="mb-6">{{ selectedSensor.documentation.summary }}</p>
+                            <div v-show="activeTab === 'readme'" class="p-6 md:p-8 readme-container text-text-muted text-sm">
+                                <p class="mb-6 text-text-main">{{ selectedSensor.documentation.summary }}</p>
                                 
                                 <div v-for="section in selectedSensor.documentation.sections" :key="section.title" class="mb-6">
-                                    <h3 class="text-lg font-bold text-slate-900 dark:text-zinc-100 mb-3">{{ section.title }}</h3>
+                                    <h3 class="text-lg font-bold text-text-main mb-3">{{ section.title }}</h3>
                                     <ul v-if="section.type === 'list'" class="list-disc pl-5 space-y-1">
                                         <li v-for="item in section.content" :key="item">{{ item }}</li>
                                     </ul>
@@ -235,36 +395,35 @@ const copyToClipboard = () => {
 
                             <div v-show="activeTab === 'compose'" class="p-6 md:p-8 relative h-full flex flex-col">
                                 <div class="mb-4">
-                                    <p class="text-sm text-slate-600 dark:text-zinc-400">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-slate-100 dark:bg-zinc-800 px-1 py-0.5 rounded-md text-blue-600 dark:text-slate-300">docker compose up -d</code>.</p>
+                                    <p class="text-sm text-text-muted">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-bg-inset px-1 py-0.5 rounded-md text-text-main border border-border-default/50">docker compose up -d</code>.</p>
                                 </div>
                                 
-                                <!-- Config Forms with FIXED Text Colors -->
-                                <div v-if="selectedSensor.deployment.env_vars && selectedSensor.deployment.env_vars.filter(env => !env.hidden).length > 0" class="mb-6">
-                                    <h4 class="text-sm font-bold text-slate-900 dark:text-zinc-100 mb-3">Configuration</h4>
+                                <div v-if="sortedEnvVars.length > 0" class="mb-6">
+                                    <h4 class="text-sm font-bold text-text-main mb-3">Configuration</h4>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div v-for="env in selectedSensor.deployment.env_vars.filter(env => !env.hidden)" :key="env.name" class="space-y-1">
-                                            <label class="block text-xs font-medium text-slate-700 dark:text-zinc-300">{{ env.name }}</label>
+                                        <div v-for="env in sortedEnvVars" :key="env.name" class="space-y-1">
+                                            <label class="block text-xs font-medium text-text-main">{{ env.name }}</label>
                                             <input 
                                                 v-model="envVarValues[env.name]"
                                                 :type="env.type === 'int' ? 'number' : 'text'"
                                                 :placeholder="getUIDefault(env.default)"
                                                 @focus="activeEnvVar = env.name"
                                                 @blur="activeEnvVar = null"
-                                                class="w-full px-3 py-2 text-sm text-slate-900 dark:text-zinc-100 bg-white dark:bg-zinc-900 border border-slate-300 dark:border-zinc-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-zinc-500 transition-colors"
+                                                class="w-full px-3 py-2 text-sm text-text-main bg-bg-surface border border-border-default rounded-md focus:outline-none focus:ring-2 focus:ring-highlight-ring transition-colors"
                                             />
-                                            <p class="text-xs text-slate-500 dark:text-zinc-400">{{ env.description }}</p>
+                                            <p class="text-xs text-text-muted">{{ env.description }}</p>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <!-- YAML Output using PRE for Highlights instead of Textarea -->
                                 <div class="relative flex-1 min-h-[350px]">
                                     <pre 
+                                        ref="composePre"
                                         v-html="highlightedCompose"
-                                        class="absolute inset-0 w-full h-full bg-slate-50 dark:bg-[#121215] text-slate-800 dark:text-zinc-300 p-5 rounded-md text-[13px] mono custom-scroll border border-slate-200 dark:border-zinc-800/80 leading-relaxed overflow-auto focus:outline-none"
+                                        class="absolute inset-0 w-full h-full bg-bg-surface text-text-muted p-5 rounded-md text-[13px] mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth"
                                     ></pre>
                                     <button id="copy-btn" @click="copyToClipboard"
-                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-white dark:bg-[#1f1f22] hover:bg-blue-50 hover:text-blue-600 dark:hover:text-slate-300 dark:hover:bg-slate-500/30 dark:hover:border-slate-300/50 text-slate-600 dark:text-zinc-300 text-[11px] font-bold uppercase tracking-wider transition-colors border border-slate-200 dark:border-zinc-700 shadow-sm active:scale-95 z-10">
+                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-bg-inset hover:bg-button-hover hover:text-text-main text-text-muted text-[11px] font-bold uppercase tracking-wider transition-colors border border-border-default shadow-sm active:scale-95 z-10">
                                         Copy
                                     </button>
                                 </div>
@@ -283,16 +442,14 @@ const copyToClipboard = () => {
 .readme-container :deep(h3) {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--text-main);
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
-}
-.dark .readme-container :deep(h3) {
-    color: #f4f4f5;
 }
 .readme-container :deep(h4) {
     font-size: 0.95rem;
     font-weight: 700;
+    color: var(--text-main);
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
 }
@@ -302,14 +459,11 @@ const copyToClipboard = () => {
 }
 .readme-container :deep(code) {
     font-family: 'JetBrains Mono', monospace;
-    background-color: #f1f5f9;
-    color: #0f172a;
+    background-color: var(--bg-inset);
+    color: var(--text-main);
     padding: 0.1rem 0.3rem;
     border-radius: 0.25rem;
     font-size: 0.9em;
-}
-.dark .readme-container :deep(code) {
-    background-color: #27272a;
-    color: #e4e4e7;
+    border: 1px solid var(--border-default);
 }
 </style>
