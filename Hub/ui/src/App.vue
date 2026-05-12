@@ -134,7 +134,7 @@ if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.match
     <Login @login-success="checkAuthAndInit" @toggle-theme="toggleTheme" /> 
   </div>
 
-  <div v-else class="flex h-screen overflow-hidden bg-bg text-text-main transition-colors duration-200">
+  <div v-else class="flex h-screen overflow-hidden bg-bg text-text-h transition-colors duration-200">
     <Sidebar />
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
       <Header />

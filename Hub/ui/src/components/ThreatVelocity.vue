@@ -4,7 +4,10 @@ import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useAppStore } from '../stores/app'
 import { useEventsStore } from '../stores/events'
-import { getCssVariable, hexToRgb } from '../utils/theme' // Ensure hexToRgb is imported if used for the lines
+import { getComputedRgb, injectAlpha } from '../utils/theme'
+import BaseTimeFilter from './ui/BaseTimeFilter.vue'
+import BaseLegend from './ui/BaseLegend.vue'
+import BaseWidget from './ui/BaseWidget.vue'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
@@ -129,34 +132,30 @@ const updateTheme = () => {
     
     const isDark = document.documentElement.classList.contains('dark')
     const ctx = chartCanvas.value.getContext('2d')
-    
     const chartHeight = chartInstance.value.chartArea?.bottom || chartInstance.value.height || 200
 
     chartInstance.value.data.datasets.forEach((dataset, index) => {
         const sev = severities[index]
-        const rgb = getSeverityRgb(sev);
+        // This now safely returns 'rgb(x, y, z)' computed perfectly by the browser
+        const baseRgb = getComputedRgb(`--sev-${sev}`) 
+        
         const gradient = ctx.createLinearGradient(0, 0, 0, chartHeight)
-        const rgbStr = typeof rgb === 'object' ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : rgb;
+        gradient.addColorStop(0, injectAlpha(baseRgb, isDark ? 0.3 : 0.15))
+        gradient.addColorStop(1, injectAlpha(baseRgb, 0))
         
-        gradient.addColorStop(0, `rgba(${rgbStr}, ${isDark ? '0.3' : '0.15'})`)
-        gradient.addColorStop(1, `rgba(${rgbStr}, 0)`)
-        
-        dataset.borderColor = `rgb(${rgbStr})`
+        dataset.borderColor = baseRgb
         dataset.backgroundColor = gradient
-        dataset.pointHoverBackgroundColor = `rgb(${rgbStr})`
+        dataset.pointHoverBackgroundColor = baseRgb
     })
 
-    // Fixed Tooltip Logic: Now dynamically pulling from CSS variables instead of hardcoded hexes
-    // Fallbacks provided just in case getCssVariable fails on initial render
-    const bgHex = getCssVariable('--bg-surface') || (isDark ? '#18181b' : '#ffffff');
-    const bgRgb = hexToRgb(bgHex);
-    const bgRgbStr = typeof bgRgb === 'object' ? `${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}` : (bgRgb || (isDark ? '24, 24, 27' : '255, 255, 255'));
-
-    chartInstance.value.options.plugins.tooltip.backgroundColor = `rgba(${bgRgbStr}, 0.95)`
-    chartInstance.value.options.plugins.tooltip.titleColor = getCssVariable('--text-muted') || (isDark ? '#a1a1aa' : '#64748b')
-    chartInstance.value.options.plugins.tooltip.bodyColor = getCssVariable('--text-main') || (isDark ? '#f4f4f5' : '#0f172a')
-    chartInstance.value.options.plugins.tooltip.borderColor = getCssVariable('--border-default') || (isDark ? '#3f3f46' : '#e2e8f0')
-    chartInstance.value.options.scales.x.ticks.color = getCssVariable('--text-muted') || (isDark ? '#52525b' : '#94a3b8')
+    // Update Tooltips securely with browser-computed RGBs
+    const bgSurfaceRgb = getComputedRgb('--bg-surface')
+    chartInstance.value.options.plugins.tooltip.backgroundColor = injectAlpha(bgSurfaceRgb, 0.95)
+    
+    chartInstance.value.options.plugins.tooltip.titleColor = getComputedRgb('--text-m')
+    chartInstance.value.options.plugins.tooltip.bodyColor = getComputedRgb('--text-h')
+    chartInstance.value.options.plugins.tooltip.borderColor = getComputedRgb('--border-default')
+    chartInstance.value.options.scales.x.ticks.color = getComputedRgb('--text-m')
 
     chartInstance.value.update('none')
 }
@@ -193,47 +192,41 @@ onUnmounted(() => {
     if (themeObserver) themeObserver.disconnect()
     if (liveTicker) clearInterval(liveTicker)
 })
+
+const legendItems = [
+    { label: 'Crit', colorClass: 'bg-critical' },
+    { label: 'High', colorClass: 'bg-high' },
+    { label: 'Med', colorClass: 'bg-medium' },
+    { label: 'Low', colorClass: 'bg-low' },
+    { label: 'Info', colorClass: 'bg-info' }
+]
 </script>
 
 <template>
-    <div class="bg-bg-surface border border-border-default rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
-        
-        <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
-
-            <div>
-                <h3 class="text-sm font-semibold text-text-main">Events velocity</h3>
-                <div class="flex items-center gap-2 mt-1 leading-none">
-                    <span class="text-xs font-semibold" :class="recentEventCount > 0 ? 'text-critical' : 'text-success-main'">{{ recentEventCount }}</span>
-                    <span class="text-xs font-medium text-text-muted">Events Recorded</span>
+    <BaseWidget>
+        <template #header>
+            <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
+                <div>
+                    <h3 class="text-base text-text-h">Events velocity</h3>
+                    <div class="flex items-center gap-2 mt-1 leading-none">
+                        <span class="text-sm" :class="recentEventCount > 0 ? 'text-critical' : 'text-success-main'">{{ recentEventCount }}</span>
+                        <span class="text-sm text-text-m">Events Recorded</span>
+                    </div>
                 </div>
+                
+                <BaseTimeFilter v-model="appStore.velocityTimeframe" />
             </div>
-            
-            <div class="flex bg-secondary-main p-1 rounded-md border border-secondary-border text-[11px] w-fit shadow-inner">
-                <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
-                        @click="appStore.velocityTimeframe = time"
-                        class="px-3 py-1 rounded transition-all outline-none"
-                        :class="velocityTimeframe === time 
-                            ? 'bg-primary-selected text-primary-text font-bold shadow-sm' 
-                            : 'text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
-                    {{ time }}
-                </button>
-            </div>
-        </div>
+        </template>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full -mx-2">
-            <div v-if="recentEventCount === 0" class="absolute inset-0 flex items-center justify-center text-xs text-text-muted z-20">
+            <div v-if="recentEventCount === 0" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
         </div>
 
-        <div class="mt-auto h-4 pt-5 flex items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-text-muted uppercase tracking-wider shrink-0 border-t border-transparent">
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-critical"></span>Crit</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-high"></span>High</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-medium"></span>Med</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-low"></span>Low</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-info"></span>Info</div>
-        </div>
-
-    </div>
+        <template #footer>
+            <BaseLegend :items="legendItems" />
+        </template>
+    </BaseWidget>
 </template>

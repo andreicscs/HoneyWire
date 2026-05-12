@@ -2,6 +2,9 @@
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFleetStore } from '../stores/fleet'
+import BaseTimeFilter from './ui/BaseTimeFilter.vue'
+import BaseWidget from './ui/BaseWidget.vue'
+import BaseLegend from './ui/BaseLegend.vue'
 
 const fleetStore = useFleetStore()
 const { sensors: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
@@ -110,40 +113,39 @@ onUnmounted(() => {
     window.removeEventListener('click', closeMenu)
     window.removeEventListener('scroll', closeOnScroll, true) 
 })
+
+const legendItems = [
+    { label: 'Up', colorClass: 'bg-success-main' },
+    { label: 'Degraded', colorClass: 'bg-high' },
+    { label: 'Down', colorClass: 'bg-critical' },
+    { label: 'N/A', colorClass: 'bg-bg-inset' }
+]
 </script>
 
 <template>
-    <div class="bg-bg-surface border border-border-default rounded-lg p-4 sm:p-5 flex flex-col shadow-sm h-full w-full overflow-hidden relative group">
-        
-        <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
-            <div>
-                <h3 class="text-sm font-semibold text-text-main">Fleet Uptime</h3>
-                <div class="flex items-center gap-4 mt-1">
-                    <p class="text-xs text-text-muted">
-                        Fleet Overall Uptime: 
-                        <span class="font-semibold transition-colors" 
-                              :class="parseFloat(overallUptime) >= 95 ? 'text-success-main' : (parseFloat(overallUptime) >= 85 ? 'text-high' : 'text-critical')">
-                            {{ overallUptime }}
-                        </span>
-                    </p>
+    <BaseWidget>
+        <template #header>
+            <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
+                <div>
+                    <h3 class="text-base  text-text-h">Fleet Uptime</h3>
+                    <div class="flex items-center gap-4 mt-1">
+                        <p class="text-sm text-text-m">
+                            Fleet Overall Uptime: 
+                            <span class=" transition-colors" 
+                                  :class="parseFloat(overallUptime) >= 95 ? 'text-success-main' : (parseFloat(overallUptime) >= 85 ? 'text-high' : 'text-critical')">
+                                {{ overallUptime }}
+                            </span>
+                        </p>
+                    </div>
                 </div>
+                
+                <BaseTimeFilter v-model="fleetStore.activeTimeframe" />
             </div>
-            
-            <div class="flex bg-secondary-main p-1 rounded-md border border-secondary-border text-[11px] w-fit shadow-inner">
-                <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
-                        @click="fleetStore.activeTimeframe = time"
-                        class="px-3 py-1 rounded transition-all focus:outline-none"
-                        :class="activeTimeframe === time 
-                            ? 'bg-primary-selected text-primary-text font-bold shadow-sm' 
-                            : 'text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
-                    {{ time }}
-                </button>
-            </div>
-        </div>
+        </template>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full">
             <div ref="scrollArea" @scroll.passive="checkScroll" class="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto custom-scroll pr-3 pb-10">
-                <div v-show="uptimeData.length === 0" class="text-xs text-text-muted py-4 text-center">No fleet data available.</div>
+                <div v-show="uptimeData.length === 0" class="text-sm text-text-m py-4 text-center">No fleet data available.</div>
                 
                 <div v-for="group in groupedUptime" :key="group.nodeId" :id="'group-' + group.nodeId"
                     class="transition-all duration-300 rounded-lg p-1 mb-1.5 border"
@@ -157,8 +159,8 @@ onUnmounted(() => {
                         :class="group.nodeId !== 'unassigned' ? 'cursor-pointer' : ''"
                         @click="group.nodeId !== 'unassigned' ? fleetStore.selectTarget(group.nodeId) : null">
                                             
-                        <span class="text-[8.5px] uppercase tracking-wider font-bold transition-colors"
-                              :class="group.nodeId !== 'unassigned' ? 'text-text-muted group-hover/header:text-text-main' : 'text-text-muted'">
+                        <span class="text-sm tracking-wider transition-colors"
+                              :class="group.nodeId !== 'unassigned' ? 'text-text-m group-hover/header:text-text-h' : 'text-text-m'">
                             {{ group.nodeId !== 'unassigned' ? group.nodeId : 'Unassigned Sensors' }}
                         </span>
                         
@@ -179,9 +181,9 @@ onUnmounted(() => {
                             <div @click.stop="toggleMenu($event, sensor.node_id, sensor.id)" 
                                  class="meatball-toggle w-5 h-5 rounded flex items-center justify-center transition-all cursor-pointer shrink-0"
                                  :class="[
-                                     activeMenu === sensor.node_id + '|' + sensor.id ? 'text-text-main bg-button-selected' :
-                                     selectedSensor === sensor.id ? 'text-text-muted hover:text-text-main hover:bg-button-hover' :
-                                     'text-text-muted/70 hover:text-text-main hover:bg-button-hover'
+                                     activeMenu === sensor.node_id + '|' + sensor.id ? 'text-text-h bg-button-selected' :
+                                     selectedSensor === sensor.id ? 'text-text-m hover:text-text-h hover:bg-button-hover' :
+                                     'text-text-m/70 hover:text-text-h hover:bg-button-hover'
                                  ]">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                             </div>
@@ -189,8 +191,8 @@ onUnmounted(() => {
                             <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="sensor.isOnline ? 'bg-success-main' : 'bg-critical'"></span>
                             
                             <button @click="fleetStore.selectTarget(sensor.node_id, sensor.id)"
-                                class="text-[11px] mono text-left transition-colors cursor-pointer px-1 py-0.5 rounded-md flex items-center gap-1.5 max-w-[calc(100%-28px)]"
-                                :class="selectedSensor === sensor.id && selectedNode === sensor.node_id ? 'text-text-main font-bold' : 'text-text-muted font-medium hover:text-text-main'"
+                                class="text-sm mono text-left transition-colors cursor-pointer px-1 py-0.5 rounded-md flex items-center gap-1.5 max-w-[calc(100%-28px)]"
+                                :class="selectedSensor === sensor.id && selectedNode === sensor.node_id ? 'text-text-h ' : 'text-text-m  hover:text-text-h'"
                                 :title="`Node: ${sensor.node_id || 'Unassigned'}`">
                                 <span class="truncate">{{ sensor.name }}</span>
                                 
@@ -230,12 +232,9 @@ onUnmounted(() => {
             </div>
         </div>
         
-        <div class="hidden sm:flex mt-auto h-4 pt-5 items-center justify-center gap-3 sm:gap-4 text-[8px] font-semibold text-text-muted uppercase tracking-wider shrink-0 border-t border-transparent">
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-success-main"></span>Up</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-high"></span>Degraded</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-critical"></span>Down</div>
-            <div class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-bg-inset"></span>N/A</div>
-        </div>
+        <template #footer>
+            <div class="hidden sm:block"><BaseLegend :items="legendItems" /></div>
+        </template>
 
         <Teleport to="body">
             <transition enter-active-class="transition ease-out duration-100" enter-from-class="transform opacity-0 scale-95" enter-to-class="transform opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95">
@@ -244,8 +243,8 @@ onUnmounted(() => {
                      class="global-sensor-dropdown fixed w-36 rounded-md shadow-xl bg-bg-surface border border-border-default z-[100] py-1 overflow-hidden">
                     
                     <button @click.stop="handleSilence(activeSensorData.node_id, activeSensorData.sensor_id)" 
-                            class="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 hover:bg-button-hover transition-colors group"
-                            :class="activeSensorData.is_silenced ? 'text-archive-text' : 'text-text-muted hover:text-text-main'">
+                            class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-button-hover transition-colors group"
+                            :class="activeSensorData.is_silenced ? 'text-archive-text' : 'text-text-m hover:text-text-h'">
                         <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path v-if="!activeSensorData.is_silenced" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                             <path v-if="activeSensorData.is_silenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
@@ -254,7 +253,7 @@ onUnmounted(() => {
                     </button>
                     
                     <button @click="handleForget(activeSensorData.node_id, activeSensorData.sensor_id)" 
-                            class="w-full text-left px-3 py-2 text-xs font-semibold text-danger-text flex items-center gap-2 hover:bg-danger-bg-subtle transition-colors group border-t border-border-default mt-1 pt-2">
+                            class="w-full text-left px-3 py-2 text-sm text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
                         <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />
                             <path class="origin-bottom-right transition-transform duration-300 group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
@@ -265,5 +264,5 @@ onUnmounted(() => {
             </transition>
         </Teleport>
 
-    </div>
+    </BaseWidget>
 </template>

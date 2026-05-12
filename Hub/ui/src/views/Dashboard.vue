@@ -38,12 +38,12 @@ const copyCommand = () => {
     
     btn.innerHTML = 'Copied!'
     btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
-    btn.classList.remove('bg-bg-surface', 'text-text-main', 'border-border-default', 'hover:bg-button-hover')
+    btn.classList.remove('bg-bg-surface', 'text-text-h', 'border-border-default', 'hover:bg-button-hover')
     
     setTimeout(() => { 
         btn.innerHTML = originalText 
         btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
-        btn.classList.add('bg-bg-surface', 'text-text-main', 'border-border-default', 'hover:bg-button-hover')
+        btn.classList.add('bg-bg-surface', 'text-text-h', 'border-border-default', 'hover:bg-button-hover')
     }, 2000)
 }
 </script>
@@ -53,7 +53,7 @@ const copyCommand = () => {
         
         <div class="flex justify-end w-full mb-4 px-2 sm:px-4 lg:px-6">
             <button @click="generateToken" :disabled="isGeneratingToken"
-                    class="bg-text-main text-bg-surface hover:opacity-90 text-xs font-bold py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
+                    class="bg-text-main text-bg-surface hover:opacity-90 text-xs  py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 {{ isGeneratingToken ? 'Generating...' : 'Add Node' }}
             </button>
@@ -85,14 +85,14 @@ const copyCommand = () => {
             <div v-if="showProvisionModal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div class="bg-bg-surface border border-border-default rounded-lg shadow-2xl max-w-lg w-full overflow-hidden flex flex-col transform transition-all">
                     <div class="p-5 border-b border-border-default flex justify-between items-center">
-                        <h3 class="font-bold text-text-main">Provision New Node</h3>
-                        <button @click="showProvisionModal = false" class="text-text-muted hover:text-text-main transition-colors hover:bg-button-hover rounded-full p-1 -mr-1">
+                        <h3 class=" text-text-h">Provision New Node</h3>
+                        <button @click="showProvisionModal = false" class="text-text-m hover:text-text-h transition-colors hover:bg-button-hover rounded-full p-1 -mr-1">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
                     </div>
                     
                     <div class="p-5 space-y-4">
-                        <p class="text-sm text-text-muted">
+                        <p class="text-sm text-text-m">
                             Run the following command on the server you want to monitor. This token is single-use and expires in 15 minutes.
                         </p>
                         
@@ -101,14 +101,14 @@ const copyCommand = () => {
                                 ./wizard --link http://{{ currentHost }} {{ provisionToken }}
                             </code>
                             <button id="copy-cmd-btn" @click="copyCommand"
-                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-main text-[11px] font-bold uppercase tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
+                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-h text-[11px]   tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
                                 Copy
                             </button>
                         </div>
                     </div>
 
                     <div class="p-4 bg-bg-base border-t border-border-default flex justify-end">
-                        <button @click="showProvisionModal = false" class="px-4 py-2 bg-bg-surface hover:bg-button-hover text-text-main border border-border-default text-sm font-semibold rounded-md transition-colors shadow-sm">
+                        <button @click="showProvisionModal = false" class="px-4 py-2 bg-bg-surface hover:bg-button-hover text-text-h border border-border-default text-base  rounded-md transition-colors shadow-sm">
                             Close
                         </button>
                     </div>
