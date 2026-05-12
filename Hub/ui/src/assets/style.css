@@ -1,115 +1,166 @@
 @import "tailwindcss";
 @variant dark (&:where(.dark, .dark *)); /* <-- ADD THIS LINE */
 
-/* -- Design System: CSS Variables -- */
+/* -- Design System: CSS Variables (OKLCH Edition) -- */
+/* Format: oklch(Lightness Chroma Hue)
+   - L: 0% (Black) to 100% (White)
+   - C: 0 (Grayscale) to 0.4 (Ultra Vibrant)
+   - H: 0 to 360 (Color Wheel)
+*/
+
 :root {
-  --bg: #e7e7e7;
-  --bg-base: #f0f0f0;
-  --bg-surface: #ffffff;
-  --bg-inset: #d6dbe0;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --border-default: #d2d9e2;
-  --button-selected: rgb(209, 212, 219);
-  --button-hover: #e1e4e9;
+  /* Structural (Neutral Slate: Hue 250, very low Chroma) */
+  --bg: oklch(92% 0.01 250);
+  --bg-base: oklch(96% 0.01 250);
+  --bg-surface: oklch(99% 0.01 250);
+  --bg-inset: oklch(88% 0.01 250);
+  
+  --surface-highlight: oklch(100% 0 0); /* The lighting sheen */
+  
+  --text-main: oklch(25% 0.02 250);
+  --text-muted: oklch(50% 0.02 250);
+  --border-default: oklch(85% 0.02 250);
+
+  /* ---> Action & Interactive Variables <--- */
+  
+  /* Primary Actions */
+  --primary-main: oklch(20% 0.02 250);
+  --primary-hover: oklch(30% 0.02 250);
+  --primary-selected: oklch(15% 0.02 250);
+  --primary-text: oklch(98% 0 0); /* Softened from pure white */
+  
+  /* Secondary Actions */
+  --secondary-main: oklch(99% 0 0);
+  --secondary-hover: oklch(90% 0.01 250);
+  --secondary-selected: oklch(88% 0.02 250);
+  --secondary-text: oklch(45% 0.02 250);
+  --secondary-border: oklch(85% 0.02 250);
+
+  /* Disabled State */
+  --disabled-bg: oklch(92% 0.01 250);
+  --disabled-text: oklch(70% 0.01 250);
+  --disabled-border: oklch(85% 0.01 250);
+  
+  /* Forms & Inputs */
+  --input-bg: oklch(98% 0.01 250);          
+  --input-border: oklch(85% 0.02 250);
+  --focus-ring: oklch(60% 0.15 250 / 0.4); /* Blue-ish glow */
 
   /* Alert Severities */
-  --sev-critical: #f43f5e;
-  --sev-high: #fb923c;
-  --sev-medium: #eab308;
-  --sev-low: #3b82f6;
-  --sev-info: #64748b;
+  --sev-critical: oklch(60% 0.22 20);      /* Rose */
+  --sev-high: oklch(65% 0.18 50);          /* Orange */
+  --sev-medium: oklch(75% 0.15 85);        /* Amber */
+  --sev-low: oklch(60% 0.15 250);          /* Blue */
+  --sev-info: oklch(55% 0.02 250);         /* Slate */
 
-  /* Danger Actions (System Resets, Purges) */
-  --danger-main: #e11d48;       /* Solid buttons*/
-  --danger-hover: #be123c;      /* Solid button hover*/
-  --danger-text: #3f0f1c;       /* Text accents*/
-  --danger-bg: #ffcbcd;         /* Panel background*/
-  --danger-bg-subtle: #ffe4e6;  /* Badge/Subtle button bg*/
-  --danger-bg-hover: #f8aeb7;   /* Subtle button hover*/
-  --danger-border: #ff8393;     /* Borders*/
+  /* Danger Actions */
+  --danger-main: oklch(55% 0.22 20);
+  --danger-hover: oklch(45% 0.22 20);
+  --danger-text: oklch(25% 0.1 20);
+  --danger-bg: oklch(90% 0.05 20);
+  --danger-bg-subtle: oklch(95% 0.02 20);
+  --danger-bg-hover: oklch(85% 0.08 20);
+  --danger-border: oklch(80% 0.1 20);
 
   /* Archive Actions (Amber) */
-  --archive-text: #92400e;       /* Text accents*/
-  --archive-bg: #fef3c7;         /* Active/Selected bg*/
-  --archive-bg-subtle: #fffbeb;  /* Hover bg subtle*/
-  --archive-border: #fcd34d;     /* Borders*/
+  --archive-text: oklch(35% 0.1 85);
+  --archive-bg: oklch(90% 0.08 85);
+  --archive-bg-subtle: oklch(96% 0.04 85);
+  --archive-border: oklch(80% 0.12 85);
 
-  /* Success Actions (Armed, Online, OK) */
-  --success-main: #10b981;       /* Solid elements*/
-  --success-selected: #68cc98;   /* Selected/Active elements*/
-  --success-text: #033a2a;       /* Text accents*/
-  --success-bg: #83e9b4;         /* Active/Selected bg*/
-  --success-border: #6ec29b;     /* Borders*/
+  /* Success Actions (Emerald) */
+  --success-main: oklch(65% 0.15 150);
+  --success-selected: oklch(75% 0.12 150);
+  --success-text: oklch(25% 0.08 150);
+  --success-bg: oklch(90% 0.06 150);
+  --success-border: oklch(80% 0.1 150);
 
-  /* Highlight Actions (Secondary selections, e.g., Node pill when sensor is clicked) */
-  --highlight-bg: #eff6ff;
-  --highlight-border: #60a5fa;
-  --highlight-text: #1e3a8a;
-  --highlight-ring: rgba(59, 130, 246, 0.3);
+  /* Highlight Actions */
+  --highlight-bg: oklch(96% 0.03 250);
+  --highlight-border: oklch(75% 0.1 250);
+  --highlight-text: oklch(35% 0.1 250);
+  --highlight-ring: oklch(75% 0.1 250 / 0.3);
 
-  /* Selection Layers (Node Pills, Uptime Groups/Rows) */
-  --select-solid-bg: #1e293b;
-  --select-solid-text: #ffffff;
-  --select-group-bg: rgba(248, 250, 252, 0.5);
-  --select-group-border: #cbd5e1;
-  --select-row-bg: #f1f5f9;
-  --select-row-border: #cbd5e1;
+  /* Selection Layers */
+  --select-solid-bg: oklch(25% 0.02 250);
+  --select-solid-text: oklch(98% 0 0);
+  --select-group-bg: oklch(97% 0.01 250 / 0.5);
+  --select-group-border: oklch(85% 0.02 250);
+  --select-row-bg: oklch(95% 0.01 250);
+  --select-row-border: oklch(85% 0.02 250);
 }
 
 .dark {
-  --bg: #030303;
-  --bg-base: #09090b;
-  --bg-surface: #18181b;
-  --bg-inset: #09090b;
-  --text-main: #f4f4f5;
-  --text-muted: #a1a1aa;
-  --border-default: #2c2c30;
-  --button-selected: #2f2f33;
-  --button-hover: #202024;
+  /* Structural (Elevation via mathematically spaced Lightness) */
+  --bg: oklch(10% 0.01 250);
+  --bg-inset: oklch(12% 0.01 250);       /* Deepest */
+  --bg-base: oklch(16% 0.01 250);        /* Base layer */
+  --bg-surface: oklch(22% 0.01 250);     /* Closest to user */
+  
+  --surface-highlight: oklch(35% 0.02 250); /* Dark mode lighting sheen */
+  
+  --text-main: oklch(95% 0.01 250);      /* Softened from pure white */
+  --text-muted: oklch(70% 0.02 250);
+  --border-default: oklch(30% 0.02 250);
+  
+  /* Primary Actions */
+  --primary-main: oklch(95% 0.01 250);
+  --primary-hover: oklch(100% 0 0);
+  --primary-selected: oklch(85% 0.02 250);
+  --primary-text: oklch(15% 0.01 250);   /* Softened from pure black */
+  
+  /* Secondary Actions */
+  --secondary-main: oklch(22% 0.01 250);
+  --secondary-hover: oklch(26% 0.02 250);
+  --secondary-selected: oklch(35% 0.02 250);
+  --secondary-text: oklch(70% 0.02 250);
+  --secondary-border: oklch(30% 0.02 250);
 
-  /* Alert Severities */
-  --sev-critical: #f43f5e;
-  --sev-high: #fb923c;
-  --sev-medium: #facc15;
-  --sev-low: #3b82f6;
-  --sev-info: #94a3b8;
+  /* Disabled State */
+  --disabled-bg: oklch(22% 0.01 250);
+  --disabled-text: oklch(45% 0.01 250);
+  --disabled-border: oklch(30% 0.01 250);
+  
+  /* Forms & Inputs */
+  --input-bg: oklch(14% 0.01 250);           
+  --input-border: oklch(30% 0.01 250);
+  --focus-ring: oklch(70% 0.05 250 / 0.4);
 
-  /* Danger Actions (System Resets, Purges) */
-  --danger-main: #f43f5e;       /* Solid buttons*/
-  --danger-hover: #e11d48;      /* Solid button hover*/
-  --danger-text: #fb7185;       /* Text accents*/
-  --danger-bg: #150a0a;         /* Panel background*/
-  --danger-bg-subtle: #241114;  /* Badge/Subtle button bg*/
-  --danger-bg-hover: #38151d;   /* Subtle button hover */
-  --danger-border: #3f0f1c;     /* Borders*/
+  /* Danger Actions */
+  --danger-main: oklch(60% 0.22 20);
+  --danger-hover: oklch(50% 0.22 20);
+  --danger-text: oklch(75% 0.15 20);
+  --danger-bg: oklch(20% 0.05 20);
+  --danger-bg-subtle: oklch(25% 0.08 20);
+  --danger-bg-hover: oklch(30% 0.1 20);
+  --danger-border: oklch(35% 0.1 20);
 
   /* Archive Actions (Amber) */
-  --archive-text: #fbbf24;       /* Text accents*/
-  --archive-bg: rgba(245, 158, 11, 0.2);       /* Active/Selected bg*/
-  --archive-bg-subtle: rgba(120, 53, 15, 0.2); /* Hover bg subtle*/
-  --archive-border: rgba(245, 158, 11, 0.3);   /* Borders*/
+  --archive-text: oklch(85% 0.1 85);
+  --archive-bg: oklch(25% 0.08 85 / 0.2);
+  --archive-bg-subtle: oklch(20% 0.05 85 / 0.2);
+  --archive-border: oklch(50% 0.15 85 / 0.3);
 
-  /* Success Actions (Armed, Online, OK) */
-  --success-main: #10b981;               /* Solid elements*/
-  --success-selected: rgba(45, 182, 145, 0.3);   /* Selected/Active elements*/
-  --success-text: #34d399;               /* Text accents*/
-  --success-bg: rgba(10, 136, 102, 0.18);    /* Active bg*/
-  --success-border: rgba(6, 78, 59, 0.5);/* Borders*/
+  /* Success Actions (Emerald) */
+  --success-main: oklch(65% 0.15 150);
+  --success-selected: oklch(60% 0.15 150 / 0.3);
+  --success-text: oklch(80% 0.12 150);
+  --success-bg: oklch(35% 0.1 150 / 0.18);
+  --success-border: oklch(40% 0.1 150 / 0.5);
 
   /* Highlight Actions */
   --highlight-bg: transparent;
-  --highlight-border: #a1a1aa;
-  --highlight-text: #e4e4e7;
-  --highlight-ring: rgba(161, 161, 170, 0.5);
+  --highlight-border: oklch(70% 0.02 250);
+  --highlight-text: oklch(90% 0.01 250);
+  --highlight-ring: oklch(70% 0.02 250 / 0.5);
 
   /* Selection Layers */
-  --select-solid-bg: #e4e4e7;
-  --select-solid-text: #000000;
-  --select-group-bg: rgba(255, 255, 255, 0.05);
-  --select-group-border: #52525b;
-  --select-row-bg: #27272a;
-  --select-row-border: #71717a;
+  --select-solid-bg: oklch(90% 0.01 250);
+  --select-solid-text: oklch(15% 0.01 250);
+  --select-group-bg: oklch(100% 0 0 / 0.05);
+  --select-group-border: oklch(40% 0.02 250);
+  --select-row-bg: oklch(26% 0.02 250);
+  --select-row-border: oklch(50% 0.02 250);
 }
 
 @theme {
@@ -120,9 +171,28 @@
   --color-text-main: var(--text-main);
   --color-text-muted: var(--text-muted);
   --color-border-default: var(--border-default);
-  --color-button-selected: var(--button-selected);
-  --color-button-hover: var(--button-hover);
 
+  /* Inject Action Palettes */
+  --color-primary-main: var(--primary-main);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-selected: var(--primary-selected);
+  --color-primary-text: var(--primary-text);
+  
+  --color-secondary-main: var(--secondary-main);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-selected: var(--secondary-selected);
+  --color-secondary-text: var(--secondary-text);
+  --color-secondary-border: var(--secondary-border);
+
+  --color-disabled-bg: var(--disabled-bg);
+  --color-disabled-text: var(--disabled-text);
+  --color-disabled-border: var(--disabled-border);
+  
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+  --color-focus-ring: var(--focus-ring);
+
+  /* Inject Severity Palettes */
   --color-critical: var(--sev-critical);
   --color-high: var(--sev-high);
   --color-medium: var(--sev-medium);

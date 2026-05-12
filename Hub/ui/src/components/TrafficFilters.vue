@@ -20,8 +20,6 @@ const isNodeSilenced = computed(() => {
     return activeNodeData.value.sensors.every(s => s.is_silenced);
 })
 
-// FIXED: Removed highlightedNodeId completely to prevent duplicate ID bugs.
-
 const activeNodes = computed(() => {
     const nodesMap = {};
     
@@ -93,7 +91,6 @@ watch(() => selectedNode.value, (newVal) => {
 
 watch(() => selectedSensor.value, (newVal) => {
     nextTick(() => {
-        // FIXED: Relying on selectedNode.value instead of highlightedNodeId
         const elId = newVal && selectedNode.value ? `pill-${selectedNode.value}` : 'pill-all'
         const el = document.getElementById(elId)
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
@@ -121,11 +118,11 @@ onUnmounted(() => {
                 <div class="relative flex overflow-x-auto gap-1">
                     <div ref="scrollArea" @scroll.passive="checkScroll" class="flex overflow-x-auto whitespace-nowrap gap-2 items-center custom-scroll pb-3 pr-2 relative">
                         
-                        <div class="sticky left-0 z-20 pr-2 bg-bg-bg flex items-center border-r border-border-default transition-all duration-200">
+                        <div class="sticky left-0 z-20 pr-2 bg-bg flex items-center border-r border-border-default transition-all duration-200">
                             
                             <button id="pill-all" @click="fleetStore.selectTarget(null, null)" 
-                                    class="shrink-0 px-3.5 py-1.5 rounded-md border text-sm font-bold transition-all duration-300 shadow-sm"
-                                    :class="!selectedNode && !selectedSensor ? 'bg-select-solid-bg text-select-solid-text border-select-solid-bg' : 'bg-bg-surface border-border-default text-text-muted hover:bg-button-hover hover:text-text-main'">
+                                    class="shrink-0 px-3.5 py-1.5 rounded-md border text-sm font-bold transition-all duration-300 shadow-sm outline-none"
+                                    :class="!selectedNode && !selectedSensor ? 'bg-primary-selected text-primary-text border-primary-selected' : 'bg-secondary-main border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
                                 All Traffic
                             </button>
                         </div>
@@ -133,14 +130,14 @@ onUnmounted(() => {
                         <div v-for="n in activeNodes" :key="n.node_id" :id="'pill-' + n.node_id"
                             class="shrink-0 relative flex items-center rounded-md border transition-all duration-300 shadow-sm group/pill"
                             :class="[
-                                /* Solid Selected Style */
-                                (selectedNode === n.node_id && !selectedSensor) ? 'bg-select-solid-bg text-select-solid-text border-select-solid-bg' : 
+                                /* FIXED: Solid Selected Style uses Primary Selected */
+                                (selectedNode === n.node_id && !selectedSensor) ? 'bg-primary-selected text-primary-text border-primary-selected' : 
                                 
-                                /* Blue Highlight Style (Sensor selected) */
+                                /* Blue Highlight Style (Sensor selected) remains highlight palette */
                                 (selectedNode === n.node_id && selectedSensor) ? 'bg-highlight-bg border-highlight-border text-highlight-text ring-1 ring-highlight-ring' : 
                                 
-                                /* Default */
-                                'bg-bg-surface border-border-default text-text-muted hover:bg-button-hover hover:text-text-main',
+                                /* FIXED: Default is now Secondary Main */
+                                'bg-secondary-main border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-main',
                                 
                                 n.status === 'offline' ? 'is-offline' : '',
                                 n.status === 'degraded' ? 'is-degraded' : '',
@@ -163,9 +160,10 @@ onUnmounted(() => {
                             <div @click.stop="toggleMenu($event, n.node_id)" 
                                  class="meatball-toggle w-5 h-5 mr-1 rounded flex items-center justify-center transition-all cursor-pointer shrink-0 opacity-40 group-hover/pill:opacity-100"
                                  :class="[
-                                     activeMenu === n.node_id ? 'opacity-100 text-text-main bg-button-selected' :
-                                     selectedNode === n.node_id ? 'hover:bg-bg-surface/20' :
-                                     'hover:text-text-main hover:bg-button-hover'
+                                     activeMenu === n.node_id ? 'opacity-100 text-text-main bg-secondary-selected' :
+                                     (selectedNode === n.node_id && !selectedSensor) ? 'text-primary-text/60 hover:text-primary-text hover:bg-primary-hover' :
+                                     (selectedNode === n.node_id && selectedSensor) ? 'text-highlight-text/60 hover:text-highlight-text hover:bg-highlight-text/20' :
+                                     'text-secondary-text hover:text-text-main hover:bg-secondary-selected'
                                  ]">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
                             </div>
@@ -180,7 +178,7 @@ onUnmounted(() => {
                         </transition>
                     </div>
                 </div>
-                <div class="absolute right-5 top-0 bottom-7 w-10 h-8 bg-gradient-to-l from-bg-bg to-transparent pointer-events-none"></div>
+                <div class="absolute right-5 top-0 bottom-7 w-10 h-8 bg-gradient-to-l from-bg to-transparent pointer-events-none"></div>
             </div>
         </div>
 
@@ -191,8 +189,8 @@ onUnmounted(() => {
                      class="node-dropdown fixed w-40 rounded-md shadow-xl bg-bg-surface border border-border-default z-[100] py-1 overflow-hidden">
                     
                     <button @click.stop="handleSilenceNode(activeNodeData.node_id)" 
-                            class="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 hover:bg-button-hover transition-colors group"
-                            :class="isNodeSilenced ? 'text-archive-text' : 'text-text-muted hover:text-text-main'">
+                            class="w-full text-left px-3 py-2 text-xs font-semibold flex items-center gap-2 transition-colors group"
+                            :class="isNodeSilenced ? 'text-archive-text hover:bg-archive-bg-subtle' : 'text-text-muted hover:text-text-main hover:bg-secondary-hover'">
                         <svg class="w-3.5 h-3.5 transition-transform duration-200 group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path v-if="!isNodeSilenced" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                             <path v-if="isNodeSilenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>

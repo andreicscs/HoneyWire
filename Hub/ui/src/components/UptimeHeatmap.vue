@@ -129,11 +129,13 @@ onUnmounted(() => {
                 </div>
             </div>
             
-            <div class="flex bg-bg-inset border border-border-default/50 p-0.5 rounded-md text-[11px] font-medium text-text-muted">
+            <div class="flex bg-secondary-main p-1 rounded-md border border-secondary-border text-[11px] w-fit shadow-inner">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
                         @click="fleetStore.activeTimeframe = time"
-                        class="px-2.5 py-1 rounded transition-colors"
-                        :class="activeTimeframe === time ? 'bg-bg-surface text-text-main shadow-sm border border-border-default' : 'hover:text-text-main hover:bg-button-hover/50'">
+                        class="px-3 py-1 rounded transition-all focus:outline-none"
+                        :class="activeTimeframe === time 
+                            ? 'bg-primary-selected text-primary-text font-bold shadow-sm' 
+                            : 'text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
                     {{ time }}
                 </button>
             </div>

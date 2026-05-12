@@ -17,7 +17,6 @@ const settings = ref({
     siemProtocol: 'tcp'
 })
 
-// Deep clone to track original state
 const initialSettings = ref(null)
 
 watch(() => config.isLoaded, (loaded) => {
@@ -25,12 +24,10 @@ watch(() => config.isLoaded, (loaded) => {
         const loadedSettings = {
             hubEndpoint: config.hubEndpoint || window.location.origin,
             hubKey: config.hubKey || '',
-            // Use strict undefined checks to allow 0 (Keep Forever)
             autoArchiveDays: config.autoArchiveDays !== undefined ? config.autoArchiveDays : 0,
             autoPurgeDays: config.autoPurgeDays !== undefined ? config.autoPurgeDays : 0,
             webhookType: config.webhookType || 'ntfy',
             webhookUrl: config.webhookUrl || '',
-            // Enforce array defaults if empty
             webhookEvents: config.webhookEvents && config.webhookEvents.length > 0 
                 ? [...config.webhookEvents] 
                 : ['critical', 'high', 'medium', 'low', 'info'],
@@ -90,7 +87,6 @@ const toggleSeverity = (sev) => {
     }
 }
 
-// FIXED: Now relies on standard CSS variables injected via style instead of tailwind hardcodes
 const getSeverityStyle = (sev, isActive) => {
     if (!isActive) {
         return { 
@@ -107,7 +103,6 @@ const getSeverityStyle = (sev, isActive) => {
     };
 }
 
-// --- CUSTOM MODALS FOR DANGER ZONE ---
 const showPasswordModal = ref(false)
 const pwdData = ref({ current: '', new: '', confirmNew: '' })
 const pwdError = ref('')
@@ -187,8 +182,8 @@ const submitFactoryReset = async () => {
                 </span>
 
                 <button @click="saveSettings" :disabled="isSaving || !hasUnsavedChanges"
-                        class="px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95 border"
-                        :class="hasUnsavedChanges ? 'bg-text-main text-bg-surface border-text-main hover:opacity-90' : 'bg-bg-inset text-text-muted border-border-default cursor-not-allowed'">
+                        class="px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all shadow-sm active:scale-95 border outline-none focus:ring-2 focus:ring-focus-ring"
+                        :class="hasUnsavedChanges ? 'bg-primary-main text-primary-text border-primary-main hover:bg-primary-hover' : 'bg-disabled-bg text-disabled-text border-disabled-border shadow-none cursor-not-allowed active:scale-100'">
                     {{ isSaving ? 'Saving...' : 'Save Changes' }}
                 </button>
             </div>
@@ -198,25 +193,25 @@ const submitFactoryReset = async () => {
             <nav class="w-full md:w-56 shrink-0 flex flex-col gap-2">
                 <button @click="activeTab = 'general'" 
                         class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
-                        :class="activeTab === 'general' ? 'bg-button-selected text-text-main font-bold shadow-sm border-select-row-border' : 'bg-bg-surface font-medium text-text-muted hover:bg-button-hover hover:text-text-main border-border-default/50'">
+                        :class="activeTab === 'general' ? 'bg-secondary-selected text-text-main font-bold shadow-sm border-secondary-border' : 'bg-secondary-main font-medium text-secondary-text hover:bg-secondary-hover hover:text-text-main border-secondary-border/50'">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     Hub Configuration
                 </button>
                 <button @click="activeTab = 'data'" 
                         class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
-                        :class="activeTab === 'data' ? 'bg-button-selected text-text-main font-bold shadow-sm border-select-row-border' : 'bg-bg-surface font-medium text-text-muted hover:bg-button-hover hover:text-text-main border-border-default/50'">
+                        :class="activeTab === 'data' ? 'bg-secondary-selected text-text-main font-bold shadow-sm border-secondary-border' : 'bg-secondary-main font-medium text-secondary-text hover:bg-secondary-hover hover:text-text-main border-secondary-border/50'">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
                     Data Retention
                 </button>
                 <button @click="activeTab = 'alerts'" 
                         class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
-                        :class="activeTab === 'alerts' ? 'bg-button-selected text-text-main font-bold shadow-sm border-select-row-border' : 'bg-bg-surface font-medium text-text-muted hover:bg-button-hover hover:text-text-main border-border-default/50'">
+                        :class="activeTab === 'alerts' ? 'bg-secondary-selected text-text-main font-bold shadow-sm border-secondary-border' : 'bg-secondary-main font-medium text-secondary-text hover:bg-secondary-hover hover:text-text-main border-secondary-border/50'">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     Push Notifications
                 </button>
                 <button @click="activeTab = 'siem'" 
                         class="w-full text-left px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-3 border"
-                        :class="activeTab === 'siem' ? 'bg-button-selected text-text-main font-bold shadow-sm border-select-row-border' : 'bg-bg-surface font-medium text-text-muted hover:bg-button-hover hover:text-text-main border-border-default/50'">
+                        :class="activeTab === 'siem' ? 'bg-secondary-selected text-text-main font-bold shadow-sm border-secondary-border' : 'bg-secondary-main font-medium text-secondary-text hover:bg-secondary-hover hover:text-text-main border-secondary-border/50'">
                     <svg class="w-5 h-5 shrink-0" fill="currentColor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" xml:space="preserve">
                         <path d="M77.2,56.2h-3.7c-1,0-1.8,1-1.8,1.8v12.3c0,1-0.9,1.8-1.8,1.8H29.3c-1,0-1.8-0.9-1.8-1.8V58 c0-0.9-0.9-1.8-1.8-1.8h-3.7c-1,0-1.8,1-1.8,1.8v16.6c0,2.7,2.2,4.9,4.9,4.9h49.1c2.7,0,4.9-2.2,4.9-4.9V58 C79,57.1,78.2,56.2,77.2,56.2z M50.8,21c-0.7-0.7-1.8-0.7-2.6,0L31.6,37.6c-0.7,0.7-0.7,1.8,0,2.6l2.6,2.6c0.7,0.7,1.8,0.7,2.6,0 l6.9-6.9c0.7-0.7,2.2-0.2,2.2,0.9v26c0,1,0.7,1.8,1.7,1.8h3.7c1,0,2-1,2-1.8V36.9c0-1.1,1.2-1.6,2.1-0.9l6.9,6.9 c0.7,0.7,1.8,0.7,2.6,0l2.6-2.6c0.7-0.7,0.7-1.8,0-2.6C67.3,37.7,50.8,21,50.8,21z"></path>
                     </svg>
@@ -240,16 +235,16 @@ const submitFactoryReset = async () => {
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">Hub Endpoint URL</label>
                                 <p class="text-xs text-text-muted mb-3">The publicly accessible URL or IP where sensors will send their telemetry.</p>
                                 <input type="text" v-model="settings.hubEndpoint" 
-                                       class="w-full max-w-md px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-colors">
+                                       class="w-full max-w-md px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-colors">
                             </div>
                             <div class="pt-5 border-t border-border-default/50">
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">Hub Secret Key</label>
                                 <p class="text-xs text-text-muted mb-3">The shared secret required by sensors to authenticate with the Hub API.</p>
                                 <div class="flex gap-3 items-center flex-wrap sm:flex-nowrap">
                                     <input type="text" v-model="settings.hubKey"
-                                           class="flex-1 w-full max-w-md px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-colors">
+                                           class="flex-1 w-full max-w-md px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-colors">
                                     <button @click="regenerateKey" 
-                                            class="px-4 py-2 rounded-md bg-bg-surface border border-border-default text-text-main text-xs font-bold hover:bg-button-hover transition-colors shadow-sm whitespace-nowrap">
+                                            class="px-4 py-2 rounded-md bg-secondary-main border border-secondary-border text-secondary-text text-xs font-bold hover:bg-secondary-hover hover:text-text-main transition-colors shadow-sm whitespace-nowrap outline-none focus:ring-2 focus:ring-focus-ring">
                                         Regenerate Key
                                     </button>
                                 </div>
@@ -268,7 +263,7 @@ const submitFactoryReset = async () => {
                                     <p class="text-xs text-text-muted mt-1">Move events from the Live Queue to the Archive automatically.</p>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <div class="flex items-center rounded-md border border-border-default overflow-hidden bg-bg-base shadow-inner">
+                                    <div class="flex items-center rounded-md border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-highlight-border transition-colors">
                                         <button @click="adjustDays('autoArchiveDays', -1, 0, 90)" class="px-3 py-1.5 text-text-muted hover:bg-button-hover transition-colors font-bold select-none outline-none">-</button>
                                         <input type="number" v-model="settings.autoArchiveDays" min="0" max="90"
                                                class="w-12 text-center text-sm mono font-bold bg-transparent border-none focus:outline-none focus:ring-0 text-text-main hide-arrows p-0" />
@@ -284,7 +279,7 @@ const submitFactoryReset = async () => {
                                     <p class="text-xs text-text-muted mt-1">Permanently delete archived events from the SQLite database.</p>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <div class="flex items-center rounded-md border border-border-default overflow-hidden bg-bg-base shadow-inner">
+                                    <div class="flex items-center rounded-md border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-highlight-border transition-colors">
                                         <button @click="adjustDays('autoPurgeDays', -1, 0, 365)" class="px-3 py-1.5 text-text-muted hover:bg-button-hover transition-colors font-bold select-none outline-none">-</button>
                                         <input type="number" v-model="settings.autoPurgeDays" min="0" max="365"
                                                class="w-12 text-center text-sm mono font-bold bg-transparent border-none focus:outline-none focus:ring-0 text-text-main hide-arrows p-0" />
@@ -308,10 +303,10 @@ const submitFactoryReset = async () => {
                                 <div class="flex flex-wrap gap-2.5">
                                     <button v-for="provider in ['ntfy', 'gotify', 'discord', 'slack']" :key="provider"
                                             @click="settings.webhookType = provider"
-                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all flex items-center justify-center"
+                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all flex items-center justify-center outline-none focus:ring-2 focus:ring-focus-ring"
                                             :class="settings.webhookType === provider 
-                                                ? 'bg-text-main text-bg-surface border-text-main shadow-sm' 
-                                                : 'bg-bg-inset border-border-default text-text-muted hover:bg-button-hover'">
+                                                ? 'bg-primary-selected text-primary-text border-primary-selected shadow-sm' 
+                                                : 'bg-secondary-main border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
                                         {{ provider }}
                                     </button>
                                 </div>
@@ -324,14 +319,14 @@ const submitFactoryReset = async () => {
                                     <span v-else>Paste the incoming Webhook URL provided by {{ settings.webhookType === 'discord' ? 'Discord' : 'Slack' }}.</span>
                                 </p>
                                 <input type="url" v-model="settings.webhookUrl" placeholder="https://..."
-                                       class="w-full max-w-xl px-4 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-colors placeholder:text-text-muted/50">
+                                       class="w-full max-w-xl px-4 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-colors placeholder:text-text-muted/50">
                             </div>
                             <div class="pt-5 border-t border-border-default/50">
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">Trigger Severities</label>
                                 <div class="flex flex-wrap gap-2.5">
                                     <button v-for="sev in ['critical', 'high', 'medium', 'low', 'info']" :key="sev"
                                             @click="toggleSeverity(sev)"
-                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all border outline-none select-none hover:opacity-80"
+                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all border outline-none select-none hover:opacity-80 focus:ring-2 focus:ring-focus-ring"
                                             :style="getSeverityStyle(sev, settings.webhookEvents.includes(sev))">
                                         {{ sev }}
                                     </button>
@@ -351,17 +346,17 @@ const submitFactoryReset = async () => {
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2">Server Address</label>
                                 <p class="text-xs text-text-muted mb-3">Forward syslog events to your SIEM (e.g., <code>elk.example.com:514</code>).</p>
                                 <input type="text" v-model="settings.siemAddress" placeholder="host:port"
-                                       class="w-full max-w-xl px-4 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-colors placeholder:text-text-muted/50">
+                                       class="w-full max-w-xl px-4 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-colors placeholder:text-text-muted/50">
                             </div>
                             <div class="pt-5 border-t border-border-default/50">
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">Protocol</label>
                                 <div class="flex flex-wrap gap-2.5">
                                     <button v-for="proto in ['tcp', 'udp']" :key="proto"
                                             @click="settings.siemProtocol = proto"
-                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all flex items-center justify-center"
+                                            class="px-3.5 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-all flex items-center justify-center outline-none focus:ring-2 focus:ring-focus-ring"
                                             :class="settings.siemProtocol === proto 
-                                                ? 'bg-text-main text-bg-surface border-text-main shadow-sm' 
-                                                : 'bg-bg-inset border-border-default text-text-muted hover:bg-button-hover'">
+                                                ? 'bg-primary-selected text-primary-text border-primary-selected shadow-sm' 
+                                                : 'bg-secondary-main border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
                                         {{ proto }}
                                     </button>
                                 </div>
@@ -379,7 +374,7 @@ const submitFactoryReset = async () => {
                         <div>
                             <p class="text-sm text-text-muted mb-4 max-w-2xl">Update the master password used to access this dashboard. You will be logged out immediately upon changing this.</p>
                             <button @click="pwdData = {current:'', new:'', confirmNew:''}; pwdError = ''; showPasswordModal = true" 
-                                    class="px-4 py-2 rounded-md bg-bg-surface border border-border-default text-text-main text-sm font-bold hover:bg-button-hover transition-colors shadow-sm">
+                                    class="px-4 py-2 rounded-md bg-secondary-main border border-secondary-border text-secondary-text text-sm font-bold hover:bg-secondary-hover hover:text-text-main transition-colors shadow-sm outline-none focus:ring-2 focus:ring-focus-ring">
                                 Change Master Password
                             </button>
                         </div>
@@ -397,7 +392,7 @@ const submitFactoryReset = async () => {
                                     <p class="text-xs text-text-muted mt-1 max-w-xl">Wipes all configuration, logs, and authentication keys. The application will restart in setup mode.</p>
                                 </div>
                                 <button @click="resetPassword = ''; resetError = ''; showResetModal = true" 
-                                        class="shrink-0 px-4 py-2 rounded-md bg-danger-main hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-sm">
+                                        class="shrink-0 px-4 py-2 rounded-md bg-danger-main border border-danger-main hover:bg-danger-hover text-white text-xs font-bold uppercase tracking-wider transition-colors shadow-sm outline-none focus:ring-2 focus:ring-danger-border">
                                     Reset System
                                 </button>
                             </div>
@@ -421,24 +416,26 @@ const submitFactoryReset = async () => {
                         <form @submit.prevent="submitPasswordChange" class="space-y-4">
                             <div>
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Current Password</label>
-                                <input type="password" v-model="pwdData.current" class="w-full px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-all" required autofocus>
+                                <input type="password" v-model="pwdData.current" class="w-full px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-all" required autofocus>
                             </div>
                             
                             <div class="pt-2">
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5">New Password</label>
-                                <input type="password" v-model="pwdData.new" class="w-full px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-all" required>
+                                <input type="password" v-model="pwdData.new" class="w-full px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-all" required>
                             </div>
 
                             <div>
                                 <label class="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Confirm New Password</label>
-                                <input type="password" v-model="pwdData.confirmNew" class="w-full px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-highlight-ring shadow-inner transition-all" required>
+                                <input type="password" v-model="pwdData.confirmNew" class="w-full px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-highlight-border focus:ring-focus-ring shadow-inner transition-all" required>
                             </div>
 
                             <div v-if="pwdError" class="text-xs font-bold text-danger-text bg-danger-bg-subtle p-2.5 rounded-md border border-danger-border">{{ pwdError }}</div>
                             
                             <div class="pt-4 flex justify-end gap-3">
-                                <button type="button" @click="showPasswordModal = false" class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-main transition-colors">Cancel</button>
-                                <button type="submit" :disabled="pwdLoading" class="px-4 py-2 rounded-md bg-text-main text-bg-surface text-sm font-bold shadow-sm hover:opacity-90 disabled:opacity-50 transition-all active:scale-95">
+                                <button type="button" @click="showPasswordModal = false" class="px-4 py-2 text-sm font-medium text-secondary-text hover:text-text-main transition-colors outline-none focus:ring-2 focus:ring-focus-ring rounded-md">Cancel</button>
+                                <button type="submit" :disabled="pwdLoading" 
+                                        class="px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-all active:scale-95 border outline-none focus:ring-2 focus:ring-focus-ring"
+                                        :class="pwdLoading ? 'bg-disabled-bg text-disabled-text border-disabled-border cursor-not-allowed active:scale-100 shadow-none' : 'bg-primary-main text-primary-text border-primary-main hover:bg-primary-hover'">
                                     {{ pwdLoading ? 'Updating...' : 'Update Password' }}
                                 </button>
                             </div>
@@ -460,14 +457,16 @@ const submitFactoryReset = async () => {
                         
                         <form @submit.prevent="submitFactoryReset" class="space-y-4">
                             <div>
-                                <input type="password" v-model="resetPassword" placeholder="Master Password" class="w-full px-3 py-2 rounded-md bg-bg-base border border-border-default text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-danger-border focus:ring-danger-border/50 shadow-inner transition-all" required autofocus>
+                                <input type="password" v-model="resetPassword" placeholder="Master Password" class="w-full px-3 py-2 rounded-md bg-input-bg border border-input-border text-sm mono text-text-main focus:outline-none focus:ring-1 focus:border-danger-border focus:ring-danger-border/50 shadow-inner transition-all" required autofocus>
                             </div>
                             
                             <div v-if="resetError" class="text-xs font-bold text-danger-text bg-danger-bg-subtle p-2.5 rounded-md border border-danger-border text-center">{{ resetError }}</div>
                             
                             <div class="pt-4 flex justify-end gap-3">
-                                <button type="button" @click="showResetModal = false" class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-main transition-colors">Cancel</button>
-                                <button type="submit" :disabled="resetLoading" class="px-4 py-2 rounded-md bg-danger-main text-white text-sm font-bold shadow-sm hover:bg-danger-hover disabled:opacity-50 transition-colors active:scale-95">
+                                <button type="button" @click="showResetModal = false" class="px-4 py-2 text-sm font-medium text-secondary-text hover:text-text-main transition-colors outline-none focus:ring-2 focus:ring-focus-ring rounded-md">Cancel</button>
+                                <button type="submit" :disabled="resetLoading" 
+                                        class="px-4 py-2 rounded-md text-sm font-bold shadow-sm transition-colors active:scale-95 border outline-none focus:ring-2 focus:ring-danger-border/50"
+                                        :class="resetLoading ? 'bg-disabled-bg text-disabled-text border-disabled-border cursor-not-allowed shadow-none active:scale-100' : 'bg-danger-main text-white border-danger-main hover:bg-danger-hover'">
                                     {{ resetLoading ? 'Wiping...' : 'Destroy Data' }}
                                 </button>
                             </div>

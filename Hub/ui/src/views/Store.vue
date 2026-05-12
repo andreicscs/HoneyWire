@@ -150,12 +150,10 @@ const formatComposeYaml = (yamlStr) => {
             if (line.trim().startsWith('- ')) {
                 envVars.push(line);
                 if (i === lines.length - 1) {
-                    // Flush if it's the very last line
                     envVars.sort((a, b) => sortEnvVarsLogic(a, b));
                     parsedLines.push(...envVars);
                 }
             } else {
-                // We've hit the end of the environment block, sort and flush
                 envVars.sort((a, b) => sortEnvVarsLogic(a, b));
                 parsedLines.push(...envVars);
                 envVars = [];
@@ -182,7 +180,6 @@ const formatComposeYaml = (yamlStr) => {
     for (let i = servicesIndex + 1; i < parsedLines.length; i++) {
         const line = parsedLines[i];
         
-        // Match a new top-level service (e.g., '  hw-sensor-canary:')
         if (line.match(/^ {2}[a-zA-Z0-9_-]+:/)) {
             if (currentService) {
                 servicesMap.push({ name: currentService, lines: currentBlock });
@@ -190,12 +187,10 @@ const formatComposeYaml = (yamlStr) => {
             currentService = line.trim().replace(':', '');
             currentBlock = [line];
         } 
-        // Match service contents (indented lines) or blank lines
         else if (line.startsWith('    ') || line.startsWith('   ') || line === '') {
             if (currentService) currentBlock.push(line);
             else finalYaml.push(line);
         } 
-        // Match out-of-scope blocks (e.g., 'volumes:', 'networks:' at root)
         else if (!line.startsWith(' ')) {
             if (currentService) {
                 servicesMap.push({ name: currentService, lines: currentBlock });
@@ -210,7 +205,6 @@ const formatComposeYaml = (yamlStr) => {
         servicesMap.push({ name: currentService, lines: currentBlock });
     }
 
-    // Pull any service that DOES NOT start with 'hw-sensor' to the top
     servicesMap.sort((a, b) => {
         const aIsSensor = a.name.startsWith('hw-sensor');
         const bIsSensor = b.name.startsWith('hw-sensor');
@@ -226,7 +220,6 @@ const formatComposeYaml = (yamlStr) => {
     return finalYaml.join('\n');
 }
 
-// Helper function to keep sorting logic clean
 const sortEnvVarsLogic = (a, b) => {
     const aName = a.trim().replace('- ', '').split(/[:=]/)[0];
     const bName = b.trim().replace('- ', '').split(/[:=]/)[0];
@@ -283,12 +276,14 @@ const copyToClipboard = () => {
     
     btn.innerHTML = 'Copied!'
     btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
-    btn.classList.remove('text-text-muted', 'bg-bg-inset', 'border-border-default', 'hover:bg-button-hover', 'hover:text-text-main')
+    // FIXED: Mapped to the new Secondary Palettes
+    btn.classList.remove('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-main')
     
     setTimeout(() => { 
         btn.innerHTML = originalText 
         btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
-        btn.classList.add('text-text-muted', 'bg-bg-inset', 'border-border-default', 'hover:bg-button-hover', 'hover:text-text-main')
+        // FIXED: Restore the Secondary Palettes
+        btn.classList.add('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-main')
     }, 2000)
 }
 </script>
@@ -325,10 +320,10 @@ const copyToClipboard = () => {
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
             <div v-for="s in sensors" :key="s.id" 
                  @click="openSensor(s)"
-                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-highlight-border hover:shadow-md cursor-pointer transition-all group flex flex-col">
+                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all group flex flex-col">
                 
                 <div class="flex justify-between items-start mb-4">
-                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-highlight-text flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
+                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-main flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                     </div>
                     <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-bg-inset text-text-muted border border-border-default/50">
@@ -349,7 +344,7 @@ const copyToClipboard = () => {
                         
                         <div class="px-6 py-5 border-b border-border-default flex justify-between items-start bg-bg-surface shrink-0">
                             <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-md bg-bg-inset border border-border-default/50 text-highlight-text flex items-center justify-center shrink-0 shadow-sm">
+                                <div class="w-12 h-12 rounded-md bg-bg-inset border border-border-default/50 text-text-main flex items-center justify-center shrink-0 shadow-sm">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="selectedSensor.icon_svg"></path></svg>
                                 </div>
                                 <div>
@@ -362,7 +357,7 @@ const copyToClipboard = () => {
                                     <p class="text-sm text-text-muted mt-0.5">{{ selectedSensor.description }}</p>
                                 </div>
                             </div>
-                            <button @click="closeSensor" class="p-2 -mr-2 text-text-muted hover:text-text-main transition-colors rounded-full hover:bg-button-hover">
+                            <button @click="closeSensor" class="p-2 -mr-2 text-text-muted hover:text-text-main transition-colors rounded-full hover:bg-secondary-hover focus:outline-none">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
@@ -370,12 +365,12 @@ const copyToClipboard = () => {
                         <div class="flex border-b border-border-default px-6 shrink-0 bg-bg-base">
                             <button @click="activeTab = 'readme'" 
                                     class="py-3 px-2 mr-6 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'readme' ? 'border-highlight-border text-highlight-text' : 'border-transparent text-text-muted hover:text-text-main'">
+                                    :class="activeTab === 'readme' ? 'border-primary-main text-text-main' : 'border-transparent text-text-muted hover:text-text-main'">
                                 Overview
                             </button>
                             <button @click="activeTab = 'compose'" 
                                     class="py-3 px-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'compose' ? 'border-highlight-border text-highlight-text' : 'border-transparent text-text-muted hover:text-text-main'">
+                                    :class="activeTab === 'compose' ? 'border-primary-main text-text-main' : 'border-transparent text-text-muted hover:text-text-main'">
                                 Deployment Script
                             </button>
                         </div>
@@ -395,7 +390,7 @@ const copyToClipboard = () => {
 
                             <div v-show="activeTab === 'compose'" class="p-6 md:p-8 relative h-full flex flex-col">
                                 <div class="mb-4">
-                                    <p class="text-sm text-text-muted">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-bg-inset px-1 py-0.5 rounded-md text-text-main border border-border-default/50">docker compose up -d</code>.</p>
+                                    <p class="text-sm text-text-muted">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-input-bg px-1 py-0.5 rounded-md text-text-main border border-input-border">docker compose up -d</code>.</p>
                                 </div>
                                 
                                 <div v-if="sortedEnvVars.length > 0" class="mb-6">
@@ -409,7 +404,7 @@ const copyToClipboard = () => {
                                                 :placeholder="getUIDefault(env.default)"
                                                 @focus="activeEnvVar = env.name"
                                                 @blur="activeEnvVar = null"
-                                                class="w-full px-3 py-2 text-sm text-text-main bg-bg-surface border border-border-default rounded-md focus:outline-none focus:ring-2 focus:ring-highlight-ring transition-colors"
+                                                class="w-full px-3 py-2 text-sm text-text-main bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main transition-colors shadow-inner placeholder:text-text-muted/50"
                                             />
                                             <p class="text-xs text-text-muted">{{ env.description }}</p>
                                         </div>
@@ -422,8 +417,9 @@ const copyToClipboard = () => {
                                         v-html="highlightedCompose"
                                         class="absolute inset-0 w-full h-full bg-bg-surface text-text-muted p-5 rounded-md text-[13px] mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth"
                                     ></pre>
+                                    
                                     <button id="copy-btn" @click="copyToClipboard"
-                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-bg-inset hover:bg-button-hover hover:text-text-main text-text-muted text-[11px] font-bold uppercase tracking-wider transition-colors border border-border-default shadow-sm active:scale-95 z-10">
+                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-main text-[11px] font-bold uppercase tracking-wider transition-colors shadow-sm active:scale-95 z-10 focus:outline-none">
                                         Copy
                                     </button>
                                 </div>
@@ -459,11 +455,11 @@ const copyToClipboard = () => {
 }
 .readme-container :deep(code) {
     font-family: 'JetBrains Mono', monospace;
-    background-color: var(--bg-inset);
+    background-color: var(--input-bg);
     color: var(--text-main);
     padding: 0.1rem 0.3rem;
     border-radius: 0.25rem;
     font-size: 0.9em;
-    border: 1px solid var(--border-default);
+    border: 1px solid var(--input-border);
 }
 </style>

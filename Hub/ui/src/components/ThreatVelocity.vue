@@ -208,11 +208,13 @@ onUnmounted(() => {
                 </div>
             </div>
             
-            <div class="flex bg-bg-inset p-0.5 rounded-md  text-[11px] font-medium text-text-muted border border-border-default/50">
+            <div class="flex bg-secondary-main p-1 rounded-md border border-secondary-border text-[11px] w-fit shadow-inner">
                 <button v-for="time in ['1H', '24H', '7D', '30D']" :key="time"
                         @click="appStore.velocityTimeframe = time"
-                        class="px-2.5 py-1 rounded transition-colors"
-                        :class="velocityTimeframe === time ? 'bg-bg-surface text-text-main shadow-sm border border-border-default' : 'hover:text-text-main hover:bg-bg-surface/50'">
+                        class="px-3 py-1 rounded transition-all outline-none"
+                        :class="velocityTimeframe === time 
+                            ? 'bg-primary-selected text-primary-text font-bold shadow-sm' 
+                            : 'text-secondary-text hover:bg-secondary-hover hover:text-text-main'">
                     {{ time }}
                 </button>
             </div>

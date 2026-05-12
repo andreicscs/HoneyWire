@@ -141,7 +141,7 @@ const formatTime = (timestamp) => {
                 <button v-show="!viewingArchive && events.length > 0" @click="eventsStore.archiveAll()"
                         type="button"
                         aria-label="Archive all active events"
-                        class="px-2.5 py-1 rounded-md text-xs font-semibold text-text-muted bg-bg-surface border border-border-default transition-colors hover:bg-archive-bg-subtle hover:text-archive-text hover:border-archive-border shadow-sm">
+                        class="px-2.5 py-1 rounded-md text-xs font-semibold tracking-wider transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg-subtle hover:text-archive-text hover:border-archive-border active:scale-95">
                     Archive All
                 </button>
             </div>
@@ -225,8 +225,9 @@ const formatTime = (timestamp) => {
                             <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default/50'">
                                 <button @click.stop="eventsStore.archiveEvent(event.id)"                                     
                                         type="button"
+                                        
                                         aria-label="Archive this event"                                        
-                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md bg-bg-surface border border-border-default text-text-muted hover:bg-archive-bg-subtle hover:border-archive-border hover:text-archive-text transition-all duration-200 shadow-sm active:scale-95"
+                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md transition-all duration-200 shadow-sm active:scale-95 border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg-subtle hover:text-archive-text hover:border-archive-border"
                                         title="Archive Event">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
