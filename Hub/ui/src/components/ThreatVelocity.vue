@@ -5,6 +5,7 @@ import Chart from 'chart.js/auto'
 import { useAppStore } from '../stores/app'
 import { useEventsStore } from '../stores/events'
 import { getComputedRgb, injectAlpha } from '../utils/theme'
+import { baseTooltipConfig, applyChartTheme } from '../utils/chartConfig'
 import BaseTimeFilter from './ui/BaseTimeFilter.vue'
 import BaseLegend from './ui/BaseLegend.vue'
 import BaseWidget from './ui/BaseWidget.vue'
@@ -44,16 +45,14 @@ const initChart = () => {
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            layout: { padding: { top: 10, left: -5, right: -5, bottom: 0 } },
+            layout: { padding: { top: 15, left: 0, right: 0, bottom: 0 } },
             animation: { duration: 0 }, 
             plugins: { 
                 legend: { display: false }, 
                 tooltip: { 
-                    mode: 'index', intersect: false, 
-                    borderWidth: 1, padding: 10, boxPadding: 4, 
-                    usePointStyle: true, boxWidth: 8, boxHeight: 8, 
-                    titleFont: { size: 11, family: 'ui-monospace, monospace', weight: 'normal' }, 
-                    bodyFont: { size: 12, weight: 'bold' },
+                    ...baseTooltipConfig,
+                    mode: 'index', 
+                    intersect: false, 
                     callbacks: {
                         title: (context) => exactTimesList[context[0].dataIndex],
                         labelColor: (context) => {
@@ -64,7 +63,11 @@ const initChart = () => {
             },
             scales: {
                 x: { grid: { display: false, drawBorder: false }, ticks: { maxRotation: 0, minRotation: 0, maxTicksLimit: 5, font: { size: 10, family: 'ui-monospace, monospace' }, align: 'inner' } },
-                y: { display: false, beginAtZero: true } 
+                y: { 
+                    display: false, 
+                    beginAtZero: true,
+                    grace: '15%'
+                } 
             },
             interaction: { intersect: false, mode: 'index' }
         }
@@ -207,7 +210,7 @@ const legendItems = [
         <template #header>
             <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
                 <div>
-                    <h3 class="text-base text-text-h">Events velocity</h3>
+                    <h3 class="text-base font-medium text-text-h">Events Velocity</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
                         <span class="text-sm" :class="recentEventCount > 0 ? 'text-critical' : 'text-success-main'">{{ recentEventCount }}</span>
                         <span class="text-sm text-text-m">Events Recorded</span>
@@ -218,7 +221,7 @@ const legendItems = [
             </div>
         </template>
 
-        <div class="flex-1 relative mt-2 min-h-0 w-full -mx-2">
+        <div class="flex-1 relative mt-2 min-h-0 w-full">
             <div v-if="recentEventCount === 0" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>

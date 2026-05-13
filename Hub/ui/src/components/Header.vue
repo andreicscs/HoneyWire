@@ -42,10 +42,10 @@ const toggleTheme = () => {
                         <ellipse style="stroke-width: 1; stroke: rgba(0, 0, 0, 0);" cx="705.092" cy="462.231" rx="36.769" ry="36.769"/>
                     </g>
                 </svg>
-                <span class="text-base  text-text-h leading-none tracking-wide">HoneyWire</span>
+                <span class="text-h1 font-medium text-text-h leading-none tracking-wide">HoneyWire</span>
             </div>
             
-            <h2 class="text-base  text-text-m capitalize hidden sm:block">{{ currentView.replace('-', ' ') }}</h2>
+            <h2 class="text-base  text-text-m font-medium capitalize hidden sm:block">{{ currentView.replace('-', ' ') }}</h2>
         </div>
         
         <div class="flex items-center gap-3">

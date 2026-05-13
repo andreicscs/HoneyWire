@@ -10,7 +10,7 @@
   --bg: oklch(92% 0.01 250);
   --bg-base: oklch(96% 0.01 250);
   --bg-surface: oklch(99% 0.01 250);
-  --bg-inset: oklch(88% 0.01 250);
+  --bg-inset: oklch(74.695% 0.0147 248.161);
   --surface-highlight: oklch(100% 0 0); 
   
   --border-default: oklch(85% 0.02 250);
@@ -44,8 +44,8 @@
   --sev-low: oklch(60% 0.15 250);
   --sev-info: oklch(55% 0.02 250);
 
-  --danger-main: oklch(62% 0.16 25);
-  --danger-hover: oklch(45% 0.22 20);
+  --danger-main: oklch(64.379% 0.21643 25.707);
+  --danger-hover: oklch(65.385% 0.16476 13.619);
   --danger-bg: oklch(90% 0.05 20);
   --danger-text: oklch(25% 0.1 20);
   --danger-border: oklch(80% 0.1 20);
@@ -70,7 +70,7 @@
   --select-solid-text: oklch(98% 0 0);
   --select-group-bg: oklch(97% 0.01 250 / 0.5);
   --select-group-border: oklch(85% 0.02 250);
-  --select-row-bg: oklch(95% 0.01 250);
+  --select-row-bg: oklch(93.967% 0.015 251.307);
   --select-row-border: oklch(85% 0.02 250);
 
   /* --- 4. Typography --- */

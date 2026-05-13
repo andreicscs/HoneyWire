@@ -15,7 +15,7 @@ defineProps({
         !center ? 'sm:flex-row sm:items-end sm:justify-between' : 'items-center text-center'
     ]">
         <div :class="['flex flex-col gap-1', !center ? 'text-left' : 'text-center']">
-            <h1 v-if="size === 'md'" class="text-h1 text-text-h tracking-tight">
+            <h1 v-if="size === 'md'" class="text-h1 text-text-h font-medium tracking-tight">
                 {{ title }}
             </h1>
             <h3 v-else class="text-base tracking-wider text-text-h">

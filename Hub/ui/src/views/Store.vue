@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useConfig } from '../api/useConfig'
+import PageHeader from '../components/ui/PageHeader.vue' // Adjust path if needed
 
 const { config } = useConfig()
 
@@ -137,7 +138,6 @@ const formatComposeYaml = (yamlStr) => {
     let inEnvBlock = false;
     let envVars = [];
     
-    // Pass 1: Reorder Environment Variables
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
         if (line.match(/^ {4}environment:/) || line.match(/^ {2}environment:/)) {
@@ -165,11 +165,10 @@ const formatComposeYaml = (yamlStr) => {
         }
     }
 
-    // Pass 2: Reorder Services to pull Helpers to the top
     const finalYaml = [];
     let servicesIndex = parsedLines.findIndex(l => l.startsWith('services:'));
     
-    if (servicesIndex === -1) return parsedLines.join('\n'); // Failsafe
+    if (servicesIndex === -1) return parsedLines.join('\n'); 
 
     finalYaml.push(...parsedLines.slice(0, servicesIndex + 1));
     
@@ -251,7 +250,7 @@ const applyHighlighting = () => {
     if (activeEnvVar.value) {
         const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm');
-        htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring  px-1 rounded transition-colors duration-200 active-highlight">$&</span>`);
+        htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring px-1 rounded transition-colors duration-[var(--duration-fast)] active-highlight">$&</span>`);
     }
     
     highlightedCompose.value = htmlYaml;
@@ -276,13 +275,11 @@ const copyToClipboard = () => {
     
     btn.innerHTML = 'Copied!'
     btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
-    // FIXED: Mapped to the new Secondary Palettes
     btn.classList.remove('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-h')
     
     setTimeout(() => { 
         btn.innerHTML = originalText 
         btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
-        // FIXED: Restore the Secondary Palettes
         btn.classList.add('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-h')
     }, 2000)
 }
@@ -291,12 +288,11 @@ const copyToClipboard = () => {
 <template>
     <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6">
         
-        <div class="mb-6 shrink-0 mt-4 sm:mt-6 flex justify-between items-end">
-            <div>
-                <h1 class="text-2xl  text-text-h">Sensor Store</h1>
-                <p class="text-sm text-text-m mt-1 max-w-3xl">Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations.</p>
-            </div>
-        </div>
+        <PageHeader 
+            class="mb-6 mt-4 sm:mt-6 shrink-0"
+            title="Sensor Store" 
+            description="Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations."
+        />
 
         <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
             <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse flex flex-col justify-between">
@@ -313,31 +309,31 @@ const copyToClipboard = () => {
         
         <div v-else-if="fetchError" class="flex flex-col items-center justify-center py-20 text-center">
             <svg class="w-12 h-12 text-danger-text mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            <h3 class="text-lg  text-text-h">Unable to reach Sensor Registry</h3>
-            <p class="text-sm text-text-m mt-2 max-w-md">Please ensure this Hub has internet access to pull the latest sensor manifests from GitHub.</p>
+            <h3 class="text-base font-medium text-text-h">Unable to reach Sensor Registry</h3>
+            <p class="text-base text-text-m mt-2 max-w-md">Please ensure this Hub has internet access to pull the latest sensor manifests from GitHub.</p>
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
             <div v-for="s in sensors" :key="s.id" 
                  @click="openSensor(s)"
-                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all group flex flex-col">
+                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all duration-[var(--duration-normal)] group flex flex-col">
                 
                 <div class="flex justify-between items-start mb-4">
-                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-300">
+                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-[var(--duration-normal)]">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                     </div>
-                    <span class="px-2 py-1 rounded text-[10px]   tracking-wider bg-bg-inset text-text-m border border-border-default/50">
+                    <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50">
                         {{ s.osi_layer }}
                     </span>
                 </div>
                 
-                <h3 class="text-base  text-text-h mb-1">{{ s.name }}</h3>
-                <p class="text-xs text-text-m leading-relaxed line-clamp-2">{{ s.description }}</p>
+                <h3 class="text-base font-medium text-text-h mb-1">{{ s.name }}</h3>
+                <p class="text-sm text-text-m leading-relaxed line-clamp-2">{{ s.description }}</p>
             </div>
         </div>
 
         <Teleport to="body">
-            <transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <transition enter-active-class="transition duration-[var(--duration-normal)] ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
                 <div v-if="selectedSensor" class="fixed inset-0 z-50 flex justify-center items-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm" @click.self="closeSensor">
                     
                     <div class="bg-bg-base w-full max-w-4xl h-full max-h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
@@ -349,28 +345,28 @@ const copyToClipboard = () => {
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-3">
-                                        <h2 class="text-xl  text-text-h">{{ selectedSensor.name }}</h2>
-                                        <span class="px-2 py-0.5 rounded text-[10px]   tracking-wider bg-bg-inset text-text-m border border-border-default/50 hidden sm:block">
+                                        <h2 class="text-[length:var(--text-h1)] font-medium text-text-h">{{ selectedSensor.name }}</h2>
+                                        <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50 hidden sm:block">
                                             {{ selectedSensor.osi_layer }}
                                         </span>
                                     </div>
                                     <p class="text-sm text-text-m mt-0.5">{{ selectedSensor.description }}</p>
                                 </div>
                             </div>
-                            <button @click="closeSensor" class="p-2 -mr-2 text-text-m hover:text-text-h transition-colors rounded-full hover:bg-secondary-hover focus:outline-none">
+                            <button @click="closeSensor" class="p-2 -mr-2 text-text-m hover:text-text-h transition-colors duration-[var(--duration-fast)] rounded-full hover:bg-secondary-hover focus:outline-none">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
 
                         <div class="flex border-b border-border-default px-6 shrink-0 bg-bg-base">
                             <button @click="activeTab = 'readme'" 
-                                    class="py-3 px-2 mr-6 text-xs   tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'readme' ? 'border-primary-main text-text-h' : 'border-transparent text-text-m hover:text-text-h'">
+                                    class="py-3 px-2 mr-6 text-base border-b-2 transition-colors duration-[var(--duration-fast)] focus:outline-none"
+                                    :class="activeTab === 'readme' ? 'border-primary-main text-text-h font-medium' : 'border-transparent text-text-m hover:text-text-h'">
                                 Overview
                             </button>
                             <button @click="activeTab = 'compose'" 
-                                    class="py-3 px-2 text-xs   tracking-wider border-b-2 transition-colors focus:outline-none"
-                                    :class="activeTab === 'compose' ? 'border-primary-main text-text-h' : 'border-transparent text-text-m hover:text-text-h'">
+                                    class="py-3 px-2 text-base border-b-2 transition-colors duration-[var(--duration-fast)] focus:outline-none"
+                                    :class="activeTab === 'compose' ? 'border-primary-main text-text-h font-medium' : 'border-transparent text-text-m hover:text-text-h'">
                                 Deployment Script
                             </button>
                         </div>
@@ -378,10 +374,10 @@ const copyToClipboard = () => {
                         <div class="flex-1 overflow-y-auto custom-scroll bg-bg-base">
                             
                             <div v-show="activeTab === 'readme'" class="p-6 md:p-8 readme-container text-text-m text-base">
-                                <p class="mb-6 text-text-h">{{ selectedSensor.documentation.summary }}</p>
+                                <p class="mb-6 text-base font-medium text-text-h">{{ selectedSensor.documentation.summary }}</p>
                                 
                                 <div v-for="section in selectedSensor.documentation.sections" :key="section.title" class="mb-6">
-                                    <h3 class="text-lg  text-text-h mb-3">{{ section.title }}</h3>
+                                    <h3 class="text-base font-medium text-text-h mb-3">{{ section.title }}</h3>
                                     <ul v-if="section.type === 'list'" class="list-disc pl-5 space-y-1">
                                         <li v-for="item in section.content" :key="item">{{ item }}</li>
                                     </ul>
@@ -390,23 +386,23 @@ const copyToClipboard = () => {
 
                             <div v-show="activeTab === 'compose'" class="p-6 md:p-8 relative h-full flex flex-col">
                                 <div class="mb-4">
-                                    <p class="text-sm text-text-m">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-input-bg px-1 py-0.5 rounded-md text-text-h border border-input-border">docker compose up -d</code>.</p>
+                                    <p class="text-base text-text-m">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-input-bg px-1.5 py-0.5 rounded-md text-text-h border border-input-border font-mono">docker compose up -d</code>.</p>
                                 </div>
                                 
                                 <div v-if="sortedEnvVars.length > 0" class="mb-6">
-                                    <h4 class="text-base  text-text-h mb-3">Configuration</h4>
+                                    <h4 class="text-base font-medium text-text-h mb-3">Configuration</h4>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div v-for="env in sortedEnvVars" :key="env.name" class="space-y-1">
-                                            <label class="block text-xs  text-text-h">{{ env.name }}</label>
+                                            <label class="block text-sm text-text-h mb-0.5">{{ env.name }}</label>
                                             <input 
                                                 v-model="envVarValues[env.name]"
                                                 :type="env.type === 'int' ? 'number' : 'text'"
                                                 :placeholder="getUIDefault(env.default)"
                                                 @focus="activeEnvVar = env.name"
                                                 @blur="activeEnvVar = null"
-                                                class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main transition-colors shadow-inner placeholder:text-text-m/50"
+                                                class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50"
                                             />
-                                            <p class="text-xs text-text-m">{{ env.description }}</p>
+                                            <p class="text-sm text-text-m">{{ env.description }}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -415,11 +411,11 @@ const copyToClipboard = () => {
                                     <pre 
                                         ref="composePre"
                                         v-html="highlightedCompose"
-                                        class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-5 rounded-md text-[13px] mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth"
+                                        class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-5 rounded-md text-sm font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"
                                     ></pre>
                                     
                                     <button id="copy-btn" @click="copyToClipboard"
-                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-h text-[11px]   tracking-wider transition-colors shadow-sm active:scale-95 z-10 focus:outline-none">
+                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-h text-sm font-medium transition-colors duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none">
                                         Copy
                                     </button>
                                 </div>
@@ -436,16 +432,16 @@ const copyToClipboard = () => {
 
 <style scoped>
 .readme-container :deep(h3) {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--text-main);
+    font-size: var(--text-base); 
+    font-weight: var(--font-weight-medium);
+    color: var(--text-h);
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
 }
 .readme-container :deep(h4) {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text-main);
+    font-size: var(--text-base); 
+    font-weight: var(--font-weight-medium);
+    color: var(--text-h);
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
 }
@@ -454,12 +450,12 @@ const copyToClipboard = () => {
     margin-bottom: 1rem;
 }
 .readme-container :deep(code) {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
     background-color: var(--input-bg);
-    color: var(--text-main);
+    color: var(--text-h);
     padding: 0.1rem 0.3rem;
-    border-radius: 0.25rem;
-    font-size: 0.9em;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
     border: 1px solid var(--input-border);
 }
 </style>

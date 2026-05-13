@@ -3,7 +3,8 @@ import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useEventsStore } from '../stores/events'
-import { getCssVariable, hexToRgb } from '../utils/theme'
+import { getComputedRgb } from '../utils/theme'
+import { baseTooltipConfig, applyChartTheme } from '../utils/chartConfig'
 import BaseLegend from './ui/BaseLegend.vue'
 import BaseWidget from './ui/BaseWidget.vue'
 
@@ -35,11 +36,11 @@ const neonGlowPlugin = {
 Chart.register(neonGlowPlugin)
 
 const getChartColors = () => [
-    getCssVariable('--sev-critical') || '#f43f5e',
-    getCssVariable('--sev-high') || '#fb923c',
-    getCssVariable('--sev-medium') || '#eab308',
-    getCssVariable('--sev-low') || '#3b82f6',
-    getCssVariable('--sev-info') || '#64748b'
+    getComputedRgb('--sev-critical') || 'rgb(244, 63, 94)',
+    getComputedRgb('--sev-high') || 'rgb(251, 146, 60)',
+    getComputedRgb('--sev-medium') || 'rgb(234, 179, 8)',
+    getComputedRgb('--sev-low') || 'rgb(59, 130, 246)',
+    getComputedRgb('--sev-info') || 'rgb(100, 116, 139)'
 ]
 
 const updateData = () => {
@@ -66,23 +67,11 @@ const updateData = () => {
 const updateTheme = () => {
     if (!chartInstance) return;
     
-    const isDark = document.documentElement.classList.contains('dark')
-
-    // FIXED: Dynamically pull tooltip colors from CSS variables
-    const bgHex = getCssVariable('--bg-surface') || (isDark ? '#18181b' : '#ffffff');
-    const bgRgb = hexToRgb(bgHex);
-    const bgRgbStr = typeof bgRgb === 'object' ? `${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}` : (bgRgb || (isDark ? '24, 24, 27' : '255, 255, 255'));
-
-    chartInstance.options.plugins.tooltip.backgroundColor = `rgba(${bgRgbStr}, 0.95)`
-    chartInstance.options.plugins.tooltip.titleColor = getCssVariable('--text-m') || (isDark ? '#a1a1aa' : '#64748b')
-    chartInstance.options.plugins.tooltip.bodyColor = getCssVariable('--text-h') || (isDark ? '#f4f4f5' : '#0f172a')
-    chartInstance.options.plugins.tooltip.borderColor = getCssVariable('--border-default') || (isDark ? '#3f3f46' : '#e2e8f0')
-    
+    // Re-grab the colors in case the theme switched to dark mode
     chartInstance.data.datasets[0].backgroundColor = getChartColors();
-
-    chartInstance.update('none'); 
+    
+    applyChartTheme(chartInstance);
 }
-
 onMounted(() => {
     if (chartCanvas.value) {
         chartInstance = new Chart(chartCanvas.value, {
@@ -100,18 +89,13 @@ onMounted(() => {
                 responsive: true,
                 maintainAspectRatio: false,
                 layout: {
-                    padding: {
-                        bottom: 5 // Gives the doughnut a tiny bit of breathing room inside the canvas
-                    }
+                    padding: { bottom: 5 }
                 },
                 animation: true,
                 plugins: { 
                     legend: { display: false },
                     tooltip: { 
-                        borderWidth: 1, padding: 10, boxPadding: 4, 
-                        usePointStyle: true, boxWidth: 8, boxHeight: 8, 
-                        titleFont: { size: 11, family: 'ui-monospace, monospace', weight: 'normal' }, 
-                        bodyFont: { size: 12, weight: 'bold' },
+                        ...baseTooltipConfig,
                         callbacks: {
                             labelColor: (context) => {
                                 const color = context.dataset.backgroundColor[context.dataIndex];
@@ -159,7 +143,7 @@ const legendItems = [
     <BaseWidget>
         <template #header>
             <div>
-                <h3 class="text-base text-text-h">Severity Distribution</h3>
+                <h3 class="text-base font-medium text-text-h">Severity Distribution</h3>
                 <div class="flex items-center gap-4 mt-1">
                     <p class="text-sm text-text-m">Active Threat Breakdown</p>
                 </div>
