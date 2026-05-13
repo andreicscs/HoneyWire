@@ -322,7 +322,7 @@ const copyToClipboard = () => {
                     <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-normal">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                     </div>
-                    <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50">
+                    <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-h border border-border-default/50">
                         {{ s.osi_layer }}
                     </span>
                 </div>
@@ -346,7 +346,7 @@ const copyToClipboard = () => {
                                 <div>
                                     <div class="flex items-center gap-3">
                                         <h2 class="text-h1 font-medium text-text-h">{{ selectedSensor.name }}</h2>
-                                        <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50 hidden sm:block">
+                                        <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-h border border-border-default/50 hidden sm:block">
                                             {{ selectedSensor.osi_layer }}
                                         </span>
                                     </div>
