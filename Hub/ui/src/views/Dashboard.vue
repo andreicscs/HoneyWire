@@ -83,7 +83,7 @@ const copyCommand = () => {
     <Teleport to="body">
         <transition enter-active-class="transition duration-200 ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-150 ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
             <div v-if="showProvisionModal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div class="bg-bg-surface border border-border-default rounded-lg shadow-2xl max-w-lg w-full overflow-hidden flex flex-col transform transition-all">
+                <div class="bg-bg-surface border border-border-default rounded-lg shadow-lg max-w-lg w-full overflow-hidden flex flex-col transform transition-all">
                     <div class="p-5 border-b border-border-default flex justify-between items-center">
                         <h3 class=" text-text-h">Provision New Node</h3>
                         <button @click="showProvisionModal = false" class="text-text-m hover:text-text-h transition-colors hover:bg-button-hover rounded-full p-1 -mr-1">
@@ -101,7 +101,7 @@ const copyCommand = () => {
                                 ./wizard --link http://{{ currentHost }} {{ provisionToken }}
                             </code>
                             <button id="copy-cmd-btn" @click="copyCommand"
-                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-h text-[11px]   tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
+                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-h text-sm   tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
                                 Copy
                             </button>
                         </div>

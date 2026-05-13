@@ -11,7 +11,7 @@ defineProps({
 
 <template>
     <div 
-        class="p-[var(--space-card-p)] rounded-[var(--radius-md)] border text-center transition-colors duration-normal"
+        class="p-[var(--space-card-p)] rounded-md border text-center transition-colors duration-normal"
         :class="{
             'bg-danger-bg border-danger-border text-danger-text': variant === 'danger',
             'bg-success-bg border-success-border text-success-text': variant === 'success',

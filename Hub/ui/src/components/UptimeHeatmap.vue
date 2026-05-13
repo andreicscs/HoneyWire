@@ -89,7 +89,7 @@ const legendItems = [
                     <h3 class="text-base font-medium text-text-h">Fleet Uptime</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
                         <span class="text-sm text-text-m">Fleet Overall:</span>
-                        <span class="text-sm transition-colors duration-[var(--duration-normal)]" 
+                        <span class="text-sm transition-colors duration-normal" 
                               :class="parseFloat(overallUptime) >= 95 ? 'text-success-main' : (parseFloat(overallUptime) >= 85 ? 'text-high' : 'text-critical')">
                             {{ overallUptime }}
                         </span>
@@ -106,7 +106,7 @@ const legendItems = [
                 <div v-show="uptimeData.length === 0" class="text-sm font-medium text-text-m py-4 text-center">No fleet data available.</div>
                 
                 <div v-for="group in groupedUptime" :key="group.nodeId" :id="'group-' + group.nodeId"
-                    class="transition-all duration-[var(--duration-normal)] rounded-lg p-0.5 mb-0.5 border"
+                    class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"
                     :class="{
                         'border-select-group-border bg-select-group-bg': selectedNode === group.nodeId && !selectedSensor,
                         'border-transparent': selectedNode !== group.nodeId || selectedSensor,
@@ -126,7 +126,7 @@ const legendItems = [
                     </div>
                      
                     <div v-for="sensor in group.sensors" :key="sensor.node_id + '-' + sensor.id" :id="'row-' + sensor.node_id + '-' + sensor.id" 
-                        class="flex items-center w-full transition-all duration-[var(--duration-normal)] px-1.5 h-7 rounded-md border"
+                        class="flex items-center w-full transition-all duration-normal px-1.5 h-7 rounded-md border"
                         :class="{
                             'opacity-50': selectedSensor && (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
                             'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor === sensor.id && selectedNode === sensor.node_id,
@@ -139,7 +139,7 @@ const legendItems = [
                                 <button @click="handleSilence(sensor.node_id, sensor.id)" 
                                         class="w-full text-left px-3 py-2 text-sm text-text-m font-medium flex items-center gap-2 hover:bg-secondary-hover transition-colors group"
                                         :class="isSilenced(sensor.node_id, sensor.id) ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
-                                    <svg class="w-3.5 h-3.5 transition-transform duration-[var(--duration-normal)] group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path v-if="!isSilenced(sensor.node_id, sensor.id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                                         <path v-if="isSilenced(sensor.node_id, sensor.id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                     </svg>
@@ -148,9 +148,9 @@ const legendItems = [
                                 
                                 <button @click="handleForget(sensor.node_id, sensor.id)" 
                                         class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
-                                    <svg class="w-3.5 h-3.5 transition-transform duration-[var(--duration-normal)] group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />
-                                        <path class="origin-bottom-right transition-transform duration-[var(--duration-normal)] group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                                        <path class="origin-bottom-right transition-transform duration-normal group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
                                     </svg>
                                     Forget Sensor
                                 </button>
@@ -187,13 +187,13 @@ const legendItems = [
             </div>
 
             <div class="absolute bottom-0 left-0 right-0 flex items-end justify-center pointer-events-none pb-2 bg-gradient-to-t from-bg-surface to-transparent h-12">
-                <transition enter-active-class="transition-all duration-[var(--duration-normal)] ease-out" enter-from-class="opacity-0 translate-y-4 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100" leave-active-class="transition-all duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100 translate-y-0 scale-100" leave-to-class="opacity-0 translate-y-4 scale-95">
+                <transition enter-active-class="transition-all duration-normal ease-out" enter-from-class="opacity-0 translate-y-4 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100" leave-active-class="transition-all duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100 translate-y-0 scale-100" leave-to-class="opacity-0 translate-y-4 scale-95">
                     <div v-show="canScrollDown && uptimeData.some(s => s.blocks.some(b => b.status === 'down' || b.status === 'degraded'))" 
                         @click="scrollToBottom"
                         class="pointer-events-auto relative cursor-pointer group/notify active:scale-95 transition-transform duration-[var(--duration-fast)] drop-shadow-md">
-                        <div class="animate-bounce-subtle relative bg-bg-surface border border-border-default py-1.5 px-2 rounded-full flex justify-center items-center transition-colors duration-[var(--duration-normal)] group-hover/notify:bg-bg-inset z-10">
+                        <div class="animate-bounce-subtle relative bg-bg-surface border border-border-default py-1.5 px-2 rounded-full flex justify-center items-center transition-colors duration-normal group-hover/notify:bg-bg-inset z-10">
                             <div class="w-1.5 z-1 h-2.5 rounded-[1px]" :class="[(uptimeData.some(s => s.blocks.some(b => b.status === 'down')) ? 'bg-critical' : 'bg-high'), { 'animate-pulse': canScrollDown }]"></div>
-                            <div class="absolute z-0 -bottom-[3px] left-1/2 transform -translate-x-1/2 w-2 h-2 bg-bg-surface border-r border-b border-border-default rotate-45 rounded-[1px] transition-colors duration-[var(--duration-normal)] group-hover/notify:bg-bg-inset"></div>
+                            <div class="absolute z-0 -bottom-[3px] left-1/2 transform -translate-x-1/2 w-2 h-2 bg-bg-surface border-r border-b border-border-default rotate-45 rounded-[1px] transition-colors duration-normal group-hover/notify:bg-bg-inset"></div>
                         </div>
                     </div>
                 </transition>

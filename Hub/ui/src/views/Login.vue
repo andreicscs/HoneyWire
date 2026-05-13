@@ -44,7 +44,7 @@ const doLogin = async () => {
 </script>
 
 <template>
-    <div class="h-screen flex flex-col items-center justify-center bg-bg-base p-6 relative transition-colors duration-[var(--duration-normal)]">
+    <div class="h-screen flex flex-col items-center justify-center bg-bg-base p-6 relative transition-colors duration-normal">
         
         <div class="absolute top-6 right-6">
             <ThemeToggle @toggle="$emit('toggle-theme')" />
@@ -61,7 +61,7 @@ const doLogin = async () => {
                 />
             </div>
 
-            <BaseCard class="relative overflow-hidden transition-all duration-[var(--duration-normal)]">
+            <BaseCard class="relative overflow-hidden transition-all duration-normal">
                 <div class="absolute top-0 left-0 right-0 h-1 opacity-90" style="background: linear-gradient(to right, var(--sev-info), var(--sev-low), var(--sev-medium), var(--sev-high), var(--sev-critical))"></div>
 
                 <form @submit.prevent="doLogin" class="mt-2 space-y-6">

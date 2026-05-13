@@ -9,11 +9,11 @@
   /* --- 1. Colors: Structural (OKLCH) --- */
   --bg: oklch(92% 0.01 250);
   --bg-base: oklch(96% 0.01 250);
-  --bg-surface: oklch(99% 0.01 250);
+  --bg-surface: oklch(98% 0.01 250);
   --bg-inset: oklch(74.695% 0.0147 248.161);
   --surface-highlight: oklch(100% 0 0); 
   
-  --border-default: oklch(85% 0.02 250);
+  --border-default: oklch(80% 0.02 250);
 
   /* --- 2. Colors: Actions & Interactive --- */
   --primary-main: oklch(20% 0.02 250);
@@ -22,7 +22,7 @@
   --primary-text: oklch(98% 0 0);
   --primary-border: oklch(85% 0.02 250);
 
-  --secondary-main: oklch(99% 0 0);
+  --secondary-main: oklch(98% 0.01 285);
   --secondary-hover: oklch(94% 0.01 250);
   --secondary-selected: oklch(88% 0.02 250);
   --secondary-text: oklch(45% 0.02 250);
@@ -281,13 +281,13 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   
-  --text-size-h1: var(--text-size-h1);
-  --text-size-base: var(--text-size-base);
-  --text-size-small: var(--text-size-small);
+  --text-h1: var(--text-h1);
+  --text-base: var(--text-base);
+  --text-sm: var(--text-sm);
  
-  --text-weight-bold: var(--text-weight-bold);
-  --text-weight-medium: var(--text-weight-medium);
-  --text-weight-normal: var(--text-weight-normal);
+  --text-weight-bold: var(--font-weight-bold);
+  --text-weight-medium: var(--font-weight-medium);
+  --text-weight-normal: var(--font-weight-normal);
  
   --text-leading-tight: var(--text-leading-tight);
   --text-leading-normal: var(--text-leading-normal);

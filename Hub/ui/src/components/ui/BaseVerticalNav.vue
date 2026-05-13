@@ -13,7 +13,7 @@ defineEmits(['update:modelValue'])
             <div v-if="tab.divider" class="h-px bg-border-default/50 my-2 mx-4"></div>
             
             <button v-else @click="$emit('update:modelValue', tab.id)"
-                class="w-full text-left px-4 py-2.5 rounded-[var(--radius-md)] text-base text-text-h transition-all duration-fast flex items-center gap-3 border outline-none shadow-lg hover:shadow-md"
+                class="w-full text-left px-4 py-2.5 rounded-md text-base text-text-h transition-all duration-fast flex items-center gap-3 border outline-none shadow-lg hover:shadow-md"
                 :class="[
                     modelValue === tab.id 
                         ? (tab.danger ? 'bg-danger-hover text-danger-text !shadow-sm border-danger-border' : 'bg-secondary-selected text-text-h !shadow-sm border-secondary-border')

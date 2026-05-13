@@ -316,10 +316,10 @@ const copyToClipboard = () => {
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
             <div v-for="s in sensors" :key="s.id" 
                  @click="openSensor(s)"
-                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all duration-[var(--duration-normal)] group flex flex-col">
+                 class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all duration-normal group flex flex-col">
                 
                 <div class="flex justify-between items-start mb-4">
-                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-[var(--duration-normal)]">
+                    <div class="w-12 h-12 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-normal">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                     </div>
                     <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50">
@@ -333,7 +333,7 @@ const copyToClipboard = () => {
         </div>
 
         <Teleport to="body">
-            <transition enter-active-class="transition duration-[var(--duration-normal)] ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <transition enter-active-class="transition duration-normal ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
                 <div v-if="selectedSensor" class="fixed inset-0 z-50 flex justify-center items-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm" @click.self="closeSensor">
                     
                     <div class="bg-bg-base w-full max-w-4xl h-full max-h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
@@ -345,7 +345,7 @@ const copyToClipboard = () => {
                                 </div>
                                 <div>
                                     <div class="flex items-center gap-3">
-                                        <h2 class="text-[length:var(--text-h1)] font-medium text-text-h">{{ selectedSensor.name }}</h2>
+                                        <h2 class="text-h1 font-medium text-text-h">{{ selectedSensor.name }}</h2>
                                         <span class="px-2 py-0.5 rounded text-sm bg-bg-inset text-text-m border border-border-default/50 hidden sm:block">
                                             {{ selectedSensor.osi_layer }}
                                         </span>

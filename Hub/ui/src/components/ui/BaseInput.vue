@@ -26,7 +26,7 @@ defineEmits(['update:modelValue', 'focus', 'blur'])
             :placeholder="placeholder"
             :required="required"
             :disabled="disabled"
-            class="w-full px-3 py-2 rounded-[var(--radius-md)] text-base text-text-h transition-colors duration-fast shadow-inner outline-none disabled:cursor-not-allowed"
+            class="w-full px-3 py-2 rounded-md text-base text-text-h transition-colors duration-fast shadow-inner outline-none disabled:cursor-not-allowed"
             :class="disabled 
                 ? 'bg-disabled-bg border border-disabled-border text-disabled-text' 
                 : 'bg-input-bg border border-input-border focus:border-primary-main focus:ring-1 focus:ring-focus-ring placeholder:text-text-m/50'" 

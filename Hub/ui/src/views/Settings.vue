@@ -277,11 +277,11 @@ const submitFactoryReset = async () => {
                         <BaseDivider />
                         
                         <div>
-                            <label class="block text-[11px]  tracking-wider  text-text-m mb-2">Trigger Severities</label>
+                            <label class="block text-sm  tracking-wider  text-text-m mb-2">Trigger Severities</label>
                             <div class="flex flex-wrap gap-2.5">
                                 <button v-for="sev in ['critical', 'high', 'medium', 'low', 'info']" :key="sev"
                                         @click="toggleSeverity(sev)"
-                                        class="text-[11px]   tracking-wider px-3.5 py-1.5 rounded-md transition-all border outline-none select-none hover:opacity-80"
+                                        class="text-sm   tracking-wider px-3.5 py-1.5 rounded-md transition-all border outline-none select-none hover:opacity-80"
                                         :style="getSeverityStyle(sev, settings.webhookEvents.includes(sev))">
                                     {{ sev }}
                                 </button>

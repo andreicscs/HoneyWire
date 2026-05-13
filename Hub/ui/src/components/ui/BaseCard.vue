@@ -7,7 +7,7 @@ defineProps({
 
 <template>
     <div 
-        class="border rounded-[var(--radius-lg)] p-[var(--space-card-p)] shadow-sm transition-colors duration-normal"
+        class="border rounded-lg p-[var(--space-card-p)] shadow-sm transition-colors duration-normal"
         :class="danger ? 'bg-danger-bg border-danger-border' : 'bg-bg-surface border-border-default'"
     >
         <div v-if="title || $slots.icon" class="mb-5 flex items-center gap-2">

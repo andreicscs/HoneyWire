@@ -59,7 +59,7 @@ onMounted(() => {
          class="meatball-trigger w-5 h-5 rounded flex items-center justify-center transition-colors cursor-pointer shrink-0"
          :class="[
              inverted 
-                ? (isOpen ? 'text-primary-text bg-white/20' : 'text-primary-text/70 hover:text-primary-text hover:bg-white/15')
+                ? (isOpen ? 'text-primary-text bg-primary-text/20' : 'text-primary-text/70 hover:text-primary-text hover:bg-primary-text/15')
                 : (isOpen ? 'text-text-h bg-border-default' : 'text-text-l hover:text-text-h hover:bg-border-default/60')
          ]">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">

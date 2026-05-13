@@ -24,7 +24,7 @@ const adjust = (delta) => {
             <p v-if="description" class="text-sm text-text-m mt-[var(--space-label-gap)]">{{ description }}</p>
         </div>
         <div class="flex items-center gap-3">
-            <div class="flex items-center rounded-[var(--radius-md)] border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-primary-main transition-colors duration-fast">
+            <div class="flex items-center rounded-md border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-primary-main transition-colors duration-fast">
                 <button @click="adjust(-1)" type="button" class="px-3 py-1.5 text-text-m hover:bg-secondary-hover transition-colors duration-fast select-none outline-none">-</button>
                 <input 
                     :value="modelValue" 
