@@ -1,15 +1,15 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useConfig } from '../api/useConfig'
-import BaseButton from '../components/ui/BaseButton.vue'
-import BaseInput from '../components/ui/BaseInput.vue'
-import BaseModal from '../components/ui/BaseModal.vue'
-import PageHeader from '../components/ui/PageHeader.vue'
-import BaseCard from '../components/ui/BaseCard.vue'
-import BaseDivider from '../components/ui/BaseDivider.vue'
-import BaseVerticalNav from '../components/ui/BaseVerticalNav.vue'
-import BaseRadioGroup from '../components/ui/BaseRadioGroup.vue'
-import BaseNumberStepper from '../components/ui/BaseNumberStepper.vue'
+import BaseButton from '../components/ui/forms/BaseButton.vue'
+import BaseInput from '../components/ui/forms/BaseInput.vue'
+import BaseModal from '../components/ui/feedback/BaseModal.vue'
+import PageHeader from '../components/ui/layout/PageHeader.vue'
+import BaseCard from '../components/ui/layout/BaseCard.vue'
+import BaseDivider from '../components/ui/layout/BaseDivider.vue'
+import BaseVerticalNav from '../components/ui/navigation/BaseVerticalNav.vue'
+import BaseRadioGroup from '../components/ui/forms/BaseRadioGroup.vue'
+import BaseNumberStepper from '../components/ui/forms/BaseNumberStepper.vue'
 
 const { config, patchConfig } = useConfig()
 const activeTab = ref('general')

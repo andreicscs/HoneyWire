@@ -1,9 +1,9 @@
 <script setup>
-import TrafficFilters from '../components/TrafficFilters.vue'
-import SeverityChart from '../components/SeverityChart.vue'
-import UptimeHeatmap from '../components/UptimeHeatmap.vue'
-import EventTable from '../components/EventTable.vue'
-import ThreatVelocity from '../components/ThreatVelocity.vue'
+import TrafficFilters from '../components/dashboard/TrafficFilters.vue'
+import SeverityChart from '../components/dashboard/SeverityChart.vue'
+import UptimeHeatmap from '../components/dashboard/UptimeHeatmap.vue'
+import EventTable from '../components/dashboard/EventTable.vue'
+import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
 import { ref } from 'vue'
 
 const showProvisionModal = ref(false)

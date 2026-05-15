@@ -2,13 +2,13 @@
 import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick, toRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
-import { useAppStore } from '../stores/app'
-import { useEventsStore } from '../stores/events'
-import { getComputedRgb, injectAlpha } from '../utils/theme'
-import { baseTooltipConfig, applyChartTheme } from '../utils/chartConfig'
-import BaseTimeFilter from './ui/BaseTimeFilter.vue'
-import BaseLegend from './ui/BaseLegend.vue'
-import BaseWidget from './ui/BaseWidget.vue'
+import { useAppStore } from '../../stores/app'
+import { useEventsStore } from '../../stores/events'
+import { getComputedRgb, injectAlpha } from '../../utils/theme'
+import { baseTooltipConfig, applyChartTheme } from '../../utils/chartConfig'
+import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
+import BaseLegend from '../ui/feedback/BaseLegend.vue'
+import BaseWidget from '../ui/layout/BaseWidget.vue'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
@@ -233,3 +233,4 @@ const legendItems = [
         </template>
     </BaseWidget>
 </template>
+emplate>

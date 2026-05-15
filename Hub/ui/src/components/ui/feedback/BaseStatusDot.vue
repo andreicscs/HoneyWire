@@ -18,7 +18,7 @@ defineProps({
         :class="{
             'bg-success-main': ['up', 'online'].includes(status.toLowerCase()),
             'bg-danger-main': ['down', 'offline', 'critical'].includes(status.toLowerCase()),
-            'bg-sev-high': ['degraded', 'high'].includes(status.toLowerCase()),
+            'bg-high': ['degraded', 'high'].includes(status.toLowerCase()),
             'bg-bg-inset': status.toLowerCase() === 'nodata',
             'animate-pulse shadow-sm': animate
         }"

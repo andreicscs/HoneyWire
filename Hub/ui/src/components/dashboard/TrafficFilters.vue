@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useFleetStore } from '../stores/fleet'
-import BaseMeatballMenu from './ui/BaseMeatballMenu.vue'
-import BaseStatusDot from './ui/BaseStatusDot.vue'
+import { useFleetStore } from '../../stores/fleet'
+import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
+import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 
 const fleetStore = useFleetStore()
 const { sensors, selectedNode, selectedSensor } = storeToRefs(fleetStore)
@@ -147,4 +147,4 @@ onMounted(() => nextTick(checkScroll))
             </div>
         </div>
     </div>
-</template>
+</template>>

@@ -1,12 +1,12 @@
 <script setup>
 import { ref } from 'vue'
-import BaseInput from '../components/ui/BaseInput.vue'
-import BaseButton from '../components/ui/BaseButton.vue'
-import BaseCard from '../components/ui/BaseCard.vue'
-import BaseAlert from '../components/ui/BaseAlert.vue'
-import PageHeader from '../components/ui/PageHeader.vue'
-import ThemeToggle from '../components/ui/ThemeToggle.vue'
-import BaseLogo from '../components/ui/BaseLogo.vue'
+import BaseInput from '../components/ui/forms/BaseInput.vue'
+import BaseButton from '../components/ui/forms/BaseButton.vue'
+import BaseCard from '../components/ui/layout/BaseCard.vue'
+import BaseAlert from '../components/ui/feedback/BaseAlert.vue'
+import PageHeader from '../components/ui/layout/PageHeader.vue'
+import ThemeToggle from '../components/ui/branding/ThemeToggle.vue'
+import BaseLogo from '../components/ui/branding/BaseLogo.vue'
 
 const emit = defineEmits(['login-success', 'toggle-theme'])
 const password = ref('')

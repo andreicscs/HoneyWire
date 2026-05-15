@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useAppStore } from '../stores/app'
-import { useEventsStore } from '../stores/events'
+import { useAppStore } from '../../stores/app'
+import { useEventsStore } from '../../stores/events'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()

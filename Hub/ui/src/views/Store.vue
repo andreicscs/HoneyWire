@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useConfig } from '../api/useConfig'
-import PageHeader from '../components/ui/PageHeader.vue' // Adjust path if needed
+import PageHeader from '../components/ui/layout/PageHeader.vue' // Adjust path if needed
 
 const { config } = useConfig()
 

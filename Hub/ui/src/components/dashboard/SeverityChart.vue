@@ -2,11 +2,11 @@
 import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
-import { useEventsStore } from '../stores/events'
-import { getComputedRgb } from '../utils/theme'
-import { baseTooltipConfig, applyChartTheme } from '../utils/chartConfig'
-import BaseLegend from './ui/BaseLegend.vue'
-import BaseWidget from './ui/BaseWidget.vue'
+import { useEventsStore } from '../../stores/events'
+import { getComputedRgb } from '../../utils/theme'
+import { baseTooltipConfig, applyChartTheme } from '../../utils/chartConfig'
+import BaseLegend from '../ui/feedback/BaseLegend.vue'
+import BaseWidget from '../ui/layout/BaseWidget.vue'
 
 const eventsStore = useEventsStore()
 const { filteredEvents: events } = storeToRefs(eventsStore)
@@ -165,4 +165,4 @@ const legendItems = [
             <BaseLegend :items="legendItems" />
         </template>
     </BaseWidget>
-</template>
+</template>mplate>

@@ -1,12 +1,12 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useFleetStore } from '../stores/fleet'
-import BaseTimeFilter from './ui/BaseTimeFilter.vue'
-import BaseWidget from './ui/BaseWidget.vue'
-import BaseLegend from './ui/BaseLegend.vue'
-import BaseStatusDot from './ui/BaseStatusDot.vue'
-import BaseMeatballMenu from './ui/BaseMeatballMenu.vue'
+import { useFleetStore } from '../../stores/fleet'
+import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
+import BaseWidget from '../ui/layout/BaseWidget.vue'
+import BaseLegend from '../ui/feedback/BaseLegend.vue'
+import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
+import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 
 const fleetStore = useFleetStore()
 const { sensors: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)

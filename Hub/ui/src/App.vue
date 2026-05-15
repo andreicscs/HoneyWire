@@ -3,8 +3,8 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 // Components
-import Sidebar from './components/Sidebar.vue'
-import Header from './components/Header.vue'
+import Sidebar from './components/layout/Sidebar.vue'
+import Header from './components/layout/Header.vue'
 import Dashboard from './views/Dashboard.vue'
 import Login from './views/Login.vue'
 import Store from './views/Store.vue'
