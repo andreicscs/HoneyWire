@@ -6,7 +6,7 @@ import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 
 const fleetStore = useFleetStore()
-const { sensors, selectedNode, selectedSensor } = storeToRefs(fleetStore)
+const { sensors, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const showOfflineWarning = ref(false)
@@ -18,6 +18,7 @@ const isNodeSilenced = (node) => {
 
 const activeNodes = computed(() => {
     const nodesMap = {};
+    
     sensors.value.forEach(s => {
         if (!s.node_id) return;
         if (!nodesMap[s.node_id]) {
@@ -25,7 +26,16 @@ const activeNodes = computed(() => {
         }
         nodesMap[s.node_id].sensors.push(s);
         nodesMap[s.node_id].total++;
-        if (s.status === 'online') nodesMap[s.node_id].online++;
+        
+        // Check the uptimeData for the true online status
+        const uptimeRecord = uptimeData.value.find(up => up.node_id === s.node_id && up.id === s.sensor_id);
+        
+        // If uptimeData knows it's online (or as a fallback, if the sensor got a heartbeat before uptimeData loaded)
+        if (uptimeRecord && uptimeRecord.isOnline) {
+            nodesMap[s.node_id].online++;
+        } else if (!uptimeRecord && s.status === 'online') {
+            nodesMap[s.node_id].online++;
+        }
     });
 
     return Object.values(nodesMap).map(n => {

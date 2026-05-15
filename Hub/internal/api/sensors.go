@@ -36,6 +36,10 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	minuteBucket := now.Truncate(time.Minute).Format(time.RFC3339)
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
+	// Check if this is a new sensor (first heartbeat)
+	existingSensor, _ := h.Store.GetSensor(hb.NodeID, hb.SensorID)
+	isNewSensor := existingSensor == nil
+
 	// Update sensor last_seen and metadata with composite key (node_id, sensor_id)
 	if err := h.Store.UpsertSensor(&hb, nowStr, string(metadataJSON)); err != nil {
 		log.Printf("[ERROR] Heartbeat DB Upsert failed for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
@@ -53,11 +57,20 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[WARNING] Failed to log heartbeat bucket for node %s/sensor %s: %v", hb.NodeID, hb.SensorID, err)
 	}
 
-	h.broadcastWS("SENSOR_HEARTBEAT", map[string]string{
-		"node_id":   hb.NodeID,
-		"sensor_id": hb.SensorID,
-		"timestamp": nowStr,
-	})
+	// Broadcast NEW_SENSOR only on first heartbeat, then SENSOR_HEARTBEAT every time
+	if isNewSensor {
+		h.broadcastWS("NEW_SENSOR", map[string]string{
+			"node_id":   hb.NodeID,
+			"sensor_id": hb.SensorID,
+			"timestamp": nowStr,
+		})
+	} else {
+		h.broadcastWS("SENSOR_HEARTBEAT", map[string]string{
+			"node_id":   hb.NodeID,
+			"sensor_id": hb.SensorID,
+			"timestamp": nowStr,
+		})
+	}
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "alive"})
 }

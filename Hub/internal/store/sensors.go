@@ -86,6 +86,39 @@ func (s *SQLiteStore) GetAllSensors() ([]models.Sensor, error) {
 	return fleet, nil
 }
 
+// GetSensor retrieves a single sensor by node_id and sensor_id composite key
+func (s *SQLiteStore) GetSensor(nodeID, sensorID string) (*models.Sensor, error) {
+	var sensor models.Sensor
+	var metadataStr string
+	var isSilencedInt int
+
+	err := s.DB.QueryRow(
+		`SELECT sensor_id, node_id, first_seen, last_seen, metadata, is_silenced 
+		 FROM sensors 
+		 WHERE node_id = ? AND sensor_id = ?`,
+		nodeID, sensorID,
+	).Scan(&sensor.SensorID, &sensor.NodeID, &sensor.FirstSeen, &sensor.LastSeen, &metadataStr, &isSilencedInt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	sensor.IsSilenced = isSilencedInt == 1
+
+	lastSeenTime, err := time.Parse(time.RFC3339, sensor.LastSeen)
+	if err == nil && time.Now().UTC().Sub(lastSeenTime) < 90*time.Second {
+		sensor.Status = "online"
+	} else {
+		sensor.Status = "offline"
+	}
+
+	var metadata map[string]interface{}
+	json.Unmarshal([]byte(metadataStr), &metadata)
+	sensor.Metadata = metadata
+
+	return &sensor, nil
+}
+
 func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, error) {
 	rows, err := s.DB.Query("SELECT node_id, sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY node_id, sensor_id", nowStr)
 	if err != nil {

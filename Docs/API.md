@@ -4,7 +4,6 @@
 
 All API routes are prefixed with `/api/v1` unless otherwise noted.
 
----
 
 ## Authentication
 
@@ -22,15 +21,13 @@ Protected by a unique node key generated during provisioning. Pass the key using
 Authorization: Bearer <HW_NODE_KEY>
 ```
 
----
-
 ## WebSocket
 
 ### GET /api/v1/ws
 
 Upgrades the connection to a persistent WebSocket for real-time dashboard updates. Requires a valid `hw_auth` session cookie.
 
-The Hub pushes a JSON message to all connected dashboard clients whenever a sensor reports an event, a new sensor comes online, a sensor is removed, or a sensor's silence state changes.
+The Hub pushes a JSON message to all connected dashboard clients whenever a sensor reports an event, a new sensor comes online, a sensor is removed, a sensor's silence state changes, or when time-series charts need synchronization.
 
 All messages share the same envelope:
 
@@ -41,7 +38,9 @@ All messages share the same envelope:
 | Type | Trigger | Payload |
 |---|---|---|
 | `NEW_EVENT` | A sensor reports an event | Full event object (see event schema below) |
-| `NEW_SENSOR` | A sensor sends its first heartbeat | `{ "node_id": "...", "sensor_id": "...", "timestamp": "..." }` |
+| `NEW_SENSOR` | A sensor sends its first heartbeat (new sensor detected) | `{ "node_id": "...", "sensor_id": "...", "timestamp": "..." }` |
+| `SENSOR_HEARTBEAT` | A sensor sends a periodic heartbeat (every ~30 seconds) | `{ "node_id": "...", "sensor_id": "...", "timestamp": "..." }` |
+| `SYNC_CHARTS` | Periodic time-series chart synchronization orchestrator (every 1 minute) | `null` |
 | `DELETE_SENSOR` | A sensor is forgotten via the dashboard | `{ "node_id": "...", "sensor_id": "..." }` |
 | `SILENCE_SENSOR` | A sensor\'s silence state is toggled | `{ "node_id": "...", "sensor_id": "...", "is_silenced": true }` |
 
@@ -70,7 +69,17 @@ All messages share the same envelope:
 }
 ```
 
----
+### Pure-Push Architecture
+
+HoneyWire eliminates frontend polling entirely. The dashboard establishes a single persistent WebSocket connection and receives all state changes in real-time:
+
+- **Events** push instantly via `NEW_EVENT` 
+- **New sensors** are detected instantly via `NEW_SENSOR` and trigger a full fleet refresh
+- **Status indicators** (Live online/offline dots) are updated at 0-latency thanks to `SENSOR_HEARTBEAT` messages natively updating the Vue state.
+- **Fleet changes** (remove/silence) broadcast immediately via `DELETE_SENSOR` and `SILENCE_SENSOR`
+- **Uptime charts** update seamlessly via `SYNC_CHARTS` orchestrator messages (every 1 minute). This "Push-to-Pull" pattern keeps all connected clients' historical time-series blocks perfectly synchronized without relying on wasteful, throttle-prone browser timers.
+
+**Reconnection Recovery:** If the user's connection drops, the frontend automatically reconnects, fires an `onReconnect` hook, and fetches any missed data. This ensures the dashboard never displays stale information or misses events that occurred while offline.
 
 ## System & Configuration
 

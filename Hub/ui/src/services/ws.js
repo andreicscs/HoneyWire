@@ -28,6 +28,8 @@ export class HoneyWireWS {
       onNewSensor: null,
       onDeleteSensor: null,
       onSilenceSensor: null,
+      onReconnect: null,
+      onSyncCharts: null,
     }
   }
 
@@ -67,6 +69,12 @@ export class HoneyWireWS {
 
     this.ws.onopen = () => {
       console.log('WebSocket: Connected')
+      
+      // If retryCount > 0, it means we dropped and just successfully reconnected
+      if (this.retryCount > 0 && this.callbacks.onReconnect) {
+        this.callbacks.onReconnect()
+      }
+      
       this.retryCount = 0
       this.retryDelay = 3000
     }
@@ -108,6 +116,10 @@ export class HoneyWireWS {
             this.callbacks.onSensorHeartbeat(data.payload)
           }
           break
+        
+        case 'SYNC_CHARTS':
+         if (this.callbacks.onSyncCharts) this.callbacks.onSyncCharts()
+         break
 
         case 'NEW_SENSOR':
           if (this.callbacks.onNewSensor) {

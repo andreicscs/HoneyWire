@@ -264,7 +264,29 @@ export const useFleetStore = defineStore('fleet', () => {
       if (sensor) {
         sensor.is_silenced = payload.is_silenced
       }
-    }
+    } else if (type === 'SENSOR_HEARTBEAT') {
+      // Update the main sensors array
+      const sensor = sensors.value.find(
+        s => s.node_id === payload.node_id && s.sensor_id === payload.sensor_id
+      )
+      if (sensor) {
+        sensor.last_seen = payload.timestamp || new Date().toISOString()
+        sensor.status = 'online'
+      }
+
+      // Find the same sensor in the uptimeData array and force it to Online
+      const uptimeSensor = uptimeData.value.find(
+        s => s.node_id === payload.node_id && s.id === payload.sensor_id
+      )
+      if (uptimeSensor) {
+        uptimeSensor.isOnline = true
+        
+        if (uptimeSensor.blocks && uptimeSensor.blocks.length > 0) {
+            uptimeSensor.blocks[uptimeSensor.blocks.length - 1].status = 'up'
+            uptimeSensor.blocks[uptimeSensor.blocks.length - 1].label = 'Online (Live)'
+        }
+      }
+    } 
   }
 
   return {

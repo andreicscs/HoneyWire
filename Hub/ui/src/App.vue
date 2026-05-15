@@ -38,7 +38,6 @@ const requiresSetup = ref(false)
 const isAuthenticated = ref(false)
 
 const wsService = new HoneyWireWS()
-let healthSyncInterval = null
 
 const checkAuthAndInit = async () => {
     // ----------------------------------------------------
@@ -81,13 +80,22 @@ const checkAuthAndInit = async () => {
             wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
             wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
             wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
+            
+            // SMART RECOVERY: Only fetch data if the socket drops and reconnects
+            wsService.on('onReconnect', async () => {
+                console.log("WebSocket Reconnected: Syncing missed data...")
+                await Promise.all([
+                    fleetStore.fetchFleet(),
+                    fleetStore.fetchUptime(fleetStore.activeTimeframe),
+                    eventsStore.fetchEvents()
+                ])
+            })
+
+            wsService.on('onSyncCharts', () => {
+                fleetStore.fetchUptime(fleetStore.activeTimeframe)
+            })
 
             wsService.connect()
-            
-            healthSyncInterval = setInterval(() => { 
-                fleetStore.fetchFleet()
-                fleetStore.fetchUptime(fleetStore.activeTimeframe) 
-            }, 30000)
 
         } else {
             isAuthenticated.value = false
@@ -114,7 +122,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-    if (healthSyncInterval) clearInterval(healthSyncInterval)
     wsService.disconnect()
 })
 </script>

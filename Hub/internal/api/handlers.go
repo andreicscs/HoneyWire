@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/honeywire/hub/internal/auth"
@@ -41,6 +42,7 @@ func NewHandler(s *store.SQLiteStore, cfg *config.Config, sess *auth.SessionStor
 		authTracker:  make(map[string]*loginState),
 	}
 	go h.cleanupAuthTracker()
+	go h.startChartSyncBroadcaster()
 	return h
 }
 
@@ -118,4 +120,16 @@ func (h *Handler) broadcastWS(msgType string, payload interface{}) {
 		c.Close()
 	}
 	h.clientsMu.Unlock()
+}
+
+// Run this in a goroutine when your server starts
+func (h *Handler) startChartSyncBroadcaster() {
+    ticker := time.NewTicker(30 * time.Second)
+    defer ticker.Stop()
+
+    for range ticker.C {
+        // Just tell all connected clients that 30 seconds have passed
+        // and they should refresh their time-series charts.
+        h.broadcastWS("SYNC_CHARTS", nil)
+    }
 }

@@ -13,16 +13,52 @@ const { sensors: fleet, uptimeData, selectedNode, selectedSensor, activeTimefram
 
 const scrollArea = ref(null)
 const canScrollDown = ref(false)
+const worstWarningBelow = ref(null)
 
 const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
 const handleForget = (nodeId, sensorId) => fleetStore.forgetSensor(nodeId, sensorId)
 
+// Helper to flag rows that have warnings
+const getWorstStatus = (sensor) => {
+    if (sensor.blocks.some(b => b.status === 'down')) return 'down'
+    if (sensor.blocks.some(b => b.status === 'degraded')) return 'degraded'
+    return null
+}
+
 const checkScroll = () => {
     if (!scrollArea.value) return
     const container = scrollArea.value
+    
+    // 1. Basic scroll check
     const currentBottom = Math.ceil(container.scrollTop + container.clientHeight)
     canScrollDown.value = currentBottom < (container.scrollHeight - 15)
+
+    // 2. DOM-Aware Warning Check
+    let worstStatus = null
+    const warningNodes = container.querySelectorAll('.has-warnings')
+
+    if (warningNodes.length > 0) {
+        const containerRect = container.getBoundingClientRect()
+        
+        for (let i = 0; i < warningNodes.length; i++) {
+            const nodeRect = warningNodes[i].getBoundingClientRect()
+            
+            // If the top of the warning row is below the bottom of the visible container
+            if (nodeRect.top > containerRect.bottom - 10) { 
+                const status = warningNodes[i].getAttribute('data-worst-status')
+                if (status === 'down') {
+                    worstStatus = 'down'
+                    break // 'down' is the worst, stop checking
+                } else if (status === 'degraded') {
+                    worstStatus = 'degraded'
+                }
+            }
+        }
+    }
+    
+    worstWarningBelow.value = worstStatus
 }
+
 
 const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
@@ -130,8 +166,11 @@ const legendItems = [
                         :class="{
                             'opacity-50': selectedSensor && (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
                             'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor === sensor.id && selectedNode === sensor.node_id,
-                            'border-transparent': !selectedSensor || (selectedSensor !== sensor.id || selectedNode !== sensor.node_id)
-                        }">
+                            'border-transparent': !selectedSensor || (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
+                            'has-warnings': getWorstStatus(sensor) !== null
+                        }"
+                        :data-worst-status="getWorstStatus(sensor)"
+                        >
                          
                         <div class="w-[180px] flex items-center gap-2 shrink-0 pr-2">
                             
@@ -188,11 +227,13 @@ const legendItems = [
 
             <div class="absolute bottom-0 left-0 right-0 flex items-end justify-center pointer-events-none pb-2 bg-gradient-to-t from-bg-surface to-transparent h-12">
                 <transition enter-active-class="transition-all duration-normal ease-out" enter-from-class="opacity-0 translate-y-4 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100" leave-active-class="transition-all duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100 translate-y-0 scale-100" leave-to-class="opacity-0 translate-y-4 scale-95">
-                    <div v-show="canScrollDown && uptimeData.some(s => s.blocks.some(b => b.status === 'down' || b.status === 'degraded'))" 
+                    <div v-show="canScrollDown && worstWarningBelow !== null" 
                         @click="scrollToBottom"
                         class="pointer-events-auto relative cursor-pointer group/notify active:scale-95 transition-transform duration-[var(--duration-fast)] drop-shadow-md">
                         <div class="animate-bounce-subtle relative bg-bg-surface border border-border-default py-1.5 px-2 rounded-full flex justify-center items-center transition-colors duration-normal group-hover/notify:bg-bg-inset z-10">
-                            <div class="w-1.5 z-1 h-2.5 rounded-[1px]" :class="[(uptimeData.some(s => s.blocks.some(b => b.status === 'down')) ? 'bg-critical' : 'bg-high'), { 'animate-pulse': canScrollDown }]"></div>
+                            
+                            <div class="w-1.5 z-1 h-2.5 rounded-[1px]" :class="[(worstWarningBelow === 'down' ? 'bg-critical' : 'bg-high'), { 'animate-pulse': canScrollDown }]"></div>
+                            
                             <div class="absolute z-0 -bottom-[3px] left-1/2 transform -translate-x-1/2 w-2 h-2 bg-bg-surface border-r border-b border-border-default rotate-45 rounded-[1px] transition-colors duration-normal group-hover/notify:bg-bg-inset"></div>
                         </div>
                     </div>
