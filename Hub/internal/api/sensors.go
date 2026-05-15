@@ -112,7 +112,7 @@ func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	sensorID := chi.URLParam(r, "sensor_id")
-	
+
 	// Add NodeID to the expected JSON payload
 	var req struct {
 		NodeID     string `json:"node_id"`

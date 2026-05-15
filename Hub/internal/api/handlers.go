@@ -124,12 +124,12 @@ func (h *Handler) broadcastWS(msgType string, payload interface{}) {
 
 // Run this in a goroutine when your server starts
 func (h *Handler) startChartSyncBroadcaster() {
-    ticker := time.NewTicker(30 * time.Second)
-    defer ticker.Stop()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
-    for range ticker.C {
-        // Just tell all connected clients that 30 seconds have passed
-        // and they should refresh their time-series charts.
-        h.broadcastWS("SYNC_CHARTS", nil)
-    }
+	for range ticker.C {
+		// Just tell all connected clients that 30 seconds have passed
+		// and they should refresh their time-series charts.
+		h.broadcastWS("SYNC_CHARTS", nil)
+	}
 }
