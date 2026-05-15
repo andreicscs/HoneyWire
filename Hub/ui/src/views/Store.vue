@@ -5,6 +5,7 @@ import PageHeader from '../components/ui/layout/PageHeader.vue' // Adjust path i
 
 const { config } = useConfig()
 
+// State
 const selectedSensor = ref(null)
 const activeTab = ref('readme')
 const envVarValues = ref({}) 
@@ -16,9 +17,40 @@ const fetchError = ref(false)
 
 const rawCompose = ref('')
 const highlightedCompose = ref('')
-const baseYaml = ref('') 
 const composePre = ref(null) 
 
+const isSeverityOpen = ref(false)
+
+// Separated text colors from hover effects to prevent the main button from turning transparent on hover
+const severityOptions = [
+    { value: 'info', label: 'Info', textClass: 'text-info', hoverClass: 'hover:bg-info/10 hover:text-info' },
+    { value: 'low', label: 'Low', textClass: 'text-low', hoverClass: 'hover:bg-low/10 hover:text-low' },
+    { value: 'medium', label: 'Medium', textClass: 'text-medium', hoverClass: 'hover:bg-medium/10 hover:text-medium' },
+    { value: 'high', label: 'High', textClass: 'text-high', hoverClass: 'hover:bg-high/10 hover:text-high' },
+    { value: 'critical', label: 'Critical', textClass: 'text-critical', hoverClass: 'hover:bg-critical/10 hover:text-critical' }
+]
+
+const currentSeverity = computed(() => {
+    return severityOptions.find(s => s.value === envVarValues.value['HW_SEVERITY']) || severityOptions[3];
+})
+
+const toggleSeverity = () => {
+    isSeverityOpen.value = !isSeverityOpen.value;
+    // Highlight when open, un-highlight when closed
+    activeEnvVar.value = isSeverityOpen.value ? 'HW_SEVERITY' : null;
+}
+
+const closeSeverity = () => {
+    isSeverityOpen.value = false;
+    activeEnvVar.value = null;
+}
+
+const selectSeverity = (val) => {
+    envVarValues.value['HW_SEVERITY'] = val;
+    closeSeverity(); // Close and remove highlight after picking
+}
+
+// Initial Fetch
 onMounted(async () => {
     try {
         isLoading.value = true;
@@ -33,6 +65,7 @@ onMounted(async () => {
     }
 });
 
+// Helper: Parse Go template defaults for UI display
 const getUIDefault = (def) => {
     if (!def) return '';
     if (!def.includes('{{')) return def; 
@@ -43,6 +76,7 @@ const getUIDefault = (def) => {
     return '';
 }
 
+// Variables that should appear first in the UI list
 const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_NODE_ID', 'HW_NODE_ALIAS', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL'];
 
 const sortedEnvVars = computed(() => {
@@ -60,25 +94,29 @@ const sortedEnvVars = computed(() => {
         });
 });
 
+// Watchers
 watch(envVarValues, () => {
-    applyLocalUpdates();
+    fetchYamlFromHub();
 }, { deep: true });
 
 watch(activeEnvVar, () => {
     applyHighlighting();
 });
 
+// --- ACTIONS ---
 const openSensor = (sensor) => {
     selectedSensor.value = sensor
     activeTab.value = 'readme'
     envVarValues.value = {}
     
+    // 1. Force the Core Variables to always exist
+    envVarValues.value['HW_SEVERITY'] = 'critical';
+    envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin;
+    envVarValues.value['HW_HUB_KEY'] = config.hubKey || '<YOUR_HW_HUB_KEY>';
+
+    // 2. Load the dynamic variables from the manifest
     sensor.deployment.env_vars?.forEach(env => {
-        if (env.name === 'HW_HUB_ENDPOINT') {
-            envVarValues.value[env.name] = config.hubEndpoint || window.location.origin;
-        } else if (env.name === 'HW_HUB_KEY') {
-            envVarValues.value[env.name] = config.hubKey || '<YOUR_HW_HUB_KEY>';
-        } else {
+        if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
             envVarValues.value[env.name] = getUIDefault(env.default);
         }
     })
@@ -94,6 +132,7 @@ const closeSensor = () => {
     document.body.style.overflow = ''
 }
 
+// Backend Integration
 const fetchYamlFromHub = async () => {
     if (!selectedSensor.value) return;
 
@@ -121,9 +160,8 @@ const fetchYamlFromHub = async () => {
         
         if (!response.ok) throw new Error("Failed to compile YAML");
         
-        const rawBackendYaml = await response.text();
-        baseYaml.value = formatComposeYaml(rawBackendYaml); 
-        applyLocalUpdates(); 
+        rawCompose.value = await response.text();
+        applyHighlighting(); 
 
     } catch (e) {
         console.error("YAML Generation Error:", e);
@@ -132,129 +170,20 @@ const fetchYamlFromHub = async () => {
     }
 }
 
-const formatComposeYaml = (yamlStr) => {
-    let lines = yamlStr.split('\n');
-    let parsedLines = [];
-    let inEnvBlock = false;
-    let envVars = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-        if (line.match(/^ {4}environment:/) || line.match(/^ {2}environment:/)) {
-            inEnvBlock = true;
-            parsedLines.push(line);
-            continue;
-        }
-
-        if (inEnvBlock) {
-            if (line.trim().startsWith('- ')) {
-                envVars.push(line);
-                if (i === lines.length - 1) {
-                    envVars.sort((a, b) => sortEnvVarsLogic(a, b));
-                    parsedLines.push(...envVars);
-                }
-            } else {
-                envVars.sort((a, b) => sortEnvVarsLogic(a, b));
-                parsedLines.push(...envVars);
-                envVars = [];
-                inEnvBlock = false;
-                parsedLines.push(line);
-            }
-        } else {
-            parsedLines.push(line);
-        }
-    }
-
-    const finalYaml = [];
-    let servicesIndex = parsedLines.findIndex(l => l.startsWith('services:'));
-    
-    if (servicesIndex === -1) return parsedLines.join('\n'); 
-
-    finalYaml.push(...parsedLines.slice(0, servicesIndex + 1));
-    
-    let servicesMap = [];
-    let currentService = null;
-    let currentBlock = [];
-
-    for (let i = servicesIndex + 1; i < parsedLines.length; i++) {
-        const line = parsedLines[i];
-        
-        if (line.match(/^ {2}[a-zA-Z0-9_-]+:/)) {
-            if (currentService) {
-                servicesMap.push({ name: currentService, lines: currentBlock });
-            }
-            currentService = line.trim().replace(':', '');
-            currentBlock = [line];
-        } 
-        else if (line.startsWith('    ') || line.startsWith('   ') || line === '') {
-            if (currentService) currentBlock.push(line);
-            else finalYaml.push(line);
-        } 
-        else if (!line.startsWith(' ')) {
-            if (currentService) {
-                servicesMap.push({ name: currentService, lines: currentBlock });
-                currentService = null;
-            }
-            finalYaml.push(...parsedLines.slice(i));
-            break;
-        }
-    }
-    
-    if (currentService) {
-        servicesMap.push({ name: currentService, lines: currentBlock });
-    }
-
-    servicesMap.sort((a, b) => {
-        const aIsSensor = a.name.startsWith('hw-sensor');
-        const bIsSensor = b.name.startsWith('hw-sensor');
-        if (aIsSensor && !bIsSensor) return 1;
-        if (!aIsSensor && bIsSensor) return -1;
-        return 0;
-    });
-
-    servicesMap.forEach(svc => {
-        finalYaml.push(...svc.lines);
-    });
-
-    return finalYaml.join('\n');
-}
-
-const sortEnvVarsLogic = (a, b) => {
-    const aName = a.trim().replace('- ', '').split(/[:=]/)[0];
-    const bName = b.trim().replace('- ', '').split(/[:=]/)[0];
-    const aIsCore = coreVars.includes(aName);
-    const bIsCore = coreVars.includes(bName);
-    if (aIsCore && !bIsCore) return -1;
-    if (!aIsCore && bIsCore) return 1;
-    if (aIsCore && bIsCore) return coreVars.indexOf(aName) - coreVars.indexOf(bName);
-    return aName.localeCompare(bName);
-}
-
-const applyLocalUpdates = () => {
-    if (!baseYaml.value) return;
-    let updatedYaml = baseYaml.value;
-
-    for (const [key, val] of Object.entries(envVarValues.value)) {
-        const safeVal = val !== undefined && val !== null ? String(val) : '';
-        const regex = new RegExp(`^(\\s*(?:-\\s+)?${key}\\s*[:=]\\s*["']?)([^"\'\\r\\n]*)(["']?.*)$`, 'gm');
-        updatedYaml = updatedYaml.replace(regex, `$1${safeVal}$3`);
-    }
-
-    rawCompose.value = updatedYaml;
-    applyHighlighting();
-}
-
+// UI Formatting
 const applyHighlighting = () => {
     let htmlYaml = rawCompose.value;
     
     if (activeEnvVar.value) {
         const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Simple regex to find the key name and highlight the line
         const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm');
         htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring px-1 rounded transition-colors duration-[var(--duration-fast)] active-highlight">$&</span>`);
     }
     
     highlightedCompose.value = htmlYaml;
 
+    // Auto-scroll to highlighted variable
     nextTick(() => {
         if (composePre.value) {
             const highlightEl = composePre.value.querySelector('.active-highlight');
@@ -389,21 +318,58 @@ const copyToClipboard = () => {
                                     <p class="text-base text-text-m">Configure the sensor deployment below. Once ready, save it as <code>docker-compose.yml</code> on your target server and deploy using <code class="bg-input-bg px-1.5 py-0.5 rounded-md text-text-h border border-input-border font-mono">docker compose up -d</code>.</p>
                                 </div>
                                 
-                                <div v-if="sortedEnvVars.length > 0" class="mb-6">
+                                <div class="mb-6">
                                     <h4 class="text-base font-medium text-text-h mb-3">Configuration</h4>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div v-for="env in sortedEnvVars" :key="env.name" class="space-y-1">
-                                            <label class="block text-sm text-text-h mb-0.5">{{ env.name }}</label>
-                                            <input 
-                                                v-model="envVarValues[env.name]"
-                                                :type="env.type === 'int' ? 'number' : 'text'"
-                                                :placeholder="getUIDefault(env.default)"
-                                                @focus="activeEnvVar = env.name"
-                                                @blur="activeEnvVar = null"
-                                                class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50"
-                                            />
-                                            <p class="text-sm text-text-m">{{ env.description }}</p>
+                                        
+                                        <div class="space-y-1 relative">
+                                            <label class="block text-sm text-text-h mb-0.5">HW_SEVERITY</label>
+                                            
+                                            <div 
+                                                @click="toggleSeverity"
+                                                class="w-full px-3 py-2 text-base bg-input-bg border rounded-md cursor-pointer flex justify-between items-center transition-all duration-[var(--duration-fast)] shadow-sm select-none"
+                                                :class="isSeverityOpen ? 'border-primary-main ring-1 ring-focus-ring' : 'border-input-border hover:border-border-default'"
+                                            >
+                                                <span :class="currentSeverity.textClass">
+                                                    {{ currentSeverity.label }}
+                                                </span>
+                                                <svg class="w-5 h-5 text-text-m transition-transform duration-200" :class="isSeverityOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                            </div>
+
+                                            <div v-if="isSeverityOpen" @click="closeSeverity" class="fixed inset-0 z-10"></div>
+
+                                            <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                                <ul v-if="isSeverityOpen" class="absolute z-20 w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden">
+                                                    <li v-for="option in severityOptions" :key="option.value"
+                                                        @click="selectSeverity(option.value)"
+                                                        class="px-3 py-2 cursor-pointer transition-colors duration-[var(--duration-fast)] flex items-center gap-2"
+                                                        :class="[option.textClass, option.hoverClass]"
+                                                    >
+                                                        <span class="w-2 h-2 rounded-full" :class="option.textClass.replace('text-', 'bg-')"></span>
+                                                        {{ option.label }}
+                                                    </li>
+                                                </ul>
+                                            </transition>
+
+                                            <p class="text-sm text-text-m">Alert severity level triggered by this sensor.</p>
                                         </div>
+
+                                        <template v-for="env in sortedEnvVars" :key="env.name">
+                                            <div v-if="env.name !== 'HW_SEVERITY'" class="space-y-1">
+                                                <label class="block text-sm text-text-h mb-0.5">{{ env.name }}</label>
+                                                
+                                                <input 
+                                                    v-model="envVarValues[env.name]"
+                                                    :type="env.type === 'int' ? 'number' : 'text'"
+                                                    :placeholder="getUIDefault(env.default)"
+                                                    @focus="activeEnvVar = env.name"
+                                                    @blur="activeEnvVar = null"
+                                                    class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50"
+                                                />
+                                                <p class="text-sm text-text-m">{{ env.description }}</p>
+                                            </div>
+                                        </template>
+
                                     </div>
                                 </div>
                                 
