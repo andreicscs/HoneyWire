@@ -342,7 +342,7 @@ const copyToClipboard = () => {
                                                 <ul v-if="isSeverityOpen" class="absolute z-20 w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden">
                                                     <li v-for="option in severityOptions" :key="option.value"
                                                         @click="selectSeverity(option.value)"
-                                                        class="px-3 py-2 cursor-pointer transition-colors duration-[var(--duration-fast)] flex items-center gap-2"
+                                                        class="px-3 py-2 cursor-pointer transition-colors text-base duration-[var(--duration-fast)] flex items-center gap-2"
                                                         :class="[option.textClass, option.hoverClass]"
                                                     >
                                                         <span class="w-2 h-2 rounded-full" :class="option.textClass.replace('text-', 'bg-')"></span>
