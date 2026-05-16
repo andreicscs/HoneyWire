@@ -30,7 +30,7 @@
 
   --disabled-bg: oklch(92% 0.01 250);
   --disabled-text: oklch(70% 0.01 250);
-  --disabled-border: oklch(85% 0.01 250);
+  --disabled-border: oklch(60% 0.01 250);
   
   --input-bg: oklch(98% 0.01 250);          
   --input-border: oklch(85% 0.02 250);
@@ -146,13 +146,12 @@
   --secondary-text: oklch(70% 0.02 250);
   --secondary-border: oklch(30% 0.02 250);
  
-  --disabled-bg: oklch(22% 0.01 250);
+  --disabled-bg: oklch(16.081% 0.00909 240.653);
   --disabled-text: oklch(45% 0.01 250);
-  --disabled-border: oklch(30% 0.01 250);
+  --disabled-border: oklch(40% 0.01 250);
   
   --input-bg: oklch(14% 0.01 250);           
   --input-border: oklch(30% 0.01 250);
-  --focus-ring: oklch(70% 0.05 250 / 0.4);
  
   /* --- 3. Colors: States & Severities --- */
  
@@ -234,7 +233,6 @@
   /* Input States */
   --color-input-bg: var(--input-bg);
   --color-input-border: var(--input-border);
-  --color-focus-ring: var(--focus-ring);
  
   /* Severity Levels */
   --color-critical: var(--sev-critical);

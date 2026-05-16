@@ -6,10 +6,14 @@ import { storeToRefs } from 'pinia'
 import Sidebar from './components/layout/Sidebar.vue'
 import Header from './components/layout/Header.vue'
 import Dashboard from './views/Dashboard.vue'
+import FleetView from './views/FleetView.vue'
+import NodeDetailView from './views/NodeDetailView.vue'
 import Login from './views/Login.vue'
 import Store from './views/Store.vue'
 import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
+
+
 
 // Services & Stores
 import { useConfig } from './api/useConfig'
@@ -147,6 +151,8 @@ if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.match
       <Header />
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
         <Dashboard v-if="currentView === 'dashboard'" />
+        <FleetView v-else-if="currentView === 'fleet'" />
+        <NodeDetailView v-else-if="currentView === 'node-detail'" />
         <Store v-else-if="currentView === 'store'" />
         <Settings v-else-if="currentView === 'settings'" />
       </div>
