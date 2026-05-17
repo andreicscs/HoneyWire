@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sort"
 
-	"github.com/honeywire/hub/internal/auth"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,26 +92,6 @@ func (h *Handler) GenerateCompose(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid payload", http.StatusBadRequest)
 		return
 	}
-
-	// 1. DUAL AUTHENTICATION CHECK
-	isAuthorized := false
-
-	if cookie, err := r.Cookie(auth.CookieName); err == nil {
-		if h.SessionStore.IsValid(cookie.Value) {
-			isAuthorized = true
-		}
-	}
-
-	if !isAuthorized {
-		isAuthorized = h.validateNodeAuth(r, req.NodeID)
-	}
-
-	if !isAuthorized {
-		http.Error(w, "Unauthorized: Valid UI Session or Node Key required", http.StatusUnauthorized)
-		return
-	}
-
-	// 2. COMPOSE GENERATION
 	var compose ComposeFile
 
 	for _, s := range req.Sensors {

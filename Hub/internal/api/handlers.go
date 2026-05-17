@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -56,7 +56,7 @@ func SendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		fmt.Printf("SendJSON encode error: %v\n", err)
+		log.Printf("[ERROR] SendJSON encode error: %v\n", err) 
 	}
 }
 

@@ -12,42 +12,50 @@ import (
 const v2Schema = `
 -- Nodes: Physical servers/agents managing sensors
 CREATE TABLE IF NOT EXISTS nodes (
-    node_id     TEXT PRIMARY KEY,
-    alias       TEXT NOT NULL,
-    node_key    TEXT UNIQUE NOT NULL,
-    ip_address  TEXT,
-    first_seen  TEXT NOT NULL,
-    last_seen   TEXT NOT NULL
+    id              TEXT PRIMARY KEY,
+    alias           TEXT NOT NULL,
+    api_key         TEXT UNIQUE NOT NULL,
+    public_ip       TEXT,
+    private_ip      TEXT,
+    tags            TEXT NOT NULL DEFAULT '[]',
+    pending_config  INTEGER NOT NULL DEFAULT 0,
+    active_revision TEXT,
+    last_heartbeat  TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
 );
 
--- Sensors: Monitored honeypots, strictly owned by a Node
-CREATE TABLE IF NOT EXISTS sensors (
-    node_id     TEXT NOT NULL,
-    sensor_id   TEXT NOT NULL,
-    first_seen  TEXT NOT NULL,
-    last_seen   TEXT NOT NULL,
-    metadata    TEXT NOT NULL DEFAULT '{}',
-    is_silenced INTEGER NOT NULL DEFAULT 0,
+-- NodeSensors: Installed instances of catalog sensors
+CREATE TABLE IF NOT EXISTS node_sensors (
+    node_id         TEXT NOT NULL,
+    sensor_id       TEXT NOT NULL, 
+    custom_name     TEXT NOT NULL, 
+    config_values   TEXT NOT NULL DEFAULT '{}',
+    metadata        TEXT NOT NULL DEFAULT '{}',
+	last_heartbeat  TEXT,
+    is_silenced     INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
     PRIMARY KEY (node_id, sensor_id),
-    FOREIGN KEY (node_id) REFERENCES nodes(node_id) ON DELETE CASCADE
+    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
 
 -- Events: Security alerts from sensors
 CREATE TABLE IF NOT EXISTS events (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id         TEXT NOT NULL,
-    sensor_id       TEXT NOT NULL,
-    timestamp       TEXT NOT NULL,
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id          TEXT NOT NULL,
+    sensor_id        TEXT NOT NULL, 
+    timestamp        TEXT NOT NULL,
     contract_version TEXT NOT NULL DEFAULT '1.0.0',
-    event_trigger   TEXT NOT NULL DEFAULT 'alert',
-    severity        TEXT NOT NULL DEFAULT 'medium',
-    source          TEXT NOT NULL DEFAULT 'Unknown',
-    target          TEXT NOT NULL DEFAULT 'Unknown',
-    details         TEXT NOT NULL DEFAULT '{}',
-    is_read         INTEGER NOT NULL DEFAULT 0,
-    is_archived     INTEGER NOT NULL DEFAULT 0,
-    count           INTEGER NOT NULL DEFAULT 1,
-    FOREIGN KEY (node_id, sensor_id) REFERENCES sensors(node_id, sensor_id) ON DELETE CASCADE
+    event_trigger    TEXT NOT NULL DEFAULT 'alert',
+    severity         TEXT NOT NULL DEFAULT 'medium',
+    source           TEXT NOT NULL DEFAULT 'Unknown',
+    target           TEXT NOT NULL DEFAULT 'Unknown',
+    details          TEXT NOT NULL DEFAULT '{}',
+    is_read          INTEGER NOT NULL DEFAULT 0,
+    is_archived      INTEGER NOT NULL DEFAULT 0,
+    count            INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
 );
 
 -- Sensor Heartbeats: Routine health pings from sensors
@@ -56,14 +64,7 @@ CREATE TABLE IF NOT EXISTS sensor_heartbeats (
     sensor_id   TEXT NOT NULL,
     time_bucket TEXT NOT NULL,
     PRIMARY KEY (node_id, sensor_id, time_bucket),
-    FOREIGN KEY (node_id, sensor_id) REFERENCES sensors(node_id, sensor_id) ON DELETE CASCADE
-);
-
--- Pairing Tokens: One-time tokens for secure node provisioning via wizard
-CREATE TABLE IF NOT EXISTS pairing_tokens (
-    token       TEXT PRIMARY KEY,
-    expires_at  DATETIME NOT NULL,
-    created_at  DATETIME NOT NULL
+    FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
 );
 
 -- System Configuration
@@ -72,20 +73,18 @@ CREATE TABLE IF NOT EXISTS config (
     value TEXT NOT NULL
 );
 
--- High-performance indexes for dashboard queries
+-- High-performance indexes
 CREATE INDEX IF NOT EXISTS idx_events_archived ON events(is_archived, id DESC);
 CREATE INDEX IF NOT EXISTS idx_events_node_sensor ON events(node_id, sensor_id);
 CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
-CREATE INDEX IF NOT EXISTS idx_sensors_node ON sensors(node_id);
+CREATE INDEX IF NOT EXISTS idx_sensors_node ON node_sensors(node_id);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
-CREATE INDEX IF NOT EXISTS idx_pairing_tokens_expires ON pairing_tokens(expires_at);
 `
 
 type SQLiteStore struct {
 	DB *sql.DB
 }
 
-// NewStore initializes the SQLite database with the v2.0.0 schema
 func NewStore(dbPath string) (*SQLiteStore, error) {
 	// Enable WAL mode, set a 5-second busy timeout to prevent locking, and enable Foreign Keys
 	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)", dbPath)
@@ -100,7 +99,6 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	// Apply the clean v2 schema
 	if _, err := db.Exec(v2Schema); err != nil {
 		return nil, err
 	}

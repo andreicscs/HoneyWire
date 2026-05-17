@@ -11,12 +11,13 @@ import (
 )
 
 type Sensor struct {
-	NodeID             string // Added NodeID
+	NodeID             string
 	SensorID           string
 	AgentVersion       string
 	hubContractVersion string
 	HubEndpoint        string
 	HubKey             string
+	ConfigRev          string
 	TestMode           bool
 	client             *http.Client
 	stopCh             chan struct{}
@@ -29,6 +30,7 @@ func NewSensor() (*Sensor, error) {
 		AgentVersion: "1.0.0",
 		HubEndpoint:  getEnv("HW_HUB_ENDPOINT", ""),
 		HubKey:       getEnv("HW_HUB_KEY", ""),
+		ConfigRev:    getEnv("HW_CONFIG_REV", ""),
 		TestMode:     getEnv("HW_TEST_MODE", "false") == "true",
 		client:       &http.Client{Timeout: 10 * time.Second},
 		stopCh:       make(chan struct{}),
@@ -127,6 +129,7 @@ func (s *Sensor) sendHeartbeat() {
 		"metadata": map[string]string{
 			"agent_version":    s.AgentVersion,
 			"contract_version": s.hubContractVersion,
+			"HW_CONFIG_REV":    s.ConfigRev,
 		},
 	}
 	

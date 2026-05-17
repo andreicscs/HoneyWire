@@ -25,7 +25,7 @@ type Event struct {
 	ID              int                    `json:"id"`
 	Timestamp       string                 `json:"timestamp"`
 	ContractVersion string                 `json:"contract_version"`
-	SensorID        string                 `json:"sensor_id"`
+	SensorID        string                 `json:"sensor_id"` // Catalog ID (e.g. hw-tcp-tarpit)
 	NodeID          string                 `json:"node_id"`
 	EventTrigger    string                 `json:"event_trigger"`
 	Severity        string                 `json:"severity"`
@@ -41,27 +41,34 @@ type Event struct {
 type Heartbeat struct {
 	SensorID string                 `json:"sensor_id"`
 	NodeID   string                 `json:"node_id"`
-	Metadata map[string]interface{} `json:"metadata"`
+	Metadata map[string]interface{} `json:"metadata"` // Contains HW_CONFIG_REV
 }
 
-// Sensor represents a known node in the fleet
-type Sensor struct {
-	SensorID   string                 `json:"sensor_id"`
-	NodeID     string                 `json:"node_id"`
-	FirstSeen  string                 `json:"first_seen"`
-	LastSeen   string                 `json:"last_seen"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	IsSilenced bool                   `json:"is_silenced"`
-	Status     string                 `json:"status"`
-}
-
-// Node represents a physical server/agent managing sensors
+// Node represents a physical server managing sensors
 type Node struct {
-	NodeID    string `json:"node_id"`
-	Alias     string `json:"alias"`
-	IPAddress string `json:"ip_address"`
-	LastSeen  string `json:"last_seen"`
-	Status    string `json:"status"`
+	ID               string       `json:"id"`
+	Alias            string       `json:"alias"`
+	PublicIP         *string      `json:"publicIp"`
+	PrivateIP        *string      `json:"privateIp"`
+	Tags             []string     `json:"tags"`
+	HasPendingConfig bool         `json:"hasPendingConfig"`
+	LastHeartbeat    *string      `json:"lastHeartbeat"`
+	Status           string       `json:"status"` // Derived status (up, down, pending)
+	InstalledSensors []NodeSensor `json:"installedSensors"`
+}
+
+// NodeSensor represents a deployed sensor on a node
+type NodeSensor struct {
+	ID            string                 `json:"id"`
+	NodeID        string                 `json:"node_id"`
+	Name          string                 `json:"name"`
+	Display       string                 `json:"display"`
+	Status        string                 `json:"status"`
+	LastHeartbeat *string                `json:"lastHeartbeat"`
+	IsSilenced    bool                   `json:"isSilenced"`
+	Events24h     int                    `json:"events24h"`
+	EnvVars       map[string]interface{} `json:"envVars"`
+	Metadata      map[string]interface{} `json:"metadata"`
 }
 
 // SystemState represents global hub settings

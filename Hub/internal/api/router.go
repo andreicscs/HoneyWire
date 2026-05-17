@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -21,7 +22,6 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(ww, r)
 
-		// Only print to the terminal if something went wrong
 		if ww.Status() >= 400 {
 			log.Printf("[-] HTTP %d | %s %s from %s (took %v)",
 				ww.Status(), r.Method, r.URL.Path, r.RemoteAddr, time.Since(start))
@@ -29,7 +29,7 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 	})
 }
 
-func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.SessionStore) *chi.Mux {
+func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.SessionStore) (*chi.Mux, error) {
 	r := chi.NewRouter()
 
 	r.Use(ErrorOnlyLogger)
@@ -43,18 +43,29 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 	r.Post("/logout", h.Logout)
 	r.Get("/api/v1/setup/status", h.GetSetupStatus)
 	r.Post("/api/v1/setup", h.CompleteSetup)
-	r.Post("/api/v1/wizard/link", h.WizardLink)
 
 	// UI Endpoints (Protected by Cookies)
 	r.Group(func(r chi.Router) {
 		r.Use(UIAuthMiddleware(sessionStore))
 
 		r.Get("/api/v1/ws", h.ServeWS)
+		r.Get("/api/v1/manifests", h.GetManifests) // Fetches catalog
 
-		r.Get("/api/v1/manifests", h.GetManifests)
+		// UI Compose Preview
+		r.Post("/api/v1/compose/generate", h.GenerateCompose) // Used by UI modal for live preview
 
-		// Provisioning
-		r.Post("/api/v1/tokens/generate", h.GenerateToken)
+		// --- Node & Fleet Management ---
+		r.Post("/api/v1/nodes", h.CreateNode)
+		r.Get("/api/v1/nodes", h.GetNodes)
+		r.Get("/api/v1/nodes/{id}", h.GetNodeDetails)
+		r.Patch("/api/v1/nodes/{id}", h.UpdateNode)
+		r.Delete("/api/v1/nodes/{id}", h.DeleteNode)
+
+		// --- Sensor Management ---
+		r.Post("/api/v1/nodes/{id}/sensors", h.AddNodeSensor)
+		r.Put("/api/v1/nodes/{id}/sensors/{sensor_id}", h.EditNodeSensor)
+		r.Delete("/api/v1/nodes/{id}/sensors/{sensor_id}", h.DeleteNodeSensor)
+		r.Patch("/api/v1/nodes/{id}/sensors/{sensor_id}/silence", h.ToggleSilence)
 
 		// System Configuration & Danger Zone
 		r.Get("/api/v1/config", h.GetConfig)
@@ -62,8 +73,7 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 		r.Patch("/api/v1/system/password", h.ChangePassword)
 		r.Post("/api/v1/system/reset", h.FactoryReset)
 
-		// Telemetry & State
-		r.Get("/api/v1/sensors", h.GetSensors)
+		// Telemetry & State (For UI Dashboards)
 		r.Get("/api/v1/events", h.GetEvents)
 		r.Get("/api/v1/uptime", h.GetUptime)
 		r.Get("/api/v1/system/state", h.GetSystemState)
@@ -76,28 +86,22 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 		r.Delete("/api/v1/events", h.ClearEvents)
 		r.Patch("/api/v1/events/{event_id}/archive", h.ArchiveEvent)
 		r.Patch("/api/v1/events/archive-all", h.ArchiveAll)
-
-		// Sensor Management
-		r.Patch("/api/v1/sensors/{sensor_id}/silence", h.ToggleSilence)
-		r.Delete("/api/v1/sensors/{sensor_id}", h.ForgetSensor)
 	})
 
-	// --- Sensor Endpoints ---
-	// no middleware, Node authentication requires the 'node_id', which is inside the JSON payload.
-	// If a middleware reads the http.Request Body to extract the ID, it drains the IO stream.
-	// Therefore, auth is checked inside the handler immediately AFTER the JSON is parsed.
+	// --- Wizard & Telemetry Endpoints ---
+	// Authentication is handled via API Key (Bearer Token) inside the handler
+	r.Get("/api/v1/nodes/compose", h.GetNodeCompose) // aggreagates all generated compose files for a node's sensors
 	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
 	r.Post("/api/v1/event", h.ReceiveEvent)
-	r.Post("/api/v1/compose/generate", h.GenerateCompose) // Dual Auth, both UI sessions and Nodes can generate compose files, so auth is checked inside the handler after JSON parsing.
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")
 	if err != nil {
-		panic("Failed to mount embedded UI files: " + err.Error())
+		return nil, fmt.Errorf("failed to mount embedded UI files: %w", err)
 	}
 
 	fileServer := http.FileServer(http.FS(distFS))
 	r.Handle("/*", fileServer)
 
-	return r
+	return r, nil
 }

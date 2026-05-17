@@ -1,10 +1,8 @@
 package store
 
 import (
-	"encoding/json"
+	"database/sql"
 	"time"
-
-	"github.com/honeywire/hub/internal/models"
 )
 
 type SensorUptimeData struct {
@@ -20,14 +18,42 @@ type HeartbeatData struct {
 	TimeBucket string
 }
 
-func (s *SQLiteStore) UpsertSensor(hb *models.Heartbeat, nowStr, metadataStr string) error {
-	_, err := s.DB.Exec(`
-		INSERT INTO sensors (node_id, sensor_id, first_seen, last_seen, metadata, is_silenced)
-		VALUES (?, ?, ?, ?, ?, 0)
-		ON CONFLICT(node_id, sensor_id) DO UPDATE SET last_seen = ?, metadata = ?`,
-		hb.NodeID, hb.SensorID, nowStr, nowStr, metadataStr, nowStr, metadataStr,
-	)
-	return err
+// ProcessHeartbeat safely handles node updates and config reconciliation
+func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, metadataStr string) (bool, error) {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback() // Safely catches any uncommitted exit
+
+	// Update the Host Node's heartbeat
+	if _, err := tx.Exec("UPDATE nodes SET last_heartbeat = ? WHERE id = ?", nowStr, nodeID); err != nil {
+		return false, err
+	}
+
+	// Update the specific Sensor's heartbeat AND metadata
+	if _, err := tx.Exec(`
+		UPDATE node_sensors 
+		SET metadata = ?, last_heartbeat = ?, updated_at = ? 
+		WHERE node_id = ? AND sensor_id = ?`,
+		metadataStr, nowStr, nowStr, nodeID, sensorID); err != nil {
+		return false, err
+	}
+
+	// Check config reconciliation
+	var dbRevision sql.NullString
+	var pendingConfig int
+	err = tx.QueryRow("SELECT active_revision, pending_config FROM nodes WHERE id = ?", nodeID).Scan(&dbRevision, &pendingConfig)
+
+	justSynced := false
+	if err == nil && pendingConfig == 1 && dbRevision.Valid && dbRevision.String == agentRevision {
+		if _, err := tx.Exec("UPDATE nodes SET pending_config = 0 WHERE id = ?", nodeID); err != nil {
+			return false, err
+		}
+		justSynced = true
+	}
+
+	return justSynced, tx.Commit()
 }
 
 func (s *SQLiteStore) InsertHeartbeat(nodeID, sensorID, timeBucket string) error {
@@ -38,89 +64,13 @@ func (s *SQLiteStore) InsertHeartbeat(nodeID, sensorID, timeBucket string) error
 	return err
 }
 
-func (s *SQLiteStore) GetAllSensors() ([]models.Sensor, error) {
-	rows, err := s.DB.Query(`
-		SELECT sensor_id, node_id, first_seen, last_seen, metadata, is_silenced 
-		FROM sensors 
-		ORDER BY COALESCE(node_id, 'ZZZ') ASC, sensor_id ASC
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var fleet []models.Sensor
-	for rows.Next() {
-		var s models.Sensor
-		var metadataStr string
-		var isSilencedInt int
-		var dbNodeID *string
-
-		if err := rows.Scan(&s.SensorID, &dbNodeID, &s.FirstSeen, &s.LastSeen, &metadataStr, &isSilencedInt); err != nil {
-			continue
-		}
-
-		if dbNodeID != nil {
-			s.NodeID = *dbNodeID
-		}
-
-		s.IsSilenced = isSilencedInt == 1
-
-		lastSeenTime, err := time.Parse(time.RFC3339, s.LastSeen)
-		if err == nil && time.Now().UTC().Sub(lastSeenTime) < 90*time.Second {
-			s.Status = "online"
-		} else {
-			s.Status = "offline"
-		}
-
-		var metadata map[string]interface{}
-		json.Unmarshal([]byte(metadataStr), &metadata)
-		s.Metadata = metadata
-
-		fleet = append(fleet, s)
-	}
-
-	if fleet == nil {
-		fleet = []models.Sensor{}
-	}
-	return fleet, nil
-}
-
-// GetSensor retrieves a single sensor by node_id and sensor_id composite key
-func (s *SQLiteStore) GetSensor(nodeID, sensorID string) (*models.Sensor, error) {
-	var sensor models.Sensor
-	var metadataStr string
-	var isSilencedInt int
-
-	err := s.DB.QueryRow(
-		`SELECT sensor_id, node_id, first_seen, last_seen, metadata, is_silenced 
-		 FROM sensors 
-		 WHERE node_id = ? AND sensor_id = ?`,
-		nodeID, sensorID,
-	).Scan(&sensor.SensorID, &sensor.NodeID, &sensor.FirstSeen, &sensor.LastSeen, &metadataStr, &isSilencedInt)
-
-	if err != nil {
-		return nil, err
-	}
-
-	sensor.IsSilenced = isSilencedInt == 1
-
-	lastSeenTime, err := time.Parse(time.RFC3339, sensor.LastSeen)
-	if err == nil && time.Now().UTC().Sub(lastSeenTime) < 90*time.Second {
-		sensor.Status = "online"
-	} else {
-		sensor.Status = "offline"
-	}
-
-	var metadata map[string]interface{}
-	json.Unmarshal([]byte(metadataStr), &metadata)
-	sensor.Metadata = metadata
-
-	return &sensor, nil
-}
-
 func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, error) {
-	rows, err := s.DB.Query("SELECT node_id, sensor_id, last_seen, COALESCE(first_seen, ?) FROM sensors ORDER BY node_id, sensor_id", nowStr)
+	// Join nodes and node_sensors to get the creation date and the parent node's last heartbeat
+	rows, err := s.DB.Query(`
+		SELECT ns.node_id, ns.sensor_id, n.last_heartbeat, ns.created_at 
+		FROM node_sensors ns
+		JOIN nodes n ON ns.node_id = n.id
+		ORDER BY ns.node_id, ns.sensor_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -129,11 +79,18 @@ func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, er
 	var sensors []SensorUptimeData
 	for rows.Next() {
 		var sd SensorUptimeData
-		var lastSeenStr string
-		if err := rows.Scan(&sd.NodeID, &sd.SensorID, &lastSeenStr, &sd.FirstSeen); err == nil {
-			sd.LastSeen, _ = time.Parse(time.RFC3339, lastSeenStr)
-			sensors = append(sensors, sd)
+		var lastSeenStr sql.NullString
+
+		if err := rows.Scan(&sd.NodeID, &sd.SensorID, &lastSeenStr, &sd.FirstSeen); err != nil {
+			return nil, err
 		}
+
+		if lastSeenStr.Valid {
+			sd.LastSeen, _ = time.Parse(time.RFC3339, lastSeenStr.String)
+		} else {
+			sd.LastSeen = time.Time{} // Never checked in
+		}
+		sensors = append(sensors, sd)
 	}
 	return sensors, nil
 }
@@ -148,22 +105,35 @@ func (s *SQLiteStore) GetHeartbeatsSince(cutoffStr string) ([]HeartbeatData, err
 	var hbs []HeartbeatData
 	for rows.Next() {
 		var hb HeartbeatData
-		if err := rows.Scan(&hb.NodeID, &hb.SensorID, &hb.TimeBucket); err == nil {
-			hbs = append(hbs, hb)
+		if err := rows.Scan(&hb.NodeID, &hb.SensorID, &hb.TimeBucket); err != nil {
+			return nil, err
 		}
+		hbs = append(hbs, hb)
 	}
 	return hbs, nil
 }
 
 func (s *SQLiteStore) UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error {
-	_, err := s.DB.Exec("UPDATE sensors SET is_silenced = ? WHERE node_id = ? AND sensor_id = ?", silenceVal, nodeID, sensorID)
+	_, err := s.DB.Exec("UPDATE node_sensors SET is_silenced = ? WHERE node_id = ? AND sensor_id = ?", silenceVal, nodeID, sensorID)
 	return err
 }
 
-func (s *SQLiteStore) DeleteSensor(nodeID, sensorID string) (int64, error) {
-	result, err := s.DB.Exec("DELETE FROM sensors WHERE node_id = ? AND sensor_id = ?", nodeID, sensorID)
+// UpdateNodeLastHeartbeat flags BOTH the parent node and the specific sensor as alive
+func (s *SQLiteStore) UpdateNodeLastHeartbeat(nodeID, sensorID, timestamp string) error {
+	tx, err := s.DB.Begin()
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return result.RowsAffected()
+
+	if _, err := tx.Exec(`UPDATE nodes SET last_heartbeat = ? WHERE id = ?`, timestamp, nodeID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if _, err := tx.Exec(`UPDATE node_sensors SET last_heartbeat = ?, updated_at = ? WHERE node_id = ? AND sensor_id = ?`, timestamp, timestamp, nodeID, sensorID); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }

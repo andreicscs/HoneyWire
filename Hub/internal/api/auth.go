@@ -134,45 +134,34 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// --- Per-Node Authentication ---
-// nodeAuthCache stores per-node keys in memory for fast validation
-// Key: node_id, Value: node_key (64-char hex string)
-
 // validateNodeAuth checks if a request is authenticated for a given node
-// Extracts Bearer token from Authorization header and compares against node_key
-func (h *Handler) validateNodeAuth(r *http.Request, nodeID string) bool {
+// Extracts Bearer token from Authorization header and maps it to the expected node_id
+func (h *Handler) validateNodeAuth(r *http.Request, expectedNodeID string) bool {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return false
 	}
 
-	// Parse "Bearer <token>" format
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) != 2 || parts[0] != "Bearer" {
 		return false
 	}
-	token := parts[1]
+	token := parts[1] // This is the api_key (hw_key_...)
 
-	// Check cache first
-	if cachedKey, ok := h.nodeAuthCache.Load(nodeID); ok {
-		return subtle.ConstantTimeCompare([]byte(token), []byte(cachedKey.(string))) == 1
+	// 1. Check cache first (Key: Token, Value: NodeID)
+	if cachedNodeID, ok := h.nodeAuthCache.Load(token); ok {
+		return subtle.ConstantTimeCompare([]byte(cachedNodeID.(string)), []byte(expectedNodeID)) == 1
 	}
 
-	// Cache miss - query database
-	nodeKey, err := h.Store.GetNodeKey(nodeID)
-	if err != nil {
+	// 2. Cache miss - query database to find the Node ID that owns this API key
+	actualNodeID, err := h.Store.GetNodeByKey(token)
+	if err != nil || actualNodeID == "" {
 		return false
 	}
 
-	// Cache the key for future requests
-	h.nodeAuthCache.Store(nodeID, nodeKey)
+	// 3. Cache the valid token-to-node mapping for future requests
+	h.nodeAuthCache.Store(token, actualNodeID)
 
-	// Validate token
-	return subtle.ConstantTimeCompare([]byte(token), []byte(nodeKey)) == 1
-}
-
-// invalidateNodeCache removes a node from the auth cache
-// Called after node deletion or key rotation
-func (h *Handler) invalidateNodeCache(nodeID string) {
-	h.nodeAuthCache.Delete(nodeID)
+	// 4. Validate that the token's owner matches the Node ID claiming the request
+	return subtle.ConstantTimeCompare([]byte(actualNodeID), []byte(expectedNodeID)) == 1
 }

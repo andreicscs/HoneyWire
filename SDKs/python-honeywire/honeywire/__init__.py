@@ -17,6 +17,7 @@ class HoneyWireSensor(ABC):
         self.hub_key = os.getenv("HW_HUB_KEY")
         self.node_id = os.getenv("HW_NODE_ID")
         self.sensor_id = os.getenv("HW_SENSOR_ID")
+        self.config_rev = os.getenv("HW_CONFIG_REV", "")
         self.test_mode = os.getenv("HW_TEST_MODE", "false").lower() == "true"
         self.agent_version = os.getenv("HONEYWIRE_VERSION", SDK_DEFAULT_AGENT_VERSION)
         
@@ -87,10 +88,11 @@ class HoneyWireSensor(ABC):
         payload = {
             "node_id": self.node_id,
             "sensor_id": self.sensor_id,
-            "details": {
+            "metadata": {
                 "agent_version": self.agent_version,
                 "contract_version": self._hub_contract_version,
-                "sensor_type": self.sensor_type
+                "sensor_type": self.sensor_type,
+                "HW_CONFIG_REV": self.config_rev
             }
         }
         try:

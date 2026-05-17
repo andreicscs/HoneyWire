@@ -27,7 +27,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-node authentication
+	// Per-node authentication (API Key -> NodeID)
 	if !h.validateNodeAuth(r, e.NodeID) {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -55,10 +55,8 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.ID = lastInsertID
 	e.Timestamp = nowStr
 
-	// Update node last_seen
-	if err := h.Store.UpdateNodeLastSeen(e.NodeID, nowStr); err != nil {
-		log.Printf("[WARNING] Failed to update node %s last_seen: %v", e.NodeID, err)
-	}
+	// update node and sensor last_heartbeat (an event proves it is alive)
+	h.Store.UpdateNodeLastHeartbeat(e.NodeID, e.SensorID, nowStr)
 
 	// Check if sensor is silenced
 	isSilenced, err := h.Store.IsSensorSilenced(e.NodeID, e.SensorID)
