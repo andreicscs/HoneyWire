@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
 import { useFleetStore } from '../stores/fleet'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
@@ -21,8 +22,9 @@ onMounted(() => {
 const showDeployModal = ref(false)
 const deployStep = ref(1) 
 const newNodeForm = ref({ alias: '' })
-const tagInput = ref('')
-const tagsList = ref([])
+const editingTagNodeId = ref(null)
+const newTagValue = ref('')
+const tagInputRefs = ref({}) // Dictionary to hold refs for multiple nodes
 const generatedNodeKey = ref('')
 
 // --- EDIT MODAL STATE ---
@@ -30,16 +32,63 @@ const showEditModal = ref(false)
 const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '', apiKey: '' })
 
 // --- TAGS LOGIC ---
-const addTag = () => {
-    const val = tagInput.value.trim()
-    if (val && !tagsList.value.includes(val)) {
-        tagsList.value.push(val)
+const enableTagEdit = async (nodeId) => {
+    editingTagNodeId.value = nodeId
+    await nextTick()
+    // Auto-focus the specific input for this node
+    if (tagInputRefs.value[nodeId]) {
+        tagInputRefs.value[nodeId].focus()
     }
-    tagInput.value = ''
 }
 
-const removeTag = (index) => {
-    tagsList.value.splice(index, 1)
+const cancelTag = () => {
+    editingTagNodeId.value = null
+    newTagValue.value = ''
+}
+
+const saveTag = async (node) => {
+    const val = newTagValue.value.trim()
+    if (val && !node.tags.includes(val)) {
+        const originalTags = [...node.tags]
+        const newTags = [...node.tags, val]
+        
+        // Optimistic UI Update
+        node.tags = newTags
+        
+        try {
+            await fleetStore.updateNode(node.id, {
+                alias: node.alias,
+                tags: newTags,
+                publicIp: node.publicIp,
+                privateIp: node.privateIp
+            })
+        } catch (err) {
+            // Rollback on failure
+            node.tags = originalTags
+        }
+    }
+    cancelTag()
+}
+
+const removeTag = async (node, index) => {
+    const originalTags = [...node.tags]
+    const newTags = [...node.tags]
+    newTags.splice(index, 1)
+    
+    // Optimistic UI Update
+    node.tags = newTags
+    
+    try {
+        await fleetStore.updateNode(node.id, {
+            alias: node.alias,
+            tags: newTags,
+            publicIp: node.publicIp,
+            privateIp: node.privateIp
+        })
+    } catch (err) {
+        // Rollback on failure
+        node.tags = originalTags
+    }
 }
 
 // --- DATA MAPPING ---
@@ -76,7 +125,7 @@ const handleDeploySubmit = async () => {
         const response = await fetch('/api/v1/nodes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ alias: newNodeForm.value.alias, tags: tagsList.value }),
+            body: JSON.stringify({ alias: newNodeForm.value.alias}),
         })
 
         if (!response.ok) throw new Error('Failed to create node')
@@ -99,7 +148,6 @@ const handleOpenEditNode = (node) => {
         privateIp: node.privateIp || '',
         apiKey: node.apiKey || ''
     }
-    tagsList.value = [...(node.tags || [])] 
     showEditModal.value = true
 }
 
@@ -133,7 +181,6 @@ const handleEditSubmit = async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 alias: editNodeForm.value.alias, 
-                tags: tagsList.value,
                 publicIp: editNodeForm.value.publicIp,
                 privateIp: editNodeForm.value.privateIp
             }),
@@ -153,8 +200,6 @@ const closeDeployModal = () => {
     setTimeout(() => {
         deployStep.value = 1
         newNodeForm.value.alias = ''
-        tagsList.value = []
-        tagInput.value = ''
         generatedNodeKey.value = ''
     }, 300)
 }
@@ -201,7 +246,7 @@ const handleCopy = async (id, text) => {
             </BaseButton>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5 auto-rows-max">
+        <div class="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-max">
             
             <BaseWidget v-for="node in displayNodes" :key="node.id" class="flex flex-col h-full min-h-[280px]">
                 
@@ -263,10 +308,29 @@ const handleCopy = async (id, text) => {
                     </div>
 
                     <div class="flex flex-wrap gap-1.5 mb-4">
-                        <span v-for="tag in node.tags" :key="tag" class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-sm font-medium rounded-md tracking-wider">
+                        <span v-for="(tag, index) in node.tags" :key="tag" 
+                            class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-sm font-medium rounded-md tracking-wider flex items-center gap-1.5 group/tag transition-colors hover:border-text-m">
                             {{ tag }}
+                            <button @click.stop="removeTag(node, index)" class="opacity-0 group-hover/tag:opacity-100 text-text-m hover:text-danger-text transition-all outline-none focus:opacity-100">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </span>
-                        <button @click.stop="openEditModal(node)" class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-sm rounded-md hover:text-text-h transition-colors">
+
+                        <div v-if="editingTagNodeId === node.id" class="relative flex items-center">
+                            <span class="absolute left-2 text-text-m text-sm pointer-events-none">+</span>
+                            <input 
+                                :ref="el => { if (el) tagInputRefs[node.id] = el }"
+                                v-model="newTagValue"
+                                @keyup.enter="saveTag(node)"
+                                @keyup.esc="cancelTag"
+                                @blur="cancelTag"
+                                class="pl-5 pr-2 py-0.5 bg-input-bg border border-primary-main text-text-h text-sm rounded-md focus:outline-none ring-1 ring-focus-ring w-32 shadow-sm transition-all placeholder:text-text-m/50"
+                                placeholder="tag name..."
+                            />
+                        </div>
+                        
+                        <button v-else @click.stop="enableTagEdit(node.id)" 
+                                class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-sm rounded-md hover:text-text-h hover:border-text-m transition-colors outline-none focus:ring-1 focus:ring-focus-ring">
                             + Tag
                         </button>
                     </div>
@@ -345,27 +409,6 @@ const handleCopy = async (id, text) => {
             <div>
                 <label class="block text-sm font-medium text-text-h mb-1.5">Node Alias</label>
                 <BaseInput v-model="newNodeForm.alias" placeholder="e.g., AWS-East-Gateway" autofocus />
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-text-h mb-1.5">Tags (Optional)</label>
-                <div class="flex flex-col gap-2.5">
-                    <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
-                        <span v-for="(tag, index) in tagsList" :key="tag" 
-                            class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
-                            {{ tag }}
-                            <button @click="removeTag(index)" class="text-text-m hover:text-text-h hover:text-danger-text transition-colors outline-none">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </span>
-                    </div>
-                    
-                    <BaseInput 
-                        v-model="tagInput" 
-                        @keydown.enter.prevent="addTag" 
-                        placeholder="Type a tag and press Enter..." 
-                    />
-                </div>
             </div>
 
             <div class="flex justify-end gap-3 pt-5 border-t border-border-default mt-6">
@@ -458,22 +501,6 @@ const handleCopy = async (id, text) => {
                 <div>
                     <label class="block text-sm font-medium text-text-h mb-1.5">Private IP</label>
                     <BaseInput v-model="editNodeForm.privateIp" placeholder="e.g. 10.0.0.5" />
-                </div>
-            </div>
-            
-            <div>
-                <label class="block text-sm font-medium text-text-h mb-1.5">Tags</label>
-                <div class="flex flex-col gap-2.5">
-                    <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
-                        <span v-for="(tag, index) in tagsList" :key="tag" 
-                            class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
-                            {{ tag }}
-                            <button @click="removeTag(index)" class="text-text-m hover:text-danger-text transition-colors outline-none">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </span>
-                    </div>
-                    <BaseInput v-model="tagInput" @keydown.enter.prevent="addTag" placeholder="Type a tag and press Enter..." />
                 </div>
             </div>
 

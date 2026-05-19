@@ -148,9 +148,27 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
+  const updateNode = async (nodeId, payload) => {
+    try {
+      const res = await fetch(`/api/v1/nodes/${nodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) throw new Error('Failed to update node')
+      
+      // Sync state from backend to ensure UI matches reality
+      await fetchFleet() 
+    } catch (err) {
+      console.error('Failed to update node:', err)
+      throw err // Throw back to component for UI rollback
+    }
+  }
+
   return {
     nodes, uptimeData, selectedNode, selectedSensor, activeTimeframe,
     overallUptime,
-    fetchFleet, fetchUptime, selectTarget, deleteNode, deleteSensor, toggleSilence, silenceNode, handleWsUpdate
+    fetchFleet, fetchUptime, selectTarget, deleteNode, deleteSensor, toggleSilence, silenceNode, handleWsUpdate,
+    updateNode, 
   }
 })

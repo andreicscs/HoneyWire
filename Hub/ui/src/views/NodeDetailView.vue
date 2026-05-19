@@ -544,7 +544,7 @@ const applyHighlighting = () => {
 
             <div>
                 <h3 class="text-sm font-semibold text-text-h mb-4 mt-2">Deployed Sensors</h3>
-                <div v-if="node.installedSensors.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                <div v-if="node.installedSensors.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     <div v-for="sensor in node.installedSensors" :key="sensor.id" class="bg-bg-surface border border-border-default rounded-lg p-4 flex flex-col group hover:border-text-m transition-colors shadow-sm relative overflow-hidden">
                         
                         <div class="absolute top-0 left-0 right-0 h-1 transition-colors" :class="sensor.status === 'up' ? 'bg-success-main' : 'bg-danger-main'"></div>
