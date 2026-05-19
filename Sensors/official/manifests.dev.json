@@ -47,7 +47,6 @@
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_NODE_ID", "description": "The Node UUID.", "default": "${HW_NODE_ID}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-tcp-tarpit-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "high", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
@@ -104,7 +103,6 @@
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_NODE_ID", "description": "The Node UUID.", "default": "${HW_NODE_ID}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-web-decoy-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "critical", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
@@ -168,7 +166,6 @@
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_NODE_ID", "description": "The Node UUID.", "default": "${HW_NODE_ID}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-file-canary-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "critical", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
@@ -224,7 +221,6 @@
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_NODE_ID", "description": "The Node UUID.", "default": "${HW_NODE_ID}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-ping-canary-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "high", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true }
@@ -276,7 +272,6 @@
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_NODE_ID", "description": "The Node UUID.", "default": "${HW_NODE_ID}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-scan-detector-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "critical", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
