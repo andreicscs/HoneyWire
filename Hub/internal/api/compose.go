@@ -512,12 +512,7 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 // NODE-SPECIFIC COMPOSE GENERATION
 // -----------------------------------------------------------------------------
 
-func buildComposeFileForNode(
-	hubEndpoint string,
-	hubKey string,
-	configRev string,
-	installedSensors []models.NodeSensor,
-) ([]byte, error) {
+func buildComposeFileForNode(hubEndpoint string, hubKey string, configRev string, installedSensors []models.NodeSensor) ([]byte, error) {
 
 	manifests, err := fetchCatalogManifests()
 	if err != nil {
