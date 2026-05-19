@@ -9,14 +9,16 @@ import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 
 const fleetStore = useFleetStore()
-const { sensors: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
+// V2 ALIGNMENT: Swapped 'sensors: fleet' to 'nodes: fleet'
+const { nodes: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const canScrollDown = ref(false)
 const worstWarningBelow = ref(null)
 
 const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
-const handleForget = (nodeId, sensorId) => fleetStore.forgetSensor(nodeId, sensorId)
+// V2 ALIGNMENT: Updated action name from forgetSensor to deleteSensor
+const handleForget = (nodeId, sensorId) => fleetStore.deleteSensor(nodeId, sensorId)
 
 // Helper to flag rows that have warnings
 const getWorstStatus = (sensor) => {
@@ -59,14 +61,17 @@ const checkScroll = () => {
     worstWarningBelow.value = worstStatus
 }
 
-
 const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
 }
 
+// V2 ALIGNMENT: Search through the parent node -> installedSensors
 const isSilenced = (nodeId, sensorId) => {
-    const sensor = fleet.value.find(f => f.node_id === nodeId && f.sensor_id === sensorId)
-    return sensor ? sensor.is_silenced : false
+    const node = fleet.value.find(n => n.id === nodeId)
+    if (!node || !node.installedSensors) return false
+    const sensor = node.installedSensors.find(s => s.id === sensorId || s.name === sensorId)
+    // Note: V2 uses camelCase 'isSilenced' in the UI model mapping
+    return sensor ? !!sensor.isSilenced : false
 }
 
 const groupedUptime = computed(() => {

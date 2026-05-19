@@ -6,49 +6,39 @@ import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 
 const fleetStore = useFleetStore()
-const { sensors, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetStore)
+// V2 Alignment: Swap 'sensors' out for 'nodes'
+const { nodes, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const showOfflineWarning = ref(false)
 
 const isNodeSilenced = (node) => {
-    if (!node || !node.sensors.length) return false
-    return node.sensors.every(s => s.is_silenced)
+    // V2 Alignment: Read from installedSensors and match naming convention
+    if (!node || !node.sensors || !node.sensors.length) return false
+    return node.sensors.every(s => s.isSilenced)
 }
 
 const activeNodes = computed(() => {
-    const nodesMap = {};
-    
-    sensors.value.forEach(s => {
-        if (!s.node_id) return;
-        if (!nodesMap[s.node_id]) {
-            nodesMap[s.node_id] = { node_id: s.node_id, alias: s.node_id, sensors: [], total: 0, online: 0 };
-        }
-        nodesMap[s.node_id].sensors.push(s);
-        nodesMap[s.node_id].total++;
-        
-        // Check the uptimeData for the true online status
-        const uptimeRecord = uptimeData.value.find(up => up.node_id === s.node_id && up.id === s.sensor_id);
-        
-        // If uptimeData knows it's online (or as a fallback, if the sensor got a heartbeat before uptimeData loaded)
-        if (uptimeRecord && uptimeRecord.isOnline) {
-            nodesMap[s.node_id].online++;
-        } else if (!uptimeRecord && s.status === 'online') {
-            nodesMap[s.node_id].online++;
-        }
-    });
+    // V2 Alignment: Directly map over the nodes array from our V2 store
+    return nodes.value.map(node => {
+        const sensorsList = node.installedSensors || []
+        const total = sensorsList.length
+        const online = sensorsList.filter(s => s.status === 'up').length
 
-    return Object.values(nodesMap).map(n => {
-        let status = 'offline';
-        if (n.online === n.total) status = 'up'; 
-        else if (n.online > 0) status = 'degraded';
-        else status = 'down';
-        return { ...n, status };
-    });
-});
+        return {
+            node_id: node.id,
+            alias: node.alias,
+            sensors: sensorsList,
+            total,
+            online,
+            status: node.status // Backend already derives exact status (up, down, degraded)
+        }
+    })
+})
 
 const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
-const handleForgetNode = (nodeId) => fleetStore.forgetNode(nodeId)
+// V2 Alignment: Call deleteNode instead of the deprecated forgetNode action
+const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
 const checkScroll = () => {
     if (!scrollArea.value) return

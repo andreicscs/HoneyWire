@@ -22,11 +22,11 @@ type ConfigPayload struct {
 
 // Event represents an incoming alert from a sensor
 type Event struct {
-	ID              int                    `json:"id"`
+	ID              int                    `json:"id,omitempty"`
+	NodeID          string                 `json:"node_id,omitempty"`
+	SensorID        string                 `json:"sensor_id"` // Catalog ID (e.g. hw-tcp-tarpit)`
 	Timestamp       string                 `json:"timestamp"`
 	ContractVersion string                 `json:"contract_version"`
-	SensorID        string                 `json:"sensor_id"` // Catalog ID (e.g. hw-tcp-tarpit)
-	NodeID          string                 `json:"node_id"`
 	EventTrigger    string                 `json:"event_trigger"`
 	Severity        string                 `json:"severity"`
 	Source          string                 `json:"source"`
@@ -40,7 +40,6 @@ type Event struct {
 // Heartbeat represents a routine ping from a sensor
 type Heartbeat struct {
 	SensorID string                 `json:"sensor_id"`
-	NodeID   string                 `json:"node_id"`
 	Metadata map[string]interface{} `json:"metadata"` // Contains HW_CONFIG_REV
 }
 
@@ -48,6 +47,9 @@ type Heartbeat struct {
 type Node struct {
 	ID               string       `json:"id"`
 	Alias            string       `json:"alias"`
+	APIKey           string       `json:"apiKey"`
+	ActiveRevision   string       `json:"activeRevision,omitempty"`
+	DesiredRevision  string       `json:"desiredRevision,omitempty"`
 	PublicIP         *string      `json:"publicIp"`
 	PrivateIP        *string      `json:"privateIp"`
 	Tags             []string     `json:"tags"`

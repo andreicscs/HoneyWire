@@ -41,16 +41,24 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, 
 	}
 
 	// Check config reconciliation
-	var dbRevision sql.NullString
+	var activeRevision sql.NullString
+	var desiredRevision sql.NullString
 	var pendingConfig int
-	err = tx.QueryRow("SELECT active_revision, pending_config FROM nodes WHERE id = ?", nodeID).Scan(&dbRevision, &pendingConfig)
+	err = tx.QueryRow("SELECT active_revision, desired_revision, pending_config FROM nodes WHERE id = ?", nodeID).Scan(&activeRevision, &desiredRevision, &pendingConfig)
 
 	justSynced := false
-	if err == nil && pendingConfig == 1 && dbRevision.Valid && dbRevision.String == agentRevision {
-		if _, err := tx.Exec("UPDATE nodes SET pending_config = 0 WHERE id = ?", nodeID); err != nil {
-			return false, err
+	if err == nil && pendingConfig == 1 {
+		if desiredRevision.Valid && desiredRevision.String == agentRevision {
+			if _, err := tx.Exec(`UPDATE nodes SET active_revision = ?, desired_revision = NULL, pending_config = 0 WHERE id = ?`, desiredRevision.String, nodeID); err != nil {
+				return false, err
+			}
+			justSynced = true
+		} else if !desiredRevision.Valid && activeRevision.Valid && activeRevision.String == agentRevision {
+			if _, err := tx.Exec(`UPDATE nodes SET pending_config = 0 WHERE id = ?`, nodeID); err != nil {
+				return false, err
+			}
+			justSynced = true
 		}
-		justSynced = true
 	}
 
 	return justSynced, tx.Commit()

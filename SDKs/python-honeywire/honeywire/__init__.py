@@ -15,7 +15,6 @@ class HoneyWireSensor(ABC):
 
         self.hub_endpoint = os.getenv("HW_HUB_ENDPOINT")
         self.hub_key = os.getenv("HW_HUB_KEY")
-        self.node_id = os.getenv("HW_NODE_ID")
         self.sensor_id = os.getenv("HW_SENSOR_ID")
         self.config_rev = os.getenv("HW_CONFIG_REV", "")
         self.test_mode = os.getenv("HW_TEST_MODE", "false").lower() == "true"
@@ -30,8 +29,8 @@ class HoneyWireSensor(ABC):
         self._stop_event = threading.Event()
 
     def _validate_required_env(self):
-        if not all([self.hub_endpoint, self.hub_key, self.node_id, self.sensor_id]):
-            raise ValueError("Missing required environment variables (HW_HUB_ENDPOINT, HW_HUB_KEY, HW_NODE_ID, HW_SENSOR_ID).")
+        if not all([self.hub_endpoint, self.hub_key, self.sensor_id]):
+            raise ValueError("Missing required environment variables (HW_HUB_ENDPOINT, HW_HUB_KEY, HW_SENSOR_ID).")
 
     def _build_headers(self) -> dict:
         return {
@@ -86,7 +85,6 @@ class HoneyWireSensor(ABC):
 
     def _send_heartbeat(self) -> None:
         payload = {
-            "node_id": self.node_id,
             "sensor_id": self.sensor_id,
             "metadata": {
                 "agent_version": self.agent_version,
@@ -111,7 +109,6 @@ class HoneyWireSensor(ABC):
             "event_trigger": event_trigger,
             "source": source,
             "target": target,
-            "node_id": self.node_id,
             "sensor_id": self.sensor_id,
             "details": details
         }

@@ -111,7 +111,6 @@ Generates a `docker-compose.yml` preview from the selected sensor manifests and 
 **Request:**
 ```json
 {
-  "node_id": "node-12345678",
   "hub_endpoint": "https://hub.honeywire.local",
   "hub_key": "hub_key_abc",
   "sensors": [
@@ -145,7 +144,6 @@ Creates a new node entry and returns the generated node credentials.
 **Response:**
 ```json
 {
-  "node_id": "node-12345678",
   "api_key": "hw_key_abcd1234...",
   "alias": "production-db-node"
 }
@@ -213,7 +211,6 @@ Toggles a sensor's silence state. Silenced sensors still log events but suppress
 ```json
 {
   "status": "success",
-  "node_id": "node-12345678",
   "sensor_id": "hw-tcp-tarpit",
   "is_silenced": true
 }
@@ -381,7 +378,7 @@ Returns a generated `docker-compose.yml` for a node based on the node's current 
 
 **Authentication:** `Authorization: Bearer <HW_NODE_KEY>`
 
-This endpoint also updates the node's active revision and clears its pending config flag when successfully fetched.
+This endpoint is read-only for node deployment: it returns the current or requested `HW_CONFIG_REV` without marking the node as synced. The node is marked synced only when its heartbeat reports the expected revision.
 
 ## Agent Endpoints
 
@@ -394,7 +391,6 @@ Reports a sensor heartbeat and updates runtime metadata.
 **Request:**
 ```json
 {
-  "node_id": "node-12345678",
   "sensor_id": "alpha-node-01",
   "metadata": {
     "agent_version": "1.0.0",
@@ -418,7 +414,6 @@ Reports an intrusion event to the Hub.
 ```json
 {
   "contract_version": "1.0",
-  "node_id": "node-12345678",
   "sensor_id": "core-dpi-engine",
   "event_trigger": "malformed_jwt_detected",
   "severity": "critical",

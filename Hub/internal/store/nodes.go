@@ -72,7 +72,7 @@ func deriveStatus(lastHeartbeat *string) string {
 // GetNodes returns a list of all nodes and their installed sensors for the Fleet Dashboard
 func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 	rows, err := s.DB.Query(`
-		SELECT id, alias, public_ip, private_ip, tags, pending_config, last_heartbeat 
+		SELECT id, alias, api_key, active_revision, desired_revision, public_ip, private_ip, tags, pending_config, last_heartbeat 
 		FROM nodes ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -84,9 +84,18 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 		var n models.Node
 		var tagsJSON string
 		var pendingInt int
+		var activeRevision sql.NullString
+		var desiredRevision sql.NullString
 
-		if err := rows.Scan(&n.ID, &n.Alias, &n.PublicIP, &n.PrivateIP, &tagsJSON, &pendingInt, &n.LastHeartbeat); err != nil {
+		if err := rows.Scan(&n.ID, &n.Alias, &n.APIKey, &activeRevision, &desiredRevision, &n.PublicIP, &n.PrivateIP, &tagsJSON, &pendingInt, &n.LastHeartbeat); err != nil {
 			return nil, err
+		}
+
+		if activeRevision.Valid {
+			n.ActiveRevision = activeRevision.String
+		}
+		if desiredRevision.Valid {
+			n.DesiredRevision = desiredRevision.String
 		}
 
 		json.Unmarshal([]byte(tagsJSON), &n.Tags)
@@ -135,14 +144,22 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 	var node models.Node
 	var tagsJSON string
 	var pendingInt int
+	var activeRevision sql.NullString
+	var desiredRevision sql.NullString
 
 	// Fetch Node Meta
 	err := s.DB.QueryRow(`
-		SELECT id, alias, public_ip, private_ip, tags, pending_config, last_heartbeat 
+		SELECT id, alias, api_key, active_revision, desired_revision, public_ip, private_ip, tags, pending_config, last_heartbeat 
 		FROM nodes WHERE id = ?`, nodeID).
-		Scan(&node.ID, &node.Alias, &node.PublicIP, &node.PrivateIP, &tagsJSON, &pendingInt, &node.LastHeartbeat)
+		Scan(&node.ID, &node.Alias, &node.APIKey, &activeRevision, &desiredRevision, &node.PublicIP, &node.PrivateIP, &tagsJSON, &pendingInt, &node.LastHeartbeat)
 	if err != nil {
 		return nil, err
+	}
+	if activeRevision.Valid {
+		node.ActiveRevision = activeRevision.String
+	}
+	if desiredRevision.Valid {
+		node.DesiredRevision = desiredRevision.String
 	}
 
 	json.Unmarshal([]byte(tagsJSON), &node.Tags)
@@ -294,6 +311,17 @@ func (s *SQLiteStore) DeleteNode(nodeID string) error {
 }
 
 // ApplyNodeRevision saves the newly generated compose revision and clears the pending flag
+func (s *SQLiteStore) SetNodeDesiredRevision(nodeID, revision string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.DB.Exec(`
+		UPDATE nodes 
+		SET desired_revision = ?, pending_config = 1, updated_at = ? 
+		WHERE id = ?`,
+		revision, now, nodeID,
+	)
+	return err
+}
+
 func (s *SQLiteStore) ApplyNodeRevision(nodeID, revision string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.DB.Exec(`

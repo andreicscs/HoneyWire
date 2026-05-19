@@ -20,13 +20,14 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if hb.NodeID == "" || hb.SensorID == "" {
-		RespondError(w, "node_id and sensor_id are required", http.StatusBadRequest)
+	if hb.SensorID == "" {
+		RespondError(w, "sensor_id is required", http.StatusBadRequest)
 		return
 	}
 
-	// Per-node authentication (Using the Token -> NodeID cache logic)
-	if !h.validateNodeAuth(r, hb.NodeID) {
+	nodeID, err := h.authenticateNodeRequest(r)
+
+	if err != nil {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -45,27 +46,27 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	metadataJSON, _ := json.Marshal(hb.Metadata)
 
 	// 1. Update Node & Sensor last_seen, Metadata & Reconcile Config
-	justSynced, err := h.Store.ProcessHeartbeat(hb.NodeID, hb.SensorID, agentRevision, nowStr, string(metadataJSON))
+	justSynced, err := h.Store.ProcessHeartbeat(nodeID, hb.SensorID, agentRevision, nowStr, string(metadataJSON))
 	if err != nil {
-		log.Printf("[ERROR] Heartbeat DB update failed for node %s: %v", hb.NodeID, err)
+		log.Printf("[ERROR] Heartbeat DB update failed for node %s: %v", nodeID, err)
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	// 2. Log heartbeat bucket
-	if err := h.Store.InsertHeartbeat(hb.NodeID, hb.SensorID, minuteBucket); err != nil {
+	if err := h.Store.InsertHeartbeat(nodeID, hb.SensorID, minuteBucket); err != nil {
 		log.Printf("[WARNING] Failed to log heartbeat bucket: %v", err)
 	}
 
 	// 3. Broadcasts
 	if justSynced {
 		h.broadcastWS("NODE_SYNCED", map[string]string{
-			"node_id": hb.NodeID,
+			"node_id": nodeID,
 		})
 	}
 
 	h.broadcastWS("SENSOR_HEARTBEAT", map[string]string{
-		"node_id":   hb.NodeID,
+		"node_id":   nodeID,
 		"sensor_id": hb.SensorID,
 		"timestamp": nowStr,
 	})

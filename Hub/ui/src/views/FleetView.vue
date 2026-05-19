@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
+import { useFleetStore } from '../stores/fleet'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
 import BaseWidget from '../components/ui/layout/BaseWidget.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
@@ -10,8 +11,13 @@ import BaseModal from '../components/ui/feedback/BaseModal.vue'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 
 const appStore = useAppStore()
+const fleetStore = useFleetStore()
 
-// --- MODAL STATE ---
+onMounted(() => {
+    fleetStore.fetchFleet()
+})
+
+// --- DEPLOY MODAL STATE ---
 const showDeployModal = ref(false)
 const deployStep = ref(1) 
 const newNodeForm = ref({ alias: '' })
@@ -19,6 +25,11 @@ const tagInput = ref('')
 const tagsList = ref([])
 const generatedNodeKey = ref('')
 
+// --- EDIT MODAL STATE ---
+const showEditModal = ref(false)
+const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '', apiKey: '' })
+
+// --- TAGS LOGIC ---
 const addTag = () => {
     const val = tagInput.value.trim()
     if (val && !tagsList.value.includes(val)) {
@@ -31,9 +42,110 @@ const removeTag = (index) => {
     tagsList.value.splice(index, 1)
 }
 
-const handleDeploySubmit = () => {
-    generatedNodeKey.value = 'hw_key_' + Math.random().toString(36).substring(2, 15)
-    deployStep.value = 2
+// --- DATA MAPPING ---
+const displayNodes = computed(() => {
+    return fleetStore.nodes.map(node => {
+        const sensorsList = node.installedSensors || []
+        const onlineSensors = sensorsList.filter(s => s.status === 'up').length
+        const totalSensors = sensorsList.length
+        const isSilenced = totalSensors > 0 && sensorsList.every(s => s.isSilenced)
+
+        // Grouping for the UI tooltip
+        const sensorSummary = totalSensors > 0
+            ? [{ type: 'Deployed', count: totalSensors, sensors: sensorsList.map(s => ({ name: s.display || s.name, status: s.status })) }]
+            : []
+
+        return {
+            ...node,
+            totalSensors,
+            onlineSensors,
+            isSilenced,
+            sensorSummary,
+            hasUpdate: false,
+            // A node is pending if it has no sensors or has explicitly just been created
+            isAwaitingCheckIn: node.status === 'pending' || (!node.lastHeartbeat && totalSensors === 0)
+        }
+    })
+})
+
+// --- API ACTIONS ---
+const handleDeploySubmit = async () => {
+    if (!newNodeForm.value.alias) return
+
+    try {
+        const response = await fetch('/api/v1/nodes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias: newNodeForm.value.alias, tags: tagsList.value }),
+        })
+
+        if (!response.ok) throw new Error('Failed to create node')
+
+        const data = await response.json()
+        generatedNodeKey.value = data.apiKey
+        deployStep.value = 2
+        await fleetStore.fetchFleet()
+    } catch (err) {
+        console.error('Create node failed:', err)
+        alert('Could not create node. Please try again.')
+    }
+}
+
+const handleOpenEditNode = (node) => {
+    editNodeForm.value = { 
+        id: node.id, 
+        alias: node.alias, 
+        publicIp: node.publicIp || '', 
+        privateIp: node.privateIp || '',
+        apiKey: node.apiKey || ''
+    }
+    tagsList.value = [...(node.tags || [])] 
+    showEditModal.value = true
+}
+
+const triggerManualSync = async (node) => {
+    if (!node) return
+    const apiKey = node.apiKey
+    if (!apiKey) {
+        alert('Unable to sync this node because the node API key is missing.')
+        return
+    }
+
+    try {
+        const response = await fetch('/api/v1/nodes/compose', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        })
+        if (!response.ok) {
+            throw new Error(`Sync failed: ${response.status}`)
+        }
+        await fleetStore.fetchFleet()
+        alert('Pending sync request sent successfully. The node compose was generated and pending config has been updated.')
+    } catch (err) {
+        console.error('Failed to sync node:', err)
+        alert('Unable to sync this node. Please try again.')
+    }
+}
+
+const handleEditSubmit = async () => {
+    try {
+        const response = await fetch(`/api/v1/nodes/${editNodeForm.value.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                alias: editNodeForm.value.alias, 
+                tags: tagsList.value,
+                publicIp: editNodeForm.value.publicIp,
+                privateIp: editNodeForm.value.privateIp
+            }),
+        })
+
+        if (!response.ok) throw new Error('Failed to update node')
+        
+        showEditModal.value = false
+        await fleetStore.fetchFleet()
+    } catch (err) {
+        console.error('Update node failed:', err)
+    }
 }
 
 const closeDeployModal = () => {
@@ -43,84 +155,19 @@ const closeDeployModal = () => {
         newNodeForm.value.alias = ''
         tagsList.value = []
         tagInput.value = ''
+        generatedNodeKey.value = ''
     }, 300)
 }
-// -------------------
 
-const ghostNode = {
-    id: 'node-789',
-    alias: 'DMZ-Honeypot-Alpha',
-    status: 'pending', // You may need to add 'pending' to your BaseStatusDot (gray/pulse)
-    publicIp: null,
-    privateIp: null,
-    hasUpdate: false,
-    hasPendingConfig: false,
-    tags: ['DMZ', 'New'],
-    sensorSummary: [],
-    totalSensors: 0,
-    onlineSensors: 0,
-    isSilenced: false,
-    isAwaitingCheckIn: true // <-- Flag to trigger the ghost UI
+const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
+const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
+
+const handleOpenNodeDetail = (nodeId) => {
+    fleetStore.selectTarget(nodeId)
+    appStore.currentView = 'node-detail'
 }
 
-// Mock Data
-const mockNodes = ref([
-    {
-        id: 'node-123',
-        alias: 'AWS-East-Gateway',
-        status: 'up',
-        publicIp: '203.0.113.42',
-        privateIp: '10.0.1.4',
-        hasUpdate: false,
-        hasPendingConfig: true, 
-        tags: ['DMZ', 'Production'],
-        sensorSummary: [
-            { type: 'Network', count: 3, sensors: [{ name: 'hw-tcp-tarpit', status: 'up' }, { name: 'hw-udp-reflector', status: 'up' }, { name: 'hw-port-scan', status: 'down' }] },
-            { type: 'Web', count: 1, sensors: [{ name: 'hw-web-router', status: 'up' }] },
-            { type: 'File', count: 1, sensors: [{ name: 'hw-file-canary', status: 'up' }] }
-        ],
-        totalSensors: 5,
-        onlineSensors: 5,
-        isSilenced: false
-    },
-    {
-        id: 'node-456',
-        alias: 'Internal-DB-Honeypot',
-        status: 'degraded',
-        publicIp: '198.51.100.12',
-        privateIp: '192.168.1.100',
-        hasUpdate: true, 
-        hasPendingConfig: false,
-        tags: ['Internal', 'VLAN-40'],
-        sensorSummary: [
-            { type: 'Database', count: 2, sensors: [{ name: 'hw-sql-tarpit', status: 'up' }, { name: 'hw-redis-canary', status: 'down' }] },
-            { type: 'Network', count: 1, sensors: [{ name: 'hw-tcp-tarpit', status: 'up' }] }
-        ],
-        totalSensors: 3,
-        onlineSensors: 2,
-        isSilenced: true
-    },
-    {
-        id: 'unassigned',
-        alias: 'Unassigned Sensors',
-        status: 'down',
-        publicIp: null,
-        privateIp: null,
-        hasUpdate: false,
-        hasPendingConfig: false,
-        tags: [],
-        sensorSummary: [
-            { type: 'File', count: 2, sensors: [{ name: 'hw-file-canary', status: 'down' }, { name: 'hw-file-canary-2', status: 'down' }] }
-        ],
-        totalSensors: 2,
-        onlineSensors: 0,
-        isSilenced: false
-    },
-    ghostNode
-])
-
 // --- Copy Animation Logic ---
-// We use an object to track multiple copy states (e.g., 'node-123-pub', 'node-123-priv')
 const copiedStates = ref({})
 
 const handleCopy = async (id, text) => {
@@ -128,7 +175,6 @@ const handleCopy = async (id, text) => {
     try {
         await navigator.clipboard.writeText(text)
         copiedStates.value[id] = true
-        
         setTimeout(() => {
             copiedStates.value[id] = false
         }, 2000)
@@ -157,7 +203,7 @@ const handleCopy = async (id, text) => {
 
         <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-5 auto-rows-max">
             
-            <BaseWidget v-for="node in mockNodes" :key="node.id" class="flex flex-col h-full min-h-[280px]">
+            <BaseWidget v-for="node in displayNodes" :key="node.id" class="flex flex-col h-full min-h-[280px]">
                 
                 <template #header>
                     <div class="flex items-start justify-between w-full">
@@ -179,13 +225,13 @@ const handleCopy = async (id, text) => {
                         </div>
 
                         <BaseMeatballMenu v-if="node.id !== 'unassigned'" :id="`node-menu-${node.id}`">
-                            <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
+                            <button @click="handleSilenceNode(node.id)" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
                                 {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
                             </button>
-                            <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
-                                Rename Node
+                            <button @click="handleOpenEditNode(node)" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
+                                Node Settings
                             </button>
-                            <button class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">
+                            <button @click="handleForgetNode(node.id)" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">
                                 Delete Node
                             </button>
                         </BaseMeatballMenu>
@@ -216,11 +262,11 @@ const handleCopy = async (id, text) => {
                         </div>
                     </div>
 
-                    <div v-if="node.tags && node.tags.length > 0" class="flex flex-wrap gap-1.5 mb-4">
+                    <div class="flex flex-wrap gap-1.5 mb-4">
                         <span v-for="tag in node.tags" :key="tag" class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-sm font-medium rounded-md tracking-wider">
                             {{ tag }}
                         </span>
-                        <button class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-sm rounded-md hover:text-text-h transition-colors">
+                        <button @click.stop="openEditModal(node)" class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-sm rounded-md hover:text-text-h transition-colors">
                             + Tag
                         </button>
                     </div>
@@ -230,9 +276,9 @@ const handleCopy = async (id, text) => {
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
-                            Pending Deployment
+                            Pending Sync
                         </div>
-                        <BaseButton variant="secondary" class="gap-2 text-sm text-text-h">
+                        <BaseButton variant="secondary" class="gap-2 text-sm text-text-h" @click="triggerManualSync(node)">
                             Sync Now
                         </BaseButton>
                     </div>
@@ -269,17 +315,17 @@ const handleCopy = async (id, text) => {
                         </div>
                     </div>
                     <div v-else class="mt-auto bg-disabled-bg border border-dashed border-disabled-border rounded-lg p-4 flex flex-col items-center justify-center text-center opacity-70">
-                            <svg class="w-6 h-6 text-text-h mb-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            <span class="text-sm font-medium text-text-h">Awaiting Initial Check-in</span>
-                            <span class="text-xs text-text-m mt-1 max-w-[200px]">Deploy your first Sensor!.</span>
-                        </div>
+                        <svg class="w-6 h-6 text-text-h mb-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span class="text-sm font-medium text-text-h">Awaiting Initial Check-in</span>
+                        <span class="text-xs text-text-m mt-1 max-w-[200px]">Deploy your first Sensor!</span>
+                    </div>
 
                 </div>
 
                 <template #footer>
-                    <button @click="appStore.currentView = 'node-detail'" class="w-full py-3 text-sm font-medium text-text-h hover:text-text-h bg-bg-secondary hover:bg-secondary-hover border-t border-border-default rounded-b-xl transition-colors flex items-center justify-center gap-2 group/btn outline-none">
+                    <button @click="handleOpenNodeDetail(node.id)" class="w-full py-3 text-sm font-medium text-text-h hover:text-text-h bg-bg-secondary hover:bg-secondary-hover border-t border-border-default rounded-b-xl transition-colors flex items-center justify-center gap-2 group/btn outline-none">
                         <span>{{ node.totalSensors === 0 ? 'Install First Sensor' : 'Manage Node & Sensors' }}</span>
                         <svg class="w-4 h-4 transition-transform duration-normal group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
@@ -291,7 +337,6 @@ const handleCopy = async (id, text) => {
     </div>
     
     <BaseModal :show="showDeployModal" @close="closeDeployModal" title="Deploy New Node">
-    
         <div v-if="deployStep === 1" class="space-y-5">
             <p class="text-sm text-text-m leading-normal">
                 Create a logical node in the hub before installing the agent on your server.
@@ -305,7 +350,6 @@ const handleCopy = async (id, text) => {
             <div>
                 <label class="block text-sm font-medium text-text-h mb-1.5">Tags (Optional)</label>
                 <div class="flex flex-col gap-2.5">
-                    
                     <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
                         <span v-for="(tag, index) in tagsList" :key="tag" 
                             class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
@@ -331,7 +375,6 @@ const handleCopy = async (id, text) => {
         </div>
 
         <div v-else class="space-y-6">
-            
             <div class="flex items-center gap-3 text-success-text bg-success-bg border border-success-border p-3.5 rounded-md">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span class="text-sm font-medium">Node created successfully.</span>
@@ -358,7 +401,7 @@ const handleCopy = async (id, text) => {
                         {{ generatedNodeKey }}
                     </code>
                 </div>
-                <p class="text-xs text-success-main font-medium mt-2">This key can be viewed later in Node Management.</p>
+                <p class="text-xs text-text-m font-medium mt-2">This key can also be viewed later in Node Settings.</p>
             </div>
 
             <div>
@@ -385,4 +428,60 @@ const handleCopy = async (id, text) => {
             </div>
         </div>
     </BaseModal>
+
+    <BaseModal :show="showEditModal" @close="showEditModal = false" title="Node Settings">
+        <div class="space-y-4">
+            <div class="mb-2">
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-sm font-medium text-text-h">API Key</label>
+                    <BaseButton variant="ghost" class="!py-1 !px-2 !text-xs transition-colors" :class="copiedStates['edit-key'] ? '!text-success-main hover:!text-success-main' : ''" @click="handleCopy('edit-key', editNodeForm.apiKey)">
+                        <span class="flex items-center gap-1.5">
+                            <svg v-if="!copiedStates['edit-key']" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            {{ copiedStates['edit-key'] ? 'Copied!' : 'Copy Key' }}
+                        </span>
+                    </BaseButton>
+                </div>
+                <code class="block w-full px-3 py-2 bg-bg-inset border border-border-default rounded-md text-sm font-mono text-text-m truncate select-all">{{ editNodeForm.apiKey || 'Unavailable' }}</code>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-text-h mb-1.5">Node Alias</label>
+                <BaseInput v-model="editNodeForm.alias" />
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-h mb-1.5">Public IP</label>
+                    <BaseInput v-model="editNodeForm.publicIp" placeholder="e.g. 198.51.100.14" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-h mb-1.5">Private IP</label>
+                    <BaseInput v-model="editNodeForm.privateIp" placeholder="e.g. 10.0.0.5" />
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-text-h mb-1.5">Tags</label>
+                <div class="flex flex-col gap-2.5">
+                    <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
+                        <span v-for="(tag, index) in tagsList" :key="tag" 
+                            class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
+                            {{ tag }}
+                            <button @click="removeTag(index)" class="text-text-m hover:text-danger-text transition-colors outline-none">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </span>
+                    </div>
+                    <BaseInput v-model="tagInput" @keydown.enter.prevent="addTag" placeholder="Type a tag and press Enter..." />
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-5 border-t border-border-default mt-6">
+                <BaseButton variant="ghost" @click="showEditModal = false">Cancel</BaseButton>
+                <BaseButton variant="primary" @click="handleEditSubmit" :disabled="!editNodeForm.alias">Save Changes</BaseButton>
+            </div>
+        </div>
+    </BaseModal>
+
 </template>

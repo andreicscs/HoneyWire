@@ -22,13 +22,15 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if e.NodeID == "" || e.SensorID == "" {
-		RespondError(w, "node_id and sensor_id are required", http.StatusBadRequest)
+	if e.SensorID == "" {
+		RespondError(w, "sensor_id is required", http.StatusBadRequest)
 		return
 	}
 
-	// Per-node authentication (API Key -> NodeID)
-	if !h.validateNodeAuth(r, e.NodeID) {
+	// Per-node authentication (API Key -> nodeID)
+	nodeID, err := h.authenticateNodeRequest(r)
+
+	if err != nil {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -43,11 +45,12 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 	detailsJSON, _ := json.Marshal(e.Details)
+	e.NodeID = nodeID
 
 	// Insert event with composite key reference (node_id, sensor_id)
 	lastInsertID, err := h.Store.InsertEvent(&e, nowStr, string(detailsJSON))
 	if err != nil {
-		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
+		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", nodeID, e.SensorID, err)
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -56,12 +59,12 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.Timestamp = nowStr
 
 	// update node and sensor last_heartbeat (an event proves it is alive)
-	h.Store.UpdateNodeLastHeartbeat(e.NodeID, e.SensorID, nowStr)
+	h.Store.UpdateNodeLastHeartbeat(nodeID, e.SensorID, nowStr)
 
 	// Check if sensor is silenced
-	isSilenced, err := h.Store.IsSensorSilenced(e.NodeID, e.SensorID)
+	isSilenced, err := h.Store.IsSensorSilenced(nodeID, e.SensorID)
 	if err != nil {
-		log.Printf("[WARNING] Failed to check silence status for node %s/sensor %s: %v", e.NodeID, e.SensorID, err)
+		log.Printf("[WARNING] Failed to check silence status for node %s/sensor %s: %v", nodeID, e.SensorID, err)
 	}
 
 	if !isSilenced {

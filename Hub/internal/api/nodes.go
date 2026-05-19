@@ -1,12 +1,11 @@
 package api
 
 import (
-	"encoding/json"
-	"net/http"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
-	"strings"
+	"encoding/json"
+	"log"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -42,7 +41,7 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 
 	SendJSON(w, http.StatusCreated, map[string]interface{}{
 		"node_id": nodeID,
-		"api_key": apiKey,
+		"apiKey":  apiKey,
 		"alias":   req.Alias,
 	})
 }
@@ -89,6 +88,7 @@ func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetNodes(w http.ResponseWriter, r *http.Request) {
 	nodes, err := h.Store.GetNodes()
 	if err != nil {
+		log.Printf("[ERROR] GetNodes failed: %v\n", err)
 		RespondError(w, "Failed to fetch fleet nodes", http.StatusInternalServerError)
 		return
 	}
@@ -106,7 +106,20 @@ func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendJSON(w, http.StatusOK, node)
+	SendJSON(w, http.StatusOK, map[string]interface{}{
+		"id":               node.ID,
+		"alias":            node.Alias,
+		"apiKey":           node.APIKey,
+		"activeRevision":   node.ActiveRevision,
+		"desiredRevision":  node.DesiredRevision,
+		"publicIp":         node.PublicIP,
+		"privateIp":        node.PrivateIP,
+		"tags":             node.Tags,
+		"hasPendingConfig": node.HasPendingConfig,
+		"lastHeartbeat":    node.LastHeartbeat,
+		"status":           node.Status,
+		"installedSensors": node.InstalledSensors,
+	})
 }
 
 // AddNodeSensor handles POST /api/v1/nodes/{id}/sensors
@@ -179,76 +192,6 @@ func generateRevisionHash() string {
 	b := make([]byte, 4)
 	rand.Read(b)
 	return "rev_" + hex.EncodeToString(b)
-}
-
-// GetNodeCompose generates the official docker-compose.yml for a specific agent
-// Authentication: Bearer <API_KEY>
-func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-		RespondError(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
-		return
-	}
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// Auth check - Get NodeID from DB using the API Key
-	nodeID, err := h.Store.GetNodeByKey(token)
-	if err != nil || nodeID == "" {
-		RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Fetch configured sensors from DB
-	nodeDetails, err := h.Store.GetNodeDetails(nodeID)
-	if err != nil {
-		RespondError(w, "Failed to load node configuration", http.StatusInternalServerError)
-		return
-	}
-
-	// Fetch Hub Endpoint from runtime DB config
-	hubEndpoint, err := h.Store.GetConfigValue("hub_endpoint")
-	if err != nil || hubEndpoint == "" {
-		hubEndpoint = "https://" + r.Host // Fallback
-	}
-
-	// Generate HW_CONFIG_REV
-	newRevision := generateRevisionHash()
-	
-	// Build YAML skeleton
-	// Note: In the final version, this will merge with remote manifests. 
-	// For now, it dynamically constructs the base YAML so the agent can boot.
-	var sb strings.Builder
-	sb.WriteString("version: '3.8'\n\nservices:\n")
-
-	for _, sensor := range nodeDetails.InstalledSensors {
-		sb.WriteString(fmt.Sprintf("  %s:\n", sensor.ID))
-		sb.WriteString(fmt.Sprintf("    image: ghcr.io/honeywire/%s:latest\n", sensor.ID))
-		sb.WriteString("    restart: always\n")
-		sb.WriteString("    environment:\n")
-		
-		// Use the dynamically fetched hubEndpoint
-		sb.WriteString(fmt.Sprintf("      - HW_HUB_URL=%s\n", hubEndpoint))
-		sb.WriteString(fmt.Sprintf("      - HW_HUB_KEY=%s\n", token))
-		sb.WriteString(fmt.Sprintf("      - HW_NODE_ID=%s\n", nodeID))
-		sb.WriteString(fmt.Sprintf("      - HW_CONFIG_REV=%s\n", newRevision))
-
-		for k, v := range sensor.EnvVars {
-			sb.WriteString(fmt.Sprintf("      - %s=%v\n", k, v))
-		}
-		sb.WriteString("\n")
-	}
-	yamlString := sb.String()
-
-	// Update Database: Set the new active revision and clear the pending flag
-	if err := h.Store.ApplyNodeRevision(nodeID, newRevision); err != nil {
-		RespondError(w, "Failed to update node state", http.StatusInternalServerError)
-		return
-	}
-
-	// Serve the raw YAML
-	w.Header().Set("Content-Type", "application/x-yaml")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(yamlString))
 }
 
 // DeleteNode handles DELETE /api/v1/nodes/{id}

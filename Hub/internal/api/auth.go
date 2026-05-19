@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
+	"fmt"
+	
 	"github.com/honeywire/hub/internal/auth"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -134,34 +135,41 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// validateNodeAuth checks if a request is authenticated for a given node
-// Extracts Bearer token from Authorization header and maps it to the expected node_id
-func (h *Handler) validateNodeAuth(r *http.Request, expectedNodeID string) bool {
+func (h *Handler) authenticateNodeRequest(r *http.Request) (string, error) {
+
 	authHeader := r.Header.Get("Authorization")
+
 	if authHeader == "" {
-		return false
+		return "", fmt.Errorf("missing authorization header")
 	}
 
 	parts := strings.SplitN(authHeader, " ", 2)
+
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return false
+		return "", fmt.Errorf("invalid authorization format")
 	}
-	token := parts[1] // This is the api_key (hw_key_...)
 
-	// 1. Check cache first (Key: Token, Value: NodeID)
+	token := parts[1]
+
+	// -------------------------------------------------------------------------
+	// CACHE LOOKUP
+	// -------------------------------------------------------------------------
+
 	if cachedNodeID, ok := h.nodeAuthCache.Load(token); ok {
-		return subtle.ConstantTimeCompare([]byte(cachedNodeID.(string)), []byte(expectedNodeID)) == 1
+		return cachedNodeID.(string), nil
 	}
 
-	// 2. Cache miss - query database to find the Node ID that owns this API key
-	actualNodeID, err := h.Store.GetNodeByKey(token)
-	if err != nil || actualNodeID == "" {
-		return false
+	// -------------------------------------------------------------------------
+	// DATABASE LOOKUP
+
+	nodeID, err := h.Store.GetNodeByKey(token)
+
+	if err != nil || nodeID == "" {
+		return "", fmt.Errorf("invalid node api key")
 	}
 
-	// 3. Cache the valid token-to-node mapping for future requests
-	h.nodeAuthCache.Store(token, actualNodeID)
+	// CACHE VALID TOKEN
+	h.nodeAuthCache.Store(token, nodeID)
 
-	// 4. Validate that the token's owner matches the Node ID claiming the request
-	return subtle.ConstantTimeCompare([]byte(actualNodeID), []byte(expectedNodeID)) == 1
+	return nodeID, nil
 }

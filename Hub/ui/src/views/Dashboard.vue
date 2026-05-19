@@ -5,24 +5,42 @@ import UptimeHeatmap from '../components/dashboard/UptimeHeatmap.vue'
 import EventTable from '../components/dashboard/EventTable.vue'
 import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
 import { ref } from 'vue'
+import { useFleetStore } from '../stores/fleet'
 
+const fleetStore = useFleetStore()
 const showProvisionModal = ref(false)
 const provisionToken = ref('')
+const provisionNodeId = ref('')
 const isGeneratingToken = ref(false)
 const currentHost = ref(window.location.host)
 
 const generateToken = async () => {
+    const alias = window.prompt('Enter a friendly alias for the new node', `New Node ${Date.now()}`)
+    if (!alias) {
+        return
+    }
+
     isGeneratingToken.value = true
     try {
-        const response = await fetch('/api/v1/tokens/generate', { method: 'POST' })
-        if (!response.ok) throw new Error('Failed to generate token')
-        
+        const response = await fetch('/api/v1/nodes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias, tags: [] }),
+        })
+
+        if (!response.ok) {
+            const errText = await response.text()
+            throw new Error(errText || 'Failed to create node')
+        }
+
         const data = await response.json()
-        provisionToken.value = data.token
+        provisionToken.value = data.api_key
+        provisionNodeId.value = data.node_id
         showProvisionModal.value = true
+        fleetStore.fetchFleet()
     } catch (err) {
-        console.error("Token error:", err)
-        alert("Failed to generate token.")
+        console.error('Create node error:', err)
+        alert('Failed to create node. Please try again.')
     } finally {
         isGeneratingToken.value = false
     }
@@ -50,14 +68,6 @@ const copyCommand = () => {
 
 <template>
     <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6 ">
-        
-        <div class="flex justify-end w-full mb-4 px-2 sm:px-4 lg:px-6">
-            <button @click="generateToken" :disabled="isGeneratingToken"
-                    class="bg-text-main text-bg-surface hover:opacity-90 text-xs  py-2 px-4 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                {{ isGeneratingToken ? 'Generating...' : 'Add Node' }}
-            </button>
-        </div>
 
         <TrafficFilters />
 
@@ -96,14 +106,17 @@ const copyCommand = () => {
                             Run the following command on the server you want to monitor. This token is single-use and expires in 15 minutes.
                         </p>
                         
-                        <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
-                            <code class="text-success-main text-xs font-mono break-all leading-relaxed">
-                                ./wizard --link http://{{ currentHost }} {{ provisionToken }}
-                            </code>
-                            <button id="copy-cmd-btn" @click="copyCommand"
-                                    class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-h text-sm   tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
-                                Copy
-                            </button>
+                        <div class="space-y-3">
+                            <div class="text-xs text-text-m font-medium">Node ID: <span class="font-mono text-text-h">{{ provisionNodeId }}</span></div>
+                            <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
+                                <code class="text-success-main text-xs font-mono break-all leading-relaxed">
+                                    ./wizard --link http://{{ currentHost }} {{ provisionToken }}
+                                </code>
+                                <button id="copy-cmd-btn" @click="copyCommand"
+                                        class="self-end px-3 py-1.5 rounded-md bg-bg-surface border border-border-default text-text-h text-sm   tracking-wider hover:bg-button-hover transition-colors shadow-sm active:scale-95">
+                                    Copy
+                                </button>
+                            </div>
                         </div>
                     </div>
 

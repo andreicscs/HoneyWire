@@ -18,11 +18,12 @@ CREATE TABLE IF NOT EXISTS nodes (
     public_ip       TEXT,
     private_ip      TEXT,
     tags            TEXT NOT NULL DEFAULT '[]',
-    pending_config  INTEGER NOT NULL DEFAULT 0,
-    active_revision TEXT,
-    last_heartbeat  TEXT,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL
+    pending_config    INTEGER NOT NULL DEFAULT 0,
+    active_revision   TEXT,
+    desired_revision  TEXT,
+    last_heartbeat    TEXT,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL
 );
 
 -- NodeSensors: Installed instances of catalog sensors
@@ -88,7 +89,7 @@ type SQLiteStore struct {
 func NewStore(dbPath string) (*SQLiteStore, error) {
 	// Enable WAL mode, set a 5-second busy timeout to prevent locking, and enable Foreign Keys
 	dsn := fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)", dbPath)
-	
+
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

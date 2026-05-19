@@ -37,7 +37,6 @@ type DeployableSensor struct {
 }
 
 type ComposeReq struct {
-	NodeID      string             `json:"node_id"`
 	HubEndpoint string             `json:"hub_endpoint"`
 	HubKey      string             `json:"hub_key"`
 	Sensors     []DeployableSensor `json:"sensors"`
@@ -188,14 +187,13 @@ func handleMissingDocker() ([]string, error) {
 // --- CORE ACTIONS ---
 
 // Apply fetches the compartmentalized compose file, modifies it with it's environment based generated values, and spins the containers up.
-func Apply(recs []*autodiscovery.Recommendation, nodeID, hubURL, nodeKey string) error {
+func Apply(recs []*autodiscovery.Recommendation, hubURL, nodeKey string) error {
 	cmdBase, err := GetDockerCommand()
 	if err != nil {
 		return err
 	}
 
 	payload := ComposeReq{
-		NodeID:      nodeID,
 		HubEndpoint: hubURL,
 		HubKey:      nodeKey,
 		Sensors:     []DeployableSensor{},

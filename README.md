@@ -64,7 +64,6 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
   "event_trigger": "malformed_jwt_detected",
   "source": "104.28.19.12",
   "target": "Auth Gateway",
-  "node_id": "node-12345678",
   "sensor_id": "core-dpi-engine",  
   "details": {
     "protocol": "TCP",

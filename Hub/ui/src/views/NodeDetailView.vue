@@ -1,55 +1,60 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useAppStore } from '../stores/app'
+import { useFleetStore } from '../stores/fleet'
+import { useEventsStore } from '../stores/events'
 import { useConfig } from '../api/useConfig'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
+import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../components/ui/navigation/BaseMeatballMenu.vue'
+import BaseModal from '../components/ui/feedback/BaseModal.vue'
 
 const appStore = useAppStore()
+const fleetStore = useFleetStore()
+const eventsStore = useEventsStore()
 const { config } = useConfig()
+
+const selectedNodeId = computed(() => fleetStore.selectedNode)
 
 // --- 1. NODE STATE ---
 const node = ref({
-    id: 'node-123',
-    alias: 'AWS-East-Gateway',
-    status: 'up',
-    publicIp: '203.0.113.42',
-    privateIp: '10.0.1.4',
-    tags: ['DMZ', 'Production'],
+    id: null,
+    alias: 'Loading node...',
+    status: 'unknown',
+    publicIp: null,
+    privateIp: null,
+    apiKey: null,
+    tags: [],
     hasPendingConfig: false,
-    lastEvent: '2 mins ago',
-    installedSensors: [
-        { id: 's-01', name: 'hw-tcp-tarpit', display: 'TCP Port Scanner Trap', status: 'up', events24h: 842, isSilenced: false, colorClass: 'bg-text-h', icon: 'M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z', osi: 'Network Layer' },
-        { id: 's-02', name: 'hw-web-router', display: 'Web Router Decoy', status: 'up', events24h: 312, isSilenced: false, colorClass: 'bg-text-m', icon: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4', osi: 'Application Layer' },
-        { id: 's-03', name: 'hw-file-canary', display: 'Sensitive Files Canary', status: 'up', events24h: 45, isSilenced: true, colorClass: 'bg-text-l', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', osi: 'Host Level' }
-    ]
+    lastEvent: 'Unknown',
+    installedSensors: [],
 })
 
-const maxSensorEvents = computed(() => Math.max(...node.value.installedSensors.map(s => s.events24h), 1))
-const sortedInstalledSensors = computed(() => [...node.value.installedSensors].sort((a, b) => b.events24h - a.events24h))
+const maxSensorEvents = computed(() => {
+    if (!node.value.installedSensors.length) return 1
+    return Math.max(...node.value.installedSensors.map(s => s.events24h || 0), 1)
+})
 
-// Mirroring the exact EventTable data structure
-const recentActivity = ref([
-    { id: 1, time: '2m ago', severity: 'Medium', event_trigger: 'Port Scan Detected', source: '198.51.100.4' },
-    { id: 2, time: '15m ago', severity: 'Low', event_trigger: 'Unauthorized Admin Access', source: '203.0.113.88' },
-    { id: 3, time: '1h ago', severity: 'High', event_trigger: 'Service Modification', source: 'local-os' }, // Non-IP example
-    { id: 4, time: '2h ago', severity: 'Critical', event_trigger: 'Sensitive File Read (/etc/shadow)', source: '10.0.1.55' },
-])
+const sortedInstalledSensors = computed(() => {
+    return [...(node.value.installedSensors || [])].sort((a, b) => (b.events24h || 0) - (a.events24h || 0))
+})
 
-// --- 2. CATALOG & MODAL STATE ---
-const sensors = ref([])
 const isLoading = ref(true)
 const fetchError = ref(false)
 
 const selectedSensor = ref(null)
+const sensors = ref([])
 const activeTab = ref('readme')
-const envVarValues = ref({}) 
-const activeEnvVar = ref(null) 
+const envVarValues = ref({})
+const activeEnvVar = ref(null)
 const isSeverityOpen = ref(false)
 const rawCompose = ref('')
 const highlightedCompose = ref('')
-const composePre = ref(null) 
+const composePre = ref(null)
+const showKeyModal = ref(false)
+const showSyncModal = ref(false)
+const syncComposeYaml = ref('')
 
 const severityOptions = [
     { value: 'info', label: 'Info', textClass: 'text-info', hoverClass: 'hover:bg-info/10 hover:text-info' },
@@ -60,32 +65,281 @@ const severityOptions = [
 ]
 
 const currentSeverity = computed(() => severityOptions.find(s => s.value === envVarValues.value['HW_SEVERITY']) || severityOptions[3])
-const toggleSeverity = () => { isSeverityOpen.value = !isSeverityOpen.value; activeEnvVar.value = isSeverityOpen.value ? 'HW_SEVERITY' : null; }
-const closeSeverity = () => { isSeverityOpen.value = false; activeEnvVar.value = null; }
-const selectSeverity = (val) => { envVarValues.value['HW_SEVERITY'] = val; closeSeverity(); }
+const toggleSeverity = () => { isSeverityOpen.value = !isSeverityOpen.value; activeEnvVar.value = isSeverityOpen.value ? 'HW_SEVERITY' : null }
+const closeSeverity = () => { isSeverityOpen.value = false; activeEnvVar.value = null }
+const selectSeverity = (val) => { envVarValues.value['HW_SEVERITY'] = val; closeSeverity() }
 
 const getUIDefault = (def) => {
-    if (!def) return '';
-    if (!def.includes('{{')) return def; 
-    const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/);
-    if (elseMatch) return elseMatch[1].trim();
-    const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/);
-    if (funcMatch) return funcMatch[1].trim();
-    return '';
+    if (!def) return ''
+    if (!def.includes('{{')) return def
+    const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
+    if (elseMatch) return elseMatch[1].trim()
+    const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
+    if (funcMatch) return funcMatch[1].trim()
+    return ''
 }
 
-const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_NODE_ID', 'HW_NODE_ALIAS', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL'];
+const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL']
 const sortedEnvVars = computed(() => {
-    if (!selectedSensor.value?.deployment?.env_vars) return [];
+    if (!selectedSensor.value?.deployment?.env_vars) return []
     return [...selectedSensor.value.deployment.env_vars]
         .filter(env => !env.hidden)
         .sort((a, b) => {
-            const aIsCore = coreVars.includes(a.name); const bIsCore = coreVars.includes(b.name);
-            if (aIsCore && !bIsCore) return -1; if (!aIsCore && bIsCore) return 1;
-            if (aIsCore && bIsCore) return coreVars.indexOf(a.name) - coreVars.indexOf(b.name);
-            return a.name.localeCompare(b.name);
-        });
-});
+            const aIsCore = coreVars.includes(a.name); const bIsCore = coreVars.includes(b.name)
+            if (aIsCore && !bIsCore) return -1
+            if (!aIsCore && bIsCore) return 1
+            if (aIsCore && bIsCore) return coreVars.indexOf(a.name) - coreVars.indexOf(b.name)
+            return a.name.localeCompare(b.name)
+        })
+})
+
+const mapNodeSensor = (sensor) => ({
+    id: sensor.sensor_id || sensor.id || sensor.name,
+    name: sensor.custom_name || sensor.name || sensor.sensor_id || sensor.id,
+    display: sensor.custom_name || sensor.name || sensor.sensor_id || sensor.id,
+    status: sensor.status || 'down',
+    events24h: sensor.events_24h || sensor.events24h || 0,
+    isSilenced: sensor.is_silenced || sensor.isSilenced || false,
+    osi: sensor.osi_layer || sensor.osi || 'Sensor',
+    icon: sensor.icon || sensor.icon_svg || 'M12 12h0',
+    ...sensor,
+})
+
+const fetchNodeDetails = async () => {
+    if (!selectedNodeId.value) {
+        appStore.currentView = 'fleet'
+        return
+    }
+
+    isLoading.value = true
+    fetchError.value = false
+
+    try {
+        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(selectedNodeId.value)}`, { cache: 'no-store' })
+        if (!response.ok) throw new Error(`Failed to fetch node: ${response.status}`)
+        const data = await response.json()
+        node.value = {
+            id: data.id || data.node_id || selectedNodeId.value,
+            alias: data.alias || data.name || 'Unknown Node',
+            status: data.status || 'unknown',
+            publicIp: data.public_ip || data.publicIp || null,
+            privateIp: data.private_ip || data.privateIp || null,
+            apiKey: data.apiKey || null,
+            tags: data.tags || [],
+            hasPendingConfig: data.has_pending_config || data.hasPendingConfig || false,
+            lastEvent: data.last_event || data.lastEvent || 'Unknown',
+            installedSensors: Array.isArray(data.installed_sensors || data.installedSensors)
+                ? (data.installed_sensors || data.installedSensors).map(mapNodeSensor)
+                : [],
+        }
+    } catch (error) {
+        console.error('Failed to load node details', error)
+        fetchError.value = true
+        appStore.currentView = 'fleet'
+    } finally {
+        isLoading.value = false
+    }
+}
+
+const handleToggleSensorSilence = async (sensor) => {
+    if (!node.value.id || !sensor.id) return
+
+    const previous = sensor.isSilenced
+    sensor.isSilenced = !sensor.isSilenced
+
+    try {
+        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors/${encodeURIComponent(sensor.id)}/silence`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_silenced: sensor.isSilenced }),
+        })
+        if (!response.ok) throw new Error(`Server error: ${response.status}`)
+    } catch (err) {
+        sensor.isSilenced = previous
+        console.error('Failed to toggle silence:', err)
+        alert('Unable to change sensor silence state. Please try again.')
+    }
+}
+
+const handleRemoveSensor = async (sensor) => {
+    if (!node.value.id || !sensor.id) return
+    if (!confirm(`Delete sensor ${sensor.name || sensor.id} from ${node.value.alias}?`)) return
+
+    try {
+        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors/${encodeURIComponent(sensor.id)}`, {
+            method: 'DELETE',
+        })
+        if (!response.ok) throw new Error(`Server error: ${response.status}`)
+        node.value.installedSensors = node.value.installedSensors.filter(s => s.id !== sensor.id)
+    } catch (err) {
+        console.error('Failed to remove sensor:', err)
+        alert('Could not remove sensor. Please try again.')
+    }
+}
+
+const handleAddSensorToNode = async () => {
+    if (!selectedSensor.value || !node.value.id) return
+
+    const safeEnvValues = Object.fromEntries(Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : '']))
+    const payload = {
+        sensor_id: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
+        custom_name: selectedSensor.value.name || selectedSensor.value.id,
+        config_values: safeEnvValues,
+    }
+
+    try {
+        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+        if (!response.ok) throw new Error(`Server error: ${response.status}`)
+        await fetchNodeDetails()
+        closeSensor()
+    } catch (err) {
+        console.error('Failed to add sensor to node:', err)
+        alert('Could not add sensor to this node. Please try again.')
+    }
+}
+
+const handleManageKey = () => {
+    showKeyModal.value = true
+}
+
+const getNodeApiKey = () => node.value.apiKey || null
+
+const copyNodeKeyToClipboard = async () => {
+    const apiKey = getNodeApiKey()
+    if (!apiKey) return
+    try {
+        await navigator.clipboard.writeText(apiKey)
+        alert('Node API Key copied to clipboard')
+    } catch (err) {
+        console.error('Failed to copy node API Key:', err)
+        alert('Unable to copy Node API Key. Please copy it manually.')
+    }
+}
+
+const copySyncYamlToClipboard = async () => {
+    if (!syncComposeYaml.value) return
+    try {
+        await navigator.clipboard.writeText(syncComposeYaml.value)
+        alert('Compose YAML copied to clipboard')
+    } catch (err) {
+        console.error('Failed to copy compose YAML:', err)
+        alert('Unable to copy compose YAML. Please copy it manually.')
+    }
+}
+
+const triggerManualSync = async () => {
+    const apiKey = getNodeApiKey()
+    if (!apiKey) {
+        alert('Unable to sync this node: missing node API key.')
+        return
+    }
+
+    try {
+        const response = await fetch('/api/v1/nodes/compose', {
+            headers: { Authorization: `Bearer ${apiKey}` },
+        })
+
+        if (!response.ok) {
+            throw new Error(`Node sync failed: ${response.status}`)
+        }
+
+        syncComposeYaml.value = await response.text()
+        showSyncModal.value = true
+        await fetchNodeDetails()
+    } catch (err) {
+        console.error('Failed to sync node:', err)
+        alert('Unable to sync this node. Please try again.')
+    }
+}
+
+onMounted(() => {
+    fetchNodeDetails()
+    eventsStore.fetchEvents(false, selectedNodeId.value)
+})
+
+watch(selectedNodeId, (value) => {
+    if (!value) {
+        appStore.currentView = 'fleet'
+        return
+    }
+    fetchNodeDetails()
+    eventsStore.fetchEvents(false, value)
+})
+
+const timeAgo = (dateStr) => {
+    if (!dateStr) return 'Unknown'
+    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
+    if (diff < 60) return `${diff}s ago`
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
+}
+
+const recentActivity = computed(() => {
+    return eventsStore.filteredEvents.slice(0, 10).map(e => ({
+        id: e.id,
+        time: timeAgo(e.timestamp),
+        severity: e.severity || 'info',
+        event_trigger: e.event_trigger || 'Alert',
+        source: e.source || 'Unknown'
+    }))
+})
+
+// --- EDIT MODAL STATE ---
+const showEditModal = ref(false)
+const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '' })
+const tagInput = ref('')
+const tagsList = ref([])
+
+const openEditModal = () => {
+    editNodeForm.value = {
+        id: node.value.id,
+        alias: node.value.alias, 
+        publicIp: node.value.publicIp || '', 
+        privateIp: node.value.privateIp || ''
+    }
+    tagsList.value = [...(node.value.tags || [])] 
+    showEditModal.value = true
+}
+
+const addTag = () => {
+    const val = tagInput.value.trim()
+    if (val && !tagsList.value.includes(val)) {
+        tagsList.value.push(val)
+    }
+    tagInput.value = ''
+}
+
+const removeTag = (index) => {
+    tagsList.value.splice(index, 1)
+}
+
+const handleEditSubmit = async () => {
+    try {
+        const response = await fetch(`/api/v1/nodes/${editNodeForm.value.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                alias: editNodeForm.value.alias, 
+                tags: tagsList.value,
+                publicIp: editNodeForm.value.publicIp,
+                privateIp: editNodeForm.value.privateIp
+            }),
+        })
+
+        if (!response.ok) throw new Error('Failed to update node')
+        
+        showEditModal.value = false
+        await fetchNodeDetails()
+        await fleetStore.fetchFleet()
+    } catch (err) {
+        console.error('Update node failed:', err)
+    }
+}
 
 watch(envVarValues, () => { fetchYamlFromHub(); }, { deep: true });
 watch(activeEnvVar, () => { applyHighlighting(); });
@@ -104,10 +358,11 @@ onMounted(async () => {
 });
 
 const openSensor = (sensor) => {
+    const apiKey = getNodeApiKey()
     selectedSensor.value = sensor; activeTab.value = 'readme'; envVarValues.value = {};
     envVarValues.value['HW_SEVERITY'] = 'critical';
     envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin;
-    envVarValues.value['HW_HUB_KEY'] = config.hubKey || '<YOUR_HW_HUB_KEY>';
+    envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>';
     sensor.deployment?.env_vars?.forEach(env => {
         if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
             envVarValues.value[env.name] = getUIDefault(env.default);
@@ -121,11 +376,12 @@ const closeSensor = () => { selectedSensor.value = null; envVarValues.value = {}
 
 const fetchYamlFromHub = async () => {
     if (!selectedSensor.value) return;
+    const apiKey = getNodeApiKey()
     const safeEnvValues = Object.fromEntries(Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : '']));
     const payload = {
         node_id: node.value.id,
         hub_endpoint: config.hubEndpoint || window.location.origin,
-        hub_key: config.hubKey || '<YOUR_HW_HUB_KEY>',
+        hub_key: apiKey || '<YOUR_HW_NODE_KEY>',
         sensors: [{ sensor_id: selectedSensor.value.id, env_values: safeEnvValues, manifest: selectedSensor.value }]
     };
     try {
@@ -134,7 +390,7 @@ const fetchYamlFromHub = async () => {
         rawCompose.value = await response.text();
         applyHighlighting(); 
     } catch (e) {
-        console.error(e); rawCompose.value = "services:\n  error:\n    image: error_generating_yaml"; highlightedCompose.value = rawCompose.value;
+        console.error(e); rawCompose.value = "services:\n  error:\n    error_generating_yaml"; highlightedCompose.value = rawCompose.value;
     }
 }
 
@@ -155,22 +411,6 @@ const applyHighlighting = () => {
             }
         }
     });
-}
-
-const handleAddSensorToNode = () => {
-    if (!selectedSensor.value) return;
-    node.value.installedSensors.push({
-        id: 'new-' + Math.random().toString(36).substring(2, 9),
-        name: selectedSensor.value.id,
-        display: selectedSensor.value.name,
-        status: 'down', events24h: 0, isSilenced: false,
-        colorClass: 'bg-primary-main',
-        icon: selectedSensor.value.icon_svg,
-        osi: selectedSensor.value.osi_layer,
-        envVars: { ...envVarValues.value }
-    });
-    node.value.hasPendingConfig = true;
-    closeSensor();
 }
 </script>
 
@@ -207,19 +447,22 @@ const handleAddSensorToNode = () => {
                             <span class="text-text-h font-medium">Last Event:</span> {{ node.lastEvent }}
                         </div>
                         <div class="h-4 w-px bg-border-default hidden sm:block"></div>
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1.5 flex-wrap">
                             <span v-for="tag in node.tags" :key="tag" class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-[10px] font-medium rounded-md tracking-wider">{{ tag }}</span>
+                            <button @click.stop="openEditModal" class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-[10px] rounded-md hover:text-text-h transition-colors">
+                                + Tag
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-3 shrink-0">
-                    <BaseButton variant="secondary" class="!py-1.5 !px-3 !text-sm flex items-center gap-2">
+                    <BaseButton variant="secondary" class="!py-1.5 !px-3 !text-sm flex items-center gap-2" @click="handleManageKey">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                         Manage Key
                     </BaseButton>
                     <BaseMeatballMenu id="node-super-menu">
-                        <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Rename Node</button>
+                        <button @click="openEditModal" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Rename / Edit Node</button>
                         <button class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Delete Node</button>
                     </BaseMeatballMenu>
                 </div>
@@ -229,11 +472,11 @@ const handleAddSensorToNode = () => {
                 <div class="flex items-start gap-3">
                     <svg class="w-5 h-5 text-high mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     <div>
-                        <h4 class="text-sm font-semibold text-high">Unsynced Configuration Changes</h4>
+                        <h4 class="text-sm font-semibold text-high">Pending Sync</h4>
                         <p class="text-sm text-text-h opacity-90 mt-0.5">Sensors have been added or modified. Sync this node to apply changes.</p>
                     </div>
                 </div>
-                <BaseButton variant="secondary" class="!border-high/30 !bg-bg-surface hover:!bg-high/10 !text-high shrink-0">Sync Node</BaseButton>
+                <BaseButton @click="triggerManualSync" variant="secondary" class="!border-high/30 !bg-bg-surface hover:!bg-high/10 !text-high shrink-0">Sync Node</BaseButton>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -318,10 +561,10 @@ const handleAddSensorToNode = () => {
                             </div>
                             <BaseMeatballMenu :id="`sensor-menu-${sensor.id}`">
                                 <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Edit Configuration</button>
-                                <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
+                                <button @click="handleToggleSensorSilence(sensor)" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
                                     {{ sensor.isSilenced ? 'Unsilence Alerts' : 'Silence Alerts' }}
                                 </button>
-                                <button class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Remove Sensor</button>
+                                <button @click="handleRemoveSensor(sensor)" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Remove Sensor</button>
                             </BaseMeatballMenu>
                         </div>
                         <div class="mt-3 pt-3 border-t border-border-default flex justify-between items-center">
@@ -355,6 +598,74 @@ const handleAddSensorToNode = () => {
                 </div>
             </div>
         </div>
+
+        <BaseModal :show="showKeyModal" @close="showKeyModal = false" title="Manage Node Key">
+            <div class="space-y-4">
+                <p class="text-sm text-text-m">This is the unique API key for this node. It is used to authenticate the node with the hub.</p>
+                <div class="bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm break-all">
+                    <div class="text-text-h font-semibold mb-2">Node API Key</div>
+                    <div>{{ node.apiKey || 'Unavailable' }}</div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <BaseButton variant="secondary" @click="showKeyModal = false">Close</BaseButton>
+                    <BaseButton variant="primary" @click="copyNodeKeyToClipboard">Copy API Key</BaseButton>
+                </div>
+            </div>
+        </BaseModal>
+
+        <BaseModal :show="showSyncModal" @close="showSyncModal = false" title="Node Compose YAML">
+            <div class="space-y-4">
+                <p class="text-sm text-text-m">This is the generated docker-compose.yml for this node. Use it to deploy the node with the selected sensors and config.</p>
+                <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-xs text-text-h overflow-auto max-h-[40vh]">
+                    <pre class="whitespace-pre-wrap break-words">{{ syncComposeYaml || 'No compose output available.' }}</pre>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <BaseButton variant="secondary" @click="showSyncModal = false">Close</BaseButton>
+                    <BaseButton variant="primary" @click="copySyncYamlToClipboard">Copy Compose</BaseButton>
+                </div>
+            </div>
+        </BaseModal>
+
+        <BaseModal :show="showEditModal" @close="showEditModal = false" title="Node Settings">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-h mb-1.5">Node Alias</label>
+                    <BaseInput v-model="editNodeForm.alias" />
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-h mb-1.5">Public IP</label>
+                        <BaseInput v-model="editNodeForm.publicIp" placeholder="e.g. 203.0.113.5" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-h mb-1.5">Private IP</label>
+                        <BaseInput v-model="editNodeForm.privateIp" placeholder="e.g. 10.0.1.50" />
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-text-h mb-1.5">Tags</label>
+                    <div class="flex flex-col gap-2.5">
+                        <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
+                            <span v-for="(tag, index) in tagsList" :key="tag" 
+                                class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
+                                {{ tag }}
+                                <button @click="removeTag(index)" class="text-text-m hover:text-danger-text transition-colors outline-none">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </span>
+                        </div>
+                        <BaseInput v-model="tagInput" @keydown.enter.prevent="addTag" placeholder="Type a tag and press Enter..." />
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-5 border-t border-border-default mt-6">
+                    <BaseButton variant="secondary" class="mr-2" @click="showEditModal = false">Cancel</BaseButton>
+                    <BaseButton variant="primary" @click="handleEditSubmit">Save Changes</BaseButton>
+                </div>
+            </div>
+        </BaseModal>
 
         <Teleport to="body">
             <transition enter-active-class="transition duration-normal ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">

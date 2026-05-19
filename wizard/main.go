@@ -295,7 +295,6 @@ func buildStrategy(hostState *scanner.HostState, systemState *state.SystemState,
 	for _, rec := range recommendations {
 		updateEnvVar(rec, "HW_HUB_ENDPOINT", nodeConfig.HubURL)
 		updateEnvVar(rec, "HW_HUB_KEY", nodeConfig.NodeKey)
-		updateEnvVar(rec, "HW_NODE_ID", nodeConfig.NodeID)
 		updateEnvVar(rec, "HW_SENSOR_ID", rec.SensorID)
 	}
 
@@ -332,7 +331,7 @@ func executeDeployment(recs []*autodiscovery.Recommendation, dockerMap map[int]s
 			}
 
 			fmt.Printf("\n    %sExecuting Infrastructure-as-Code...%s\n", Cyan, Reset)
-			if err := generator.Apply(recs, nodeConfig.NodeID, nodeConfig.HubURL, nodeConfig.NodeKey); err != nil {
+			if err := generator.Apply(recs, nodeConfig.HubURL, nodeConfig.NodeKey); err != nil {
             return fmt.Errorf("Deployment failed: %w", err)
         }
 			
