@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { useAppStore } from '../stores/app'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseCard from '../components/ui/layout/BaseCard.vue'
@@ -9,6 +10,8 @@ import ThemeToggle from '../components/ui/branding/ThemeToggle.vue'
 import BaseLogo from '../components/ui/branding/BaseLogo.vue'
 
 const emit = defineEmits(['login-success', 'toggle-theme'])
+const appStore = useAppStore()
+
 const password = ref('')
 const loading = ref(false)
 const error = ref(false)
@@ -19,27 +22,19 @@ const doLogin = async () => {
     error.value = false
     rateLimited.value = false
     
-    try {
-        const res = await fetch('/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ password: password.value })
-        })
-        
-        if (res.ok) {
-            emit('login-success')
-        } else if (res.status === 429) {
-            rateLimited.value = true
-            password.value = ''
-        } else {
-            error.value = true
-            password.value = ''
-        }
-    } catch (err) {
+    const result = await appStore.login(password.value)
+    
+    if (result.success) {
+        emit('login-success')
+    } else if (result.status === 429) {
+        rateLimited.value = true
+        password.value = ''
+    } else {
         error.value = true
-    } finally {
-        loading.value = false
+        password.value = ''
     }
+    
+    loading.value = false
 }
 </script>
 

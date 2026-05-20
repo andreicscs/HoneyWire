@@ -39,11 +39,14 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.broadcastWS("NEW_NODE", map[string]string{"node_id": nodeID})
+
 	SendJSON(w, http.StatusCreated, map[string]interface{}{
 		"node_id": nodeID,
 		"apiKey":  apiKey,
 		"alias":   req.Alias,
 	})
+	
 }
 
 // UpdateNode handles UI requests to edit a Node's metadata

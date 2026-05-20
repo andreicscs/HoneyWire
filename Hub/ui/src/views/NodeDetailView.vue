@@ -17,34 +17,27 @@ const { config } = useConfig()
 
 const selectedNodeId = computed(() => fleetStore.selectedNode)
 
-// --- 1. NODE STATE ---
-const node = ref({
-    id: null,
-    alias: 'Loading node...',
-    status: 'unknown',
-    publicIp: null,
-    privateIp: null,
-    apiKey: null,
-    tags: [],
-    hasPendingConfig: false,
-    lastEvent: 'Unknown',
-    installedSensors: [],
-})
+// --- NODE STATE ---
+// Single source of truth: the live reactive object from the store.
+const node = computed(() => fleetStore.getNode(selectedNodeId.value))
 
 const maxSensorEvents = computed(() => {
-    if (!node.value.installedSensors.length) return 1
-    return Math.max(...node.value.installedSensors.map(s => s.events24h || 0), 1)
+  if (!node.value?.installedSensors?.length) return 1
+  return Math.max(...node.value.installedSensors.map(s => s.events24h || 0), 1)
 })
 
 const sortedInstalledSensors = computed(() => {
-    return [...(node.value.installedSensors || [])].sort((a, b) => (b.events24h || 0) - (a.events24h || 0))
+  return [...(node.value?.installedSensors || [])]
+    .sort((a, b) => (b.events24h || 0) - (a.events24h || 0))
 })
 
-const isLoading = ref(true)
+// --- SENSOR CATALOG STATE ---
+const isManifestLoading = ref(true)
 const fetchError = ref(false)
-
-const selectedSensor = ref(null)
 const sensors = ref([])
+
+// --- SENSOR MODAL STATE ---
+const selectedSensor = ref(null)
 const activeTab = ref('readme')
 const envVarValues = ref({})
 const activeEnvVar = ref(null)
@@ -52,365 +45,287 @@ const isSeverityOpen = ref(false)
 const rawCompose = ref('')
 const highlightedCompose = ref('')
 const composePre = ref(null)
+
+// --- MODAL STATE ---
 const showKeyModal = ref(false)
 const showSyncModal = ref(false)
 const syncComposeYaml = ref('')
-
-const severityOptions = [
-    { value: 'info', label: 'Info', textClass: 'text-info', hoverClass: 'hover:bg-info/10 hover:text-info' },
-    { value: 'low', label: 'Low', textClass: 'text-low', hoverClass: 'hover:bg-low/10 hover:text-low' },
-    { value: 'medium', label: 'Medium', textClass: 'text-medium', hoverClass: 'hover:bg-medium/10 hover:text-medium' },
-    { value: 'high', label: 'High', textClass: 'text-high', hoverClass: 'hover:bg-high/10 hover:text-high' },
-    { value: 'critical', label: 'Critical', textClass: 'text-critical', hoverClass: 'hover:bg-critical/10 hover:text-critical' }
-]
-
-const currentSeverity = computed(() => severityOptions.find(s => s.value === envVarValues.value['HW_SEVERITY']) || severityOptions[3])
-const toggleSeverity = () => { isSeverityOpen.value = !isSeverityOpen.value; activeEnvVar.value = isSeverityOpen.value ? 'HW_SEVERITY' : null }
-const closeSeverity = () => { isSeverityOpen.value = false; activeEnvVar.value = null }
-const selectSeverity = (val) => { envVarValues.value['HW_SEVERITY'] = val; closeSeverity() }
-
-const getUIDefault = (def) => {
-    if (!def) return ''
-    if (!def.includes('{{')) return def
-    const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
-    if (elseMatch) return elseMatch[1].trim()
-    const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
-    if (funcMatch) return funcMatch[1].trim()
-    return ''
-}
-
-const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL']
-const sortedEnvVars = computed(() => {
-    if (!selectedSensor.value?.deployment?.env_vars) return []
-    return [...selectedSensor.value.deployment.env_vars]
-        .filter(env => !env.hidden)
-        .sort((a, b) => {
-            const aIsCore = coreVars.includes(a.name); const bIsCore = coreVars.includes(b.name)
-            if (aIsCore && !bIsCore) return -1
-            if (!aIsCore && bIsCore) return 1
-            if (aIsCore && bIsCore) return coreVars.indexOf(a.name) - coreVars.indexOf(b.name)
-            return a.name.localeCompare(b.name)
-        })
-})
-
-const mapNodeSensor = (sensor) => ({
-    id: sensor.sensor_id || sensor.id || sensor.name,
-    name: sensor.custom_name || sensor.name || sensor.sensor_id || sensor.id,
-    display: sensor.custom_name || sensor.name || sensor.sensor_id || sensor.id,
-    status: sensor.status || 'down',
-    events24h: sensor.events_24h || sensor.events24h || 0,
-    isSilenced: sensor.is_silenced || sensor.isSilenced || false,
-    osi: sensor.osi_layer || sensor.osi || 'Sensor',
-    icon: sensor.icon || sensor.icon_svg || 'M12 12h0',
-    ...sensor,
-})
-
-const fetchNodeDetails = async () => {
-    if (!selectedNodeId.value) {
-        appStore.currentView = 'fleet'
-        return
-    }
-
-    isLoading.value = true
-    fetchError.value = false
-
-    try {
-        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(selectedNodeId.value)}`, { cache: 'no-store' })
-        if (!response.ok) throw new Error(`Failed to fetch node: ${response.status}`)
-        const data = await response.json()
-        node.value = {
-            id: data.id || data.node_id || selectedNodeId.value,
-            alias: data.alias || data.name || 'Unknown Node',
-            status: data.status || 'unknown',
-            publicIp: data.public_ip || data.publicIp || null,
-            privateIp: data.private_ip || data.privateIp || null,
-            apiKey: data.apiKey || null,
-            tags: data.tags || [],
-            hasPendingConfig: data.has_pending_config || data.hasPendingConfig || false,
-            lastEvent: data.last_event || data.lastEvent || 'Unknown',
-            installedSensors: Array.isArray(data.installed_sensors || data.installedSensors)
-                ? (data.installed_sensors || data.installedSensors).map(mapNodeSensor)
-                : [],
-        }
-    } catch (error) {
-        console.error('Failed to load node details', error)
-        fetchError.value = true
-        appStore.currentView = 'fleet'
-    } finally {
-        isLoading.value = false
-    }
-}
-
-const handleToggleSensorSilence = async (sensor) => {
-    if (!node.value.id || !sensor.id) return
-
-    const previous = sensor.isSilenced
-    sensor.isSilenced = !sensor.isSilenced
-
-    try {
-        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors/${encodeURIComponent(sensor.id)}/silence`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_silenced: sensor.isSilenced }),
-        })
-        if (!response.ok) throw new Error(`Server error: ${response.status}`)
-    } catch (err) {
-        sensor.isSilenced = previous
-        console.error('Failed to toggle silence:', err)
-        alert('Unable to change sensor silence state. Please try again.')
-    }
-}
-
-const handleRemoveSensor = async (sensor) => {
-    if (!node.value.id || !sensor.id) return
-    if (!confirm(`Delete sensor ${sensor.name || sensor.id} from ${node.value.alias}?`)) return
-
-    try {
-        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors/${encodeURIComponent(sensor.id)}`, {
-            method: 'DELETE',
-        })
-        if (!response.ok) throw new Error(`Server error: ${response.status}`)
-        node.value.installedSensors = node.value.installedSensors.filter(s => s.id !== sensor.id)
-    } catch (err) {
-        console.error('Failed to remove sensor:', err)
-        alert('Could not remove sensor. Please try again.')
-    }
-}
-
-const handleAddSensorToNode = async () => {
-    if (!selectedSensor.value || !node.value.id) return
-
-    const safeEnvValues = Object.fromEntries(Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : '']))
-    const payload = {
-        sensor_id: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
-        custom_name: selectedSensor.value.name || selectedSensor.value.id,
-        config_values: safeEnvValues,
-    }
-
-    try {
-        const response = await fetch(`/api/v1/nodes/${encodeURIComponent(node.value.id)}/sensors`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        })
-        if (!response.ok) throw new Error(`Server error: ${response.status}`)
-        await fetchNodeDetails()
-        closeSensor()
-    } catch (err) {
-        console.error('Failed to add sensor to node:', err)
-        alert('Could not add sensor to this node. Please try again.')
-    }
-}
-
-const handleManageKey = () => {
-    showKeyModal.value = true
-}
-
-const getNodeApiKey = () => node.value.apiKey || null
-
-const copyNodeKeyToClipboard = async () => {
-    const apiKey = getNodeApiKey()
-    if (!apiKey) return
-    try {
-        await navigator.clipboard.writeText(apiKey)
-        alert('Node API Key copied to clipboard')
-    } catch (err) {
-        console.error('Failed to copy node API Key:', err)
-        alert('Unable to copy Node API Key. Please copy it manually.')
-    }
-}
-
-const copySyncYamlToClipboard = async () => {
-    if (!syncComposeYaml.value) return
-    try {
-        await navigator.clipboard.writeText(syncComposeYaml.value)
-        alert('Compose YAML copied to clipboard')
-    } catch (err) {
-        console.error('Failed to copy compose YAML:', err)
-        alert('Unable to copy compose YAML. Please copy it manually.')
-    }
-}
-
-const triggerManualSync = async () => {
-    const apiKey = getNodeApiKey()
-    if (!apiKey) {
-        alert('Unable to sync this node: missing node API key.')
-        return
-    }
-
-    try {
-        const response = await fetch('/api/v1/nodes/compose', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        })
-
-        if (!response.ok) {
-            throw new Error(`Node sync failed: ${response.status}`)
-        }
-
-        syncComposeYaml.value = await response.text()
-        showSyncModal.value = true
-        await fetchNodeDetails()
-    } catch (err) {
-        console.error('Failed to sync node:', err)
-        alert('Unable to sync this node. Please try again.')
-    }
-}
-
-onMounted(() => {
-    fetchNodeDetails()
-    eventsStore.fetchEvents(false, selectedNodeId.value)
-})
-
-watch(selectedNodeId, (value) => {
-    if (!value) {
-        appStore.currentView = 'fleet'
-        return
-    }
-    fetchNodeDetails()
-    eventsStore.fetchEvents(false, value)
-})
-
-const timeAgo = (dateStr) => {
-    if (!dateStr) return 'Unknown'
-    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
-    if (diff < 60) return `${diff}s ago`
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-    return `${Math.floor(diff / 86400)}d ago`
-}
-
-const recentActivity = computed(() => {
-    return eventsStore.filteredEvents.slice(0, 10).map(e => ({
-        id: e.id,
-        time: timeAgo(e.timestamp),
-        severity: e.severity || 'info',
-        event_trigger: e.event_trigger || 'Alert',
-        source: e.source || 'Unknown'
-    }))
-})
-
-// --- EDIT MODAL STATE ---
 const showEditModal = ref(false)
 const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '' })
 const tagInput = ref('')
 const tagsList = ref([])
 
+// --- SEVERITY CONFIG ---
+const severityOptions = [
+  { value: 'info', label: 'Info', textClass: 'text-info', hoverClass: 'hover:bg-info/10 hover:text-info' },
+  { value: 'low', label: 'Low', textClass: 'text-low', hoverClass: 'hover:bg-low/10 hover:text-low' },
+  { value: 'medium', label: 'Medium', textClass: 'text-medium', hoverClass: 'hover:bg-medium/10 hover:text-medium' },
+  { value: 'high', label: 'High', textClass: 'text-high', hoverClass: 'hover:bg-high/10 hover:text-high' },
+  { value: 'critical', label: 'Critical', textClass: 'text-critical', hoverClass: 'hover:bg-critical/10 hover:text-critical' }
+]
+
+const currentSeverity = computed(() =>
+  severityOptions.find(s => s.value === envVarValues.value['HW_SEVERITY']) || severityOptions[3]
+)
+
+const toggleSeverity = () => {
+  isSeverityOpen.value = !isSeverityOpen.value
+  activeEnvVar.value = isSeverityOpen.value ? 'HW_SEVERITY' : null
+}
+const closeSeverity = () => { isSeverityOpen.value = false; activeEnvVar.value = null }
+const selectSeverity = (val) => { envVarValues.value['HW_SEVERITY'] = val; closeSeverity() }
+
+// --- ENV VAR HELPERS ---
+const getUIDefault = (def) => {
+  if (!def) return ''
+  if (!def.includes('{{')) return def
+  const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
+  if (elseMatch) return elseMatch[1].trim()
+  const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
+  if (funcMatch) return funcMatch[1].trim()
+  return ''
+}
+
+const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL']
+
+const sortedEnvVars = computed(() => {
+  if (!selectedSensor.value?.deployment?.env_vars) return []
+  return [...selectedSensor.value.deployment.env_vars]
+    .filter(env => !env.hidden)
+    .sort((a, b) => {
+      const aIsCore = coreVars.includes(a.name)
+      const bIsCore = coreVars.includes(b.name)
+      if (aIsCore && !bIsCore) return -1
+      if (!aIsCore && bIsCore) return 1
+      if (aIsCore && bIsCore) return coreVars.indexOf(a.name) - coreVars.indexOf(b.name)
+      return a.name.localeCompare(b.name)
+    })
+})
+
+// --- SENSOR ACTIONS (delegated to store) ---
+
+const handleToggleSensorSilence = async (sensor) => {
+  if (!node.value?.id || !sensor.id) return
+  try {
+    await fleetStore.toggleSilence(node.value.id, sensor.id, !sensor.isSilenced)
+  } catch (err) {
+    alert('Unable to change sensor silence state. Please try again.')
+  }
+}
+
+const handleRemoveSensor = async (sensor) => {
+  if (!node.value?.id || !sensor.id) return
+  try {
+    await fleetStore.removeSensor(node.value.id, sensor.id)
+  } catch (err) {
+    alert('Could not remove sensor. Please try again.')
+  }
+}
+
+const handleAddSensorToNode = async () => {
+  if (!selectedSensor.value || !node.value?.id) return
+
+  const safeEnvValues = Object.fromEntries(
+    Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : ''])
+  )
+
+  try {
+    await fleetStore.addSensor(node.value.id, {
+      sensorId: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
+      customName: selectedSensor.value.name || selectedSensor.value.id,
+      configValues: safeEnvValues,
+    })
+    closeSensor()
+  } catch (err) {
+    alert('Could not add sensor to this node. Please try again.')
+  }
+}
+
+// --- NODE ACTIONS (delegated to store) ---
+
+const handleManageKey = () => { showKeyModal.value = true }
+
+const copyNodeKeyToClipboard = async () => {
+  const apiKey = node.value?.apiKey
+  if (!apiKey) return
+  try {
+    await navigator.clipboard.writeText(apiKey)
+    alert('Node API Key copied to clipboard')
+  } catch (err) {
+    alert('Unable to copy Node API Key. Please copy it manually.')
+  }
+}
+
+const copySyncYamlToClipboard = async () => {
+  if (!syncComposeYaml.value) return
+  try {
+    await navigator.clipboard.writeText(syncComposeYaml.value)
+    alert('Compose YAML copied to clipboard')
+  } catch (err) {
+    alert('Unable to copy compose YAML. Please copy it manually.')
+  }
+}
+
+const triggerManualSync = async () => {
+  if (!node.value?.id) return
+  try {
+    syncComposeYaml.value = await fleetStore.syncNode(node.value.id)
+    showSyncModal.value = true
+  } catch (err) {
+    alert('Unable to sync this node. Please try again.')
+  }
+}
+
+// --- NAVIGATION ---
+
+watch(selectedNodeId, async (value) => {
+  if (!value) {
+    appStore.currentView = 'fleet'
+    return
+  }
+  await fleetStore.fetchNodeDetails(value)
+  eventsStore.fetchEvents(false, value)
+}, { immediate: true })
+
+const timeAgo = (dateStr) => {
+  if (!dateStr) return 'Unknown'
+  const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+const recentActivity = computed(() => {
+  return eventsStore.filteredEvents.slice(0, 10).map(e => ({
+    id: e.id,
+    time: timeAgo(e.timestamp),
+    severity: e.severity || 'info',
+    event_trigger: e.event_trigger || 'Alert',
+    source: e.source || 'Unknown'
+  }))
+})
+
+// --- EDIT MODAL ---
+
 const openEditModal = () => {
-    editNodeForm.value = {
-        id: node.value.id,
-        alias: node.value.alias, 
-        publicIp: node.value.publicIp || '', 
-        privateIp: node.value.privateIp || ''
-    }
-    tagsList.value = [...(node.value.tags || [])] 
-    showEditModal.value = true
+  if (!node.value) return
+  editNodeForm.value = {
+    id: node.value.id,
+    alias: node.value.alias,
+    publicIp: node.value.publicIp || '',
+    privateIp: node.value.privateIp || ''
+  }
+  tagsList.value = [...(node.value.tags || [])]
+  showEditModal.value = true
 }
 
 const addTag = () => {
-    const val = tagInput.value.trim()
-    if (val && !tagsList.value.includes(val)) {
-        tagsList.value.push(val)
-    }
-    tagInput.value = ''
+  const val = tagInput.value.trim()
+  if (val && !tagsList.value.includes(val)) tagsList.value.push(val)
+  tagInput.value = ''
 }
 
-const removeTag = (index) => {
-    tagsList.value.splice(index, 1)
-}
+const removeTag = (index) => { tagsList.value.splice(index, 1) }
 
 const handleEditSubmit = async () => {
-    try {
-        const response = await fetch(`/api/v1/nodes/${editNodeForm.value.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                alias: editNodeForm.value.alias, 
-                tags: tagsList.value,
-                publicIp: editNodeForm.value.publicIp,
-                privateIp: editNodeForm.value.privateIp
-            }),
-        })
-
-        if (!response.ok) throw new Error('Failed to update node')
-        
-        showEditModal.value = false
-        await fetchNodeDetails()
-        await fleetStore.fetchFleet()
-    } catch (err) {
-        console.error('Update node failed:', err)
-    }
+  try {
+    await fleetStore.updateNode(editNodeForm.value.id, {
+      alias: editNodeForm.value.alias,
+      tags: tagsList.value,
+      publicIp: editNodeForm.value.publicIp,
+      privateIp: editNodeForm.value.privateIp,
+    })
+    showEditModal.value = false
+  } catch (err) {
+    alert('Failed to update node. Please try again.')
+  }
 }
 
-watch(envVarValues, () => { fetchYamlFromHub(); }, { deep: true });
-watch(activeEnvVar, () => { applyHighlighting(); });
+// --- SENSOR CATALOG ---
+
+watch(envVarValues, () => { fetchYamlFromHub() }, { deep: true })
+watch(activeEnvVar, () => { applyHighlighting() })
 
 onMounted(async () => {
-    try {
-        isLoading.value = true;
-        const response = await fetch("/api/v1/manifests", { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP error`);
-        sensors.value = await response.json();
-    } catch (error) {
-        console.error(error); fetchError.value = true;
-    } finally {
-        isLoading.value = false;
-    }
-});
+  isManifestLoading.value = true
+  try {
+    sensors.value = await fleetStore.fetchManifests()
+  } catch (error) {
+    console.error(error)
+    fetchError.value = true
+  } finally {
+    isManifestLoading.value = false
+  }
+})
 
 const openSensor = (sensor) => {
-    const apiKey = getNodeApiKey()
-    selectedSensor.value = sensor; activeTab.value = 'readme'; envVarValues.value = {};
-    envVarValues.value['HW_SEVERITY'] = 'critical';
-    envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin;
-    envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>';
-    sensor.deployment?.env_vars?.forEach(env => {
-        if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
-            envVarValues.value[env.name] = getUIDefault(env.default);
-        }
-    })
-    document.body.style.overflow = 'hidden';
-    fetchYamlFromHub(); 
+  const apiKey = node.value?.apiKey
+  selectedSensor.value = sensor
+  activeTab.value = 'readme'
+  envVarValues.value = {}
+  envVarValues.value['HW_SEVERITY'] = 'critical'
+  envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin
+  envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
+  sensor.deployment?.env_vars?.forEach(env => {
+    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
+      envVarValues.value[env.name] = getUIDefault(env.default)
+    }
+  })
+  document.body.style.overflow = 'hidden'
+  fetchYamlFromHub()
 }
 
-const closeSensor = () => { selectedSensor.value = null; envVarValues.value = {}; activeEnvVar.value = null; document.body.style.overflow = ''; }
+const closeSensor = () => {
+  selectedSensor.value = null
+  envVarValues.value = {}
+  activeEnvVar.value = null
+  document.body.style.overflow = ''
+}
 
 const fetchYamlFromHub = async () => {
-    if (!selectedSensor.value) return;
-    const apiKey = getNodeApiKey()
-    const safeEnvValues = Object.fromEntries(Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : '']));
-    const payload = {
-        node_id: node.value.id,
-        hub_endpoint: config.hubEndpoint || window.location.origin,
-        hub_key: apiKey || '<YOUR_HW_NODE_KEY>',
-        sensors: [{ sensor_id: selectedSensor.value.id, env_values: safeEnvValues, manifest: selectedSensor.value }]
-    };
-    try {
-        const response = await fetch('/api/v1/compose/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) throw new Error("Failed to compile YAML");
-        rawCompose.value = await response.text();
-        applyHighlighting(); 
-    } catch (e) {
-        console.error(e); rawCompose.value = "services:\n  error:\n    error_generating_yaml"; highlightedCompose.value = rawCompose.value;
-    }
+  if (!selectedSensor.value || !node.value?.id) return
+
+  const apiKey = node.value.apiKey
+  const safeEnvValues = Object.fromEntries(
+    Object.entries(envVarValues.value).map(([k, v]) => [k, v !== undefined && v !== null ? String(v) : ''])
+  )
+
+  try {
+    rawCompose.value = await fleetStore.generateCompose({
+      node_id: node.value.id,
+      hub_endpoint: config.hubEndpoint || window.location.origin,
+      hub_key: apiKey || '<YOUR_HW_NODE_KEY>',
+      sensors: [{
+        sensor_id: selectedSensor.value.id,
+        env_values: safeEnvValues,
+        manifest: selectedSensor.value
+      }]
+    })
+    applyHighlighting()
+  } catch (e) {
+    rawCompose.value = 'services:\n  error:\n    error_generating_yaml'
+    highlightedCompose.value = rawCompose.value
+  }
 }
 
 const applyHighlighting = () => {
-    let htmlYaml = rawCompose.value;
-    if (activeEnvVar.value) {
-        const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm');
-        htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring px-1 rounded transition-colors duration-[var(--duration-fast)] active-highlight">$&</span>`);
+  let htmlYaml = rawCompose.value
+  if (activeEnvVar.value) {
+    const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm')
+    htmlYaml = htmlYaml.replace(regex, `<span class="bg-highlight-bg text-highlight-text ring-1 ring-highlight-ring px-1 rounded transition-colors duration-[var(--duration-fast)] active-highlight">$&</span>`)
+  }
+  highlightedCompose.value = htmlYaml
+  nextTick(() => {
+    if (composePre.value) {
+      const highlightEl = composePre.value.querySelector('.active-highlight')
+      if (highlightEl) {
+        const scrollPos = highlightEl.offsetTop - (composePre.value.clientHeight / 2) + (highlightEl.clientHeight / 2)
+        composePre.value.scrollTo({ top: Math.max(0, scrollPos), behavior: 'smooth' })
+      }
     }
-    highlightedCompose.value = htmlYaml;
-    nextTick(() => {
-        if (composePre.value) {
-            const highlightEl = composePre.value.querySelector('.active-highlight');
-            if (highlightEl) {
-                const scrollPos = highlightEl.offsetTop - (composePre.value.clientHeight / 2) + (highlightEl.clientHeight / 2);
-                composePre.value.scrollTo({ top: Math.max(0, scrollPos), behavior: 'smooth' });
-            }
-        }
-    });
+  })
 }
 </script>
 
@@ -424,7 +339,7 @@ const applyHighlighting = () => {
             </button>
         </div>
 
-        <div class="bg-bg-base border border-border-default rounded-[var(--radius-lg)] p-5 sm:p-6 mb-8 shrink-0 shadow-sm flex flex-col gap-6">
+        <div v-if="node" class="bg-bg-base border border-border-default rounded-[var(--radius-lg)] p-5 sm:p-6 mb-8 shrink-0 shadow-sm flex flex-col gap-6">
             
             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
@@ -582,7 +497,7 @@ const applyHighlighting = () => {
 
         <div class="shrink-0 mb-6">
             <h2 class="text-lg font-semibold text-text-h mb-4">Sensor Catalog</h2>
-            <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div v-if="isManifestLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse"></div>
             </div>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

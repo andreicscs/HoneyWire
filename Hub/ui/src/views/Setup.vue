@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useAppStore } from '../stores/app'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseCard from '../components/ui/layout/BaseCard.vue'
@@ -10,6 +11,8 @@ import ThemeToggle from '../components/ui/branding/ThemeToggle.vue'
 import BaseLogo from '../components/ui/branding/BaseLogo.vue'
 
 const emit = defineEmits(['setup-complete', 'toggle-theme'])
+const appStore = useAppStore()
+
 const password = ref('')
 const confirmPassword = ref('')
 const hubEndpoint = ref('')
@@ -40,22 +43,14 @@ const doSetup = async () => {
     }
     loading.value = true
     error.value = ''
-    try {
-        const res = await fetch('/api/v1/setup', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                password: password.value,
-                hub_endpoint: hubEndpoint.value,
-                hub_key: hubKey.value
-            })
-        })
-        if (res.ok) emit('setup-complete')
-        else error.value = await res.text() || "Setup failed."
-    } catch (err) {
-        error.value = "Network error. Hub unreachable."
-    } finally {
-        loading.value = false
+
+    const result = await appStore.completeSetup(password.value, hubEndpoint.value, hubKey.value)
+
+    loading.value = false
+    if (result.success) {
+        emit('setup-complete')
+    } else {
+        error.value = result.error || "Setup failed."
     }
 }
 </script>

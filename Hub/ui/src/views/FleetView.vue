@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useAppStore } from '../stores/app'
 import { useFleetStore } from '../stores/fleet'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
@@ -18,24 +17,24 @@ onMounted(() => {
     fleetStore.fetchFleet()
 })
 
-// --- DEPLOY MODAL STATE ---
+// --- DEPLOY MODAL STATE (ephemeral UI) ---
 const showDeployModal = ref(false)
-const deployStep = ref(1) 
+const deployStep = ref(1)
 const newNodeForm = ref({ alias: '' })
-const editingTagNodeId = ref(null)
-const newTagValue = ref('')
-const tagInputRefs = ref({}) // Dictionary to hold refs for multiple nodes
 const generatedNodeKey = ref('')
 
-// --- EDIT MODAL STATE ---
+// --- EDIT MODAL STATE (ephemeral UI) ---
 const showEditModal = ref(false)
 const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '', apiKey: '' })
 
-// --- TAGS LOGIC ---
+// --- TAGS LOGIC (ephemeral UI + store delegation) ---
+const editingTagNodeId = ref(null)
+const newTagValue = ref('')
+const tagInputRefs = ref({})
+
 const enableTagEdit = async (nodeId) => {
     editingTagNodeId.value = nodeId
     await nextTick()
-    // Auto-focus the specific input for this node
     if (tagInputRefs.value[nodeId]) {
         tagInputRefs.value[nodeId].focus()
     }
@@ -49,49 +48,36 @@ const cancelTag = () => {
 const saveTag = async (node) => {
     const val = newTagValue.value.trim()
     if (val && !node.tags.includes(val)) {
-        const originalTags = [...node.tags]
-        const newTags = [...node.tags, val]
-        
-        // Optimistic UI Update
-        node.tags = newTags
-        
         try {
             await fleetStore.updateNode(node.id, {
                 alias: node.alias,
-                tags: newTags,
+                tags: [...node.tags, val],
                 publicIp: node.publicIp,
-                privateIp: node.privateIp
+                privateIp: node.privateIp,
             })
         } catch (err) {
-            // Rollback on failure
-            node.tags = originalTags
+            // Store handles rollback
         }
     }
     cancelTag()
 }
 
 const removeTag = async (node, index) => {
-    const originalTags = [...node.tags]
     const newTags = [...node.tags]
     newTags.splice(index, 1)
-    
-    // Optimistic UI Update
-    node.tags = newTags
-    
     try {
         await fleetStore.updateNode(node.id, {
             alias: node.alias,
             tags: newTags,
             publicIp: node.publicIp,
-            privateIp: node.privateIp
+            privateIp: node.privateIp,
         })
     } catch (err) {
-        // Rollback on failure
-        node.tags = originalTags
+        // Store handles rollback
     }
 }
 
-// --- DATA MAPPING ---
+// --- DATA MAPPING (presentation transform — belongs in view) ---
 const displayNodes = computed(() => {
     return fleetStore.nodes.map(node => {
         const sensorsList = node.installedSensors || []
@@ -99,7 +85,6 @@ const displayNodes = computed(() => {
         const totalSensors = sensorsList.length
         const isSilenced = totalSensors > 0 && sensorsList.every(s => s.isSilenced)
 
-        // Grouping for the UI tooltip
         const sensorSummary = totalSensors > 0
             ? [{ type: 'Deployed', count: totalSensors, sensors: sensorsList.map(s => ({ name: s.display || s.name, status: s.status })) }]
             : []
@@ -111,40 +96,30 @@ const displayNodes = computed(() => {
             isSilenced,
             sensorSummary,
             hasUpdate: false,
-            // A node is pending if it has no sensors or has explicitly just been created
             isAwaitingCheckIn: node.status === 'pending' || (!node.lastHeartbeat && totalSensors === 0)
         }
     })
 })
 
-// --- API ACTIONS ---
+// --- ACTIONS (all delegated to store) ---
+
 const handleDeploySubmit = async () => {
     if (!newNodeForm.value.alias) return
 
     try {
-        const response = await fetch('/api/v1/nodes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ alias: newNodeForm.value.alias}),
-        })
-
-        if (!response.ok) throw new Error('Failed to create node')
-
-        const data = await response.json()
-        generatedNodeKey.value = data.apiKey
+        const result = await fleetStore.createNode(newNodeForm.value.alias)
+        generatedNodeKey.value = result.apiKey
         deployStep.value = 2
-        await fleetStore.fetchFleet()
     } catch (err) {
-        console.error('Create node failed:', err)
         alert('Could not create node. Please try again.')
     }
 }
 
 const handleOpenEditNode = (node) => {
-    editNodeForm.value = { 
-        id: node.id, 
-        alias: node.alias, 
-        publicIp: node.publicIp || '', 
+    editNodeForm.value = {
+        id: node.id,
+        alias: node.alias,
+        publicIp: node.publicIp || '',
         privateIp: node.privateIp || '',
         apiKey: node.apiKey || ''
     }
@@ -152,46 +127,25 @@ const handleOpenEditNode = (node) => {
 }
 
 const triggerManualSync = async (node) => {
-    if (!node) return
-    const apiKey = node.apiKey
-    if (!apiKey) {
-        alert('Unable to sync this node because the node API key is missing.')
-        return
-    }
-
+    if (!node?.id) return
     try {
-        const response = await fetch('/api/v1/nodes/compose', {
-            headers: { Authorization: `Bearer ${apiKey}` },
-        })
-        if (!response.ok) {
-            throw new Error(`Sync failed: ${response.status}`)
-        }
-        await fleetStore.fetchFleet()
-        alert('Pending sync request sent successfully. The node compose was generated and pending config has been updated.')
+        await fleetStore.syncNode(node.id)
+        alert('Pending sync request sent successfully.')
     } catch (err) {
-        console.error('Failed to sync node:', err)
         alert('Unable to sync this node. Please try again.')
     }
 }
 
 const handleEditSubmit = async () => {
     try {
-        const response = await fetch(`/api/v1/nodes/${editNodeForm.value.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                alias: editNodeForm.value.alias, 
-                publicIp: editNodeForm.value.publicIp,
-                privateIp: editNodeForm.value.privateIp
-            }),
+        await fleetStore.updateNode(editNodeForm.value.id, {
+            alias: editNodeForm.value.alias,
+            publicIp: editNodeForm.value.publicIp,
+            privateIp: editNodeForm.value.privateIp,
         })
-
-        if (!response.ok) throw new Error('Failed to update node')
-        
         showEditModal.value = false
-        await fleetStore.fetchFleet()
     } catch (err) {
-        console.error('Update node failed:', err)
+        // Store handles rollback
     }
 }
 
@@ -209,10 +163,10 @@ const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
 const handleOpenNodeDetail = (nodeId) => {
     fleetStore.selectTarget(nodeId)
-    appStore.currentView = 'node-detail'
+    appStore.setView('node-detail')
 }
 
-// --- Copy Animation Logic ---
+// --- Copy Animation (ephemeral UI) ---
 const copiedStates = ref({})
 
 const handleCopy = async (id, text) => {
@@ -220,9 +174,7 @@ const handleCopy = async (id, text) => {
     try {
         await navigator.clipboard.writeText(text)
         copiedStates.value[id] = true
-        setTimeout(() => {
-            copiedStates.value[id] = false
-        }, 2000)
+        setTimeout(() => { copiedStates.value[id] = false }, 2000)
     } catch (err) {
         console.error('Failed to copy text', err)
     }

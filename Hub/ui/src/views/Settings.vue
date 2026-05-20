@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useAppStore } from '../stores/app'
 import { useConfig } from '../api/useConfig'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
@@ -11,10 +12,10 @@ import BaseVerticalNav from '../components/ui/navigation/BaseVerticalNav.vue'
 import BaseRadioGroup from '../components/ui/forms/BaseRadioGroup.vue'
 import BaseNumberStepper from '../components/ui/forms/BaseNumberStepper.vue'
 
+const appStore = useAppStore()
 const { config, patchConfig } = useConfig()
 const activeTab = ref('general')
 
-// Left-hand Navigation Data
 const settingTabs = [
     { id: 'general', label: 'Hub Configuration', iconSvg: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>' },
     { id: 'data', label: 'Data Retention', iconSvg: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>' },
@@ -115,6 +116,8 @@ const getSeverityStyle = (sev, isActive) => {
     };
 }
 
+// --- SECURITY MODALS (ephemeral UI + store delegation) ---
+
 const showPasswordModal = ref(false)
 const pwdData = ref({ current: '', new: '', confirmNew: '' })
 const pwdError = ref('')
@@ -136,22 +139,14 @@ const submitPasswordChange = async () => {
     }
     pwdLoading.value = true
     pwdError.value = ''
-    try {
-        const res = await fetch('/api/v1/system/password', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ current_password: pwdData.value.current, new_password: pwdData.value.new })
-        })
-        if (res.ok) window.location.reload()
-        else if (res.status === 401) pwdError.value = "Incorrect current password."
-        else {
-            const err = await res.text()
-            pwdError.value = err || "Failed to update password."
-        }
-    } catch (e) {
-        pwdError.value = "Network error."
-    } finally {
-        pwdLoading.value = false
+
+    const result = await appStore.changePassword(pwdData.value.current, pwdData.value.new)
+
+    pwdLoading.value = false
+    if (result.success) {
+        window.location.reload()
+    } else {
+        pwdError.value = result.error
     }
 }
 
@@ -162,19 +157,14 @@ const submitFactoryReset = async () => {
     }
     resetLoading.value = true
     resetError.value = ''
-    try {
-        const res = await fetch('/api/v1/system/reset', { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: resetPassword.value })
-        })
-        if (res.ok) window.location.reload()
-        else if (res.status === 401) resetError.value = "Incorrect password."
-        else resetError.value = "Factory reset failed."
-    } catch (e) {
-        resetError.value = "Network error."
-    } finally {
-        resetLoading.value = false
+
+    const result = await appStore.factoryReset(resetPassword.value)
+
+    resetLoading.value = false
+    if (result.success) {
+        window.location.reload()
+    } else {
+        resetError.value = result.error
     }
 }
 </script>

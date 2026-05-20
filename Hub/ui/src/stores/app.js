@@ -1,12 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-
-/**
- * App Store (Global UI State)
- * 
- * Manages system-wide UI settings: armed state, theme, archive view, sidebar, and current view.
- * Auth checking is handled in App.vue, not here.
- */
+import { api } from '../api/client'
 
 export const useAppStore = defineStore('app', () => {
   // --- STATE ---
@@ -18,12 +12,13 @@ export const useAppStore = defineStore('app', () => {
   const activeTimeframe = ref('24H')
   const velocityTimeframe = ref('24H')
 
-  // --- ACTIONS ---
+  // Auth/setup state (new, not used by old components)
+  const isAuthenticated = ref(false)
+  const requiresSetup = ref(false)
+  const isInitialized = ref(false)
 
-  /**
-   * Toggle the armed state of the system
-   * Makes a PATCH request to /api/v1/system/state
-   */
+  // --- ACTIONS: UI ---
+
   const toggleArmed = async () => {
     const next = !isArmed.value
     const previous = isArmed.value
@@ -43,9 +38,6 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /**
-   * Toggle between light and dark theme
-   */
   const toggleTheme = () => {
     const html = document.documentElement
     if (html.classList.contains('dark')) {
@@ -57,10 +49,26 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /**
-   * Logout and redirect to login page
-   * Makes a POST request to /logout
-   */
+  const toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value }
+  const setView = (view) => { currentView.value = view }
+  const toggleArchive = () => { viewingArchive.value = !viewingArchive.value }
+
+  // --- ACTIONS: AUTH ---
+
+  const login = async (password) => {
+    try {
+      await api.post('/login', { password })
+      // Do NOT set isAuthenticated here.
+      // App.vue controls when to reveal the authenticated shell
+      // (after loadAppData completes), so the Login component
+      // stays mounted long enough to emit 'login-success'.
+      return { success: true }
+    } catch (err) {
+      isAuthenticated.value = false
+      return { success: false, status: err.status || 0 }
+    }
+  }
+
   const logout = async () => {
     try {
       await fetch('/logout', { method: 'POST' })
@@ -70,9 +78,58 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  /**
-   * Fetch system version and state from backend (called during init)
-   */
+  // --- ACTIONS: SETUP ---
+
+  const completeSetup = async (password, hubEndpoint, hubKey) => {
+    try {
+      await api.post('/api/v1/setup', {
+        password,
+        hub_endpoint: hubEndpoint,
+        hub_key: hubKey,
+      })
+      requiresSetup.value = false
+      isAuthenticated.value = true
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: err.message }
+    }
+  }
+
+  // --- ACTIONS: SECURITY ---
+
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      await api.patch('/api/v1/system/password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      })
+      return { success: true }
+    } catch (err) {
+      if (err.status === 401) {
+        return { success: false, error: 'Incorrect current password.' }
+      }
+      return { success: false, error: err.message || 'Failed to update password.' }
+    }
+  }
+
+  const factoryReset = async (password) => {
+    try {
+      await api.request('/api/v1/system/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      return { success: true }
+    } catch (err) {
+      if (err.status === 401) {
+        return { success: false, error: 'Incorrect password.' }
+      }
+      return { success: false, error: err.message || 'Factory reset failed.' }
+    }
+  }
+
+  // --- ACTIONS: BOOTSTRAP ---
+
   const checkSetupStatus = async () => {
     try {
       const [stateRes, verRes] = await Promise.all([
@@ -87,8 +144,28 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  const checkSystemState = async () => {
+    try {
+      await api.get('/api/v1/system/state')
+      return true
+    } catch (e) {
+      return false
+    }
+  }
+
+  const checkRequiresSetup = async () => {
+    try {
+      const res = await api.get('/api/v1/setup/status')
+      const data = await res.json()
+      return data.requires_setup || false
+    } catch (e) {
+      console.error('Failed to check setup status:', e)
+      return false
+    }
+  }
+
   return {
-    // State
+    // State — ALL original properties preserved
     isArmed,
     version,
     viewingArchive,
@@ -96,10 +173,33 @@ export const useAppStore = defineStore('app', () => {
     currentView,
     activeTimeframe,
     velocityTimeframe,
-    // Actions
+
+    // Auth/setup state (new)
+    isAuthenticated,
+    requiresSetup,
+    isInitialized,
+
+    // Actions: UI (original signatures preserved)
     toggleArmed,
     toggleTheme,
+    toggleSidebar,
+    setView,
+    toggleArchive,
+
+    // Actions: auth (new)
+    login,
     logout,
+
+    // Actions: setup (new)
+    completeSetup,
+
+    // Actions: security (new)
+    changePassword,
+    factoryReset,
+
+    // Actions: bootstrap (original + new)
     checkSetupStatus,
+    checkSystemState,
+    checkRequiresSetup,
   }
 })

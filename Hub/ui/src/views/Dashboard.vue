@@ -16,37 +16,21 @@ const currentHost = ref(window.location.host)
 
 const generateToken = async () => {
     const alias = window.prompt('Enter a friendly alias for the new node', `New Node ${Date.now()}`)
-    if (!alias) {
-        return
-    }
+    if (!alias) return
 
     isGeneratingToken.value = true
     try {
-        const response = await fetch('/api/v1/nodes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ alias, tags: [] }),
-        })
-
-        if (!response.ok) {
-            const errText = await response.text()
-            throw new Error(errText || 'Failed to create node')
-        }
-
-        const data = await response.json()
-        provisionToken.value = data.api_key
-        provisionNodeId.value = data.node_id
+        const result = await fleetStore.createNode(alias)
+        provisionToken.value = result.apiKey
+        provisionNodeId.value = result.nodeId
         showProvisionModal.value = true
-        fleetStore.fetchFleet()
     } catch (err) {
-        console.error('Create node error:', err)
         alert('Failed to create node. Please try again.')
     } finally {
         isGeneratingToken.value = false
     }
 }
 
-// Added Quick-Copy functionality for the provision command
 const copyCommand = () => {
     const cmd = `./wizard --link http://${currentHost.value} ${provisionToken.value}`
     navigator.clipboard.writeText(cmd)

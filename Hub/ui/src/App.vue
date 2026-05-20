@@ -1,8 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
-// Components
 import Sidebar from './components/layout/Sidebar.vue'
 import Header from './components/layout/Header.vue'
 import Dashboard from './views/Dashboard.vue'
@@ -13,14 +12,11 @@ import Store from './views/Store.vue'
 import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
 
-
-
-// Services & Stores
 import { useConfig } from './api/useConfig'
 import { useAppStore } from './stores/app'
 import { useFleetStore } from './stores/fleet'
 import { useEventsStore } from './stores/events'
-import { HoneyWireWS } from './services/ws' 
+import { HoneyWireWS } from './services/ws'
 
 const { fetchConfig } = useConfig()
 const appStore = useAppStore()
@@ -29,7 +25,7 @@ const eventsStore = useEventsStore()
 
 const { currentView, viewingArchive } = storeToRefs(appStore)
 
-watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor], 
+watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor],
   ([isArchived, node, sensor]) => {
     eventsStore.fetchEvents(isArchived, node, sensor)
 })
@@ -38,111 +34,123 @@ watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
     fleetStore.fetchUptime(newTimeframe)
 })
 
-const requiresSetup = ref(false)
-const isAuthenticated = ref(false)
-
 const wsService = new HoneyWireWS()
 
-const checkAuthAndInit = async () => {
-    // ----------------------------------------------------
-    // TODO DEBUG OVERRIDE: 
-    // Access http://localhost:8080/?debug=setup to force UI rendering
-    // ----------------------------------------------------
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('debug') === 'setup') {
-        requiresSetup.value = true;
-        isAuthenticated.value = false;
-        return;
-    }
+const loadAppData = async () => {
+  try {
+    await fetchConfig()
+    await appStore.checkSetupStatus()
 
-    try {
-        const setupRes = await fetch('/api/v1/setup/status')
-        if (setupRes.ok) {
-            const setupData = await setupRes.json()
-            if (setupData.requires_setup) {
-                requiresSetup.value = true
-                isAuthenticated.value = false
-                return
-            }
-        }
-        
-        requiresSetup.value = false
+    await Promise.all([
+      fleetStore.fetchFleet(),
+      fleetStore.fetchUptime(fleetStore.activeTimeframe),
+      eventsStore.fetchEvents(),
+    ])
 
-        const res = await fetch('/api/v1/system/state')
-        if (res.ok) {
-            isAuthenticated.value = true
-            await fetchConfig() 
-            
-            await Promise.all([
-                fleetStore.fetchFleet(),
-                fleetStore.fetchUptime(fleetStore.activeTimeframe),
-                eventsStore.fetchEvents()
-            ])
+    wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
+    wsService.on('onNewSensor', (payload) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
+    wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
+    wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
+    wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
+    wsService.on('onNewNode', (payload) => fleetStore.handleWsUpdate('NEW_NODE', payload))
+    wsService.on('onUpdateNode', (payload) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
+    wsService.on('onDeleteNode', (payload) => fleetStore.handleWsUpdate('DELETE_NODE', payload))
+    wsService.on('onNodeSynced', (payload) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
 
-            wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
-            wsService.on('onNewSensor', (payload) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
-            wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
-            wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
-            wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
-            
-            // SMART RECOVERY: Only fetch data if the socket drops and reconnects
-            wsService.on('onReconnect', async () => {
-                console.log("WebSocket Reconnected: Syncing missed data...")
-                await Promise.all([
-                    fleetStore.fetchFleet(),
-                    fleetStore.fetchUptime(fleetStore.activeTimeframe),
-                    eventsStore.fetchEvents()
-                ])
-            })
+    wsService.on('onReconnect', async () => {
+      console.log("WebSocket Reconnected: Syncing missed data...")
+      await Promise.all([
+        fleetStore.fetchFleet(),
+        fleetStore.fetchUptime(fleetStore.activeTimeframe),
+        eventsStore.fetchEvents(),
+      ])
+    })
 
-            wsService.on('onSyncCharts', () => {
-                fleetStore.fetchUptime(fleetStore.activeTimeframe)
-            })
+    wsService.on('onSyncCharts', () => {
+      fleetStore.fetchUptime(fleetStore.activeTimeframe)
+    })
 
-            wsService.connect()
+    wsService.connect()
 
-        } else {
-            isAuthenticated.value = false
-        }
-    } catch (e) {
-        console.error("Hub connection error:", e)
-        isAuthenticated.value = false
-    }
+    appStore.isAuthenticated = true
+    appStore.isInitialized = true
+
+  } catch (e) {
+    console.error("Failed to load application data:", e)
+    appStore.isAuthenticated = true
+    appStore.isInitialized = true
+  }
 }
-  
-const toggleTheme = () => {
-    const html = document.documentElement
-    if (html.classList.contains('dark')) {
-        html.classList.remove('dark')
-        localStorage.setItem('theme', 'light')
-    } else {
-        html.classList.add('dark')
-        localStorage.setItem('theme', 'dark')
+
+const checkAuthAndInit = async () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('debug') === 'setup') {
+    appStore.requiresSetup = true
+    appStore.isAuthenticated = false
+    return
+  }
+
+  try {
+    const needsSetup = await appStore.checkRequiresSetup()
+    if (needsSetup) {
+      appStore.requiresSetup = true
+      appStore.isAuthenticated = false
+      return
     }
+
+    appStore.requiresSetup = false
+
+    const authenticated = await appStore.checkSystemState()
+    if (!authenticated) {
+      appStore.isAuthenticated = false
+      return
+    }
+
+    await loadAppData()
+
+  } catch (e) {
+    console.error("Hub connection error:", e)
+    appStore.isAuthenticated = false
+  }
+}
+
+const onLoginSuccess = async () => {
+  appStore.requiresSetup = false
+  await loadAppData()
+}
+
+const onSetupComplete = async () => {
+  appStore.requiresSetup = false
+  await loadAppData()
+}
+
+const toggleTheme = () => {
+  const html = document.documentElement
+  if (html.classList.contains('dark')) {
+    html.classList.remove('dark')
+    localStorage.setItem('theme', 'light')
+  } else {
+    html.classList.add('dark')
+    localStorage.setItem('theme', 'dark')
+  }
 }
 
 onMounted(() => {
-    checkAuthAndInit()
+  checkAuthAndInit()
 })
 
 onUnmounted(() => {
-    wsService.disconnect()
+  wsService.disconnect()
 })
 </script>
 
-<script>
-if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-    document.documentElement.classList.add('dark')
-}
-</script>
-
 <template>
-  <div v-if="requiresSetup" class="h-screen bg-bg">
-    <Setup @setup-complete="checkAuthAndInit" @toggle-theme="toggleTheme" />
+  <div v-if="appStore.requiresSetup" class="h-screen bg-bg">
+    <Setup @setup-complete="onSetupComplete" @toggle-theme="toggleTheme" />
   </div>
-  
-  <div v-else-if="!isAuthenticated" class="h-screen bg-bg">
-    <Login @login-success="checkAuthAndInit" @toggle-theme="toggleTheme" /> 
+
+  <div v-else-if="!appStore.isAuthenticated" class="h-screen bg-bg">
+    <Login @login-success="onLoginSuccess" @toggle-theme="toggleTheme" />
   </div>
 
   <div v-else class="flex h-screen overflow-hidden bg-bg text-text-h transition-colors duration-200">

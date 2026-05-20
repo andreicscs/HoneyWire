@@ -30,6 +30,10 @@ export class HoneyWireWS {
       onSilenceSensor: null,
       onReconnect: null,
       onSyncCharts: null,
+      onNewNode: null,
+      onUpdateNode: null,
+      onDeleteNode: null,
+      onNodeSynced: null,
     }
   }
 
@@ -136,6 +140,28 @@ export class HoneyWireWS {
         case 'SILENCE_SENSOR':
           if (this.callbacks.onSilenceSensor) {
             this.callbacks.onSilenceSensor(data.payload)
+          }
+          break
+        case 'NEW_NODE':
+          if (this.callbacks.onNewNode) {
+            this.callbacks.onNewNode(data.payload)
+          }
+          break
+
+        case 'UPDATE_NODE':
+          if (this.callbacks.onUpdateNode) {
+            this.callbacks.onUpdateNode(data.payload)
+          }
+          break
+
+        case 'DELETE_NODE':
+          if (this.callbacks.onDeleteNode) {
+            this.callbacks.onDeleteNode(data.payload)
+          }
+          break
+        case 'NODE_SYNCED':
+          if (this.callbacks.onNodeSynced) {
+            this.callbacks.onNodeSynced(data.payload)
           }
           break
 
