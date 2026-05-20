@@ -90,9 +90,11 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 
 	// --- Wizard & Telemetry Endpoints ---
 	// Authentication is handled via API Key (Bearer Token) inside the handler
+	r.Get("/api/v1/nodes/me", h.GetCurrentNode) // node whoami based on api key.
 	r.Get("/api/v1/nodes/compose", h.GetNodeCompose) // aggreagates all generated compose files for a node's sensors
 	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
 	r.Post("/api/v1/event", h.ReceiveEvent)
+	
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

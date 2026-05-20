@@ -1,6 +1,6 @@
 package scanner
 
-import "github.com/honeywire/wizard/pkg/state"
+import "github.com/honeywire/wizard/internal/system"
 
 // Service represents a correlated process-port binding on the host.
 type Service struct {
@@ -18,7 +18,7 @@ type HostState struct {
 // Implementations should be read-only and not modify host state.
 // systemState allows filtering out already-deployed sensors to prevent rescanning own services.
 type Scanner interface {
-	Scan(systemState *state.SystemState) (*HostState, error)
+	Scan(systemState *system.SystemState) (*HostState, error)
 }
 
 // MockScanner simulates discovering correlated services.
@@ -41,7 +41,7 @@ func NewMockScanner() *MockScanner {
 
 // Scan returns the simulated host state.
 // systemState is used to filter out already-managed services.
-func (m *MockScanner) Scan(systemState *state.SystemState) (*HostState, error) {
+func (m *MockScanner) Scan(systemState *system.SystemState) (*HostState, error) {
 	if systemState == nil {
 		return m.hostState, nil
 	}

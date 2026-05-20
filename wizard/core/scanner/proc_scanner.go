@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/honeywire/wizard/pkg/state"
+	"github.com/honeywire/wizard/internal/system"
 )
 
 // ProcScanner implements the Scanner interface by reading from /proc.
@@ -58,7 +58,7 @@ func NewProcScanner() *ProcScanner {
 
 // Scan reads /proc to discover correlated processes and ports.
 // systemState is used to filter out already-managed services and ports.
-func (p *ProcScanner) Scan(systemState *state.SystemState) (*HostState, error) {
+func (p *ProcScanner) Scan(systemState *system.SystemState) (*HostState, error) {
 	// Build a set of managed ports to skip
 	managedPortMap := make(map[int]bool)
 	if systemState != nil {

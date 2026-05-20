@@ -208,3 +208,39 @@ func (h *Handler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
+
+
+// GetCurrentNode handles GET /api/v1/nodes/me
+// Used by wizard agents authenticated via Bearer token
+func (h *Handler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
+
+	// Authenticate via Bearer token
+	nodeID, err := h.authenticateNodeRequest(r)
+
+	if err != nil {
+		RespondError(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch full node details
+	node, err := h.Store.GetNodeDetails(nodeID)
+
+	if err != nil {
+		RespondError(w, "Node not found", http.StatusNotFound)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, map[string]interface{}{
+		"id":               node.ID,
+		"alias":            node.Alias,
+		"activeRevision":   node.ActiveRevision,
+		"desiredRevision":  node.DesiredRevision,
+		"publicIp":         node.PublicIP,
+		"privateIp":        node.PrivateIP,
+		"tags":             node.Tags,
+		"hasPendingConfig": node.HasPendingConfig,
+		"lastHeartbeat":    node.LastHeartbeat,
+		"status":           node.Status,
+		"installedSensors": node.InstalledSensors,
+	})
+}

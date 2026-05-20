@@ -1,12 +1,11 @@
-package autodiscovery
+package discovery
 
 import (
-	"github.com/honeywire/wizard/pkg/scanner"
-	"github.com/honeywire/wizard/pkg/schema"
-	"github.com/honeywire/wizard/pkg/state"
+	"github.com/honeywire/wizard/core/scanner"
+	"github.com/honeywire/wizard/core/schema"
+	"github.com/honeywire/wizard/internal/system"
 )
 
-// MatchedService represents a service that matched a sensor's heuristics.
 type MatchedService struct {
 	ProcessName string
 	Port        int
@@ -20,7 +19,7 @@ type Recommendation struct {
 	Reason             string
 	MatchedServices    []MatchedService // Correlated process-port bindings
 	DeploymentTemplate *schema.Deployment
-	Manifest           *schema.SensorManifest // ADD THIS LINE!
+	Manifest           *schema.SensorManifest
 }
 
 // Engine performs matching between host state and sensor manifests.
@@ -28,7 +27,7 @@ type Engine struct {
 	manifests []*schema.SensorManifest
 }
 
-// NewEngine creates a new autodiscovery engine.
+// NewEngine creates a new discovery engine.
 func NewEngine(manifests []*schema.SensorManifest) *Engine {
 	return &Engine{
 		manifests: manifests,
@@ -38,7 +37,7 @@ func NewEngine(manifests []*schema.SensorManifest) *Engine {
 // GetRecommendations analyzes the host state and returns matching sensor recommendations.
 // Uses correlated discovery: a trigger requires both process AND port (if both specified).
 // systemState is used to filter out already-deployed sensors (idempotency).
-func (e *Engine) GetRecommendations(hostState *scanner.HostState, systemState *state.SystemState) []*Recommendation {
+func (e *Engine) GetRecommendations(hostState *scanner.HostState, systemState *system.SystemState) []*Recommendation {
 	var recommendations []*Recommendation
 
 	// Build deployed image set for idempotency checks
@@ -70,7 +69,7 @@ func (e *Engine) GetRecommendations(hostState *scanner.HostState, systemState *s
 				Reason:             manifest.Heuristics.RecommendationReason,
 				MatchedServices:    []MatchedService{}, // No specific services matched
 				DeploymentTemplate: &manifest.Deployment,
-				Manifest: manifest,
+				Manifest:           manifest,
 			}
 			recommendations = append(recommendations, rec)
 			continue
@@ -95,7 +94,7 @@ func (e *Engine) GetRecommendations(hostState *scanner.HostState, systemState *s
 				Reason:             manifest.Heuristics.RecommendationReason,
 				MatchedServices:    matchedServices,
 				DeploymentTemplate: &manifest.Deployment,
-				Manifest: manifest,
+				Manifest:           manifest,
 			}
 			recommendations = append(recommendations, rec)
 		}
