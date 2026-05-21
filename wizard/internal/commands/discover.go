@@ -31,7 +31,7 @@ var hubInjectedVars = map[string]bool{
 	"HW_TEST_MODE":    true,
 }
 
-func HandleDiscover(registry string, force bool) error {
+func HandleDiscover(force bool) error {
 	app, err := loadApp()
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func HandleDiscover(registry string, force bool) error {
 		return err
 	}
 
-	recommendations, err := buildStrategy(hostState, systemState, dockerMap, registry, app.Config, app.Random())
+	recommendations, err := buildStrategy(hostState, systemState, dockerMap, app.Config, app.Random())
 	if err != nil {
 		return err
 	}
@@ -253,11 +253,11 @@ func auditEnvironment() (*scanner.HostState, map[int]string, *system.SystemState
 	return hostState, dockerMap, systemState, nil
 }
 
-func buildStrategy(hostState *scanner.HostState, systemState *system.SystemState, dockerMap map[int]string, registry string, nodeConfig *app.NodeConfig, rng *rand.Rand) ([]*discovery.Recommendation, error) {
+func buildStrategy(hostState *scanner.HostState, systemState *system.SystemState, dockerMap map[int]string, nodeConfig *app.NodeConfig, rng *rand.Rand) ([]*discovery.Recommendation, error) {
 	fmt.Printf("\n%s[*] Step 3/3: Formulating Deception Strategy...%s\n", cli.Bold, cli.Reset)
 
 	// Force the Wizard to pull the manifest directly from the Hub.
-	registry = fmt.Sprintf("%s/api/v1/manifests?key=%s", strings.TrimRight(nodeConfig.HubURL, "/"), nodeConfig.APIKey)
+	registry := fmt.Sprintf("%s/api/v1/manifests?key=%s", strings.TrimRight(nodeConfig.HubURL, "/"), nodeConfig.APIKey)
 
 	manifests, apiErr := api.FetchManifests(registry)
 	if apiErr != nil {

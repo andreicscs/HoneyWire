@@ -211,7 +211,7 @@
         {
           "name": "decoy-provisioner",
           "image": "ghcr.io/andreicscs/honeywire-filecanary:latest",
-          "command": "/app/filecanary init",
+          "command": "/app/file-canary init",
           "user": "0:0",
           "cap_drop": [
             "ALL"

@@ -108,7 +108,7 @@ type LoggingConfig struct {
 // MANIFEST FETCHING
 // -----------------------------------------------------------------------------
 
-func fetchCatalogManifests() ([]map[string]interface{}, error) {
+func fetchManifestBytes() ([]byte, error) {
 	manifestURL := os.Getenv("HW_MANIFEST_URL")
 
 	if manifestURL == "" {
@@ -125,7 +125,11 @@ func fetchCatalogManifests() ([]map[string]interface{}, error) {
 		return nil, fmt.Errorf("manifest registry returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
+}
+
+func fetchCatalogManifests() ([]map[string]interface{}, error) {
+	body, err := fetchManifestBytes()
 	if err != nil {
 		return nil, err
 	}

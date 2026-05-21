@@ -2,10 +2,8 @@ package api
 
 import (
 	"encoding/json"
-	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -170,24 +168,13 @@ func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	manifestURL := os.Getenv("HW_MANIFEST_URL")
-	if manifestURL == "" {
-		manifestURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
-	}
-
-	resp, err := http.Get(manifestURL)
+	body, err := fetchManifestBytes()
 	if err != nil {
 		RespondError(w, "Failed to reach manifest registry", http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		RespondError(w, "Manifest registry returned an error", http.StatusBadGateway)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = io.Copy(w, resp.Body)
+	w.Write(body)
 }

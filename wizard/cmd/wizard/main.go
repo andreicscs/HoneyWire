@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/honeywire/wizard/core/api"
 	"github.com/honeywire/wizard/internal/cli"
 	"github.com/honeywire/wizard/internal/commands"
 	"github.com/honeywire/wizard/internal/system"
@@ -23,7 +22,6 @@ func run() error {
 
 	uninstallPtr := flag.Bool("uninstall", false, "Tear down and remove all managed sensors from this node")
 	forcePtr := flag.Bool("force", false, "Bypass confirmation prompts (useful for automation)")
-	registryPtr := flag.String("registry", api.DefaultRegistryURL, "URL or local path to manifests.json")
 	linkURL := flag.String("link", "", "Hub URL to link to (e.g., https://hub.honeywire.local)")
 	apiKeyPtr := flag.String("api-key", "", "Node API key (for linking to an existing node)")
 	aliasPtr := flag.String("alias", "", "Custom alias for this node (defaults to OS hostname)")
@@ -40,19 +38,19 @@ func run() error {
 	}
 
 	if *linkURL != "" {
-		return commands.HandleLink(*linkURL, *apiKeyPtr, *aliasPtr, *tagsPtr, *registryPtr, *forcePtr)
+		return commands.HandleLink(*linkURL, *apiKeyPtr, *aliasPtr, *tagsPtr, *forcePtr)
 	}
 
 	args := flag.Args()
 	if len(args) == 0 {
-		return commands.HandleInteractiveMenu(*registryPtr, *forcePtr)
+		return commands.HandleInteractiveMenu(*forcePtr)
 	}
 
 	switch args[0] {
 	case "apply":
 		return commands.HandleApply()
 	case "discover":
-		return commands.HandleDiscover(*registryPtr, *forcePtr)
+		return commands.HandleDiscover(*forcePtr)
 	case "status":
 		return commands.HandleStatus()
 	case "relink":

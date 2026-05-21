@@ -7,7 +7,7 @@ import (
 	"github.com/honeywire/wizard/internal/cli"
 )
 
-func HandleLink(hubURL, apiKey, alias, tags, registry string, force bool) error {
+func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 	if apiKey != "" {
 		if err := linkExistingNode(hubURL, apiKey); err != nil {
 			return err
@@ -24,14 +24,14 @@ func HandleLink(hubURL, apiKey, alias, tags, registry string, force bool) error 
 	}
 
 	if cli.ConfirmAction("Run host discovery now") {
-		return HandleDiscover(registry, force)
+		return HandleDiscover(force)
 	}
 
 	fmt.Printf("\n    %sRun 'wizard discover' when ready.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
 
-func HandleInteractiveMenu(registry string, force bool) error {
+func HandleInteractiveMenu(force bool) error {
 	app, err := loadApp()
 	if err != nil {
 		return cli.ShowOnboarding()
@@ -74,7 +74,7 @@ func HandleInteractiveMenu(registry string, force bool) error {
 	case "1":
 		return HandleApply()
 	case "2":
-		return HandleDiscover(registry, force)
+		return HandleDiscover(force)
 	case "3":
 		return HandleStatus()
 	case "4":

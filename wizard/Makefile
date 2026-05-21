@@ -40,7 +40,7 @@ define deploy_target
 		chmod +x /root/wizard && \
 		rm -f /etc/honeywire/config.json && \
 		HW_DASHBOARD_PASSWORD="$(HUB_PASSWORD)" \
-		/root/wizard --link $(HUB_URL) --registry /root/manifests.json \
+		/root/wizard --link $(HUB_URL) \
 	'
 endef
 

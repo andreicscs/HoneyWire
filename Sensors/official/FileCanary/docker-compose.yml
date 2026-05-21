@@ -2,7 +2,7 @@ services:
   # 1. THE DECOY PROVISIONER: Safely creates missing files explicitly avoiding symlinks and directories.
   decoy-provisioner:
     image: ghcr.io/andreicscs/honeywire-filecanary:latest
-    command: /app/sensor init
+    command: /app/file-canary init
     user: "0:0"
     environment:
       - HW_DECOY_FILES=${HW_DECOY_FILES}
