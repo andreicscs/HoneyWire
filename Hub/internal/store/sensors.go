@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -48,16 +49,40 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, 
 
 	justSynced := false
 	if err == nil && pendingConfig == 1 {
-		if desiredRevision.Valid && desiredRevision.String == agentRevision {
-			if _, err := tx.Exec(`UPDATE nodes SET active_revision = ?, desired_revision = NULL, pending_config = 0 WHERE id = ?`, desiredRevision.String, nodeID); err != nil {
-				return false, err
+		targetRevision := ""
+		if desiredRevision.Valid {
+			targetRevision = desiredRevision.String
+		}
+
+		if targetRevision != "" && targetRevision == agentRevision {
+			rows, err := tx.Query("SELECT metadata FROM node_sensors WHERE node_id = ?", nodeID)
+			if err == nil {
+				allMatched := true
+				for rows.Next() {
+					var metaStr string
+					if err := rows.Scan(&metaStr); err != nil {
+						allMatched = false
+						break
+					}
+					var meta map[string]interface{}
+					if err := json.Unmarshal([]byte(metaStr), &meta); err != nil {
+						allMatched = false
+						break
+					}
+					if rev, ok := meta["HW_CONFIG_REV"].(string); !ok || rev != targetRevision {
+						allMatched = false
+						break
+					}
+				}
+				rows.Close()
+
+				if allMatched {
+					if _, err := tx.Exec(`UPDATE nodes SET active_revision = ?, desired_revision = NULL, pending_config = 0 WHERE id = ?`, targetRevision, nodeID); err != nil {
+						return false, err
+					}
+					justSynced = true
+				}
 			}
-			justSynced = true
-		} else if !desiredRevision.Valid && activeRevision.Valid && activeRevision.String == agentRevision {
-			if _, err := tx.Exec(`UPDATE nodes SET pending_config = 0 WHERE id = ?`, nodeID); err != nil {
-				return false, err
-			}
-			justSynced = true
 		}
 	}
 

@@ -327,6 +327,34 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
+  const updateSensor = async (nodeId, sensorId, { customName, configValues }) => {
+    const node = getNode(nodeId)
+    if (!node) return
+
+    const sensor = getSensor(nodeId, sensorId)
+    if (!sensor) return
+
+    const previous = { ...sensor }
+    const previousPending = node.hasPendingConfig
+
+    sensor.display = customName || sensorId
+    sensor.envVars = configValues
+    node.hasPendingConfig = true
+
+    try {
+      await api.put(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(sensorId)}`, {
+        custom_name: customName || sensorId,
+        config_values: configValues,
+      })
+      fetchNodeDetails(nodeId)
+    } catch (err) {
+      mergeSensor(sensor, previous)
+      node.hasPendingConfig = previousPending
+      console.error('Failed to update sensor:', err)
+      throw err
+    }
+  }
+
   const removeSensor = async (nodeId, sensorId) => {
     if (!confirm('Remove this sensor? The node will be marked for deployment sync.')) return
 
@@ -531,7 +559,7 @@ export const useFleetStore = defineStore('fleet', () => {
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
     selectTarget, clearSelection,
     createNode, deleteNode, updateNode,
-    addSensor, removeSensor, toggleSilence, silenceNode,
+    addSensor, updateSensor, removeSensor, toggleSilence, silenceNode,
     fetchCompose, generateCompose, syncNode,
     handleWsUpdate,
     normalizeSensor, normalizeNode,

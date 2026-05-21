@@ -7,9 +7,10 @@ import BaseWidget from '../ui/layout/BaseWidget.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
+import { formatSensorId } from '../../utils/formatSensorId'
+
 
 const fleetStore = useFleetStore()
-// V2 ALIGNMENT: Swapped 'sensors: fleet' to 'nodes: fleet'
 const { nodes: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
@@ -17,10 +18,15 @@ const canScrollDown = ref(false)
 const worstWarningBelow = ref(null)
 
 const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
-// V2 ALIGNMENT: Updated action name from forgetSensor to deleteSensor
 const handleForget = (nodeId, sensorId) => fleetStore.deleteSensor(nodeId, sensorId)
 
-// Helper to flag rows that have warnings
+// Resolve node_id → alias for display
+const getNodeAlias = (nodeId) => {
+    if (!nodeId || nodeId === 'unassigned') return 'Unassigned'
+    const node = fleet.value.find(n => n.id === nodeId)
+    return node?.alias || nodeId
+}
+
 const getWorstStatus = (sensor) => {
     if (sensor.blocks.some(b => b.status === 'down')) return 'down'
     if (sensor.blocks.some(b => b.status === 'degraded')) return 'degraded'
@@ -31,11 +37,9 @@ const checkScroll = () => {
     if (!scrollArea.value) return
     const container = scrollArea.value
     
-    // 1. Basic scroll check
     const currentBottom = Math.ceil(container.scrollTop + container.clientHeight)
     canScrollDown.value = currentBottom < (container.scrollHeight - 15)
 
-    // 2. DOM-Aware Warning Check
     let worstStatus = null
     const warningNodes = container.querySelectorAll('.has-warnings')
 
@@ -45,12 +49,11 @@ const checkScroll = () => {
         for (let i = 0; i < warningNodes.length; i++) {
             const nodeRect = warningNodes[i].getBoundingClientRect()
             
-            // If the top of the warning row is below the bottom of the visible container
             if (nodeRect.top > containerRect.bottom - 10) { 
                 const status = warningNodes[i].getAttribute('data-worst-status')
                 if (status === 'down') {
                     worstStatus = 'down'
-                    break // 'down' is the worst, stop checking
+                    break
                 } else if (status === 'degraded') {
                     worstStatus = 'degraded'
                 }
@@ -65,12 +68,10 @@ const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
 }
 
-// V2 ALIGNMENT: Search through the parent node -> installedSensors
 const isSilenced = (nodeId, sensorId) => {
     const node = fleet.value.find(n => n.id === nodeId)
     if (!node || !node.installedSensors) return false
     const sensor = node.installedSensors.find(s => s.id === sensorId || s.name === sensorId)
-    // Note: V2 uses camelCase 'isSilenced' in the UI model mapping
     return sensor ? !!sensor.isSilenced : false
 }
 
@@ -160,7 +161,7 @@ const legendItems = [
                                             
                         <span class="text-sm font-semibold text-text-l transition-colors duration-[var(--duration-fast)]"
                               :class="group.nodeId !== 'unassigned' ? 'group-hover/header:text-text-h' : ''">
-                            {{ group.nodeId !== 'unassigned' ? group.nodeId : 'Unassigned Sensors' }}
+                            {{ getNodeAlias(group.nodeId) }}
                         </span>
                         
                         <div class="h-px flex-1 bg-border-default transition-colors duration-[var(--duration-fast)] group-hover/header:bg-text-m"></div>
@@ -205,8 +206,8 @@ const legendItems = [
                             <button @click="fleetStore.selectTarget(sensor.node_id, sensor.id)"
                                 class="font-mono text-left transition-colors cursor-pointer rounded flex items-center gap-1.5 max-w-[calc(100%-28px)] text-sm"
                                 :class="selectedSensor === sensor.id && selectedNode === sensor.node_id ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
-                                :title="`Node: ${sensor.node_id || 'Unassigned'}`">
-                                <span class="truncate">{{ sensor.name }}</span>
+                                :title="`Node: ${getNodeAlias(sensor.node_id)}`">
+                                <span class="truncate">{{ formatSensorId(sensor.name) }}</span>
                                 
                                 <svg v-show="isSilenced(sensor.node_id, sensor.id)" class="w-3 h-3 shrink-0 text-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>

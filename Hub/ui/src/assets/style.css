@@ -44,11 +44,11 @@
   --sev-low: oklch(60% 0.15 250);
   --sev-info: oklch(55% 0.02 250);
 
-  --danger-main: oklch(64.379% 0.21643 25.707);
-  --danger-hover: oklch(65.385% 0.16476 13.619);
+  --danger-main: oklch(65% 0.2 25);
+  --danger-hover: oklch(68% 0.15 25);
   --danger-bg: oklch(90% 0.05 20);
   --danger-text: oklch(25% 0.1 20);
-  --danger-border: oklch(80% 0.1 20);
+  --danger-border: oklch(70% 0.1 20);
 
   --archive-text: oklch(35% 0.1 85);
   --archive-bg: oklch(90% 0.08 85);

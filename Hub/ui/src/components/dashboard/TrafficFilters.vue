@@ -98,7 +98,7 @@ onMounted(() => nextTick(checkScroll))
                                 
                                 ['down', 'degraded'].includes(n.status) ? 'has-warnings' : '',
                                 
-                                (selectedNode && selectedNode !== n.node_id) ? 'opacity-50' : ''
+                                (selectedNode && selectedNode !== n.node_id) ? 'opacity-70' : ''
                             ]">
                              
                             <div @click="fleetStore.selectTarget(n.node_id, null)" class="flex items-center gap-2 pl-2.5 py-1 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">

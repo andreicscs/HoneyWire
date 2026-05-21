@@ -101,7 +101,8 @@ class HoneyWireSensor(ABC):
 
     def report_event(self, event_trigger: str, severity: str, source: str = "Unknown", target: str = "Unknown", details: dict = None) -> bool:
         if details is None: details = {}
-        normalized_severity = self._normalize_severity(severity)
+        # Ignore hardcoded severity argument, use configured HW_SEVERITY
+        normalized_severity = self._normalize_severity(self.severity)
         
         payload = {
             "contract_version": self._hub_contract_version,

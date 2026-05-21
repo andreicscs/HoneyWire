@@ -1,13 +1,15 @@
 package api
 
 import (
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/honeywire/hub/internal/models"
 )
 
 // CreateNode handles UI-first node creation
@@ -151,6 +153,8 @@ func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.evaluateNodeSyncState(nodeID)
+
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Sensor added, node pending sync"})
 }
 
@@ -174,6 +178,8 @@ func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.evaluateNodeSyncState(nodeID)
+
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
@@ -187,14 +193,38 @@ func (h *Handler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.evaluateNodeSyncState(nodeID)
+
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// generateRevisionHash creates a random 8-char string for tracking config state
-func generateRevisionHash() string {
-	b := make([]byte, 4)
-	rand.Read(b)
-	return "rev_" + hex.EncodeToString(b)
+func (h *Handler) evaluateNodeSyncState(nodeID string) {
+	nodeDetails, err := h.Store.GetNodeDetails(nodeID)
+	if err == nil {
+		newHash := generateRevisionHash(nodeDetails.InstalledSensors)
+		if newHash == nodeDetails.ActiveRevision {
+			h.Store.ClearNodePendingConfig(nodeID)
+			h.broadcastWS("NODE_SYNCED", map[string]string{
+				"node_id": nodeID,
+			})
+		}
+	}
+}
+
+// generateRevisionHash creates a deterministic 8-char string for tracking config state
+func generateRevisionHash(sensors []models.NodeSensor) string {
+	type sensorConfig struct {
+		ID      string
+		EnvVars map[string]interface{}
+	}
+	var configs []sensorConfig
+	for _, s := range sensors {
+		configs = append(configs, sensorConfig{ID: s.ID, EnvVars: s.EnvVars})
+	}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].ID < configs[j].ID })
+	b, _ := json.Marshal(configs)
+	hash := sha256.Sum256(b)
+	return "rev_" + hex.EncodeToString(hash[:4])
 }
 
 // DeleteNode handles DELETE /api/v1/nodes/{id}

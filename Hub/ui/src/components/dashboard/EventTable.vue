@@ -3,12 +3,17 @@ import { ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../../stores/app'
 import { useEventsStore } from '../../stores/events'
+import { useFleetStore } from '../../stores/fleet'
+import { formatSensorId } from '../../utils/formatSensorId'
+
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
+const fleetStore = useFleetStore()
 
 const { viewingArchive, isFetching } = storeToRefs(appStore)
 const { filteredEvents: events } = storeToRefs(eventsStore)
+const { nodes: fleet } = storeToRefs(fleetStore)
 
 const sortCol = ref('timestamp')
 const sortDesc = ref(true)
@@ -16,6 +21,13 @@ const expandedRows = ref(new Set())
 
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
+
+// Resolve node_id → alias for display
+const getNodeAlias = (nodeId) => {
+    if (!nodeId) return 'Unassigned'
+    const node = fleet.value.find(n => n.id === nodeId)
+    return node?.alias || nodeId
+}
 
 watch([viewingArchive, sortCol, sortDesc, () => events.value.length], () => {
     if (events.value.length === 0) currentPage.value = 1
@@ -60,6 +72,11 @@ const sortedEvents = computed(() => {
             const scores = { critical: 5, high: 4, medium: 3, low: 2, info: 1 }
             valA = scores[valA.toLowerCase()] || 0
             valB = scores[valB.toLowerCase()] || 0
+        }
+        if (sortCol.value === 'node_id') {
+            // Sort by alias for display consistency, fallback to node_id
+            valA = getNodeAlias(a.node_id)
+            valB = getNodeAlias(b.node_id)
         }
         if (valA < valB) return sortDesc.value ? 1 : -1
         if (valA > valB) return sortDesc.value ? -1 : 1
@@ -223,9 +240,9 @@ const formatTime = (timestamp) => {
                             <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.source">{{ event.source }}</td>
                             <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.target">{{ event.target }}</td>
                             
-                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.sensor_id">{{ event.sensor_id }}</td>
+                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.sensor_id">{{ formatSensorId(event.sensor_id) }}</td>
                             
-                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.node_id || 'Unassigned'">{{ event.node_id || 'Unassigned' }}</td>
+                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono w-[160px] min-w-[160px] max-w-[160px] truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.node_id || 'Unassigned'">{{ getNodeAlias(event.node_id) }}</td>
                             
                             <td class="px-5 py-3 text-base text-right text-text-m font-mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             

@@ -617,7 +617,7 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 
 	if effectiveRevision == "" && nodeDetails.HasPendingConfig {
 
-		effectiveRevision = generateRevisionHash()
+		effectiveRevision = generateRevisionHash(nodeDetails.InstalledSensors)
 
 		if err := h.Store.SetNodeDesiredRevision(nodeID, effectiveRevision); err != nil {
 			RespondError(w, "Failed to allocate node revision", http.StatusInternalServerError)
@@ -634,7 +634,7 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 	// Final bootstrap fallback
 
 	if effectiveRevision == "" {
-		effectiveRevision = generateRevisionHash()
+		effectiveRevision = generateRevisionHash(nodeDetails.InstalledSensors)
 	}
 
 

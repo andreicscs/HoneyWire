@@ -5,10 +5,11 @@ import { useFleetStore } from '../stores/fleet'
 import { useEventsStore } from '../stores/events'
 import { useConfig } from '../api/useConfig'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
-import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../components/ui/navigation/BaseMeatballMenu.vue'
 import BaseModal from '../components/ui/feedback/BaseModal.vue'
+import { formatSensorId } from '../utils/formatSensorId'
+
 
 const appStore = useAppStore()
 const fleetStore = useFleetStore()
@@ -18,26 +19,151 @@ const { config } = useConfig()
 const selectedNodeId = computed(() => fleetStore.selectedNode)
 
 // --- NODE STATE ---
-// Single source of truth: the live reactive object from the store.
 const node = computed(() => fleetStore.getNode(selectedNodeId.value))
+
+// --- LAST EVENT (from events store) ---
+const lastEventTime = computed(() => {
+    const events = eventsStore.filteredEvents
+    if (!events || events.length === 0) return 'None'
+    const latest = events.reduce((a, b) => new Date(a.timestamp) > new Date(b.timestamp) ? a : b)
+    return timeAgo(latest.timestamp)
+})
 
 const maxSensorEvents = computed(() => {
   if (!node.value?.installedSensors?.length) return 1
   return Math.max(...node.value.installedSensors.map(s => s.events24h || 0), 1)
 })
 
-const sortedInstalledSensors = computed(() => {
+const topSensors = computed(() => {
   return [...(node.value?.installedSensors || [])]
     .sort((a, b) => (b.events24h || 0) - (a.events24h || 0))
+    .slice(0, 5)
 })
 
-// --- SENSOR CATALOG STATE ---
+// --- MANIFEST LOOKUP (for icon/OSI enrichment) ---
 const isManifestLoading = ref(true)
 const fetchError = ref(false)
 const sensors = ref([])
+const manifestMap = computed(() => {
+  const map = new Map()
+  for (const s of sensors.value) {
+    map.set(s.id, s)
+    map.set(s.sensor_id, s)
+    map.set(s.name, s)
+  }
+  return map
+})
+
+const getManifestForSensor = (installedSensor) => {
+  const manifest = manifestMap.value.get(installedSensor.id)
+    || manifestMap.value.get(installedSensor.name)
+    || manifestMap.value.get(installedSensor.sensor_id)
+  return manifest
+}
+
+const sensorIcon = (installedSensor) => {
+  const manifest = getManifestForSensor(installedSensor)
+  return manifest?.icon_svg || installedSensor.icon || ''
+}
+
+const sensorOsi = (installedSensor) => {
+  const manifest = getManifestForSensor(installedSensor)
+  return manifest?.osi_layer || installedSensor.osi || ''
+}
+
+// --- INLINE RENAME STATE (ephemeral UI) ---
+const editingAliasNodeId = ref(null)
+const rawAliasValue = ref('')
+const aliasInputRefs = ref({})
+
+const enableAliasEdit = async (n) => {
+    editingAliasNodeId.value = n.id
+    rawAliasValue.value = n.alias
+    await nextTick()
+    if (aliasInputRefs.value[n.id]) {
+        aliasInputRefs.value[n.id].focus()
+        aliasInputRefs.value[n.id].select()
+    }
+}
+
+const cancelAliasEdit = () => {
+    editingAliasNodeId.value = null
+    rawAliasValue.value = ''
+}
+
+const saveAlias = async (n) => {
+    if (editingAliasNodeId.value !== n.id) return
+    const val = rawAliasValue.value.trim()
+    if (val && val !== n.alias) {
+        try {
+            await fleetStore.updateNode(n.id, {
+                alias: val,
+                tags: n.tags,
+                publicIp: n.publicIp,
+                privateIp: n.privateIp,
+            })
+        } catch (err) {
+            // Store handles rollback
+        }
+    }
+    editingAliasNodeId.value = null
+    rawAliasValue.value = ''
+}
+
+// --- INLINE TAGS STATE (ephemeral UI) ---
+const editingTagNodeId = ref(null)
+const newTagValue = ref('')
+const tagInputRefs = ref({})
+
+const enableTagEdit = async (nodeId) => {
+    editingTagNodeId.value = nodeId
+    await nextTick()
+    if (tagInputRefs.value[nodeId]) {
+        tagInputRefs.value[nodeId].focus()
+    }
+}
+
+const cancelTag = () => {
+    editingTagNodeId.value = null
+    newTagValue.value = ''
+}
+
+const saveTag = async (n) => {
+    const val = newTagValue.value.trim()
+    if (val && !n.tags.includes(val)) {
+        try {
+            await fleetStore.updateNode(n.id, {
+                alias: n.alias,
+                tags: [...n.tags, val],
+                publicIp: n.publicIp,
+                privateIp: n.privateIp,
+            })
+        } catch (err) {
+            // Store handles rollback
+        }
+    }
+    cancelTag()
+}
+
+const removeTag = async (n, index) => {
+    const newTags = [...n.tags]
+    newTags.splice(index, 1)
+    try {
+        await fleetStore.updateNode(n.id, {
+            alias: n.alias,
+            tags: newTags,
+            publicIp: n.publicIp,
+            privateIp: n.privateIp,
+        })
+    } catch (err) {
+        // Store handles rollback
+    }
+}
 
 // --- SENSOR MODAL STATE ---
 const selectedSensor = ref(null)
+const isEditingSensor = ref(false)
+const editingSensorId = ref(null)
 const activeTab = ref('readme')
 const envVarValues = ref({})
 const activeEnvVar = ref(null)
@@ -50,10 +176,23 @@ const composePre = ref(null)
 const showKeyModal = ref(false)
 const showSyncModal = ref(false)
 const syncComposeYaml = ref('')
-const showEditModal = ref(false)
-const editNodeForm = ref({ id: '', alias: '', publicIp: '', privateIp: '' })
-const tagInput = ref('')
-const tagsList = ref([])
+
+// --- COPY STATE (ephemeral UI) ---
+const copiedStates = ref({})
+
+const handleCopy = async (id, text) => {
+    if (!text) return
+    try {
+        await navigator.clipboard.writeText(text)
+        copiedStates.value[id] = true
+        setTimeout(() => { copiedStates.value[id] = false }, 2000)
+    } catch (err) {
+        console.error('Failed to copy text', err)
+    }
+}
+
+// --- FORMATTERS ---
+const formatEventType = (type) => type ? type.replace(/_/g, ' ') : ''
 
 // --- SEVERITY CONFIG ---
 const severityOptions = [
@@ -122,7 +261,7 @@ const handleRemoveSensor = async (sensor) => {
   }
 }
 
-const handleAddSensorToNode = async () => {
+const handleApplySensor = async () => {
   if (!selectedSensor.value || !node.value?.id) return
 
   const safeEnvValues = Object.fromEntries(
@@ -130,14 +269,21 @@ const handleAddSensorToNode = async () => {
   )
 
   try {
-    await fleetStore.addSensor(node.value.id, {
-      sensorId: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
-      customName: selectedSensor.value.name || selectedSensor.value.id,
-      configValues: safeEnvValues,
-    })
+    if (isEditingSensor.value && editingSensorId.value) {
+      await fleetStore.updateSensor(node.value.id, editingSensorId.value, {
+        customName: selectedSensor.value.name || selectedSensor.value.id,
+        configValues: safeEnvValues,
+      })
+    } else {
+      await fleetStore.addSensor(node.value.id, {
+        sensorId: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
+        customName: selectedSensor.value.name || selectedSensor.value.id,
+        configValues: safeEnvValues,
+      })
+    }
     closeSensor()
   } catch (err) {
-    alert('Could not add sensor to this node. Please try again.')
+    alert(isEditingSensor.value ? 'Could not update sensor. Please try again.' : 'Could not add sensor to this node. Please try again.')
   }
 }
 
@@ -145,22 +291,10 @@ const handleAddSensorToNode = async () => {
 
 const handleManageKey = () => { showKeyModal.value = true }
 
-const copyNodeKeyToClipboard = async () => {
-  const apiKey = node.value?.apiKey
-  if (!apiKey) return
-  try {
-    await navigator.clipboard.writeText(apiKey)
-    alert('Node API Key copied to clipboard')
-  } catch (err) {
-    alert('Unable to copy Node API Key. Please copy it manually.')
-  }
-}
-
 const copySyncYamlToClipboard = async () => {
   if (!syncComposeYaml.value) return
   try {
     await navigator.clipboard.writeText(syncComposeYaml.value)
-    alert('Compose YAML copied to clipboard')
   } catch (err) {
     alert('Unable to copy compose YAML. Please copy it manually.')
   }
@@ -176,71 +310,51 @@ const triggerManualSync = async () => {
   }
 }
 
+const handleSilenceNode = () => {
+    if (!node.value?.id) return
+    fleetStore.silenceNode(node.value.id)
+}
+
+const handleDeleteNode = () => {
+    if (!node.value?.id) return
+    if (confirm(`Delete node "${node.value.alias}"? This cannot be undone.`)) {
+        fleetStore.deleteNode(node.value.id)
+        appStore.currentView = 'fleet'
+    }
+}
+
 // --- NAVIGATION ---
 
 watch(selectedNodeId, async (value) => {
-  if (!value) {
-    appStore.currentView = 'fleet'
-    return
-  }
-  await fleetStore.fetchNodeDetails(value)
-  eventsStore.fetchEvents(false, value)
+    if (!value) {
+        appStore.currentView = 'fleet'
+        return
+    }
+    await Promise.all([
+        fleetStore.fetchNodeDetails(value),
+        eventsStore.fetchEvents(false, value)
+    ])
 }, { immediate: true })
 
 const timeAgo = (dateStr) => {
-  if (!dateStr) return 'Unknown'
-  const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
+    if (!dateStr) return 'Unknown'
+    const diff = Math.floor((new Date() - new Date(dateStr)) / 1000)
+    if (diff < 60) return `${diff}s ago`
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
 }
 
 const recentActivity = computed(() => {
-  return eventsStore.filteredEvents.slice(0, 10).map(e => ({
+  return eventsStore.filteredEvents.slice(0, 5).map(e => ({
     id: e.id,
     time: timeAgo(e.timestamp),
     severity: e.severity || 'info',
     event_trigger: e.event_trigger || 'Alert',
-    source: e.source || 'Unknown'
+    source: e.source || 'Unknown',
+    sensor_id: e.sensor_id || ''
   }))
 })
-
-// --- EDIT MODAL ---
-
-const openEditModal = () => {
-  if (!node.value) return
-  editNodeForm.value = {
-    id: node.value.id,
-    alias: node.value.alias,
-    publicIp: node.value.publicIp || '',
-    privateIp: node.value.privateIp || ''
-  }
-  tagsList.value = [...(node.value.tags || [])]
-  showEditModal.value = true
-}
-
-const addTag = () => {
-  const val = tagInput.value.trim()
-  if (val && !tagsList.value.includes(val)) tagsList.value.push(val)
-  tagInput.value = ''
-}
-
-const removeTag = (index) => { tagsList.value.splice(index, 1) }
-
-const handleEditSubmit = async () => {
-  try {
-    await fleetStore.updateNode(editNodeForm.value.id, {
-      alias: editNodeForm.value.alias,
-      tags: tagsList.value,
-      publicIp: editNodeForm.value.publicIp,
-      privateIp: editNodeForm.value.privateIp,
-    })
-    showEditModal.value = false
-  } catch (err) {
-    alert('Failed to update node. Please try again.')
-  }
-}
 
 // --- SENSOR CATALOG ---
 
@@ -262,6 +376,8 @@ onMounted(async () => {
 const openSensor = (sensor) => {
   const apiKey = node.value?.apiKey
   selectedSensor.value = sensor
+  isEditingSensor.value = false
+  editingSensorId.value = null
   activeTab.value = 'readme'
   envVarValues.value = {}
   envVarValues.value['HW_SEVERITY'] = 'critical'
@@ -276,8 +392,43 @@ const openSensor = (sensor) => {
   fetchYamlFromHub()
 }
 
+const editSensor = (installedSensor) => {
+  const manifest = getManifestForSensor(installedSensor)
+  if (!manifest) {
+      alert('Sensor manifest not found')
+      return
+  }
+  
+  const apiKey = node.value?.apiKey
+  selectedSensor.value = manifest
+  isEditingSensor.value = true
+  editingSensorId.value = installedSensor.id
+  activeTab.value = 'config'
+  envVarValues.value = {}
+  envVarValues.value['HW_SEVERITY'] = 'critical'
+  envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin
+  envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
+  
+  manifest.deployment?.env_vars?.forEach(env => {
+    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
+      envVarValues.value[env.name] = getUIDefault(env.default)
+    }
+  })
+  
+  if (installedSensor.envVars) {
+      Object.keys(installedSensor.envVars).forEach(key => {
+          envVarValues.value[key] = installedSensor.envVars[key]
+      })
+  }
+  
+  document.body.style.overflow = 'hidden'
+  fetchYamlFromHub()
+}
+
 const closeSensor = () => {
   selectedSensor.value = null
+  isEditingSensor.value = false
+  editingSensorId.value = null
   envVarValues.value = {}
   activeEnvVar.value = null
   document.body.style.overflow = ''
@@ -339,32 +490,75 @@ const applyHighlighting = () => {
             </button>
         </div>
 
-        <div v-if="node" class="bg-bg-base border border-border-default rounded-[var(--radius-lg)] p-5 sm:p-6 mb-8 shrink-0 shadow-sm flex flex-col gap-6">
+        <div v-if="node" class="bg-bg-base border border-border-default rounded-lg p-5 sm:p-6 mb-8 shrink-0 shadow-sm flex flex-col gap-6">
             
             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-3 mb-3">
-                        <h1 class="text-[length:var(--text-h1)] font-semibold text-text-h leading-tight">{{ node.alias }}</h1>
+                        <h1 v-if="editingAliasNodeId !== node.id"
+                            @click="enableAliasEdit(node)"
+                            class="text-[length:var(--text-h1)] font-semibold text-text-h leading-tight truncate max-w-[400px] cursor-edit hover:text-primary-main border-b border-dashed border-transparent hover:border-primary-main transition-colors select-none"
+                            :title="`Click to rename ${node.alias}`">
+                            {{ node.alias }}
+                        </h1>
+                        <input v-else
+                            :ref="el => { if (el) aliasInputRefs[node.id] = el }"
+                            v-model="rawAliasValue"
+                            @keyup.enter="saveAlias(node)"
+                            @keyup.esc="cancelAliasEdit"
+                            @blur="saveAlias(node)"
+                            class="text-[length:var(--text-h1)] font-semibold text-text-h bg-input-bg border border-primary-main rounded px-2 py-0.5 focus:outline-none ring-1 ring-focus-ring max-w-[400px] truncate"
+                        />
                         <BaseStatusDot :status="node.status" />
+                        <span v-if="node.hasPendingConfig"
+                            class="shrink-0 text-high"
+                            title="Pending sync — click Sync Node below to apply changes">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </span>
                     </div>
                     
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-m">
-                        <div class="flex items-center gap-1.5" title="Public IP">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                            <span class="font-mono">{{ node.publicIp || 'Unknown' }}</span>
+                        <div @click="handleCopy('detail-pub', node.publicIp)"
+                             class="flex items-center gap-1.5 cursor-pointer transition-colors duration-[var(--duration-fast)] group/pub w-max rounded px-1 -ml-1 py-0.5 border border-transparent"
+                             :class="copiedStates['detail-pub'] ? 'bg-success-bg text-success-text border-success-border' : 'text-text-m hover:text-text-h hover:bg-secondary-hover'">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                            <span class="font-mono">{{ copiedStates['detail-pub'] ? 'Copied!' : (node.publicIp || 'Unknown') }}</span>
                         </div>
-                        <div class="flex items-center gap-1.5" title="Private IP">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="14" width="8" height="6" rx="2" ry="2"/><rect x="14" y="14" width="8" height="6" rx="2" ry="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 14v-2a2 2 0 012-2h8a2 2 0 012 2v2M12 2v8"/><rect x="8" y="2" width="8" height="6" rx="2" ry="2"/></svg>
-                            <span class="font-mono">{{ node.privateIp || 'Unknown' }}</span>
+                        <div @click="handleCopy('detail-priv', node.privateIp)"
+                             class="flex items-center gap-1.5 cursor-pointer transition-colors duration-[var(--duration-fast)] group/priv w-max rounded px-1 -ml-1 py-0.5 border border-transparent"
+                             :class="copiedStates['detail-priv'] ? 'bg-success-bg text-success-text border-success-border' : 'text-text-m hover:text-text-h hover:bg-secondary-hover'">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="14" width="8" height="6" rx="2" ry="2"/><rect x="14" y="14" width="8" height="6" rx="2" ry="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 14v-2a2 2 0 012-2h8a2 2 0 012 2v2M12 2v8"/><rect x="8" y="2" width="8" height="6" rx="2" ry="2"/></svg>
+                            <span class="font-mono">{{ copiedStates['detail-priv'] ? 'Copied!' : (node.privateIp || 'Unknown') }}</span>
                         </div>
                         <div class="h-4 w-px bg-border-default hidden sm:block"></div>
                         <div class="flex items-center gap-1.5">
-                            <span class="text-text-h font-medium">Last Event:</span> {{ node.lastEvent }}
+                            <span class="text-text-h font-medium">Last Event:</span> {{ lastEventTime }}
                         </div>
                         <div class="h-4 w-px bg-border-default hidden sm:block"></div>
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <span v-for="tag in node.tags" :key="tag" class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-[10px] font-medium rounded-md tracking-wider">{{ tag }}</span>
-                            <button @click.stop="openEditModal" class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-[10px] rounded-md hover:text-text-h transition-colors">
+                            <span v-for="(tag, index) in node.tags" :key="tag"
+                                class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-sm font-medium rounded-md tracking-wider flex items-center gap-1.5 group/tag transition-colors hover:border-text-m">
+                                {{ tag }}
+                                <button @click.stop="removeTag(node, index)" class="opacity-0 group-hover/tag:opacity-100 text-text-m hover:text-danger-text transition-all outline-none focus:opacity-100">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </span>
+
+                            <div v-if="editingTagNodeId === node.id" class="relative flex items-center">
+                                <span class="absolute left-2 text-text-m text-sm pointer-events-none">+</span>
+                                <input
+                                    :ref="el => { if (el) tagInputRefs[node.id] = el }"
+                                    v-model="newTagValue"
+                                    @keyup.enter="saveTag(node)"
+                                    @keyup.esc="cancelTag"
+                                    @blur="cancelTag"
+                                    class="pl-5 pr-2 py-0.5 bg-input-bg border border-primary-main text-text-h text-sm rounded-md focus:outline-none ring-1 ring-focus-ring w-28 shadow-sm transition-all placeholder:text-text-m/50"
+                                    placeholder="tag name..."
+                                />
+                            </div>
+
+                            <button v-else @click.stop="enableTagEdit(node.id)"
+                                    class="px-1.5 py-0.5 border border-dashed border-border-default text-text-m text-sm rounded-md hover:text-text-h hover:border-text-m transition-colors outline-none focus:ring-1 focus:ring-focus-ring">
                                 + Tag
                             </button>
                         </div>
@@ -377,8 +571,10 @@ const applyHighlighting = () => {
                         Manage Key
                     </BaseButton>
                     <BaseMeatballMenu id="node-super-menu">
-                        <button @click="openEditModal" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Rename / Edit Node</button>
-                        <button class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Delete Node</button>
+                        <button @click="handleSilenceNode" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
+                            {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
+                        </button>
+                        <button @click="handleDeleteNode" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Delete Node</button>
                     </BaseMeatballMenu>
                 </div>
             </div>
@@ -396,10 +592,11 @@ const applyHighlighting = () => {
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 
-                <div class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm">
-                    <h3 class="text-sm font-semibold text-text-h mb-5">Sensor Volume (24h)</h3>
-                    <div v-if="sortedInstalledSensors.length > 0" class="space-y-4">
-                        <div v-for="sensor in sortedInstalledSensors" :key="sensor.id">
+                <!-- Sensor Volume (24h) -->
+                <div class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm flex flex-col">
+                    <h3 class="text-sm font-semibold text-text-h mb-4">Sensor Volume (24h)</h3>
+                    <div v-if="topSensors.length > 0" class="space-y-3 overflow-y-auto custom-scroll max-h-[240px] pr-1">
+                        <div v-for="sensor in topSensors" :key="sensor.id">
                             <div class="flex items-center justify-between mb-1.5">
                                 <span class="text-sm font-medium text-text-h truncate pr-4">{{ sensor.display }}</span>
                                 <span class="text-sm font-mono text-text-m">{{ sensor.events24h }}</span>
@@ -412,43 +609,53 @@ const applyHighlighting = () => {
                     <div v-else class="text-sm text-text-m italic">No events recorded.</div>
                 </div>
 
+                <!-- Recent Activity — mini event table -->
                 <div class="bg-bg-surface border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
-                    <div class="px-5 py-3 border-b border-border-default flex items-center justify-between bg-bg-surface shrink-0">
+                    <div class="px-4 py-3 border-b border-border-default flex items-center justify-between bg-bg-surface shrink-0">
                         <h3 class="text-sm font-semibold text-text-h">Recent Activity</h3>
-                        <button class="text-xs font-medium text-text-m hover:text-text-h transition-colors">View All &rarr;</button>
+                        <button class="text-sm font-medium text-text-m hover:text-text-h transition-colors">View All &rarr;</button>
                     </div>
                     
-                    <div class="flex-1 overflow-y-auto custom-scroll bg-bg-surface">
+                    <div class="flex-1 overflow-y-auto custom-scroll bg-bg-surface max-h-[240px]">
                         <table class="w-full text-left border-collapse">
+                            <thead class="text-sm font-medium text-text-m tracking-wider sticky top-0 bg-bg-surface shadow-[0_1px_0_0_var(--color-border-default)]">
+                                <tr>
+                                    <th class="px-3 py-2 w-14"></th>
+                                    <th class="px-3 py-2">Event</th>
+                                    <th class="px-3 py-2">Source</th>
+                                    <th class="px-3 py-2">Sensor</th>
+                                    <th class="px-3 py-2 text-right">Time</th>
+                                </tr>
+                            </thead>
                             <tbody>
                                 <tr v-if="recentActivity.length === 0">
-                                    <td colspan="4" class="px-5 py-6 text-center text-sm text-text-m">No recent activity on this node.</td>
+                                    <td colspan="5" class="px-3 py-4 text-center text-sm text-text-m">No recent activity on this node.</td>
                                 </tr>
                                 <tr v-for="event in recentActivity" :key="event.id" 
-                                    class="hover:bg-secondary-hover cursor-pointer transition-colors duration-[var(--duration-fast)] relative z-0 group"
+                                    class="hover:bg-secondary-hover cursor-pointer transition-colors duration-[var(--duration-fast)] relative z-0"
                                     :class="'bleed-' + event.severity.toLowerCase()">
                                     
-                                    <td class="px-3 py-2.5 border-b border-border-default border-l-[3px]"
-                                        :style="{ borderLeftColor: `var(--color-${event.severity.toLowerCase()})` }">
-                                        <span class="px-2 py-0.5 rounded border text-xs font-medium bg-bg-surface whitespace-nowrap capitalize flex justify-center w-max" 
+                                    <td class="px-3 py-2 border-b border-border-default">
+                                        <span class="px-1.5 py-0.5 rounded border text-sm font-medium bg-bg-base whitespace-nowrap capitalize" 
                                               :style="{ borderColor: `var(--color-${event.severity.toLowerCase()})`, color: `var(--color-${event.severity.toLowerCase()})` }">
                                             {{ event.severity }}
                                         </span>
                                     </td>
                                     
-                                    <td class="px-3 py-2.5 border-b border-border-default w-full max-w-0">
-                                        <div class="text-sm text-text-h font-medium truncate">{{ event.event_trigger }}</div>
+                                    <td class="px-3 py-2 border-b border-border-default">
+                                        <span class="text-sm text-text-h font-medium capitalize">{{ formatEventType(event.event_trigger) }}</span>
+                                    </td>
+
+                                    <td class="px-3 py-2 border-b border-border-default">
+                                        <span class="text-sm text-text-m font-mono truncate block max-w-[100px]">{{ event.source }}</span>
+                                    </td>
+
+                                    <td class="px-3 py-2 border-b border-border-default">
+                                        <span class="text-sm text-text-m font-mono truncate block max-w-[80px]">{{ formatSensorId(event.sensor_id) }}</span>
                                     </td>
                                     
-                                    <td class="px-3 py-2.5 border-b border-border-default whitespace-nowrap">
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="text-[9px] uppercase font-bold text-text-m tracking-wider bg-bg-inset border border-border-default/50 px-1 rounded">SRC</span>
-                                            <span class="text-xs text-text-m font-mono truncate max-w-[120px]">{{ event.source }}</span>
-                                        </div>
-                                    </td>
-                                    
-                                    <td class="px-4 py-2.5 border-b border-border-default text-right">
-                                        <span class="text-xs text-text-m font-mono whitespace-nowrap">{{ event.time }}</span>
+                                    <td class="px-3 py-2 border-b border-border-default text-right">
+                                        <span class="text-sm text-text-m font-mono whitespace-nowrap">{{ event.time }}</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -467,15 +674,15 @@ const applyHighlighting = () => {
                         <div class="flex justify-between items-start mt-1">
                             <div class="flex items-center gap-3 min-w-0">
                                 <div class="w-8 h-8 rounded bg-bg-inset border border-border-default/50 flex items-center justify-center text-text-h shrink-0">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="sensor.icon"></path></svg>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="sensorIcon(sensor)"></path></svg>
                                 </div>
                                 <div class="min-w-0">
                                     <h4 class="text-sm font-semibold text-text-h truncate">{{ sensor.display }}</h4>
-                                    <span class="text-xs font-mono text-text-m block truncate">{{ sensor.name }}</span>
+                                    <span class="text-sm text-text-m font-mono block truncate">{{ formatSensorId(sensor.name) }}</span>
                                 </div>
                             </div>
                             <BaseMeatballMenu :id="`sensor-menu-${sensor.id}`">
-                                <button class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Edit Configuration</button>
+                                <button @click="editSensor(sensor)" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">Edit Configuration</button>
                                 <button @click="handleToggleSensorSilence(sensor)" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
                                     {{ sensor.isSilenced ? 'Unsilence Alerts' : 'Silence Alerts' }}
                                 </button>
@@ -483,20 +690,20 @@ const applyHighlighting = () => {
                             </BaseMeatballMenu>
                         </div>
                         <div class="mt-3 pt-3 border-t border-border-default flex justify-between items-center">
-                             <span class="px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50 uppercase">{{ sensor.osi }}</span>
+                             <span class="px-1.5 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ sensorOsi(sensor) }}</span>
                              <svg v-if="sensor.isSilenced" class="w-3.5 h-3.5 text-medium shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Alerts Silenced"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/></svg>
                         </div>
                     </div>
                 </div>
                 <div v-else class="border border-dashed border-border-default rounded-lg p-8 flex flex-col items-center justify-center text-center bg-bg-surface/50">
                     <p class="text-sm text-text-h font-medium">No sensors deployed</p>
-                    <p class="text-xs text-text-m mt-1">Select a sensor from the catalog below.</p>
+                    <p class="text-sm text-text-m mt-1">Select a sensor from the catalog below.</p>
                 </div>
             </div>
         </div>
 
         <div class="shrink-0 mb-6">
-            <h2 class="text-lg font-semibold text-text-h mb-4">Sensor Catalog</h2>
+            <h2 class="text-base font-semibold text-text-h mb-4">Sensor Catalog</h2>
             <div v-if="isManifestLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse"></div>
             </div>
@@ -506,32 +713,40 @@ const applyHighlighting = () => {
                         <div class="w-10 h-10 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-normal">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg>
                         </div>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ s.osi_layer }}</span>
+                        <span class="px-2 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ s.osi_layer }}</span>
                     </div>
                     <h3 class="text-sm font-semibold text-text-h mb-1">{{ s.name }}</h3>
-                    <p class="text-xs text-text-m leading-relaxed line-clamp-2">{{ s.description }}</p>
+                    <p class="text-sm text-text-m leading-relaxed line-clamp-2">{{ s.description }}</p>
                 </div>
             </div>
         </div>
 
+        <!-- Manage Key Modal -->
         <BaseModal :show="showKeyModal" @close="showKeyModal = false" title="Manage Node Key">
             <div class="space-y-4">
                 <p class="text-sm text-text-m">This is the unique API key for this node. It is used to authenticate the node with the hub.</p>
                 <div class="bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm break-all">
-                    <div class="text-text-h font-semibold mb-2">Node API Key</div>
-                    <div>{{ node.apiKey || 'Unavailable' }}</div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-text-h font-semibold">Node API Key</span>
+                        <button @click="handleCopy('key-modal', node.apiKey)"
+                                class="px-2.5 py-1 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 border outline-none"
+                                :class="copiedStates['key-modal'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                            {{ copiedStates['key-modal'] ? 'Copied!' : 'Copy' }}
+                        </button>
+                    </div>
+                    <div class="text-text-m select-all">{{ node.apiKey || 'Unavailable' }}</div>
                 </div>
-                <div class="flex justify-end gap-2">
+                <div class="flex justify-end">
                     <BaseButton variant="secondary" @click="showKeyModal = false">Close</BaseButton>
-                    <BaseButton variant="primary" @click="copyNodeKeyToClipboard">Copy API Key</BaseButton>
                 </div>
             </div>
         </BaseModal>
 
+        <!-- Sync Compose Modal -->
         <BaseModal :show="showSyncModal" @close="showSyncModal = false" title="Node Compose YAML">
             <div class="space-y-4">
                 <p class="text-sm text-text-m">This is the generated docker-compose.yml for this node. Use it to deploy the node with the selected sensors and config.</p>
-                <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-xs text-text-h overflow-auto max-h-[40vh]">
+                <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm text-text-h overflow-auto max-h-[40vh]">
                     <pre class="whitespace-pre-wrap break-words">{{ syncComposeYaml || 'No compose output available.' }}</pre>
                 </div>
                 <div class="flex justify-end gap-2">
@@ -541,52 +756,12 @@ const applyHighlighting = () => {
             </div>
         </BaseModal>
 
-        <BaseModal :show="showEditModal" @close="showEditModal = false" title="Node Settings">
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-text-h mb-1.5">Node Alias</label>
-                    <BaseInput v-model="editNodeForm.alias" />
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-text-h mb-1.5">Public IP</label>
-                        <BaseInput v-model="editNodeForm.publicIp" placeholder="e.g. 203.0.113.5" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-text-h mb-1.5">Private IP</label>
-                        <BaseInput v-model="editNodeForm.privateIp" placeholder="e.g. 10.0.1.50" />
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-text-h mb-1.5">Tags</label>
-                    <div class="flex flex-col gap-2.5">
-                        <div v-if="tagsList.length > 0" class="flex flex-wrap gap-1.5">
-                            <span v-for="(tag, index) in tagsList" :key="tag" 
-                                class="flex items-center gap-1.5 px-2 py-1 bg-bg-inset border border-border-default text-text-m text-xs font-medium rounded-md tracking-wider">
-                                {{ tag }}
-                                <button @click="removeTag(index)" class="text-text-m hover:text-danger-text transition-colors outline-none">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </span>
-                        </div>
-                        <BaseInput v-model="tagInput" @keydown.enter.prevent="addTag" placeholder="Type a tag and press Enter..." />
-                    </div>
-                </div>
-
-                <div class="flex justify-end pt-5 border-t border-border-default mt-6">
-                    <BaseButton variant="secondary" class="mr-2" @click="showEditModal = false">Cancel</BaseButton>
-                    <BaseButton variant="primary" @click="handleEditSubmit">Save Changes</BaseButton>
-                </div>
-            </div>
-        </BaseModal>
-
+        <!-- Sensor Deployment Modal -->
         <Teleport to="body">
             <transition enter-active-class="transition duration-normal ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
                 <div v-if="selectedSensor" class="fixed inset-0 z-[var(--z-modal)] flex justify-center items-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm" @click.self="closeSensor">
                     
-                    <div class="bg-bg-base w-full max-w-4xl h-full max-h-[85vh] rounded-[var(--radius-lg)] shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
+                    <div class="bg-bg-base w-full max-w-4xl h-full max-h-[85vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
                         
                         <div class="px-6 py-5 border-b border-border-default flex justify-between items-start bg-bg-surface shrink-0">
                             <div class="flex items-center gap-4">
@@ -594,7 +769,7 @@ const applyHighlighting = () => {
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="selectedSensor.icon_svg"></path></svg>
                                 </div>
                                 <div>
-                                    <h2 class="text-xl font-bold text-text-h">{{ selectedSensor.name }}</h2>
+                                    <h2 class="text-base font-semibold text-text-h">{{ selectedSensor.name }}</h2>
                                     <p class="text-sm text-text-m mt-0.5">{{ selectedSensor.description }}</p>
                                 </div>
                             </div>
@@ -609,7 +784,7 @@ const applyHighlighting = () => {
                         </div>
 
                         <div class="flex-1 overflow-y-auto custom-scroll bg-bg-base">
-                            <div v-show="activeTab === 'readme'" class="p-6 md:p-8 readme-container text-text-m text-sm">
+                            <div v-show="activeTab === 'readme'" class="p-6 md:p-8 readme-container text-sm text-text-m">
                                 <p class="mb-6 text-sm font-medium text-text-h">{{ selectedSensor.documentation?.summary }}</p>
                                 <div v-for="section in selectedSensor.documentation?.sections" :key="section.title" class="mb-6">
                                     <h3 class="text-sm font-semibold text-text-h mb-3">{{ section.title }}</h3>
@@ -645,7 +820,7 @@ const applyHighlighting = () => {
                                             <div v-if="env.name !== 'HW_SEVERITY'" class="space-y-1">
                                                 <label class="block text-sm text-text-h mb-0.5">{{ env.name }}</label>
                                                 <input v-model="envVarValues[env.name]" :type="env.type === 'int' ? 'number' : 'text'" :placeholder="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" class="w-full px-3 py-2 text-sm text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50" />
-                                                <p class="text-[11px] text-text-m mt-1">{{ env.description }}</p>
+                                                <p class="text-sm text-text-m mt-1">{{ env.description }}</p>
                                             </div>
                                         </template>
 
@@ -653,11 +828,16 @@ const applyHighlighting = () => {
                                 </div>
                                 
                                 <div class="relative flex-1 min-h-[250px] mb-6">
-                                    <pre ref="composePre" v-html="highlightedCompose" class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-4 rounded-md text-xs font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"></pre>
+                                    <button @click="handleCopy('compose-yaml', rawCompose)"
+                                            class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
+                                            :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                        {{ copiedStates['compose-yaml'] ? 'Copied!' : 'Copy' }}
+                                    </button>
+                                    <pre ref="composePre" v-html="highlightedCompose" class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-4 rounded-md text-sm font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"></pre>
                                 </div>
 
                                 <div class="mt-auto border-t border-border-default pt-4 flex justify-end">
-                                    <BaseButton variant="primary" @click="handleAddSensorToNode" class="px-6">Add to Node</BaseButton>
+                                    <BaseButton variant="primary" @click="handleApplySensor" class="px-6">{{ isEditingSensor ? 'Apply Settings' : 'Add to Node' }}</BaseButton>
                                 </div>
                             </div>
                         </div>
@@ -670,7 +850,7 @@ const applyHighlighting = () => {
 </template>
 
 <style scoped>
-.readme-container :deep(h3) { font-size: var(--text-base); font-weight: var(--font-weight-medium); color: var(--text-h); margin-top: 1.5rem; margin-bottom: 0.75rem; }
-.readme-container :deep(p) { line-height: 1.6; margin-bottom: 1rem; }
+.readme-container :deep(h3) { font-size: var(--text-sm); font-weight: var(--font-weight-medium); color: var(--text-h); margin-top: 1.5rem; margin-bottom: 0.75rem; }
+.readme-container :deep(p) { line-height: var(--text-leading-normal); margin-bottom: 1rem; }
 .readme-container :deep(code) { font-family: var(--font-mono); background-color: var(--input-bg); color: var(--text-h); padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); font-size: var(--text-sm); border: 1px solid var(--input-border); }
 </style>

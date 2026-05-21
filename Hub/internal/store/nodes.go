@@ -239,7 +239,7 @@ func (s *SQLiteStore) AddSensorToNode(nodeID, sensorID, customName string, confi
 		return err // Likely hits UNIQUE constraint
 	}
 
-	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, updated_at = ? WHERE id = ?`, now, nodeID)
+	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, desired_revision = NULL, updated_at = ? WHERE id = ?`, now, nodeID)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -272,7 +272,7 @@ func (s *SQLiteStore) UpdateNodeSensor(nodeID, sensorID, customName string, conf
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, updated_at = ? WHERE id = ?`, now, nodeID)
+	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, desired_revision = NULL, updated_at = ? WHERE id = ?`, now, nodeID)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -295,7 +295,7 @@ func (s *SQLiteStore) RemoveNodeSensor(nodeID, sensorID string) error {
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, updated_at = ? WHERE id = ?`, now, nodeID)
+	_, err = tx.Exec(`UPDATE nodes SET pending_config = 1, desired_revision = NULL, updated_at = ? WHERE id = ?`, now, nodeID)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -318,6 +318,17 @@ func (s *SQLiteStore) SetNodeDesiredRevision(nodeID, revision string) error {
 		SET desired_revision = ?, pending_config = 1, updated_at = ? 
 		WHERE id = ?`,
 		revision, now, nodeID,
+	)
+	return err
+}
+
+func (s *SQLiteStore) ClearNodePendingConfig(nodeID string) error {
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.DB.Exec(`
+		UPDATE nodes 
+		SET pending_config = 0, desired_revision = NULL, updated_at = ? 
+		WHERE id = ?`,
+		now, nodeID,
 	)
 	return err
 }

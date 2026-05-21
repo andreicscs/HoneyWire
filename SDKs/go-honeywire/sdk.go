@@ -12,6 +12,7 @@ import (
 
 type Sensor struct {
 	SensorID           string
+	Severity           string
 	AgentVersion       string
 	hubContractVersion string
 	HubEndpoint        string
@@ -25,6 +26,7 @@ type Sensor struct {
 func NewSensor() (*Sensor, error) {
 	s := &Sensor{
 		SensorID:     getEnv("HW_SENSOR_ID", ""),
+		Severity:     getEnv("HW_SEVERITY", "medium"),
 		AgentVersion: "1.0.0",
 		HubEndpoint:  getEnv("HW_HUB_ENDPOINT", ""),
 		HubKey:       getEnv("HW_HUB_KEY", ""),
@@ -143,10 +145,11 @@ func (s *Sensor) sendHeartbeat() {
 }
 
 func (s *Sensor) ReportEvent(severity, trigger, source, target string, details map[string]any) bool {
+	_ = severity // Ignore hardcoded severity, use configured HW_SEVERITY
 	payload := map[string]any{
 		"contract_version": s.hubContractVersion,
 		"sensor_id":        s.SensorID,
-		"severity":         severity,
+		"severity":         s.Severity,
 		"event_trigger":    trigger,
 		"source":           source,
 		"target":           target,

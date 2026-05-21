@@ -29,6 +29,14 @@ export const api = {
     }))
   },
 
+  async put(url, body) {
+    return handleResponse(await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+  },
+
   async patch(url, body) {
     return handleResponse(await fetch(url, {
       method: 'PATCH',
