@@ -7,6 +7,7 @@ services:
     environment:
       - HW_DECOY_FILES=${HW_DECOY_FILES}
     cap_drop: ["ALL"]
+    cap_add: ["DAC_OVERRIDE"]
     security_opt: ["no-new-privileges:true"]
     volumes:
       # Manually map the parent directories of your HW_DECOY_FILES

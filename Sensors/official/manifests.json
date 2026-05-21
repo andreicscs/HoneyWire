@@ -216,6 +216,9 @@
           "cap_drop": [
             "ALL"
           ],
+          "cap_add": [
+            "DAC_OVERRIDE"
+          ],
           "security_opt": [
             "no-new-privileges:true"
           ],
@@ -223,7 +226,7 @@
             {
               "type": "dynamic_dir_bind",
               "source_env": "HW_DECOY_FILES",
-              "target": "/host",
+              "target_prefix": "/host",
               "read_only": false
             }
           ]
