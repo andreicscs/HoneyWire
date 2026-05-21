@@ -79,8 +79,36 @@ const groupedUptime = computed(() => {
     const groupsMap = new Map();
     uptimeData.value.forEach(sensor => {
         const nId = sensor.node_id || 'unassigned';
-        if (!groupsMap.has(nId)) groupsMap.set(nId, { nodeId: nId, sensors: [] });
-        groupsMap.get(nId).sensors.push(sensor);
+        if (!groupsMap.has(nId)) groupsMap.set(nId, { nodeId: nId, sensors: [] });        
+        // Inject live status from fleet store to ensure the UI feels instant
+        // and doesn't lag behind waiting for the next historic SYNC_CHARTS cycle.
+        let isLiveOnline = sensor.isOnline;
+        const node = fleet.value.find(n => n.id === nId);
+        
+        if (node && node.installedSensors) {
+            const liveSensor = node.installedSensors.find(s => s.id === sensor.id || s.name === sensor.id);
+            if (liveSensor) {
+                if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline;
+                else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online;
+                else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase());
+            }
+        }
+        
+        const blocks = [...(sensor.blocks || [])];
+        if (blocks.length > 0) {
+            const lastIdx = blocks.length - 1;
+            const lastBlock = { ...blocks[lastIdx] };
+            
+            if (isLiveOnline && (lastBlock.status === 'down' || lastBlock.status === 'nodata')) {
+                lastBlock.status = 'up';
+            } else if (!isLiveOnline) {
+                lastBlock.status = 'down';
+            }
+            
+            blocks[lastIdx] = lastBlock;
+        }
+
+        groupsMap.get(nId).sensors.push({ ...sensor, isOnline: isLiveOnline, blocks });
     });
     const groups = Array.from(groupsMap.values());
     groups.sort((a, b) => {
