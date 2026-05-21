@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -16,9 +17,9 @@ import (
 // --- INCOMING REQUEST PAYLOADS ---
 
 type DeployableSensor struct {
-	SensorID string                 `json:"sensor_id"`
-	EnvValues map[string]string     `json:"env_values"`
-	Manifest map[string]interface{} `json:"manifest"`
+	SensorID  string                 `json:"sensor_id"`
+	EnvValues map[string]string      `json:"env_values"`
+	Manifest  map[string]interface{} `json:"manifest"`
 }
 
 type ComposeReq struct {
@@ -81,9 +82,9 @@ type ComposeService struct {
 	CapAdd      []string `yaml:"cap_add,omitempty"`
 	SecurityOpt []string `yaml:"security_opt,omitempty"`
 
-	Logging     *LoggingConfig `yaml:"logging,omitempty"`
-	Environment []string       `yaml:"environment,omitempty"`
-	Ports       []string       `yaml:"ports,omitempty"`
+	Logging     *LoggingConfig  `yaml:"logging,omitempty"`
+	Environment []string        `yaml:"environment,omitempty"`
+	Ports       []string        `yaml:"ports,omitempty"`
 	Volumes     []ComposeVolume `yaml:"volumes,omitempty"`
 }
 
@@ -154,6 +155,49 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 		}
 
 		// -----------------------------------------------------------------
+		// ENVIRONMENT VARIABLES BUILD
+		// -----------------------------------------------------------------
+
+		envMap := make(map[string]string)
+
+		if envVars, ok := deployment["env_vars"].([]interface{}); ok {
+			for _, e := range envVars {
+				eMap, ok := e.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				name, _ := eMap["name"].(string)
+				if def, ok := eMap["default"].(string); ok {
+					envMap[name] = def
+				}
+			}
+		}
+
+		forbiddenVars := map[string]bool{
+			"HW_HUB_ENDPOINT": true,
+			"HW_HUB_KEY":      true,
+			"HW_SENSOR_ID":    true,
+			"HW_CONFIG_REV":   true,
+			"HW_TEST_MODE":    true,
+		}
+
+		for k, v := range s.EnvValues {
+			if forbiddenVars[k] {
+				continue
+			}
+			envMap[k] = v
+		}
+
+		envMap["HW_HUB_ENDPOINT"] = hubEndpoint
+		envMap["HW_HUB_KEY"] = hubKey
+		envMap["HW_SENSOR_ID"] = s.SensorID
+		envMap["HW_TEST_MODE"] = "false"
+
+		if configRev != "" {
+			envMap["HW_CONFIG_REV"] = configRev
+		}
+
+		// -----------------------------------------------------------------
 		// INIT CONTAINERS
 		// -----------------------------------------------------------------
 
@@ -176,6 +220,26 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 					initSvc.Command = cmd
 				}
 
+				if user, ok := initMap["user"].(string); ok {
+					initSvc.User = user
+				}
+				if capDrop, ok := initMap["cap_drop"].([]interface{}); ok {
+					for _, c := range capDrop {
+						initSvc.CapDrop = append(initSvc.CapDrop, c.(string))
+						if capStr, ok := c.(string); ok {
+							initSvc.CapDrop = append(initSvc.CapDrop, capStr)
+						}
+					}
+				}
+				if secOpt, ok := initMap["security_opt"].([]interface{}); ok {
+					for _, s := range secOpt {
+						initSvc.SecurityOpt = append(initSvc.SecurityOpt, s.(string))
+						if secStr, ok := s.(string); ok {
+							initSvc.SecurityOpt = append(initSvc.SecurityOpt, secStr)
+						}
+					}
+				}
+
 				if vols, ok := initMap["volume_mounts"].([]interface{}); ok {
 
 					for _, v := range vols {
@@ -185,15 +249,44 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 							continue
 						}
 
+						if volType, _ := volMap["type"].(string); volType == "dynamic_dir_bind" {
+							envKey, _ := volMap["source_env"].(string)
+							targetPrefix, _ := volMap["target_prefix"].(string)
+
+							filesStr := envMap[envKey]
+							files := strings.Split(filesStr, ",")
+
+							dirSet := make(map[string]bool)
+
+							for _, f := range files {
+								f = strings.TrimSpace(f)
+								if f == "" {
+									continue
+								}
+
+								dir := filepath.Dir(f)
+								if dirSet[dir] {
+									continue
+								}
+								dirSet[dir] = true
+
+								composeVol := ComposeVolume{
+									Type:   "bind",
+									Source: dir,
+									Target: targetPrefix + dir,
+								}
+
+								if ro, ok := volMap["read_only"].(bool); ok && ro {
+									composeVol.ReadOnly = true
+								}
+								initSvc.Volumes = append(initSvc.Volumes, composeVol)
+							}
+							continue
+						}
+
 						source, _ := volMap["source"].(string)
 
-						source = strings.ReplaceAll(
-							source,
-							"{{ .TrapPath }}",
-							"${TRAP_PATH}",
-						)
-
-						for k, val := range s.EnvValues {
+						for k, val := range envMap {
 							source = strings.ReplaceAll(
 								source,
 								"${"+k+"}",
@@ -213,6 +306,11 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 
 						initSvc.Volumes = append(initSvc.Volumes, composeVol)
 					}
+				}
+
+				// Inject environment variables into init container
+				for k, val := range envMap {
+					initSvc.Environment = append(initSvc.Environment, fmt.Sprintf("%s=%s", k, val))
 				}
 
 				compose.Services = append(
@@ -302,63 +400,8 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 		}
 
 		// -----------------------------------------------------------------
-		// ENVIRONMENT VARIABLES
+		// ENVIRONMENT VARIABLES ASSIGNMENT
 		// -----------------------------------------------------------------
-
-		envMap := make(map[string]string)
-
-		// Load manifest defaults first
-
-		if envVars, ok := deployment["env_vars"].([]interface{}); ok {
-
-			for _, e := range envVars {
-
-				eMap, ok := e.(map[string]interface{})
-				if !ok {
-					continue
-				}
-
-				name, _ := eMap["name"].(string)
-
-				if def, ok := eMap["default"].(string); ok {
-					envMap[name] = def
-				}
-			}
-		}
-
-		// Block UI override of protected variables
-
-		forbiddenVars := map[string]bool{
-			"HW_HUB_ENDPOINT": true,
-			"HW_HUB_KEY":      true,
-			"HW_SENSOR_ID":    true,
-			"HW_CONFIG_REV":   true,
-			"HW_TEST_MODE":    true,
-		}
-
-		// Apply user overrides
-
-		for k, v := range s.EnvValues {
-
-			if forbiddenVars[k] {
-				continue
-			}
-
-			if v != "" {
-				envMap[k] = v
-			}
-		}
-
-		// Force hub-owned variables
-
-		envMap["HW_HUB_ENDPOINT"] = hubEndpoint
-		envMap["HW_HUB_KEY"] = hubKey
-		envMap["HW_SENSOR_ID"] = s.SensorID
-		envMap["HW_TEST_MODE"] = "false"
-
-		if configRev != "" {
-			envMap["HW_CONFIG_REV"] = configRev
-		}
 
 		// Ordered core variables
 
@@ -431,13 +474,34 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 					continue
 				}
 
-				source, _ := volMap["source"].(string)
+				// NEW: Dynamic File Bind (Generates individual file mounts)
+				if volType, _ := volMap["type"].(string); volType == "dynamic_file_bind" {
+					envKey, _ := volMap["source_env"].(string)
+					targetPrefix, _ := volMap["target_prefix"].(string)
 
-				source = strings.ReplaceAll(
-					source,
-					"{{ .TrapPath }}",
-					"${TRAP_PATH}",
-				)
+					filesStr := envMap[envKey]
+					files := strings.Split(filesStr, ",")
+					for _, f := range files {
+						f = strings.TrimSpace(f)
+						if f == "" {
+							continue
+						}
+
+						composeVol := ComposeVolume{
+							Type:   "bind",
+							Source: f,
+							Target: targetPrefix + f,
+						}
+
+						if ro, ok := volMap["read_only"].(bool); ok && ro {
+							composeVol.ReadOnly = true
+						}
+						svc.Volumes = append(svc.Volumes, composeVol)
+					}
+					continue
+				}
+
+				source, _ := volMap["source"].(string)
 
 				for k, val := range s.EnvValues {
 					source = strings.ReplaceAll(
@@ -636,7 +700,6 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 	if effectiveRevision == "" {
 		effectiveRevision = generateRevisionHash(nodeDetails.InstalledSensors)
 	}
-
 
 	yamlData, err := buildComposeFileForNode(
 		hubEndpoint,

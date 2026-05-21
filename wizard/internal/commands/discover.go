@@ -73,9 +73,92 @@ func HandleDiscover(registry string, force bool) error {
 	cli.PrintDeploymentPlan(recommendations)
 	cli.PrintExpectedImpact(recommendations)
 
-	if !cli.ConfirmAction(fmt.Sprintf("Apply these %d sensor suggestions", len(recommendations))) {
-		fmt.Printf("\n    %sSuggestions not applied. Run 'wizard apply' when ready.%s\n\n", cli.Dim, cli.Reset)
-		return nil
+promptLoop:
+	for {
+		if len(recommendations) == 0 {
+			fmt.Printf("    %sNo recommendations left to apply.%s\n\n", cli.Dim, cli.Reset)
+			return nil
+		}
+
+		choice, err := cli.PromptInput(fmt.Sprintf("    Apply all %d sensor suggestions? (or 'e' Edit) [y/N/e]: ", len(recommendations)))
+		if err != nil {
+			return err
+		}
+
+		choice = strings.ToLower(strings.TrimSpace(choice))
+		switch choice {
+		case "y", "yes":
+			break promptLoop
+		case "e", "edit":
+		editLoop:
+			for {
+				fmt.Printf("\n    %sCurrent Suggestions:%s\n", cli.Cyan, cli.Reset)
+				for i, rec := range recommendations {
+					fmt.Printf("      [%d] %s (%s)\n", i+1, rec.SensorName, rec.SensorID)
+				}
+				fmt.Printf("\n    Type numbers to remove (e.g. '1,3'), 'i <num>' to inspect, or 'c' to continue.\n")
+				editChoice, _ := cli.PromptInput("    Edit: ")
+				editChoice = strings.ToLower(strings.TrimSpace(editChoice))
+
+				if editChoice == "c" || editChoice == "continue" || editChoice == "" {
+					cli.PrintDeploymentPlan(recommendations)
+					cli.PrintExpectedImpact(recommendations)
+					break editLoop
+				}
+
+				if strings.HasPrefix(editChoice, "i ") {
+					idxStr := strings.TrimSpace(strings.TrimPrefix(editChoice, "i "))
+					var idx int
+					if _, err := fmt.Sscanf(idxStr, "%d", &idx); err == nil && idx >= 1 && idx <= len(recommendations) {
+						rec := recommendations[idx-1]
+						fmt.Printf("\n    %s--- Sensor Inspection ---%s\n", cli.Bold, cli.Reset)
+						fmt.Printf("    Name:   %s\n", rec.SensorName)
+						fmt.Printf("    ID:     %s\n", rec.SensorID)
+						fmt.Printf("    Reason: %s\n", rec.Reason)
+						fmt.Printf("\n    Env Vars:\n")
+						for _, env := range rec.DeploymentTemplate.EnvVars {
+							fmt.Printf("      %s = %s\n", env.Name, env.Default)
+						}
+						fmt.Printf("    %s-------------------------%s\n\n", cli.Bold, cli.Reset)
+					} else {
+						fmt.Printf("    %s[!] Invalid sensor number.%s\n", cli.Red, cli.Reset)
+					}
+					continue editLoop
+				}
+
+				parts := strings.Split(editChoice, ",")
+				toRemove := make(map[int]bool)
+				valid := true
+				for _, p := range parts {
+					var idx int
+					if _, err := fmt.Sscanf(strings.TrimSpace(p), "%d", &idx); err == nil && idx >= 1 && idx <= len(recommendations) {
+						toRemove[idx-1] = true
+					} else if strings.TrimSpace(p) != "" {
+						fmt.Printf("    %s[!] Invalid input: '%s'.%s\n", cli.Red, cli.Reset, p)
+						valid = false
+						break
+					}
+				}
+
+				if valid && len(toRemove) > 0 {
+					var nextRecs []*discovery.Recommendation
+					for i, rec := range recommendations {
+						if !toRemove[i] {
+							nextRecs = append(nextRecs, rec)
+						} else {
+							fmt.Printf("    %s- Removed: %s%s\n", cli.Yellow, rec.SensorName, cli.Reset)
+						}
+					}
+					recommendations = nextRecs
+					if len(recommendations) == 0 {
+						break editLoop
+					}
+				}
+			}
+		case "", "n", "no":
+			fmt.Printf("\n    %sSuggestions not applied. Run 'wizard apply' when ready.%s\n\n", cli.Dim, cli.Reset)
+			return nil
+		}
 	}
 
 	return applySuggestions(app, recommendations, dockerMap)
@@ -95,7 +178,7 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, dockerMap 
 	for _, rec := range recs {
 		configValues := make(map[string]string)
 		for _, env := range rec.DeploymentTemplate.EnvVars {
-			if strings.HasPrefix(env.Name, "HW_") && !hubInjectedVars[env.Name] {
+			if !hubInjectedVars[env.Name] {
 				configValues[env.Name] = env.Default
 			}
 		}

@@ -209,14 +209,21 @@
       "user": "65532:65532",
       "init_containers": [
         {
-          "name": "permission-fixer",
-          "image": "alpine:latest",
-          "command": "sh -c \"apk add --no-cache acl && setfacl -R -m u:65532:rx /honey_dir\"",
+          "name": "decoy-provisioner",
+          "image": "ghcr.io/andreicscs/honeywire-filecanary:latest",
+          "command": "/app/filecanary init",
+          "user": "0:0",
+          "cap_drop": [
+            "ALL"
+          ],
+          "security_opt": [
+            "no-new-privileges:true"
+          ],
           "volume_mounts": [
             {
-              "type": "bind",
-              "source": "{{ .TrapPath }}",
-              "target": "/honey_dir",
+              "type": "dynamic_dir_bind",
+              "source_env": "HW_DECOY_FILES",
+              "target": "/host",
               "read_only": false
             }
           ]
@@ -224,9 +231,9 @@
       ],
       "volume_mounts": [
         {
-          "type": "bind",
-          "source": "{{ .TrapPath }}",
-          "target": "/honey_dir",
+          "type": "dynamic_file_bind",
+          "source_env": "HW_DECOY_FILES",
+          "target_prefix": "/canaries",
           "read_only": true
         }
       ],
@@ -248,33 +255,17 @@
           "hidden": true
         },
         {
-          "name": "HW_HONEY_DIR",
-          "description": "Internal container mount path.",
-          "default": "/honey_dir",
-          "type": "string",
-          "required": true,
-          "hidden": true
-        },
-        {
-          "name": "TRAP_PATH",
-          "description": "The physical path on the host machine to monitor.",
-          "default": "{{ if .HasWeb }}/var/www/html/.backups{{ else if .HasDB }}/var/lib/db_backups{{ else }}/opt/app_data/backups{{ end }}",
-          "type": "string",
-          "required": true,
-          "hidden": false
-        },
-        {
-          "name": "TRAP_FILE_1",
-          "description": "Primary decoy file name.",
-          "default": "{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}secrets_backup.yaml{{ end }}",
+          "name": "HW_ALERT_ON_OPEN",
+          "description": "Generate alerts when a file is simply read or opened (noisier).",
+          "default": "false",
           "type": "string",
           "required": false,
           "hidden": false
         },
         {
-          "name": "TRAP_FILE_2",
-          "description": "Secondary decoy file name (if multiple services detected).",
-          "default": "{{ if gt (len .MatchedServices) 1 }}{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}api_keys.txt{{ end }}{{ end }}",
+          "name": "HW_DECOY_FILES",
+          "description": "Comma-separated list of absolute file paths to deploy and monitor.",
+          "default": "{{ if .HasWeb }}/var/www/html/.backup-config.php{{ else if .HasDB }}/var/lib/db/dump.sql.bak{{ else }}/opt/.env.backup{{ end }}{{ if gt (len .MatchedServices) 1 }},/home/admin/vpn_keys.txt{{ end }}",
           "type": "string",
           "required": false,
           "hidden": false

@@ -1,12 +1,13 @@
 # HoneyWire Official Sensor: File Canary
 
-The File Canary acts as both a Honeypot and a File Integrity Monitor (FIM). It watches a specified directory or file on the host machine. If an attacker modifies, deletes, or drops a file into the watched area, the sensor immediately fires an alert to the HoneyWire Hub.
+The File Canary is a low-noise Host-Level Tamper and Ransomware detector. It safely provisions discrete decoy files across your system and explicitly maps them into an unprivileged sandbox using individual read-only mounts. 
 
 ## Features
 * **Zero-Setup SDK Integration:** Natively built on the HoneyWire Go SDK.
-* **Dual-Mode Operation:** Can monitor highly sensitive, real system files (FIM) or act as a standalone honeypot directory (Trap).
-* **Safe Permissions Handling:** Uses Access Control Lists (ACLs) to securely read target directories without altering their original host ownership.
-* **Failsafe Mounts:** Designed to halt deployment if the target directory doesn't exist, preventing false-positive monitoring.
+* **Tamper & Ransomware Tripwires:** Triggers on `IN_MODIFY`, `IN_DELETE_SELF`, and `IN_ATTRIB` to instantly alert on encryption routines or cleanup scripts tampering with bait artifacts.
+* **Strict Initializer Sandbox:** Validates paths, drops symlinks, ensures strict absolute targeting, and automatically creates missing artifacts without altering surrounding directory permissions.
+* **Explicit File Isolation:** Eschews broad directory tracking in favor of explicit individual file monitoring to dramatically cut false positives.
+* **Optional Access Detection:** Toggle `HW_ALERT_ON_OPEN` to catch reconnaissance activity like `cat` and `less` via `IN_OPEN` / `IN_ACCESS` events.
 
 ## Configuration
 
@@ -22,7 +23,8 @@ Configuration is managed through an `.env` file located in the same directory as
 ### Sensor-Specific Variables
 | Variable | Description | Default |
 |---|---|---|
-| `TRAP_PATH` | The physical path on the host machine to monitor. | `./trap_directory` or `/etc/passwd` |
+| `HW_DECOY_FILES` | Comma-separated list of absolute file paths to deploy and monitor. | `/var/www/html/.backup-config.php, /opt/.env.backup` |
+| `HW_ALERT_ON_OPEN` | Generates alerts when files are simply read/opened. | `false` |
 ## Deployment
 It is highly recommended to deploy this sensor using the provided `docker-compose.yml` configuration and the provided `Dockerfile` (if building from source). The compose file orchestrates the required permission fixers and read-only mounts automatically.
 
@@ -36,8 +38,8 @@ This sensor is architected for extreme resilience against exploits. By utilizing
 
 **Core Defense-in-Depth Measures:**
 * **Unprivileged Execution:** Runs entirely as a non-root user (`UID 65532`), preventing system-level modifications even in the event of a container breach.
-* **Read-Only Mounts:** The target directory is mounted with strict `read_only: true` flags, ensuring the container cannot write to or modify the host files it is monitoring under any circumstances.
-* **ACL Integration:** Instead of changing host file ownership, a temporary initialization container uses `setfacl` to grant the non-root user specific, read-only traverse rights, keeping your original host permissions completely intact.
+* **Explicit Single-File Mounts:** Completely abandons broad directory mounting. Individual files are explicitly mounted with `read_only: true` flags, leaving zero surface area for recursive filesystem traversal.
+* **Symlink & Traversal Protections:** The initialization provisioner actively refuses to follow symlinks, utilize relative paths, or touch directories, entirely mitigating path traversal injections.
 * **Kernel Capability Stripping:** Drops all default Linux kernel capabilities (`cap_drop: ALL`) via the Docker Compose configuration, neutralizing advanced kernel exploitation techniques.
 * **Distroless Isolation:** Built on a statically-linked Distroless image. It completely lacks a shell (`/bin/sh`), package managers, or standard Linux utilities, leaving attackers with zero tools to pivot to the host.
 

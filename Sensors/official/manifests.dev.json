@@ -148,7 +148,7 @@
       "triggers": {
         "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy"]
       },
-      "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch malicious payload drops or ransomware activity."
+      "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch suspicious canary file interactions or ransomware activity."
     },
     "deployment": {
       "image": "192.168.1.11:5000/honeywire-filecanary:dev",
@@ -156,23 +156,24 @@
       "user": "65532:65532",
       "init_containers": [
         {
-          "name": "permission-fixer",
-          "image": "alpine:latest",
-          "command": "sh -c \"apk add --no-cache acl && setfacl -R -m u:65532:rx /honey_dir\"",
-          "volume_mounts": [ { "type": "bind", "source": "{{ .TrapPath }}", "target": "/honey_dir", "read_only": false } ]
+          "name": "decoy-provisioner",
+          "image": "192.168.1.11:5000/honeywire-filecanary:dev",
+          "command": "/app/filecanary init",
+          "user": "0:0",
+          "cap_drop": ["ALL"],
+          "security_opt": ["no-new-privileges:true"],
+          "volume_mounts": [ { "type": "dynamic_dir_bind", "source_env": "HW_DECOY_FILES", "target_prefix": "/host", "read_only": false } ]
         }
       ],
-      "volume_mounts": [ { "type": "bind", "source": "{{ .TrapPath }}", "target": "/honey_dir", "read_only": true } ],
+      "volume_mounts": [ { "type": "dynamic_file_bind", "source_env": "HW_DECOY_FILES", "target_prefix": "/canaries", "read_only": true } ],
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "${HW_SENSOR_ID:-file-canary-01}", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "critical", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_HONEY_DIR", "description": "Internal container mount path.", "default": "/honey_dir", "type": "string", "required": true, "hidden": true },
-        { "name": "TRAP_PATH", "description": "The physical path on the host machine to monitor.", "default": "{{ if .HasWeb }}/var/www/html/.backups{{ else if .HasDB }}/var/lib/db_backups{{ else }}/opt/app_data/backups{{ end }}", "type": "string", "required": true, "hidden": false },
-        { "name": "TRAP_FILE_1", "description": "Primary decoy file name.", "default": "{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}secrets_backup.yaml{{ end }}", "type": "string", "required": false, "hidden": false },
-        { "name": "TRAP_FILE_2", "description": "Secondary decoy file name (if multiple services detected).", "default": "{{ if gt (len .MatchedServices) 1 }}{{ if .HasWeb }}{{ randWebFile .TrapPath }}{{ else if .HasDB }}{{ randDBFile .TrapPath }}{{ else }}api_keys.txt{{ end }}{{ end }}", "type": "string", "required": false, "hidden": false }
+        { "name": "HW_ALERT_ON_OPEN", "description": "Generate alerts when a file is simply read or opened (noisier).", "default": "false", "type": "string", "required": false, "hidden": false },
+        { "name": "HW_DECOY_FILES", "description": "Comma-separated list of absolute file paths to deploy and monitor.", "default": "{{ if .HasWeb }}/var/www/html/.backup-config.php{{ else if .HasDB }}/var/lib/db/dump.sql.bak{{ else }}/opt/.env.backup{{ end }}{{ if gt (len .MatchedServices) 1 }},/home/admin/vpn_keys.txt{{ end }}", "type": "string", "required": false, "hidden": false }
       ]
     }
   },
