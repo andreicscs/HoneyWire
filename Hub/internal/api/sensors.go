@@ -6,9 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/models"
 )
 
@@ -55,7 +57,11 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Log heartbeat bucket
 	if err := h.Store.InsertHeartbeat(nodeID, hb.SensorID, minuteBucket); err != nil {
-		log.Printf("[WARNING] Failed to log heartbeat bucket: %v", err)
+		if strings.Contains(err.Error(), "FOREIGN KEY") {
+			log.Printf("[INFO] Dropped heartbeat from unregistered sensor %s on node %s (node pending reconciliation)", hb.SensorID, nodeID)
+		} else {
+			log.Printf("[WARNING] Failed to log heartbeat bucket: %v", err)
+		}
 	}
 
 	// 3. Broadcasts
@@ -138,6 +144,32 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 
 // GetManifests fetches the sensor manifest JSON.
 func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
+	isAuthenticated := false
+
+	// 1. Try Node API Key Auth
+	if r.Header.Get("Authorization") == "" && r.URL.Query().Get("key") != "" {
+		r.Header.Set("Authorization", "Bearer "+r.URL.Query().Get("key"))
+	}
+	_, err := h.authenticateNodeRequest(r)
+	if err == nil {
+		isAuthenticated = true
+	}
+
+	// 2. Try UI Session Auth (Fallback)
+	if !isAuthenticated {
+		cookie, err := r.Cookie(auth.CookieName)
+		if err == nil && cookie.Value != "" {
+			if h.SessionStore.IsValid(cookie.Value) {
+				isAuthenticated = true
+			}
+		}
+	}
+
+	if !isAuthenticated {
+		RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	manifestURL := os.Getenv("HW_MANIFEST_URL")
 	if manifestURL == "" {
 		manifestURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"

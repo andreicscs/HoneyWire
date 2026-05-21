@@ -50,6 +50,10 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	// Insert event with composite key reference (node_id, sensor_id)
 	lastInsertID, err := h.Store.InsertEvent(&e, nowStr, string(detailsJSON))
 	if err != nil {
+		if strings.Contains(err.Error(), "FOREIGN KEY") {
+			RespondError(w, "Sensor is not registered", http.StatusNotFound)
+			return
+		}
 		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", nodeID, e.SensorID, err)
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return

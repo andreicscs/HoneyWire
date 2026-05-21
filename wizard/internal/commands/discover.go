@@ -256,6 +256,9 @@ func auditEnvironment() (*scanner.HostState, map[int]string, *system.SystemState
 func buildStrategy(hostState *scanner.HostState, systemState *system.SystemState, dockerMap map[int]string, registry string, nodeConfig *app.NodeConfig, rng *rand.Rand) ([]*discovery.Recommendation, error) {
 	fmt.Printf("\n%s[*] Step 3/3: Formulating Deception Strategy...%s\n", cli.Bold, cli.Reset)
 
+	// Force the Wizard to pull the manifest directly from the Hub.
+	registry = fmt.Sprintf("%s/api/v1/manifests?key=%s", strings.TrimRight(nodeConfig.HubURL, "/"), nodeConfig.APIKey)
+
 	manifests, apiErr := api.FetchManifests(registry)
 	if apiErr != nil {
 		return nil, fmt.Errorf("Registry error: %w", apiErr)

@@ -49,7 +49,6 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 		r.Use(UIAuthMiddleware(sessionStore))
 
 		r.Get("/api/v1/ws", h.ServeWS)
-		r.Get("/api/v1/manifests", h.GetManifests) // Fetches catalog
 
 		// UI Compose Preview
 		r.Post("/api/v1/compose/generate", h.GenerateCompose) // Used by UI modal for live preview
@@ -90,11 +89,12 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 
 	// --- Wizard & Telemetry Endpoints ---
 	// Authentication is handled via API Key (Bearer Token) inside the handler
-	r.Get("/api/v1/nodes/me", h.GetCurrentNode) // node whoami based on api key.
+	r.Get("/api/v1/nodes/me", h.GetCurrentNode)      // node whoami based on api key.
 	r.Get("/api/v1/nodes/compose", h.GetNodeCompose) // aggreagates all generated compose files for a node's sensors
 	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
 	r.Post("/api/v1/event", h.ReceiveEvent)
-	
+
+	r.Get("/api/v1/manifests", h.GetManifests) // Fetches catalog (Dual Auth)
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

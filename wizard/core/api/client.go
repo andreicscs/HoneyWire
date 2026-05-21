@@ -16,14 +16,6 @@ import (
 
 const wizardUserAgent = "HoneyWire-Wizard/2.0"
 
-var DefaultRegistryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
-
-func init() {
-	if envURL := os.Getenv("HW_MANIFEST_URL"); envURL != "" {
-		DefaultRegistryURL = envURL
-	}
-}
-
 type HubClient struct {
 	baseURL string
 	client  *http.Client

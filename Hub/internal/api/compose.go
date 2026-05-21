@@ -225,7 +225,6 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 				}
 				if capDrop, ok := initMap["cap_drop"].([]interface{}); ok {
 					for _, c := range capDrop {
-						initSvc.CapDrop = append(initSvc.CapDrop, c.(string))
 						if capStr, ok := c.(string); ok {
 							initSvc.CapDrop = append(initSvc.CapDrop, capStr)
 						}
@@ -233,7 +232,6 @@ func buildComposeFile(hubEndpoint string, hubKey string, configRev string, senso
 				}
 				if secOpt, ok := initMap["security_opt"].([]interface{}); ok {
 					for _, s := range secOpt {
-						initSvc.SecurityOpt = append(initSvc.SecurityOpt, s.(string))
 						if secStr, ok := s.(string); ok {
 							initSvc.SecurityOpt = append(initSvc.SecurityOpt, secStr)
 						}
