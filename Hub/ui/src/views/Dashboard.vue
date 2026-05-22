@@ -4,32 +4,6 @@ import SeverityChart from '../components/dashboard/SeverityChart.vue'
 import UptimeHeatmap from '../components/dashboard/UptimeHeatmap.vue'
 import EventTable from '../components/dashboard/EventTable.vue'
 import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
-import { ref } from 'vue'
-import { useFleetStore } from '../stores/fleet'
-
-const fleetStore = useFleetStore()
-const showProvisionModal = ref(false)
-const provisionToken = ref('')
-const provisionNodeId = ref('')
-const isGeneratingToken = ref(false)
-const currentHost = ref(window.location.host)
-
-const generateToken = async () => {
-    const alias = window.prompt('Enter a friendly alias for the new node', `New Node ${Date.now()}`)
-    if (!alias) return
-
-    isGeneratingToken.value = true
-    try {
-        const result = await fleetStore.createNode(alias)
-        provisionToken.value = result.apiKey
-        provisionNodeId.value = result.nodeId
-        showProvisionModal.value = true
-    } catch (err) {
-        alert('Failed to create node. Please try again.')
-    } finally {
-        isGeneratingToken.value = false
-    }
-}
 </script>
 
 <template>
