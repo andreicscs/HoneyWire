@@ -27,7 +27,6 @@ const settingTabs = [
 
 const settings = ref({
     hubEndpoint: window.location.origin,
-    hubKey: '',
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     webhookType: 'ntfy',
@@ -43,7 +42,6 @@ watch(() => config.isLoaded, (loaded) => {
     if (loaded) {
         const loadedSettings = {
             hubEndpoint: config.hubEndpoint || window.location.origin,
-            hubKey: config.hubKey || '',
             autoArchiveDays: config.autoArchiveDays !== undefined ? config.autoArchiveDays : 0,
             autoPurgeDays: config.autoPurgeDays !== undefined ? config.autoPurgeDays : 0,
             webhookType: config.webhookType || 'ntfy',
@@ -80,14 +78,6 @@ const saveSettings = async () => {
         setTimeout(() => saveMessage.value = '', 3000)
     } else {
         saveMessage.value = 'Failed to save configuration. Check console and server logs.'
-    }
-}
-
-const regenerateKey = () => {
-    if(confirm("Regenerating the Hub Key will immediately disconnect all active sensors. You must save changes to apply this. Continue?")) {
-        const array = new Uint8Array(16)
-        crypto.getRandomValues(array)
-        settings.value.hubKey = 'hw_sk_' + Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
     }
 }
 
@@ -201,22 +191,6 @@ const submitFactoryReset = async () => {
                             />
                         </div>
                         
-                        <BaseDivider />
-                        
-                        <div class="flex gap-3 items-end flex-wrap sm:flex-nowrap">
-                            <div class="flex-1 w-full max-w-md">
-                                <BaseInput 
-                                    v-model="settings.hubKey" 
-                                    label="Hub Secret Key" 
-                                    description="The shared secret required by sensors to authenticate with the Hub API." 
-                                />
-                            </div>
-                            <div class="pb-[1.35rem]">
-                                <BaseButton variant="secondary" @click="regenerateKey">
-                                    Regenerate Key
-                                </BaseButton>
-                            </div>
-                        </div>
                     </BaseCard>
                 </div>
 

@@ -3,7 +3,6 @@ import { reactive, readonly } from 'vue'
 const state = reactive({
     isLoaded: false,
     hubEndpoint: '',
-    hubKey: '',
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     webhookType: 'ntfy',
@@ -21,7 +20,6 @@ export function useConfig() {
                 const data = await res.json()
                 
                 state.hubEndpoint = data.hub_endpoint || window.location.origin
-                state.hubKey = data.hub_key || ''
                 
                 // STRICT CHECKS: 0 is valid for 'Keep Forever'
                 state.autoArchiveDays = data.auto_archive_days != null ? data.auto_archive_days : 0
@@ -51,7 +49,6 @@ export function useConfig() {
         try {
             const payload = {}
             if (updates.hubEndpoint !== undefined) payload.hub_endpoint = updates.hubEndpoint
-            if (updates.hubKey !== undefined) payload.hub_key = updates.hubKey
             if (updates.autoArchiveDays !== undefined) payload.auto_archive_days = updates.autoArchiveDays
             if (updates.autoPurgeDays !== undefined) payload.auto_purge_days = updates.autoPurgeDays
             if (updates.webhookType !== undefined) payload.webhook_type = updates.webhookType

@@ -34,7 +34,7 @@ func (s *SQLiteStore) GetAllConfig() (map[string]string, error) {
 	return kv, nil
 }
 
-func (s *SQLiteStore) CompleteSetup(adminHash, hubEndpoint, hubKey string) error {
+func (s *SQLiteStore) CompleteSetup(adminHash, hubEndpoint string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
@@ -46,10 +46,6 @@ func (s *SQLiteStore) CompleteSetup(adminHash, hubEndpoint, hubKey string) error
 		return err
 	}
 	_, err = tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES ('hub_endpoint', ?)", hubEndpoint)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES ('hub_key', ?)", hubKey)
 	if err != nil {
 		return err
 	}
@@ -73,7 +69,7 @@ func (s *SQLiteStore) UpdateConfigBatch(req map[string]interface{}) error {
 
 	for key, val := range req {
 		switch key {
-		case "hub_endpoint", "hub_key", "webhook_url", "siem_address":
+		case "hub_endpoint", "webhook_url", "siem_address":
 			if strVal, ok := val.(string); ok {
 				if _, err := tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", key, strVal); err != nil {
 					return err

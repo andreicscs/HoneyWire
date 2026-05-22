@@ -80,12 +80,11 @@ export const useAppStore = defineStore('app', () => {
 
   // --- ACTIONS: SETUP ---
 
-  const completeSetup = async (password, hubEndpoint, hubKey) => {
+  const completeSetup = async (password, hubEndpoint) => {
     try {
       await api.post('/api/v1/setup', {
         password,
         hub_endpoint: hubEndpoint,
-        hub_key: hubKey,
       })
       requiresSetup.value = false
       isAuthenticated.value = true

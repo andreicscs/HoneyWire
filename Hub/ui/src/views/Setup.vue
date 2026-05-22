@@ -16,24 +16,16 @@ const appStore = useAppStore()
 const password = ref('')
 const confirmPassword = ref('')
 const hubEndpoint = ref('')
-const hubKey = ref('')
 
 const loading = ref(false)
 const error = ref('')
 
-const generateKey = () => {
-    const array = new Uint8Array(16)
-    crypto.getRandomValues(array)
-    hubKey.value = 'hw_sk_' + Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 onMounted(() => {
     hubEndpoint.value = window.location.origin
-    generateKey()
 })
 
 const doSetup = async () => {
-    if (!password.value || !confirmPassword.value || !hubEndpoint.value || !hubKey.value) {
+    if (!password.value || !confirmPassword.value || !hubEndpoint.value) {
         error.value = "All fields are required."
         return
     }
@@ -44,7 +36,7 @@ const doSetup = async () => {
     loading.value = true
     error.value = ''
 
-    const result = await appStore.completeSetup(password.value, hubEndpoint.value, hubKey.value)
+    const result = await appStore.completeSetup(password.value, hubEndpoint.value)
 
     loading.value = false
     if (result.success) {
@@ -110,21 +102,6 @@ const doSetup = async () => {
                                 description="The URL sensors use to send telemetry."
                                 required 
                             />
-                            
-                            <div class="flex gap-2 items-end">
-                                <BaseInput 
-                                    v-model="hubKey" 
-                                    label="Sensor Secret Key"
-                                    placeholder="Secure API Key" 
-                                    required 
-                                    class="flex-1"
-                                />
-                                <div class="mb-0.5">
-                                    <BaseButton variant="secondary" @click="generateKey">
-                                        Generate
-                                    </BaseButton>
-                                </div>
-                            </div>
                         </div>
                     </div>
                     

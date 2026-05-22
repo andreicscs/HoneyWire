@@ -267,7 +267,6 @@ const handleCopy = async (id, text) => {
 
 <template>
     <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6">
-        
         <div class="flex items-center justify-between shrink-0">
              <PageHeader 
                 title="Fleet Overview" 

@@ -42,7 +42,7 @@ func (h *Handler) CompleteSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.HubEndpoint == "" || req.HubKey == "" || req.Password == "" {
+	if req.HubEndpoint == "" || req.Password == "" {
 		RespondError(w, "Invalid setup parameters. Missing required fields.", http.StatusBadRequest)
 		return
 	}
@@ -53,7 +53,7 @@ func (h *Handler) CompleteSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Store.CompleteSetup(string(hash), req.HubEndpoint, req.HubKey); err != nil {
+	if err := h.Store.CompleteSetup(string(hash), req.HubEndpoint); err != nil {
 		RespondError(w, "Failed to complete setup", http.StatusInternalServerError)
 		return
 	}
@@ -78,7 +78,6 @@ func (h *Handler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 	cfg := models.ConfigPayload{
 		HubEndpoint:     kv["hub_endpoint"],
-		HubKey:          kv["hub_key"],
 		AutoArchiveDays: archiveDays,
 		AutoPurgeDays:   purgeDays,
 		WebhookURL:      kv["webhook_url"],
@@ -241,7 +240,7 @@ func (h *Handler) SetSystemState(w http.ResponseWriter, r *http.Request) {
 	if req.IsArmed {
 		val = "true"
 	}
-	
+
 	if err := h.Store.UpdateConfigValue("is_armed", val); err != nil {
 		RespondError(w, "Failed to update state", http.StatusInternalServerError)
 		return

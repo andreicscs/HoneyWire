@@ -52,7 +52,6 @@ const copyCommand = () => {
 
 <template>
     <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6">
-
         <TrafficFilters />
 
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
