@@ -200,7 +200,9 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, dockerMap 
 	}
 
 	if err := deploy.Apply(reconcileCtx, composeData); err != nil {
-		return fmt.Errorf("reconciliation failed: %w", err)
+		fmt.Printf("\n    %s[!] The Hub saved your sensor config, but local deployment failed.%s\n", cli.Red, cli.Reset)
+		fmt.Printf("    %sThe node is now in a 'Pending Sync' state. Check Docker logs, resolve the issue, and run 'wizard apply' to retry.%s\n\n", cli.Yellow, cli.Reset)
+		return fmt.Errorf("local reconciliation failed: %w", err)
 	}
 
 	fmt.Printf("    %s✅ Node reconciled. Run 'docker compose -f %s -p %s ps' to view sensors.%s\n\n", cli.Green, filepath.Join(deploy.DeployDir, deploy.ComposeFile), deploy.ProjectName, cli.Reset)
