@@ -30,8 +30,13 @@ func runInit() {
 		}
 
 		clean := filepath.Clean(f)
-		if clean != f || !filepath.IsAbs(f) || strings.Contains(f, "..") || strings.Contains(f, "\x00") {
-			log.Printf("ERROR: Path %s contains invalid characters or traversal attempts", f)
+
+		// Basic path validation
+		if clean != f ||
+			!filepath.IsAbs(f) ||
+			strings.Contains(f, "..") ||
+			strings.Contains(f, "\x00") {
+			log.Printf("ERROR: Invalid decoy file path: %s", f)
 			continue
 		}
 
@@ -40,23 +45,27 @@ func runInit() {
 		// Verify intermediate path components are not symlinks
 		parts := strings.Split(strings.TrimPrefix(f, "/"), "/")
 		current := "/host"
+
 		symlinkFound := false
 
 		for _, p := range parts {
 			if p == "" {
 				continue
 			}
+
 			current = filepath.Join(current, p)
+
 			info, err := os.Lstat(current)
 			if err != nil {
 				if !os.IsNotExist(err) {
-					log.Printf("ERROR: Cannot inspect path %s: %v", current, err)
+					log.Printf("ERROR: Failed inspecting path %s: %v", current, err)
 					symlinkFound = true
 				}
-				break // Rest of the path doesn't exist yet, we can create the file
+				break
 			}
+
 			if info.Mode()&os.ModeSymlink != 0 {
-				log.Printf("ERROR: Symlink detected at %s", current)
+				log.Printf("ERROR: Symlink detected in path: %s", current)
 				symlinkFound = true
 				break
 			}
@@ -68,80 +77,137 @@ func runInit() {
 
 		parent := filepath.Dir(hostPath)
 
-		pInfo, err := os.Lstat(parent)
+		parentInfo, err := os.Lstat(parent)
 		if err != nil {
-			log.Printf("ERROR: Parent directory %s does not exist or inaccessible: %v", parent, err)
-			continue
-		}
-		if !pInfo.IsDir() {
-			log.Printf("ERROR: Parent %s is not a directory", parent)
+			log.Printf("ERROR: Parent directory inaccessible: %s (%v)", parent, err)
 			continue
 		}
 
-		fInfo, err := os.Lstat(hostPath)
+		if !parentInfo.IsDir() {
+			log.Printf("ERROR: Parent path is not a directory: %s", parent)
+			continue
+		}
+
+		// Check existing file
+		fileInfo, err := os.Lstat(hostPath)
 		if err == nil {
-			if fInfo.Mode()&os.ModeSymlink != 0 {
-				log.Printf("ERROR: File %s is a symlink", hostPath)
+
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				log.Printf("ERROR: Decoy file is a symlink: %s", hostPath)
 				continue
 			}
-			if !fInfo.Mode().IsRegular() {
-				log.Printf("ERROR: File %s is not a regular file", hostPath)
+
+			if !fileInfo.Mode().IsRegular() {
+				log.Printf("ERROR: Decoy path is not a regular file: %s", hostPath)
 				continue
 			}
-			log.Printf("File %s already exists, leaving untouched", hostPath)
+
+			log.Printf("Decoy file already exists: %s", hostPath)
 			validFiles++
 			continue
 		}
 
+		// Create file if missing
 		if os.IsNotExist(err) {
-			dirFD, err := unix.Open(parent, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+
+			dirFD, err := unix.Open(
+				parent,
+				unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC,
+				0,
+			)
+
 			if err != nil {
-				log.Printf("ERROR: Failed to open parent directory %s: %v", parent, err)
+				log.Printf("ERROR: Failed opening parent directory %s: %v", parent, err)
 				continue
 			}
-			fd, err := unix.Openat(dirFD, filepath.Base(hostPath), unix.O_CREAT|unix.O_EXCL|unix.O_WRONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0644)
+
+			fd, err := unix.Openat(
+				dirFD,
+				filepath.Base(hostPath),
+				unix.O_CREAT|
+					unix.O_EXCL|
+					unix.O_WRONLY|
+					unix.O_NOFOLLOW|
+					unix.O_CLOEXEC,
+				0644,
+			)
+
 			unix.Close(dirFD)
+
 			if err != nil {
-				log.Printf("ERROR: Failed to create file %s: %v", hostPath, err)
+				log.Printf("ERROR: Failed creating decoy file %s: %v", hostPath, err)
 				continue
 			}
+
 			unix.Close(fd)
-			log.Printf("Created missing decoy file: %s", hostPath)
+
+			log.Printf("Created decoy file: %s", hostPath)
 			validFiles++
+
 		} else {
-			log.Printf("ERROR: Failed to stat file %s: %v", hostPath, err)
-			continue
+			log.Printf("ERROR: Failed inspecting file %s: %v", hostPath, err)
 		}
 	}
 
 	if validFiles == 0 {
 		log.Fatalf("FATAL: No valid decoy files could be provisioned.")
 	}
+
+	log.Printf("Provisioned %d valid decoy file(s)", validFiles)
+}
+
+func reportFileEvent(
+	hw *sdk.Sensor,
+	trigger string,
+	category string,
+	action string,
+	path string,
+) {
+	hw.ReportEvent(
+		hw.Severity,
+		trigger,
+		"Local OS",
+		filepath.Base(path),
+		map[string]any{
+			"category": category,
+			"action":   action,
+			"path":     path,
+		},
+	)
+
+	log.Printf("[%s] %s -> %s", strings.ToUpper(category), action, path)
 }
 
 func main() {
+
+	// Init mode
 	if len(os.Args) > 1 && os.Args[1] == "init" {
 		runInit()
 		return
 	}
 
+	// Initialize SDK
 	hw, err := sdk.NewSensor()
 	if err != nil {
 		log.Fatalf("FATAL: Failed to initialize sensor: %v", err)
 	}
 
+	// Test mode
 	if hw.TestMode {
 		if hw.RunTestMode() {
-			log.Println("✅ Test mode complete. Exiting gracefully.")
+			log.Println("Test mode completed successfully.")
 			os.Exit(0)
 		}
-		log.Println("❌ Test mode failed to contact Hub.")
+
+		log.Println("Test mode failed to contact Hub.")
 		os.Exit(1)
 	}
 
+	// Start sensor
 	if err := hw.Start(); err != nil {
 		log.Fatalf("FATAL: Failed to sync with Hub: %v", err)
 	}
+
 	defer hw.Stop()
 
 	alertOnOpen := os.Getenv("HW_ALERT_ON_OPEN") == "true"
@@ -156,108 +222,213 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize inotify: %v", err)
 	}
+
 	defer unix.Close(fd)
 
 	watchMap := make(map[int]string)
 
-	mask := uint32(unix.IN_MODIFY | unix.IN_ATTRIB | unix.IN_DELETE_SELF | unix.IN_MOVE_SELF | unix.IN_CLOSE_WRITE)
+	// Default low-noise tamper detection
+	mask := uint32(
+		unix.IN_MODIFY |
+			unix.IN_ATTRIB |
+			unix.IN_DELETE_SELF |
+			unix.IN_MOVE_SELF |
+			unix.IN_CLOSE_WRITE,
+	)
+
+	// Optional access detection
 	if alertOnOpen {
 		mask |= unix.IN_OPEN | unix.IN_ACCESS
 	}
 
-	log.Println("\n[MODE]")
-	log.Println("Tamper Detection: ENABLED")
+	log.Println("")
+	log.Println("=== HoneyWire File Canary ===")
+	log.Println("")
+
+	log.Println("[Detection Modes]")
+	log.Println("- Tamper Detection: ENABLED")
+
 	if alertOnOpen {
-		log.Println("Access Detection: ENABLED")
+		log.Println("- Access Detection: ENABLED")
 	} else {
-		log.Println("Access Detection: DISABLED")
+		log.Println("- Access Detection: DISABLED")
 	}
 
-	log.Println("\n[OK] Monitoring:")
+	log.Println("")
+	log.Println("[Monitored Files]")
 
 	files := strings.Split(decoyFilesStr, ",")
+
 	for _, f := range files {
+
 		f = strings.TrimSpace(f)
+
 		if f == "" {
 			continue
 		}
 
-		targetPath := filepath.Join("/canaries", strings.TrimPrefix(f, "/"))
+		targetPath := filepath.Join(
+			"/canaries",
+			strings.TrimPrefix(f, "/"),
+		)
 
-		_, err := os.Lstat(targetPath)
+		info, err := os.Lstat(targetPath)
 		if err != nil {
-			log.Printf("WARNING: configured canary file missing or inaccessible: %s", targetPath)
+			log.Printf("WARNING: Canary file missing: %s", targetPath)
+			continue
+		}
+
+		if !info.Mode().IsRegular() {
+			log.Printf("WARNING: Canary target is not a regular file: %s", targetPath)
 			continue
 		}
 
 		wd, err := unix.InotifyAddWatch(fd, targetPath, mask)
 		if err != nil {
-			log.Printf("WARNING: Failed to add watch for %s: %v", targetPath, err)
+			log.Printf("WARNING: Failed monitoring %s: %v", targetPath, err)
 			continue
 		}
-		watchMap[int(wd)] = f // Map watch descriptor back to the original host path
-		log.Printf("- %s", targetPath)
+
+		watchMap[int(wd)] = f
+
+		log.Printf("- %s", f)
 	}
 
 	if len(watchMap) == 0 {
-		log.Fatalf("FATAL: no valid canary files mounted")
+		log.Fatalf("FATAL: No valid canary files mounted.")
 	}
 
-	log.Println("\nFile Canary active. Listening for tamper events...")
+	log.Println("")
+	log.Println("File Canary active. Listening for events...")
 
+	// Graceful shutdown handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
+
 		var buf [unix.SizeofInotifyEvent * 4096]byte
+
 		for {
+
 			n, err := unix.Read(fd, buf[:])
+
 			if err != nil {
+
 				if err == syscall.EINTR {
 					continue
 				}
+
 				log.Printf("inotify read error: %v", err)
 				return
 			}
 
 			var offset uint32
+
 			for offset <= uint32(n-unix.SizeofInotifyEvent) {
-				event := (*unix.InotifyEvent)(unsafe.Pointer(&buf[offset]))
+
+				event := (*unix.InotifyEvent)(
+					unsafe.Pointer(&buf[offset]),
+				)
 
 				fileName, ok := watchMap[int(event.Wd)]
+
 				if ok {
-					// Independent checks properly handle combined mask events
+
+					// Tamper events
 					if event.Mask&unix.IN_MODIFY != 0 {
-						hw.ReportEvent(hw.Severity, "decoy_file_tampered", "Local OS", fileName, map[string]any{"action": "File Modified (IN_MODIFY)", "file_name": fileName, "path": fileName})
+						reportFileEvent(
+							hw,
+							"decoy_file_tampered",
+							"tamper",
+							"Decoy file modified",
+							fileName,
+						)
 					}
-					if event.Mask&unix.IN_ATTRIB != 0 {
-						hw.ReportEvent(hw.Severity, "decoy_file_tampered", "Local OS", fileName, map[string]any{"action": "Attributes Changed (IN_ATTRIB)", "file_name": fileName, "path": fileName})
-					}
+
 					if event.Mask&unix.IN_CLOSE_WRITE != 0 {
-						hw.ReportEvent(hw.Severity, "decoy_file_tampered", "Local OS", fileName, map[string]any{"action": "File Written and Closed (IN_CLOSE_WRITE)", "file_name": fileName, "path": fileName})
+						reportFileEvent(
+							hw,
+							"decoy_file_tampered",
+							"tamper",
+							"Decoy file modified",
+							fileName,
+						)
 					}
+
+					if event.Mask&unix.IN_ATTRIB != 0 {
+						reportFileEvent(
+							hw,
+							"decoy_file_tampered",
+							"tamper",
+							"File attributes changed",
+							fileName,
+						)
+					}
+
 					if event.Mask&unix.IN_DELETE_SELF != 0 {
-						hw.ReportEvent(hw.Severity, "decoy_file_tampered", "Local OS", fileName, map[string]any{"action": "File Deleted (IN_DELETE_SELF)", "file_name": fileName, "path": fileName})
-						log.Fatalf("FATAL: Monitored file %s was deleted. Sensor exiting to trigger restart and reprovisioning.", fileName)
+
+						reportFileEvent(
+							hw,
+							"decoy_file_tampered",
+							"tamper",
+							"Decoy file deleted",
+							fileName,
+						)
+
+						log.Fatalf(
+							"FATAL: Monitored file deleted: %s",
+							fileName,
+						)
 					}
+
 					if event.Mask&unix.IN_MOVE_SELF != 0 {
-						hw.ReportEvent(hw.Severity, "decoy_file_tampered", "Local OS", fileName, map[string]any{"action": "File Moved (IN_MOVE_SELF)", "file_name": fileName, "path": fileName})
-						log.Fatalf("FATAL: Monitored file %s was moved. Sensor exiting to trigger restart and reprovisioning.", fileName)
+
+						reportFileEvent(
+							hw,
+							"decoy_file_tampered",
+							"tamper",
+							"Decoy file moved",
+							fileName,
+						)
+
+						log.Fatalf(
+							"FATAL: Monitored file moved: %s",
+							fileName,
+						)
 					}
+
+					// Optional access events
 					if alertOnOpen {
+
 						if event.Mask&unix.IN_OPEN != 0 {
-							hw.ReportEvent(hw.Severity, "decoy_file_accessed", "Local OS", fileName, map[string]any{"action": "File Opened (IN_OPEN)", "file_name": fileName, "path": fileName})
+							reportFileEvent(
+								hw,
+								"decoy_file_accessed",
+								"access",
+								"Decoy file opened",
+								fileName,
+							)
 						}
+
 						if event.Mask&unix.IN_ACCESS != 0 {
-							hw.ReportEvent(hw.Severity, "decoy_file_accessed", "Local OS", fileName, map[string]any{"action": "File Read (IN_ACCESS)", "file_name": fileName, "path": fileName})
+							reportFileEvent(
+								hw,
+								"decoy_file_accessed",
+								"access",
+								"Decoy file read",
+								fileName,
+							)
 						}
 					}
 				}
+
 				offset += unix.SizeofInotifyEvent + event.Len
 			}
 		}
 	}()
 
 	<-sigChan
+
 	log.Println("Shutting down File Canary...")
 }
