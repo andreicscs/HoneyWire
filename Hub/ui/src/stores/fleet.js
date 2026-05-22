@@ -34,8 +34,8 @@ export const useFleetStore = defineStore('fleet', () => {
     if (!raw) return null
     return {
       ...raw,
-      id: raw.id,
-      alias: raw.alias || 'Unnamed Node',
+      id: raw.id || raw.node_id || raw.nodeId,
+      alias: raw.alias || raw.name || 'Unnamed Node',
       status: raw.status || 'unknown',
       publicIp: raw.publicIp || raw.public_ip || null,
       privateIp: raw.privateIp || raw.private_ip || null,
@@ -58,7 +58,8 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const mergeNode = (existing, incoming) => {
     const incomingSensors = incoming.installedSensors || []
-    const existingSensors = existing.installedSensors || []
+    if (!existing.installedSensors) existing.installedSensors = []
+    const existingSensors = existing.installedSensors
 
     const incomingSensorIds = new Set(incomingSensors.map(s => s.id))
 
@@ -77,7 +78,13 @@ export const useFleetStore = defineStore('fleet', () => {
       }
     }
 
-    Object.assign(existing, incoming, { installedSensors: existingSensors })
+    // Copy properties safely to preserve Vue 3 Proxy array identity.
+    // This prevents breaking the reactive reference that components are watching.
+    for (const key of Object.keys(incoming)) {
+      if (key !== 'installedSensors') {
+        existing[key] = incoming[key]
+      }
+    }
   }
 
   // --- INDEXED ACCESS ---
@@ -222,11 +229,11 @@ export const useFleetStore = defineStore('fleet', () => {
 
       // Optimistic add — partial node, background fetch fills details
       const partialNode = normalizeNode({
-        id: data.node_id || data.nodeId,
+        id: data.node_id || data.nodeId || data.id,
         alias,
         tags,
         status: 'pending',
-        apiKey: data.api_key || data.apiKey,
+        apiKey: data.api_key || data.apiKey || data.key,
         installedSensors: [],
       })
       nodes.value.push(partialNode)
@@ -235,8 +242,8 @@ export const useFleetStore = defineStore('fleet', () => {
       fetchNodeDetails(partialNode.id)
 
       return {
-        nodeId: data.node_id || data.nodeId,
-        apiKey: data.api_key || data.apiKey,
+        nodeId: partialNode.id,
+        apiKey: partialNode.apiKey,
       }
     } catch (err) {
       console.error('Failed to create node:', err)
@@ -514,6 +521,8 @@ export const useFleetStore = defineStore('fleet', () => {
         node.hasPendingConfig = false
         if (payload.active_revision) node.activeRevision = payload.active_revision
         if (payload.desired_revision !== undefined) node.desiredRevision = payload.desired_revision
+        // Guarantee UI is 100% synced with the newly deployed sensors
+        fetchNodeDetails(payload.node_id)
       }
       return
     }
@@ -532,8 +541,12 @@ export const useFleetStore = defineStore('fleet', () => {
     }
 
     if (type === 'NEW_NODE') {
-      const exists = getNode(payload.id)
-      if (!exists) nodes.value.push(normalizeNode(payload))
+      const nodeId = payload.id || payload.node_id || payload.nodeId
+      const exists = getNode(nodeId)
+      if (!exists) {
+        nodes.value.push(normalizeNode(payload))
+      }
+      if (nodeId) fetchNodeDetails(nodeId)
       return
     }
 
