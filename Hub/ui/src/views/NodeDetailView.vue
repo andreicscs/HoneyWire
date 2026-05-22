@@ -176,6 +176,20 @@ const composePre = ref(null)
 const showKeyModal = ref(false)
 const showSyncModal = ref(false)
 const syncComposeYaml = ref('')
+const showManualSync = ref(false)
+
+watch(showSyncModal, (val) => {
+    if (!val) showManualSync.value = false
+})
+
+const syncCommand = computed(() => {
+    if (!node.value) return ''
+    const hubUrl = config.hubEndpoint || window.location.origin
+    if (!node.value.lastHeartbeat) {
+        return `./wizard --link ${hubUrl} ${node.value.apiKey}\n./wizard apply`
+    }
+    return `./wizard apply`
+})
 
 // --- COPY STATE (ephemeral UI) ---
 const copiedStates = ref({})
@@ -290,15 +304,6 @@ const handleApplySensor = async () => {
 // --- NODE ACTIONS (delegated to store) ---
 
 const handleManageKey = () => { showKeyModal.value = true }
-
-const copySyncYamlToClipboard = async () => {
-  if (!syncComposeYaml.value) return
-  try {
-    await navigator.clipboard.writeText(syncComposeYaml.value)
-  } catch (err) {
-    alert('Unable to copy compose YAML. Please copy it manually.')
-  }
-}
 
 const triggerManualSync = async () => {
   if (!node.value?.id) return
@@ -743,15 +748,64 @@ const applyHighlighting = () => {
         </BaseModal>
 
         <!-- Sync Compose Modal -->
-        <BaseModal :show="showSyncModal" @close="showSyncModal = false" title="Node Compose YAML">
-            <div class="space-y-4">
-                <p class="text-sm text-text-m">This is the generated docker-compose.yml for this node. Use it to deploy the node with the selected sensors and config.</p>
-                <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm text-text-h overflow-auto max-h-[40vh]">
-                    <pre class="whitespace-pre-wrap break-words">{{ syncComposeYaml || 'No compose output available.' }}</pre>
+        <BaseModal :show="showSyncModal" @close="showSyncModal = false" title="Synchronize Node">
+            <div class="space-y-6">
+                
+                <div>
+                    <h3 class="text-sm font-semibold text-text-h mb-2">Automatic Deployment (Recommended)</h3>
+                    <p class="text-sm text-text-m mb-4">
+                        Run the HoneyWire Wizard on your server to automatically reconcile this node's configuration.
+                    </p>
+                    
+                    <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
+                        <code class="text-success-main text-xs font-mono whitespace-pre-wrap break-all leading-relaxed">{{ syncCommand }}</code>
+                        
+                        <button @click="handleCopy('sync-cmd', syncCommand)"
+                                class="self-end px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 focus:outline-none border"
+                                :class="copiedStates['sync-cmd'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-bg-surface text-text-h border-border-default hover:bg-secondary-hover'">
+                            {{ copiedStates['sync-cmd'] ? 'Copied!' : 'Copy Command' }}
+                        </button>
+                    </div>
                 </div>
-                <div class="flex justify-end gap-2">
-                    <BaseButton variant="secondary" @click="showSyncModal = false">Close</BaseButton>
-                    <BaseButton variant="primary" @click="copySyncYamlToClipboard">Copy Compose</BaseButton>
+
+                <div class="border-t border-border-default pt-5">
+                    <button @click="showManualSync = !showManualSync" class="flex items-center justify-between w-full text-left group outline-none">
+                        <span class="text-sm font-semibold text-text-h group-hover:text-primary-main transition-colors">Advanced / Manual Deployment</span>
+                        <svg class="w-4 h-4 text-text-m transition-transform duration-normal" :class="showManualSync ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    
+                    <div v-show="showManualSync" class="mt-4 space-y-4">
+                        <p class="text-sm text-text-m">
+                            For air-gapped environments or manual orchestration, save the following configuration to <code class="px-1.5 py-0.5 bg-bg-inset border border-border-default rounded text-xs font-mono">/opt/honeywire/sensors/docker-compose.yml</code>.
+                        </p>
+                        
+                        <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm text-text-h overflow-auto max-h-[30vh] custom-scroll">
+                            <button @click="handleCopy('sync-yaml', syncComposeYaml)"
+                                    class="absolute top-3 right-3 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
+                                    :class="copiedStates['sync-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                {{ copiedStates['sync-yaml'] ? 'Copied!' : 'Copy YAML' }}
+                            </button>
+                            <pre class="whitespace-pre-wrap break-words pr-20">{{ syncComposeYaml || 'No compose output available.' }}</pre>
+                        </div>
+
+                        <p class="text-sm text-text-m">
+                            Then, apply the configuration using Docker Compose:
+                        </p>
+
+                        <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
+                            <code class="text-text-h text-xs font-mono break-all leading-relaxed">cd /opt/honeywire/sensors<br/>docker compose -p honeywire up -d --remove-orphans</code>
+                            
+                            <button @click="handleCopy('manual-cmd', 'cd /opt/honeywire/sensors\ndocker compose -p honeywire up -d --remove-orphans')"
+                                    class="self-end px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 focus:outline-none border"
+                                    :class="copiedStates['manual-cmd'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-bg-surface text-text-h border-border-default hover:bg-secondary-hover'">
+                                {{ copiedStates['manual-cmd'] ? 'Copied!' : 'Copy Command' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-5 border-t border-border-default">
+                    <BaseButton variant="secondary" @click="showSyncModal = false">Done</BaseButton>
                 </div>
             </div>
         </BaseModal>
