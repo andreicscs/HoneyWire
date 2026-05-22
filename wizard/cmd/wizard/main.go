@@ -34,7 +34,12 @@ func run() error {
 	}
 
 	if *uninstallPtr {
-		return commands.HandleTeardown(*forcePtr)
+		err := commands.HandleTeardown(*forcePtr)
+		if err == nil {
+			fmt.Printf("\n  Some HoneyWire sensors may have created host-side artifacts or decoy files.\n")
+			fmt.Printf("    Review your deployment configuration and remove any remaining files manually if desired.\n\n")
+		}
+		return err
 	}
 
 	if *linkURL != "" {
