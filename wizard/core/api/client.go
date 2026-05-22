@@ -109,14 +109,14 @@ func (c *HubClient) AuthenticateDashboard(ctx context.Context, password string) 
 	return cookieValue, nil
 }
 
-func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string, cookie string) (string, string, error) {
+func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string, cookie string) (string, error) {
 	payload := createNodeRequest{
 		Alias: alias,
 		Tags:  tags,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal create node request: %w", err)
+		return "", fmt.Errorf("failed to marshal create node request: %w", err)
 	}
 
 	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v1/nodes", bytes.NewReader(body), map[string]string{
@@ -124,24 +124,37 @@ func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string,
 		"Cookie":       "hw_auth=" + cookie,
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("network error: %w", err)
+		return "", fmt.Errorf("network error: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", "", fmt.Errorf("hub rejected request (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+		return "", fmt.Errorf("hub rejected request (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
 	}
 
 	data, err := readBody(resp)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	var result createNodeResponse
+	var result map[string]interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return "", "", fmt.Errorf("failed to parse hub response: %w", err)
+		return "", fmt.Errorf("failed to parse hub response: %w", err)
 	}
 
-	return result.NodeID, result.APIKey, nil
+	var apiKey string
+	if val, ok := result["api_key"].(string); ok && val != "" {
+		apiKey = val
+	} else if val, ok := result["apiKey"].(string); ok && val != "" {
+		apiKey = val
+	} else if val, ok := result["key"].(string); ok && val != "" {
+		apiKey = val
+	}
+
+	if apiKey == "" {
+		return "", fmt.Errorf("hub did not return an API key. Raw response: %s", string(data))
+	}
+
+	return apiKey, nil
 }
 
 func (c *HubClient) GetCurrentNode(ctx context.Context, apiKey string) (*NodeInfo, error) {
@@ -231,7 +244,6 @@ type createNodeRequest struct {
 }
 
 type createNodeResponse struct {
-	NodeID string `json:"id"`
 	APIKey string `json:"api_key"`
 	Alias  string `json:"alias"`
 }

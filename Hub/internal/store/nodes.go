@@ -62,8 +62,8 @@ func deriveStatus(lastHeartbeat *string) string {
 	if err != nil {
 		return "down"
 	}
-	// If heartbeat is older than 90 seconds, consider it offline
-	if time.Now().UTC().Sub(t) > 90*time.Second {
+	// If heartbeat is older than 60 seconds, consider it offline
+	if time.Now().UTC().Sub(t) > 60*time.Second {
 		return "down"
 	}
 	return "up"

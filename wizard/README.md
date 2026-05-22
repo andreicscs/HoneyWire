@@ -55,7 +55,7 @@ Build and run the Wizard on the host:
 
 ```bash
 make build
-./build/wizard --registry https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json
+./build/wizard
 ```
 
 Run the module test suite:

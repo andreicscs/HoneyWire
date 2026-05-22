@@ -170,3 +170,9 @@ func (s *SQLiteStore) UpdateNodeLastHeartbeat(nodeID, sensorID, timestamp string
 
 	return tx.Commit()
 }
+
+// MarkSensorOffline artificially ages a sensor's heartbeat to instantly mark it as 'down'
+func (s *SQLiteStore) MarkSensorOffline(nodeID, sensorID, offlineTime string) error {
+	_, err := s.DB.Exec(`UPDATE node_sensors SET last_heartbeat = ?, updated_at = ? WHERE node_id = ? AND sensor_id = ?`, offlineTime, offlineTime, nodeID, sensorID)
+	return err
+}

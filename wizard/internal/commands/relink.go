@@ -69,7 +69,7 @@ func HandleRelink(args []string) error {
 	case "1":
 		return provisionNewNode(hubURL, "", "")
 	case "2":
-		apiKey, err = cli.PromptInput("    API Key: ")
+		apiKey, err = cli.ReadPasswordMasked("    API Key: ")
 		if err != nil {
 			return fmt.Errorf("failed to read API key: %w", err)
 		}
@@ -113,6 +113,7 @@ func linkExistingNode(hubURL, apiKey string) error {
 	}
 
 	fmt.Printf("\n%s✅ Linked to Hub as '%s'.%s\n", cli.Green, nodeInfo.Alias, cli.Reset)
+	fmt.Printf("    %sRun 'wizard apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
 
@@ -151,10 +152,19 @@ func provisionNewNode(hubURL, customAlias, tagsStr string) error {
 		}
 	}
 
-	nodeID, apiKey, err := hub.CreateNode(ctx, customAlias, tags, cookie)
+	apiKey, err := hub.CreateNode(ctx, customAlias, tags, cookie)
 	if err != nil {
 		return fmt.Errorf("node creation failed: %w", err)
 	}
+
+	// The Hub's CreateNode API response currently only returns the API Key and Alias.
+	// We must use the new API Key to fetch the authoritative node identity (including its NodeID).
+	nodeInfo, err := hub.GetCurrentNode(ctx, apiKey)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve node ID after creation: %w", err)
+	}
+	nodeID := nodeInfo.NodeID
+
 	fmt.Printf("%s[*] Node created: %s (ID: %s)%s\n", cli.Green, customAlias, nodeID, cli.Reset)
 
 	cfg := app.NodeConfig{
@@ -172,5 +182,6 @@ func provisionNewNode(hubURL, customAlias, tagsStr string) error {
 	}
 
 	fmt.Printf("\n%s✅ Node provisioned and identity saved.%s\n", cli.Green, cli.Reset)
+	fmt.Printf("    %sRun 'wizard apply' to deploy existing sensors, or 'wizard discover' to add new ones.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }

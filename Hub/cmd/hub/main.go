@@ -40,8 +40,13 @@ func main() {
 	}
 	defer dbStore.DB.Close()
 
+	// 1. Establish Root Context for all background workers
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	defer rootCancel()
+
 	sessionStore := auth.NewSessionStore()
-	r, err := api.SetupRouter(cfg, dbStore, sessionStore)
+	h := api.NewHandler(dbStore, cfg, sessionStore)
+	r, err := api.SetupRouter(h)
 	if err != nil {
 		log.Fatalf("[FATAL] Router setup failed: %v", err)
 	}
@@ -49,6 +54,7 @@ func main() {
 	// 1. Start External Workers
 	notify.StartWorker()
 	siem.StartWorker()
+	go h.StartHealthMonitor(rootCtx)
 
 	// 2. Load Runtime Configurations Safely
 	isArmed := loadConfigSafe(dbStore, "is_armed", "false") == "true"
@@ -68,8 +74,6 @@ func main() {
 	}
 
 	// 3. Start Database Retention Worker (cancelable)
-	rootCtx, rootCancel := context.WithCancel(context.Background())
-	defer rootCancel()
 	go startRetentionWorker(rootCtx, dbStore)
 
 	// 4. Start HTTP Server

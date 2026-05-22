@@ -9,9 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/honeywire/hub/internal/auth"
-	"github.com/honeywire/hub/internal/config"
-	"github.com/honeywire/hub/internal/store"
 	"github.com/honeywire/hub/ui"
 )
 
@@ -29,13 +26,11 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 	})
 }
 
-func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.SessionStore) (*chi.Mux, error) {
+func SetupRouter(h *Handler) (*chi.Mux, error) {
 	r := chi.NewRouter()
 
 	r.Use(ErrorOnlyLogger)
 	r.Use(middleware.Recoverer)
-
-	h := NewHandler(s, cfg, sessionStore)
 
 	// Public Endpoints
 	r.Get("/api/v1/version", h.HandleVersion)
@@ -46,7 +41,7 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 
 	// UI Endpoints (Protected by Cookies)
 	r.Group(func(r chi.Router) {
-		r.Use(UIAuthMiddleware(sessionStore))
+		r.Use(UIAuthMiddleware(h.SessionStore))
 
 		r.Get("/api/v1/ws", h.ServeWS)
 
@@ -92,6 +87,7 @@ func SetupRouter(cfg *config.Config, s *store.SQLiteStore, sessionStore *auth.Se
 	r.Get("/api/v1/nodes/me", h.GetCurrentNode)      // node whoami based on api key.
 	r.Get("/api/v1/nodes/compose", h.GetNodeCompose) // aggreagates all generated compose files for a node's sensors
 	r.Post("/api/v1/heartbeat", h.ReceiveHeartbeat)
+	r.Post("/api/v1/offline", h.ReceiveOffline)
 	r.Post("/api/v1/event", h.ReceiveEvent)
 
 	r.Get("/api/v1/manifests", h.GetManifests) // Fetches catalog (Dual Auth)

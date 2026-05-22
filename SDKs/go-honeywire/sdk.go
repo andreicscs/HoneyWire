@@ -52,8 +52,9 @@ func (s *Sensor) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the heartbeat goroutine.
+// Stop gracefully shuts down the heartbeat goroutine and notifies the Hub.
 func (s *Sensor) Stop() {
+	s.GoOffline("graceful_shutdown")
 	close(s.stopCh)
 }
 
@@ -131,7 +132,7 @@ func (s *Sensor) sendHeartbeat() {
 			"HW_CONFIG_REV":    s.ConfigRev,
 		},
 	}
-	
+
 	resp, err := s.postToHub("/api/v1/heartbeat", payload)
 	if err != nil {
 		log.Printf("[-] Heartbeat failed to send: %v", err)
@@ -162,14 +163,43 @@ func (s *Sensor) ReportEvent(severity, trigger, source, target string, details m
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 400 {
 		log.Printf("[-] Hub rejected event report (HTTP %d).", resp.StatusCode)
 		return false
 	}
-	
+
 	log.Printf("[+] Event successfully reported to Hub.")
 	return true
+}
+
+func (s *Sensor) GoOffline(reason string) {
+	log.Printf("[*] Sending graceful offline status (reason: %s)...", reason)
+
+	// Strict 2-second timeout: best-effort, never hang the container shutdown
+	fastClient := &http.Client{Timeout: 2 * time.Second}
+
+	payload := map[string]any{
+		"sensor_id": s.SensorID,
+		"reason":    reason,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("POST", s.HubEndpoint+"/api/v1/offline", bytes.NewReader(jsonData))
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+s.HubKey)
+
+	if resp, err := fastClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
 }
 
 func (s *Sensor) postToHub(path string, data map[string]any) (*http.Response, error) {

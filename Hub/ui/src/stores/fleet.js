@@ -528,8 +528,14 @@ export const useFleetStore = defineStore('fleet', () => {
     }
 
     if (type === 'UPDATE_NODE') {
-      const node = getNode(payload.id)
-      if (node) mergeNode(node, normalizeNode(payload))
+      if (payload.trigger_refresh) {
+        fetchNodeDetails(payload.id)
+        return
+      }
+
+      const normalized = normalizeNode(payload)
+      const targetNode = getNode(normalized.id)
+      if (targetNode) mergeNode(targetNode, normalized)
       return
     }
 

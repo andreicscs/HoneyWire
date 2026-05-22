@@ -78,6 +78,46 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "alive"})
 }
 
+func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SensorID string `json:"sensor_id"`
+		Reason   string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	if req.SensorID == "" {
+		RespondError(w, "sensor_id is required", http.StatusBadRequest)
+		return
+	}
+
+	nodeID, err := h.authenticateNodeRequest(r)
+	if err != nil {
+		RespondError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Push last_heartbeat 2 hours into the past to instantly force deriveStatus() to return "down"
+	offlineTime := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+
+	if err := h.Store.MarkSensorOffline(nodeID, req.SensorID, offlineTime); err != nil {
+		log.Printf("[ERROR] Failed to set offline status for node %s sensor %s: %v", nodeID, req.SensorID, err)
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[INFO] Sensor %s on node %s went offline gracefully (Reason: %s)", req.SensorID, nodeID, req.Reason)
+
+	h.broadcastWS("UPDATE_NODE", map[string]interface{}{
+		"id":              nodeID,
+		"trigger_refresh": true,
+	})
+
+	SendJSON(w, http.StatusOK, map[string]string{"status": "offline_acknowledged"})
+}
+
 func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	timeframe := r.URL.Query().Get("timeframe")
 	if timeframe == "" {

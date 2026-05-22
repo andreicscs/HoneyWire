@@ -137,6 +137,19 @@ class HoneyWireSensor(ABC):
         )
         return success
 
+    def go_offline(self, reason: str):
+        print(f"[*] Sending graceful offline status (reason: {reason})...")
+        payload = {
+            "sensor_id": self.sensor_id,
+            "reason": reason
+        }
+        try:
+            # Strict 2-second timeout: best-effort, never hang the container shutdown
+            self._post_to_hub("/api/v1/offline", payload, timeout=2)
+        except Exception:
+            # Fail silently; this is a best-effort optimization
+            pass
+
     @abstractmethod
     async def monitor(self):
         pass
@@ -147,4 +160,5 @@ class HoneyWireSensor(ABC):
         await self.monitor()
         
     def stop(self):
+        self.go_offline("graceful_shutdown")
         self._stop_event.set()

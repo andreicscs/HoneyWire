@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net"
@@ -56,7 +57,7 @@ func SendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("[ERROR] SendJSON encode error: %v\n", err) 
+		log.Printf("[ERROR] SendJSON encode error: %v\n", err)
 	}
 }
 
@@ -131,5 +132,41 @@ func (h *Handler) startChartSyncBroadcaster() {
 		// Just tell all connected clients that 30 seconds have passed
 		// and they should refresh their time-series charts.
 		h.broadcastWS("SYNC_CHARTS", nil)
+	}
+}
+
+// StartHealthMonitor runs a background task to periodically check for offline nodes and sensors.
+// It should be invoked with a context from main.go to ensure graceful shutdown.
+func (h *Handler) StartHealthMonitor(ctx context.Context) {
+	log.Println("[INFO] Starting background health monitor...")
+
+	tickerPeriod := 30 * time.Second
+	ticker := time.NewTicker(tickerPeriod)
+	defer ticker.Stop()
+
+	// Offset lastCheck by the ticker period so the first run catches recent drops
+	lastCheck := time.Now().UTC().Add(-tickerPeriod)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[INFO] Health monitor stopped")
+			return
+		case t := <-ticker.C:
+			offlineThreshold := 60 * time.Second
+			updatedNodeIDs, err := h.Store.GetTransitionedOfflineNodes(offlineThreshold, lastCheck)
+
+			if err == nil {
+				for nodeID := range updatedNodeIDs {
+					// Send a lightweight signal to instruct the UI to securely refresh this node's state
+					h.broadcastWS("UPDATE_NODE", map[string]interface{}{
+						"id":              nodeID,
+						"trigger_refresh": true,
+					})
+				}
+			}
+
+			lastCheck = t.UTC()
+		}
 	}
 }

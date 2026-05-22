@@ -142,7 +142,7 @@ func GenerateUptimeResult(timeframe string, now time.Time, params UptimeParams, 
 			})
 		}
 
-		isLive := now.Sub(s.LastSeen) < 90*time.Second
+		isLive := now.Sub(s.LastSeen) < 60*time.Second
 		if isLive {
 			blocks[len(blocks)-1]["status"] = "up"
 			blocks[len(blocks)-1]["label"] = "Online (Live)"

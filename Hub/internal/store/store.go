@@ -36,6 +36,7 @@ type DataStore interface {
 	GetHeartbeatsSince(cutoffStr string) ([]HeartbeatData, error)
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
 	DeleteSensor(nodeID, sensorID string) (int64, error)
+	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 
 	// Provisioning
 	InsertPairingToken(token string, expiresAt time.Time, createdAt time.Time) error
