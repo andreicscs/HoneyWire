@@ -13,6 +13,14 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 			return err
 		}
 	} else {
+		if appInstance, err := loadApp(); err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+			defer cancel()
+			fmt.Printf("\n    %s[*] Dashboard auth required to provision a new node.%s\n", cli.Cyan, cli.Reset)
+			if authErr := appInstance.RequireDashboardAuth(ctx); authErr != nil {
+				return fmt.Errorf("dashboard authentication required: %w", authErr)
+			}
+		}
 		if err := provisionNewNode(hubURL, alias, tags); err != nil {
 			return err
 		}
