@@ -68,6 +68,7 @@ func SetupRouter(h *Handler) (*chi.Mux, error) {
 		r.Post("/api/v1/system/reset", h.FactoryReset)
 
 		// Telemetry & State (For UI Dashboards)
+		r.Get("/api/v1/events/severity", h.GetSeverityAnalytics)
 		r.Get("/api/v1/events", h.GetEvents)
 		r.Get("/api/v1/uptime", h.GetUptime)
 		r.Get("/api/v1/system/state", h.GetSystemState)

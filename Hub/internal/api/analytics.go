@@ -3,9 +3,34 @@ package api
 import (
 	"net/http"
 	"time"
-
+	
+	"github.com/honeywire/hub/internal/projections/severity"
 	"github.com/honeywire/hub/internal/projections/uptime"
 )
+
+func (h *Handler) GetSeverityAnalytics(w http.ResponseWriter, r *http.Request) {
+	timeframe := r.URL.Query().Get("timeframe")
+	if timeframe == "" {
+		timeframe = "alltime"
+	}
+
+	nodeID := r.URL.Query().Get("node")
+	sensorID := r.URL.Query().Get("sensor")
+	viewingArchiveStr := r.URL.Query().Get("viewingArchive")
+	viewingArchive := 0
+	if viewingArchiveStr == "true" || viewingArchiveStr == "1" {
+		viewingArchive = 1
+	}
+
+	projector := severity.NewProjector(h.Store)
+	projection, err := projector.BuildSeverityProjection(r.Context(), timeframe, nodeID, sensorID, viewingArchive)
+	if err != nil {
+		RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, projection)
+}
 
 // GetUptime handles GET /api/v1/uptime and returns the fleet uptime projection
 func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {

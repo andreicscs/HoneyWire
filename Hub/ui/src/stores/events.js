@@ -12,12 +12,15 @@ import { useAppStore } from './app'
  * node_id AND sensor_id must be checked together.
  */
 
+let severityAbortController = null;
+
 export const useEventsStore = defineStore('events', () => {
   // --- STATE ---
   const events = ref([])
   const unreadCount = ref(0)
   const activeEvent = ref(null)
   const isFetching = ref(false)
+  const severityProjection = ref(null)
 
   // --- GETTERS ---
   /**
@@ -104,9 +107,33 @@ export const useEventsStore = defineStore('events', () => {
     }
   }
 
-  /**
-   * Mark all events as read
-   */
+  const fetchSeverityProjection = async (timeframe = 'alltime', nodeId = null, sensorId = null) => {
+    if (severityAbortController) {
+      severityAbortController.abort();
+    }
+    severityAbortController = new AbortController();
+
+    try {
+      const appStore = useAppStore()
+      const viewingArchive = appStore.viewingArchive
+      const params = new URLSearchParams({ timeframe });
+      if (nodeId) params.append('node', nodeId);
+      if (sensorId) params.append('sensor', sensorId);
+      params.append('viewingArchive', viewingArchive);
+
+      const response = await fetch(`/api/v1/events/severity?${params.toString()}`, {
+        signal: severityAbortController.signal
+      });
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+      const data = await response.json()
+      severityProjection.value = data
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('Failed to fetch severity projection', e)
+    }
+  }
+
   const markAllRead = async () => {
     try {
       const response = await fetch('/api/v1/events/read', { method: 'PATCH' })
@@ -231,6 +258,16 @@ export const useEventsStore = defineStore('events', () => {
     if (noFilter || nodeOnlyMatch || sensorMatch) {
       events.value.unshift(payload)
     }
+
+    const appStore = useAppStore();
+    const affectsCurrentView = 
+      (!appStore.viewingArchive) &&
+      (!selectedNode || selectedNode === payload.node_id) &&
+      (!selectedSensor || selectedSensor === payload.sensor_id);
+
+    if (affectsCurrentView) {
+      fetchSeverityProjection('alltime', selectedNode, selectedSensor);
+    }
   }
 
   return {
@@ -239,10 +276,11 @@ export const useEventsStore = defineStore('events', () => {
     unreadCount,
     activeEvent,
     isFetching,
-    // Getters
+    severityProjection,
     filteredEvents,
     // Actions
     fetchEvents,
+    fetchSeverityProjection,
     markAllRead,
     markEventRead,
     archiveEvent,

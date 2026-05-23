@@ -361,6 +361,16 @@ Deletes all events permanently.
 { "status": "success", "dryrun": false }
 ```
 
+### GET /api/v1/events/severity
+
+Returns severity distribution analytics for the fleet.
+
+**Query parameters:**
+- `timeframe` — timeframe filter (e.g. `alltime`, `24H`) (default: `alltime`)
+- `node` — filter by node ID (optional)
+- `sensor` — filter by sensor ID (optional)
+- `viewingArchive` — `true`, `1`, `false`, or `0` (default: `false`)
+
 ## Uptime and Health
 
 ### GET /api/v1/uptime

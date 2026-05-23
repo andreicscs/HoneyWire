@@ -1,15 +1,21 @@
 <script setup>
-import { ref, onMounted, watch, onUnmounted, toRaw } from 'vue'
+import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useEventsStore } from '../../stores/events'
+import { useFleetStore } from '../../stores/fleet'
+import { useAppStore } from '../../stores/app'
 import { getComputedRgb } from '../../utils/theme'
 import { baseTooltipConfig, applyChartTheme } from '../../utils/chartConfig'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
 
 const eventsStore = useEventsStore()
-const { filteredEvents: events } = storeToRefs(eventsStore)
+const fleetStore = useFleetStore()
+const appStore = useAppStore()
+
+const { severityProjection } = storeToRefs(eventsStore)
+const { selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const chartCanvas = ref(null)
 let chartInstance = null
@@ -44,18 +50,12 @@ const getChartColors = () => [
 ]
 
 const updateData = () => {
-    if (!chartInstance) return;
-    const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    const p = severityProjection.value;
+    if (!chartInstance || !p) return;
     
-    const rawEvents = toRaw(events.value);
-    
-    rawEvents.forEach(e => {
-        const s = e.severity ? e.severity.toLowerCase() : 'info';
-        if (counts.hasOwnProperty(s)) counts[s]++;
-    });
-    
-    const newData = ['critical', 'high', 'medium', 'low', 'info'].map(k => counts[k]);
+    const newData = [p.critical, p.high, p.medium, p.low, p.info];
     const currentData = chartInstance.data.datasets[0].data;
+    
     const hasChanged = newData.some((val, i) => val !== currentData[i]);
 
     if (hasChanged) {
@@ -72,6 +72,7 @@ const updateTheme = () => {
     
     applyChartTheme(chartInstance);
 }
+
 onMounted(() => {
     if (chartCanvas.value) {
         chartInstance = new Chart(chartCanvas.value, {
@@ -123,7 +124,18 @@ onMounted(() => {
     themeObserver.observe(document.documentElement, { attributes: true });
 })
 
-watch([() => events.value.length, () => events.value[0]?.id], updateData)
+watch(
+    () => [selectedNode.value, selectedSensor.value, appStore.viewingArchive],
+    ([nodeId, sensorId]) => {
+        eventsStore.fetchSeverityProjection('alltime', nodeId, sensorId)
+    },
+    { immediate: true }
+)
+
+watch(
+    () => severityProjection.value,
+    updateData
+)
 
 onUnmounted(() => {
     if (chartInstance) chartInstance.destroy()
@@ -153,9 +165,9 @@ const legendItems = [
         <div class="flex-1 relative mt-2 min-h-0 w-full">
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span class="text-3xl  transition-colors leading-none"
-                      :class="events.length === 0 ? 'text-success-main' : 'text-critical'">
-                    {{ events.length }}
+                <span class="text-3xl transition-colors leading-none"
+                      :class="(severityProjection?.total || 0) === 0 ? 'text-success-main' : 'text-critical'">
+                    {{ severityProjection?.total || 0 }}
                 </span>
                 <span class="text-sm text-text-m mt-1 leading-none">Events</span>
             </div>
@@ -165,4 +177,4 @@ const legendItems = [
             <BaseLegend :items="legendItems" />
         </template>
     </BaseWidget>
-</template>mplate>
+</template>

@@ -26,7 +26,7 @@ internal/
 │       ├── calculator.go  # Pure business logic
 │       └── projection.go  # Orchestration & mapping
 ├── api/
-│   ├── uptime_handler.go  # Thin HTTP handler
+│   ├── analytics.go  # Thin HTTP handler
 │   └── ... (other handlers)
 └── ... (other packages)
 ```
