@@ -115,20 +115,11 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- GETTERS ---
 
   const overallUptime = computed(() => {
-    if (!uptimeData.value || uptimeData.value.length === 0) return '0.0%'
-    let validBlocks = 0
-    let upBlocks = 0
-
-    uptimeData.value.forEach(sensor => {
-      sensor.blocks.forEach(block => {
-        if (block.status !== 'nodata') {
-          validBlocks++
-          if (block.status === 'up') upBlocks += 1
-          else if (block.status === 'degraded') upBlocks += 0.8
-        }
-      })
-    })
-    return validBlocks === 0 ? '100.0%' : ((upBlocks / validBlocks) * 100).toFixed(1) + '%'
+    // Use the overall_uptime from the API response if available
+    if (uptimeData.value && uptimeData.value.summary && typeof uptimeData.value.summary.overall_uptime === 'number') {
+      return uptimeData.value.summary.overall_uptime.toFixed(2) + '%'
+    }
+    return '0.0%'
   })
 
   // --- ACTIONS: FETCH ---

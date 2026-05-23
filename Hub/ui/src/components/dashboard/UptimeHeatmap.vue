@@ -20,19 +20,6 @@ const worstWarningBelow = ref(null)
 const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
 const handleForget = (nodeId, sensorId) => fleetStore.deleteSensor(nodeId, sensorId)
 
-// Resolve node_id → alias for display
-const getNodeAlias = (nodeId) => {
-    if (!nodeId || nodeId === 'unassigned') return 'Unassigned'
-    const node = fleet.value.find(n => n.id === nodeId)
-    return node?.alias || nodeId
-}
-
-const getWorstStatus = (sensor) => {
-    if (sensor.blocks.some(b => b.status === 'down')) return 'down'
-    if (sensor.blocks.some(b => b.status === 'degraded')) return 'degraded'
-    return null
-}
-
 const checkScroll = () => {
     if (!scrollArea.value) return
     const container = scrollArea.value
@@ -75,49 +62,48 @@ const isSilenced = (nodeId, sensorId) => {
     return sensor ? !!sensor.isSilenced : false
 }
 
-const groupedUptime = computed(() => {
-    const groupsMap = new Map();
-    uptimeData.value.forEach(sensor => {
-        const nId = sensor.node_id || 'unassigned';
-        if (!groupsMap.has(nId)) groupsMap.set(nId, { nodeId: nId, sensors: [] });        
-        // Inject live status from fleet store to ensure the UI feels instant
-        // and doesn't lag behind waiting for the next historic SYNC_CHARTS cycle.
-        let isLiveOnline = sensor.isOnline;
-        const node = fleet.value.find(n => n.id === nId);
-        
-        if (node && node.installedSensors) {
-            const liveSensor = node.installedSensors.find(s => s.id === sensor.id || s.name === sensor.id);
-            if (liveSensor) {
-                if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline;
-                else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online;
-                else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase());
-            }
-        }
-        
-        const blocks = [...(sensor.blocks || [])];
-        if (blocks.length > 0) {
-            const lastIdx = blocks.length - 1;
-            const lastBlock = { ...blocks[lastIdx] };
-            
-            if (isLiveOnline && (lastBlock.status === 'down' || lastBlock.status === 'nodata')) {
-                lastBlock.status = 'up';
-            } else if (!isLiveOnline) {
-                lastBlock.status = 'down';
-            }
-            
-            blocks[lastIdx] = lastBlock;
-        }
+// Hydrate live status from fleet store for real-time feedback
+const hydrateGroupsWithLiveStatus = (groups) => {
+    if (!groups || !Array.isArray(groups)) return groups
 
-        groupsMap.get(nId).sensors.push({ ...sensor, isOnline: isLiveOnline, blocks });
-    });
-    const groups = Array.from(groupsMap.values());
-    groups.sort((a, b) => {
-        if (a.nodeId === 'unassigned') return 1;
-        if (b.nodeId === 'unassigned') return -1;
-        return a.nodeId.localeCompare(b.nodeId);
-    });
-    return groups;
-});
+    return groups.map(group => ({
+        ...group,
+        sensors: (group.sensors || []).map(sensor => {
+            let isLiveOnline = sensor.status === 'up'
+            const node = fleet.value.find(n => n.id === group.node_id)
+            
+            if (node && node.installedSensors) {
+                const liveSensor = node.installedSensors.find(s => s.id === sensor.sensor_id || s.name === sensor.sensor_id)
+                if (liveSensor) {
+                    if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline
+                    else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online
+                    else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
+                }
+            }
+            
+            const blocks = [...(sensor.blocks || [])]
+            if (blocks.length > 0) {
+                const lastIdx = blocks.length - 1
+                const lastBlock = { ...blocks[lastIdx] }
+                
+                if (isLiveOnline && (lastBlock.status === 'down' || lastBlock.status === 'nodata')) {
+                    lastBlock.status = 'up'
+                } else if (!isLiveOnline) {
+                    lastBlock.status = 'down'
+                }
+                
+                blocks[lastIdx] = lastBlock
+            }
+
+            return { ...sensor, isOnline: isLiveOnline, blocks }
+        })
+    }))
+}
+
+// Compute the hydrated groups from the API response
+const hydratedGroups = computed(() => {
+    return hydrateGroupsWithLiveStatus(uptimeData.value?.groups || [])
+})
 
 watch(selectedSensor, (newVal) => {
     if (newVal && selectedNode.value) {
@@ -137,7 +123,7 @@ watch(selectedNode, (newVal) => {
     }
 })
 
-watch(uptimeData, () => nextTick(checkScroll), { deep: true })
+watch(hydratedGroups, () => nextTick(checkScroll), { deep: true })
 
 onMounted(() => { 
     nextTick(checkScroll)
@@ -160,8 +146,8 @@ const legendItems = [
                     <div class="flex items-center gap-2 mt-1 leading-none">
                         <span class="text-sm text-text-m">Fleet Overall:</span>
                         <span class="text-sm transition-colors duration-normal" 
-                              :class="parseFloat(overallUptime) >= 95 ? 'text-success-main' : (parseFloat(overallUptime) >= 85 ? 'text-high' : 'text-critical')">
-                            {{ overallUptime }}
+                              :class="(uptimeData?.summary?.overall_uptime || 0) >= 95 ? 'text-success-main' : ((uptimeData?.summary?.overall_uptime || 0) >= 85 ? 'text-high' : 'text-critical')">
+                            {{ (uptimeData?.summary?.overall_uptime || 0).toFixed(2) }}%
                         </span>
                     </div>
                 </div>
@@ -173,53 +159,53 @@ const legendItems = [
         <div class="flex-1 relative mt-2 min-h-0 w-full">
             <div ref="scrollArea" @scroll.passive="checkScroll" class="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto custom-scroll pr-3 pb-10">
                 
-                <div v-show="uptimeData.length === 0" class="text-sm font-medium text-text-m py-4 text-center">No fleet data available.</div>
+                <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" class="text-sm font-medium text-text-m py-4 text-center">No fleet data available.</div>
                 
-                <div v-for="group in groupedUptime" :key="group.nodeId" :id="'group-' + group.nodeId"
+                <div v-for="group in hydratedGroups" :key="group.node_id" :id="'group-' + group.node_id"
                     class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"
                     :class="{
-                        'border-select-group-border bg-select-group-bg': selectedNode === group.nodeId && !selectedSensor,
-                        'border-transparent': selectedNode !== group.nodeId || selectedSensor,
-                        'opacity-50': (selectedNode || selectedSensor) && selectedNode !== group.nodeId
+                        'border-select-group-border bg-select-group-bg': selectedNode === group.node_id && !selectedSensor,
+                        'border-transparent': selectedNode !== group.node_id || selectedSensor,
+                        'opacity-50': (selectedNode || selectedSensor) && selectedNode !== group.node_id
                     }">
                      
                     <div class="px-1.5 mb-1 flex items-center gap-2 group/header"
-                        :class="group.nodeId !== 'unassigned' ? 'cursor-pointer' : ''"
-                        @click="group.nodeId !== 'unassigned' ? fleetStore.selectTarget(group.nodeId) : null">
+                        :class="group.node_id !== 'unassigned' ? 'cursor-pointer' : ''"
+                        @click="group.node_id !== 'unassigned' ? fleetStore.selectTarget(group.node_id) : null">
                                             
                         <span class="text-sm font-semibold text-text-l transition-colors duration-[var(--duration-fast)]"
-                              :class="group.nodeId !== 'unassigned' ? 'group-hover/header:text-text-h' : ''">
-                            {{ getNodeAlias(group.nodeId) }}
+                              :class="group.node_id !== 'unassigned' ? 'group-hover/header:text-text-h' : ''">
+                            {{ group.node_alias || group.node_id }}
                         </span>
                         
                         <div class="h-px flex-1 bg-border-default transition-colors duration-[var(--duration-fast)] group-hover/header:bg-text-m"></div>
                     </div>
                      
-                    <div v-for="sensor in group.sensors" :key="sensor.node_id + '-' + sensor.id" :id="'row-' + sensor.node_id + '-' + sensor.id" 
+                    <div v-for="sensor in group.sensors" :key="sensor.node_id + '-' + sensor.sensor_id" :id="'row-' + sensor.node_id + '-' + sensor.sensor_id" 
                         class="flex items-center w-full transition-all duration-normal px-1.5 h-7 rounded-md border"
                         :class="{
-                            'opacity-50': selectedSensor && (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
-                            'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor === sensor.id && selectedNode === sensor.node_id,
-                            'border-transparent': !selectedSensor || (selectedSensor !== sensor.id || selectedNode !== sensor.node_id),
-                            'has-warnings': getWorstStatus(sensor) !== null
+                            'opacity-50': selectedSensor && (selectedSensor !== sensor.sensor_id || selectedNode !== sensor.node_id),
+                            'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor === sensor.sensor_id && selectedNode === sensor.node_id,
+                            'border-transparent': !selectedSensor || (selectedSensor !== sensor.sensor_id || selectedNode !== sensor.node_id),
+                            'has-warnings': sensor.status !== 'up' && sensor.status !== 'nodata'
                         }"
-                        :data-worst-status="getWorstStatus(sensor)"
+                        :data-worst-status="sensor.status !== 'up' && sensor.status !== 'nodata' ? sensor.status : null"
                         >
                          
                         <div class="w-[180px] flex items-center gap-2 shrink-0 pr-2">
                             
-                            <BaseMeatballMenu :id="`${sensor.node_id}|${sensor.id}`">
-                                <button @click="handleSilence(sensor.node_id, sensor.id)" 
+                            <BaseMeatballMenu :id="`${sensor.node_id}|${sensor.sensor_id}`">
+                                <button @click="handleSilence(sensor.node_id, sensor.sensor_id)" 
                                         class="w-full text-left px-3 py-2 text-sm text-text-m font-medium flex items-center gap-2 hover:bg-secondary-hover transition-colors group"
-                                        :class="isSilenced(sensor.node_id, sensor.id) ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
+                                        :class="isSilenced(sensor.node_id, sensor.sensor_id) ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path v-if="!isSilenced(sensor.node_id, sensor.id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-                                        <path v-if="isSilenced(sensor.node_id, sensor.id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
+                                        <path v-if="!isSilenced(sensor.node_id, sensor.sensor_id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                                        <path v-if="isSilenced(sensor.node_id, sensor.sensor_id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                     </svg>
-                                    {{ isSilenced(sensor.node_id, sensor.id) ? 'Unsilence' : 'Silence Alert' }}
+                                    {{ isSilenced(sensor.node_id, sensor.sensor_id) ? 'Unsilence' : 'Silence Alert' }}
                                 </button>
                                 
-                                <button @click="handleForget(sensor.node_id, sensor.id)" 
+                                <button @click="handleForget(sensor.node_id, sensor.sensor_id)" 
                                         class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />
@@ -231,13 +217,13 @@ const legendItems = [
 
                             <BaseStatusDot :status="sensor.isOnline ? 'up' : 'down'" />
                             
-                            <button @click="fleetStore.selectTarget(sensor.node_id, sensor.id)"
+                            <button @click="fleetStore.selectTarget(sensor.node_id, sensor.sensor_id)"
                                 class="font-mono text-left transition-colors cursor-pointer rounded flex items-center gap-1.5 max-w-[calc(100%-28px)] text-sm"
-                                :class="selectedSensor === sensor.id && selectedNode === sensor.node_id ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
-                                :title="`Node: ${getNodeAlias(sensor.node_id)}`">
-                                <span class="truncate">{{ formatSensorId(sensor.name) }}</span>
+                                :class="selectedSensor === sensor.sensor_id && selectedNode === sensor.node_id ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
+                                :title="`Node: ${group.node_alias || group.node_id}`">
+                                <span class="truncate">{{ formatSensorId(sensor.sensor_id) }}</span>
                                 
-                                <svg v-show="isSilenced(sensor.node_id, sensor.id)" class="w-3 h-3 shrink-0 text-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg v-show="isSilenced(sensor.node_id, sensor.sensor_id)" class="w-3 h-3 shrink-0 text-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                 </svg>
                             </button>
@@ -252,7 +238,7 @@ const legendItems = [
                                      'bg-high': block.status === 'degraded', 
                                      'bg-bg-inset': block.status === 'nodata' 
                                  }"
-                                 :title="`${block.timeLabel} - ${block.label}`">
+                                 :title="`${block.time_label} - ${block.label}`">
                             </div>
                         </div>
                     </div>

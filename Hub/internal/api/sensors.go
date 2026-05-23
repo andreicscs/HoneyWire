@@ -118,31 +118,6 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "offline_acknowledged"})
 }
 
-func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
-	timeframe := r.URL.Query().Get("timeframe")
-	if timeframe == "" {
-		timeframe = "24H"
-	}
-
-	now := time.Now().UTC()
-	params := CalculateUptimeParams(timeframe, now)
-
-	sensors, err := h.Store.GetSensorsForUptime(now.Format(time.RFC3339))
-	if err != nil {
-		RespondError(w, "Database error fetching sensors", http.StatusInternalServerError)
-		return
-	}
-
-	hbs, err := h.Store.GetHeartbeatsSince(params.CutoffStr)
-	if err != nil {
-		RespondError(w, "Database error fetching heartbeats", http.StatusInternalServerError)
-		return
-	}
-
-	result := GenerateUptimeResult(timeframe, now, params, sensors, hbs)
-	SendJSON(w, http.StatusOK, result)
-}
-
 func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	// Extract both IDs from the updated URL route
 	nodeID := chi.URLParam(r, "id")
