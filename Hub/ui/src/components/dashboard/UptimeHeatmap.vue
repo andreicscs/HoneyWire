@@ -56,9 +56,14 @@ const scrollToBottom = () => {
 }
 
 const isSilenced = (nodeId, sensorId) => {
-    const node = fleet.value.find(n => n.id === nodeId)
-    if (!node || !node.installedSensors) return false
-    const sensor = node.installedSensors.find(s => s.id === sensorId || s.name === sensorId)
+    let sensor = null
+    if (typeof fleetStore.getSensor === 'function') {
+        sensor = fleetStore.getSensor(nodeId, sensorId)
+    }
+    if (!sensor) { // Fallback for safety
+        const node = fleet.value.find(n => n.id === nodeId)
+        sensor = node?.installedSensors?.find(s => s.id === sensorId || s.name === sensorId)
+    }
     return sensor ? !!sensor.isSilenced : false
 }
 
@@ -70,32 +75,23 @@ const hydrateGroupsWithLiveStatus = (groups) => {
         ...group,
         sensors: (group.sensors || []).map(sensor => {
             let isLiveOnline = sensor.status === 'up'
-            const node = fleet.value.find(n => n.id === group.node_id)
-            
-            if (node && node.installedSensors) {
-                const liveSensor = node.installedSensors.find(s => s.id === sensor.sensor_id || s.name === sensor.sensor_id)
-                if (liveSensor) {
-                    if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline
-                    else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online
-                    else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
-                }
+            // O(1) lookup using the fleet store getter
+            let liveSensor = null
+            if (typeof fleetStore.getSensor === 'function') {
+                liveSensor = fleetStore.getSensor(group.node_id, sensor.sensor_id)
             }
             
-            const blocks = [...(sensor.blocks || [])]
-            if (blocks.length > 0) {
-                const lastIdx = blocks.length - 1
-                const lastBlock = { ...blocks[lastIdx] }
-                
-                if (isLiveOnline && (lastBlock.status === 'down' || lastBlock.status === 'nodata')) {
-                    lastBlock.status = 'up'
-                } else if (!isLiveOnline) {
-                    lastBlock.status = 'down'
-                }
-                
-                blocks[lastIdx] = lastBlock
+            
+            if (liveSensor) {
+                if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline
+                else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online
+                else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
             }
 
-            return { ...sensor, isOnline: isLiveOnline, blocks }
+            // Pure visual hydration for the row indicator.
+            // We completely stop mutating sensor.blocks here, letting the 
+            // backend own the strict mathematical history.
+            return { ...sensor, node_id: group.node_id, isOnline: isLiveOnline }
         })
     }))
 }
