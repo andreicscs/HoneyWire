@@ -340,25 +340,3 @@ type UptimeSensor struct {
 | New status type | `calculator.go` + `dto.go` | Pure logic + contract |
 | Style changes | Frontend component | No backend impact |
 | Fetch different data | `projection.go` store interface | Fetch layer only |
-
-### Backwards Compatibility
-
-- DTOs are immutable once released
-- New fields must be optional (pointer types or omitempty)
-- Never rename existing JSON fields
-- New calculations should not change existing field meanings
-- Frontend must handle missing optional fields gracefully
-
-## Summary
-
-The uptime projection architecture achieves:
-
-✅ **Type Safety**: Strict DTOs eliminate generic response objects  
-✅ **Separation of Concerns**: Business logic isolated in calculator.go  
-✅ **Testability**: Pure functions with zero external dependencies  
-✅ **Single Source of Truth**: All calculations in one place  
-✅ **Frontend Simplicity**: Template only renders, no computation  
-✅ **Real-time Updates**: Shallow hydration without recalculation  
-✅ **Maintainability**: Clear responsibilities, easy to extend  
-
-This architecture enables the frontend to stay "dumb" (strictly rendering) while the backend becomes the authoritative source for all uptime analytics.

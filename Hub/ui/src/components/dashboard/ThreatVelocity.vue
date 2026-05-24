@@ -1,35 +1,31 @@
 <script setup>
-import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick, toRaw } from 'vue'
+import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useAppStore } from '../../stores/app'
 import { useEventsStore } from '../../stores/events'
+import { useFleetStore } from '../../stores/fleet'
 import { getComputedRgb, injectAlpha } from '../../utils/theme'
-import { baseTooltipConfig, applyChartTheme } from '../../utils/chartConfig'
+import { baseTooltipConfig } from '../../utils/chartConfig'
 import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
+const fleetStore = useFleetStore()
 
-const { velocityTimeframe } = storeToRefs(appStore)
-const { filteredEvents: events } = storeToRefs(eventsStore)
+const { velocityTimeframe, viewingArchive } = storeToRefs(appStore)
+const { threatVelocityProjection: projection, isFetchingThreatVelocityProjection, lastVelocityInvalidation } = storeToRefs(eventsStore)
+const { selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const chartCanvas = ref(null)
-const recentEventCount = ref(0)
 let chartInstance = shallowRef(null)
 let themeObserver = null
-let liveTicker = null 
+let rolloverTimeout = null 
+let lastBucket = null
 
 const severities = ['critical', 'high', 'medium', 'low', 'info']
-
-const getSeverityRgb = (sev) => {
-    const hex = getCssVariable(`--sev-${sev}`);
-    return hexToRgb(hex);
-}
-
-let exactTimesList = [] 
 
 const initChart = () => {
     const ctx = chartCanvas.value.getContext('2d')
@@ -54,7 +50,7 @@ const initChart = () => {
                     mode: 'index', 
                     intersect: false, 
                     callbacks: {
-                        title: (context) => exactTimesList[context[0].dataIndex],
+                        title: (context) => projection.value?.exact_times?.[context[0].dataIndex] || '',
                         labelColor: (context) => {
                             return { borderColor: context.dataset.borderColor, backgroundColor: context.dataset.borderColor }
                         }
@@ -74,62 +70,6 @@ const initChart = () => {
     })
 }
 
-const updateData = () => {
-    if (!chartInstance.value) return
-
-    const now = new Date()
-    let buckets = 30
-    let bucketSizeMs = 120000
-
-    if (velocityTimeframe.value === '24H') { buckets = 24; bucketSizeMs = 3600000 } 
-    else if (velocityTimeframe.value === '7D') { buckets = 14; bucketSizeMs = 43200000 } 
-    else if (velocityTimeframe.value === '30D') { buckets = 30; bucketSizeMs = 86400000 }
-
-    const labels = new Array(buckets).fill('')
-    exactTimesList = new Array(buckets).fill('')
-    
-    for (let i = 0; i < buckets; i++) {
-        const stepsAgo = buckets - 1 - i
-        const d = new Date(now.getTime() - stepsAgo * bucketSizeMs)
-        exactTimesList[i] = d.toLocaleTimeString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-        
-        if (stepsAgo === 0) labels[i] = 'Now'
-        else {
-            if (velocityTimeframe.value === '1H') labels[i] = `-${stepsAgo * 2}m`
-            else if (velocityTimeframe.value === '24H') labels[i] = `-${stepsAgo}h`
-            else if (velocityTimeframe.value === '7D') labels[i] = `-${stepsAgo * 12}h`
-            else if (velocityTimeframe.value === '30D') labels[i] = `-${stepsAgo}d`
-        }
-    }
-
-    const data = { critical: new Array(buckets).fill(0), high: new Array(buckets).fill(0), medium: new Array(buckets).fill(0), low: new Array(buckets).fill(0), info: new Array(buckets).fill(0) }
-    let count = 0
-
-    const rawEvents = toRaw(events.value)
-
-    rawEvents.forEach(e => {
-        if (!e.timestamp) return
-        const eTime = new Date(e.timestamp)
-        const diffMins = Math.floor((now - eTime) / bucketSizeMs)
-        
-        if (diffMins >= 0 && diffMins < buckets) {
-            const sev = e.severity ? e.severity.toLowerCase() : 'info'
-            if (data[sev]) data[sev][buckets - 1 - diffMins]++
-            count++
-        }
-    })
-    recentEventCount.value = count
-
-    chartInstance.value.data.labels = labels
-    chartInstance.value.data.datasets.forEach((dataset, index) => {
-        const sev = severities[index]
-        dataset.data = data[sev]
-        dataset.hidden = data[sev].every(v => v === 0)
-    })
-
-    chartInstance.value.update('none') 
-}
-
 const updateTheme = () => {
     if (!chartInstance.value || !chartCanvas.value) return
     
@@ -139,7 +79,6 @@ const updateTheme = () => {
 
     chartInstance.value.data.datasets.forEach((dataset, index) => {
         const sev = severities[index]
-        // This now safely returns 'rgb(x, y, z)' computed perfectly by the browser
         const baseRgb = getComputedRgb(`--sev-${sev}`) 
         
         const gradient = ctx.createLinearGradient(0, 0, 0, chartHeight)
@@ -151,7 +90,6 @@ const updateTheme = () => {
         dataset.pointHoverBackgroundColor = baseRgb
     })
 
-    // Update Tooltips securely with browser-computed RGBs
     const bgSurfaceRgb = getComputedRgb('--bg-surface')
     chartInstance.value.options.plugins.tooltip.backgroundColor = injectAlpha(bgSurfaceRgb, 0.95)
     
@@ -163,12 +101,61 @@ const updateTheme = () => {
     chartInstance.value.update('none')
 }
 
+const updateData = () => {
+    const p = projection.value;
+    if (!chartInstance.value || !p) return;
+
+    chartInstance.value.data.labels = p.labels;
+    
+    chartInstance.value.data.datasets.forEach((dataset, index) => {
+        const sev = severities[index]
+        const data = p.series[sev] || []
+        dataset.data = data
+        dataset.hidden = data.every(v => v === 0)
+    })
+
+    chartInstance.value.update('none');
+}
+
+const fetchContextualProjection = () => {
+    eventsStore.fetchThreatVelocityProjection(
+        velocityTimeframe.value,
+        selectedNode.value,
+        selectedSensor.value,
+        viewingArchive.value
+    );
+}
+
+const scheduleNextRollover = () => {
+    // Clear any existing timeout so they don't pile up
+    if (rolloverTimeout) clearTimeout(rolloverTimeout)
+    if (!projection.value?.bucket_size_ms) return
+
+    const bucketMs = projection.value.bucket_size_ms
+    const now = Date.now()
+    
+    // Find the exact millisecond of the next bucket boundary
+    const nextBoundary = Math.ceil(now / bucketMs) * bucketMs
+    
+    // Add a tiny 100ms buffer to ensure we safely crossed the time boundary 
+    // before asking the backend for the new data.
+    const delay = nextBoundary - now + 100
+
+    rolloverTimeout = setTimeout(() => {
+        // When the boundary hits, request fresh data
+        fetchContextualProjection()
+        
+        // Note: We don't recursively call scheduleNextRollover() here.
+        // Why? Because fetchContextualProjection() will fetch a new projection,
+        // which will trigger the watcher below, which will safely schedule the NEXT tick.
+    }, delay)
+}
+
 onMounted(async () => {
     await nextTick()
     if (chartCanvas.value) {
         initChart()
         updateTheme()
-        updateData()
     }
     
     themeObserver = new MutationObserver((mutations) => {
@@ -183,17 +170,41 @@ onMounted(async () => {
     })
     themeObserver.observe(document.documentElement, { attributes: true })
 
-    liveTicker = setInterval(() => { updateData() }, 2000)
+    rolloverTicker = setInterval(checkBucketRollover, 15000);
 })
 
-watch([() => events.value[0]?.id, velocityTimeframe, () => events.value.length], () => {
-    updateData()
-})
+// TRIGGER 1: Context Changes (User clicks filters)
+watch(
+    [velocityTimeframe, selectedNode, selectedSensor, viewingArchive],
+    fetchContextualProjection,
+    { immediate: true }
+)
+
+// TRIGGER 2: Global Invalidation (WebSocket says data is stale)
+watch(
+    lastVelocityInvalidation,
+    () => {
+        if (!viewingArchive.value) {
+            fetchContextualProjection();
+        }
+    }
+)
+
+// TRIGGER 3: Snapshot Arrives (Refetch completed)
+watch(
+    () => projection.value?.generated_at,
+    (newVal) => {
+        if (newVal) {
+            updateData();
+            scheduleNextRollover(); // Predict and schedule the next rollover perfectly
+        }
+    }
+)
 
 onUnmounted(() => {
     if (chartInstance.value) chartInstance.value.destroy()
     if (themeObserver) themeObserver.disconnect()
-    if (liveTicker) clearInterval(liveTicker)
+    if (rolloverTimeout) clearTimeout(rolloverTimeout)
 })
 
 const legendItems = [
@@ -212,7 +223,9 @@ const legendItems = [
                 <div>
                     <h3 class="text-base font-medium text-text-h">Events Velocity</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
-                        <span class="text-sm" :class="recentEventCount > 0 ? 'text-critical' : 'text-success-main'">{{ recentEventCount }}</span>
+                        <span class="text-sm transition-colors" :class="(projection?.recent_event_count || 0) > 0 ? 'text-critical' : 'text-success-main'">
+                            {{ projection?.recent_event_count || 0 }}
+                        </span>
                         <span class="text-sm text-text-m">Events Recorded</span>
                     </div>
                 </div>
@@ -222,10 +235,14 @@ const legendItems = [
         </template>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full">
-            <div v-if="recentEventCount === 0" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
+            <div v-if="(!projection || projection.recent_event_count === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>
-            <canvas ref="chartCanvas" class="w-full h-full"></canvas>
+            
+            <div v-if="isFetchingThreatVelocityProjection" class="absolute inset-0 z-10 flex items-center justify-center bg-bg-surface/50 backdrop-blur-[1px] transition-opacity">
+                <!-- Optional: Add a small spinner here -->
+            </div>
+            <canvas ref="chartCanvas" class="w-full h-full relative z-0"></canvas>
         </div>
 
         <template #footer>
@@ -233,4 +250,3 @@ const legendItems = [
         </template>
     </BaseWidget>
 </template>
-emplate>

@@ -6,7 +6,32 @@ import (
 	
 	"github.com/honeywire/hub/internal/projections/severity"
 	"github.com/honeywire/hub/internal/projections/uptime"
+	"github.com/honeywire/hub/internal/projections/velocity"
 )
+
+func (h *Handler) GetVelocityAnalytics(w http.ResponseWriter, r *http.Request) {
+	timeframe := r.URL.Query().Get("timeframe")
+	if timeframe == "" {
+		timeframe = "24H"
+	}
+
+	nodeID := r.URL.Query().Get("node_id")
+	sensorID := r.URL.Query().Get("sensor_id")
+	viewingArchiveStr := r.URL.Query().Get("archived")
+	viewingArchive := 0
+	if viewingArchiveStr == "true" || viewingArchiveStr == "1" {
+		viewingArchive = 1
+	}
+
+	projector := velocity.NewProjector(h.Store)
+	projection, err := projector.BuildThreatVelocityProjection(r.Context(), timeframe, nodeID, sensorID, viewingArchive)
+	if err != nil {
+		RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, projection)
+}
 
 func (h *Handler) GetSeverityAnalytics(w http.ResponseWriter, r *http.Request) {
 	timeframe := r.URL.Query().Get("timeframe")

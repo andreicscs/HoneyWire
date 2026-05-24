@@ -383,16 +383,3 @@ Analytics projections are contextual:
 Widgets are rendering-focused, not analytics-focused.
 
 ---
-
-# Summary
-
-The current severity analytics architecture provides:
-
-✅ Backend-authoritative analytics  
-✅ Flat projection contracts  
-✅ Context-aware filtering  
-✅ Websocket-compatible invalidation  
-✅ Lightweight rendering widgets  
-✅ No frontend event aggregation  
-✅ Efficient reactive updates  
-✅ Cleaner separation of concerns

@@ -13,6 +13,7 @@ import { useAppStore } from './app'
  */
 
 let severityAbortController = null;
+let velocityAbortController = null;
 
 export const useEventsStore = defineStore('events', () => {
   // --- STATE ---
@@ -21,6 +22,10 @@ export const useEventsStore = defineStore('events', () => {
   const activeEvent = ref(null)
   const isFetching = ref(false)
   const severityProjection = ref(null)
+
+  const threatVelocityProjection = ref(null)
+  const isFetchingThreatVelocityProjection = ref(false)
+  const lastVelocityInvalidation = ref(null)
 
   // --- GETTERS ---
   /**
@@ -132,6 +137,38 @@ export const useEventsStore = defineStore('events', () => {
     } catch (e) {
       if (e.name !== 'AbortError') console.error('Failed to fetch severity projection', e)
     }
+  }
+
+  const fetchThreatVelocityProjection = async (timeframe = '24H', nodeId = null, sensorId = null, viewingArchive = false) => {
+    if (velocityAbortController) {
+      velocityAbortController.abort();
+    }
+    velocityAbortController = new AbortController();
+
+    try {
+      isFetchingThreatVelocityProjection.value = true;
+      const params = new URLSearchParams({ timeframe, archived: viewingArchive ? 'true' : 'false' });
+      if (nodeId) params.append('node_id', nodeId);
+      if (sensorId) params.append('sensor_id', sensorId);
+
+      const response = await fetch(`/api/v1/events/velocity?${params.toString()}`, {
+        signal: velocityAbortController.signal
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+      
+      threatVelocityProjection.value = await response.json(); 
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('Velocity fetch failed:', e);
+    } finally {
+      isFetchingThreatVelocityProjection.value = false;
+    }
+  }
+
+  const invalidateThreatVelocityProjection = () => {
+    lastVelocityInvalidation.value = Date.now();
   }
 
   const markAllRead = async () => {
@@ -267,6 +304,7 @@ export const useEventsStore = defineStore('events', () => {
 
     if (affectsCurrentView) {
       fetchSeverityProjection('alltime', selectedNode, selectedSensor);
+      invalidateThreatVelocityProjection();
     }
   }
 
@@ -277,10 +315,15 @@ export const useEventsStore = defineStore('events', () => {
     activeEvent,
     isFetching,
     severityProjection,
+    threatVelocityProjection,
+    isFetchingThreatVelocityProjection,
+    lastVelocityInvalidation,
     filteredEvents,
     // Actions
     fetchEvents,
     fetchSeverityProjection,
+    fetchThreatVelocityProjection,
+    invalidateThreatVelocityProjection,
     markAllRead,
     markEventRead,
     archiveEvent,

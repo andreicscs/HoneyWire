@@ -371,6 +371,36 @@ Returns severity distribution analytics for the fleet.
 - `sensor` — filter by sensor ID (optional)
 - `viewingArchive` — `true`, `1`, `false`, or `0` (default: `false`)
 
+### GET /api/v1/events/velocity
+
+Returns time-bucketed velocity analytics for the fleet.
+
+**Query parameters:**
+- `timeframe` — timeframe filter (`1H`, `24H`, `7D`, `30D`) (default: `24H`)
+- `node_id` — filter by node ID (optional)
+- `sensor_id` — filter by sensor ID (optional)
+- `archived` — include archived events (`true` or `false`) (default: `false`)
+
+**Example Response:**
+```json
+{
+  "timeframe": "24H",
+  "bucket_size_ms": 3600000,
+  "generated_at": 1716552000000,
+  "bucket_timestamps": [1716465600000, 1716469200000],
+  "labels": ["-23h", "-22h", "Now"],
+  "exact_times": ["May 23, 08:00 AM", "May 23, 09:00 AM"],
+  "series": {
+    "critical": [0, 1, 0],
+    "high": [2, 0, 5],
+    "medium": [0, 0, 0],
+    "low": [0, 0, 0],
+    "info": [1, 3, 2]
+  },
+  "recent_event_count": 14
+}
+```
+
 ## Uptime and Health
 
 ### GET /api/v1/uptime
