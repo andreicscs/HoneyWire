@@ -245,11 +245,6 @@ const closeDeployModal = () => {
 const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
 const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
-const openNodeDetail = (nodeId) => {
-    fleetStore.selectTarget(nodeId)
-    appStore.navigate('node-detail')
-}
-
 // --- Copy Animation (ephemeral UI) ---
 const copiedStates = ref({})
 
@@ -265,8 +260,8 @@ const handleCopy = async (id, text) => {
 }
 
 const handleOpenNodeDetail = (nodeId) => {
-    fleetStore.selectTarget(nodeId)
-    appStore.setView('node-detail')
+    fleetStore.selectTarget(nodeId, null, false)
+    appStore.currentView = 'node-detail'
 }
 
 </script>

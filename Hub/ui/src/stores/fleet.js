@@ -269,13 +269,13 @@ export const useFleetStore = defineStore('fleet', () => {
     selectedSensorId.value = null
   }
 
-  const selectTarget = (nodeId, rawSensorId = null) => {
+  const selectTarget = (nodeId, rawSensorId = null, toggle = true) => {
     const compositeId = rawSensorId ? `${nodeId}:${rawSensorId}` : null
 
     const sameNode = selectedNodeId.value === nodeId
     const sameSensor = selectedSensorId.value === compositeId
 
-    if (sameNode && sameSensor) {
+    if (toggle && sameNode && sameSensor) {
       clearSelection()
       return
     }
