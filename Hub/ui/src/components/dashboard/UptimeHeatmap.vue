@@ -21,34 +21,61 @@ const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sen
 const handleForget = (nodeId, sensorId) => fleetStore.removeSensor(nodeId, sensorId)
 
 const checkScroll = () => {
-    if (!scrollArea.value) return
+    if (!scrollArea.value) {
+        console.debug('[Heatmap] checkScroll aborted: no scrollArea ref')
+        return
+    }
     const container = scrollArea.value
     
     const currentBottom = Math.ceil(container.scrollTop + container.clientHeight)
     canScrollDown.value = currentBottom < (container.scrollHeight - 15)
 
+    console.groupCollapsed('[Heatmap] checkScroll execution')
+    console.debug('Container Metrics:', {
+        scrollTop: container.scrollTop,
+        clientHeight: container.clientHeight,
+        currentBottom,
+        scrollHeight: container.scrollHeight,
+        canScrollDown: canScrollDown.value
+    })
+
     let worstStatus = null
     const warningNodes = container.querySelectorAll('.has-warnings')
+    console.debug(`Found ${warningNodes.length} rows with warnings`)
 
     if (warningNodes.length > 0) {
         const containerRect = container.getBoundingClientRect()
+        console.debug('Container bottom edge:', containerRect.bottom)
         
         for (let i = 0; i < warningNodes.length; i++) {
-            const nodeRect = warningNodes[i].getBoundingClientRect()
+            const nodeRect = warningNodes[i].getBoundingClientRect();
+            const status = warningNodes[i].getAttribute('data-worst-status')
             
-            if (nodeRect.top > containerRect.bottom - 10) { 
-                const status = warningNodes[i].getAttribute('data-worst-status')
+            // Add a 1px buffer to account for borders or subpixel rendering
+            const isBelow = (nodeRect.bottom - containerRect.bottom) > 1 
+
+            console.debug(`Row ID [${warningNodes[i].id}]:`, {
+                status,
+                bottomEdge: nodeRect.bottom,
+                isBelowVisibleArea: isBelow
+            })
+            
+            if (isBelow) { 
                 if (status === 'down') {
                     worstStatus = 'down'
+                    console.debug(`-> Triggering indicator for 'down'`)
                     break
                 } else if (status === 'degraded') {
                     worstStatus = 'degraded'
+                    console.debug(`-> Found 'degraded', continuing search for 'down'`)
                 }
             }
         }
     }
     
     worstWarningBelow.value = worstStatus
+    console.debug('Final worstWarningBelow:', worstWarningBelow.value)
+    console.groupEnd()
 }
 
 const scrollToBottom = () => {
@@ -62,9 +89,19 @@ const isSilenced = (nodeId, sensorId) => {
     }
     if (!sensor) { // Fallback for safety
         const node = fleet.value.find(n => n.id === nodeId)
-        sensor = node?.installedSensors?.find(s => s.id === sensorId || s.name === sensorId)
+        sensor = node?.installedSensors?.find(s => s.sensorId === sensorId)
     }
     return sensor ? !!sensor.isSilenced : false
+}
+
+const getRowWorstStatus = (blocks) => {
+    if (!blocks || !blocks.length) return null
+    let worst = null
+    for (let i = 0; i < blocks.length; i++) {
+        if (blocks[i].status === 'down') return 'down'
+        if (blocks[i].status === 'degraded') worst = 'degraded'
+    }
+    return worst
 }
 
 // Hydrate live status from fleet store for real-time feedback
@@ -183,9 +220,9 @@ const legendItems = [
                             'opacity-50': selectedSensor && (selectedSensor?.sensorId !== sensor.sensor_id || selectedNode?.id !== sensor.node_id),
                             'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor?.sensorId === sensor.sensor_id && selectedNode?.id === sensor.node_id,
                             'border-transparent': !selectedSensor || (selectedSensor?.sensorId !== sensor.sensor_id || selectedNode?.id !== sensor.node_id),
-                            'has-warnings': sensor.status !== 'up' && sensor.status !== 'nodata'
+                            'has-warnings': getRowWorstStatus(sensor.blocks) !== null
                         }"
-                        :data-worst-status="sensor.status !== 'up' && sensor.status !== 'nodata' ? sensor.status : null"
+                        :data-worst-status="getRowWorstStatus(sensor.blocks)"
                         >
                          
                         <div class="w-[180px] flex items-center gap-2 shrink-0 pr-2">
