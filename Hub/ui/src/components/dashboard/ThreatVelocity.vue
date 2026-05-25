@@ -238,10 +238,6 @@ const legendItems = [
             <div v-if="(!projection || projection.recent_event_count === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>
-            
-            <div v-if="isFetchingThreatVelocityProjection" class="absolute inset-0 z-10 flex items-center justify-center bg-bg-surface/50 backdrop-blur-[1px] transition-opacity">
-                <!-- Optional: Add a small spinner here -->
-            </div>
             <canvas ref="chartCanvas" class="w-full h-full relative z-0"></canvas>
         </div>
 
