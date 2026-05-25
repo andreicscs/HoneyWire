@@ -22,7 +22,6 @@ const handleForget = (nodeId, sensorId) => fleetStore.removeSensor(nodeId, senso
 
 const checkScroll = () => {
     if (!scrollArea.value) {
-        console.debug('[Heatmap] checkScroll aborted: no scrollArea ref')
         return
     }
     const container = scrollArea.value
@@ -30,22 +29,11 @@ const checkScroll = () => {
     const currentBottom = Math.ceil(container.scrollTop + container.clientHeight)
     canScrollDown.value = currentBottom < (container.scrollHeight - 15)
 
-    console.groupCollapsed('[Heatmap] checkScroll execution')
-    console.debug('Container Metrics:', {
-        scrollTop: container.scrollTop,
-        clientHeight: container.clientHeight,
-        currentBottom,
-        scrollHeight: container.scrollHeight,
-        canScrollDown: canScrollDown.value
-    })
-
     let worstStatus = null
     const warningNodes = container.querySelectorAll('.has-warnings')
-    console.debug(`Found ${warningNodes.length} rows with warnings`)
 
     if (warningNodes.length > 0) {
         const containerRect = container.getBoundingClientRect()
-        console.debug('Container bottom edge:', containerRect.bottom)
         
         for (let i = 0; i < warningNodes.length; i++) {
             const nodeRect = warningNodes[i].getBoundingClientRect();
@@ -53,29 +41,19 @@ const checkScroll = () => {
             
             // Add a 1px buffer to account for borders or subpixel rendering
             const isBelow = (nodeRect.bottom - containerRect.bottom) > 1 
-
-            console.debug(`Row ID [${warningNodes[i].id}]:`, {
-                status,
-                bottomEdge: nodeRect.bottom,
-                isBelowVisibleArea: isBelow
-            })
             
             if (isBelow) { 
                 if (status === 'down') {
                     worstStatus = 'down'
-                    console.debug(`-> Triggering indicator for 'down'`)
                     break
                 } else if (status === 'degraded') {
                     worstStatus = 'degraded'
-                    console.debug(`-> Found 'degraded', continuing search for 'down'`)
                 }
             }
         }
     }
     
     worstWarningBelow.value = worstStatus
-    console.debug('Final worstWarningBelow:', worstWarningBelow.value)
-    console.groupEnd()
 }
 
 const scrollToBottom = () => {

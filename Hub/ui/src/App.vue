@@ -38,13 +38,15 @@ const wsService = new HoneyWireWS()
 
 const loadAppData = async () => {
   try {
-    await fetchConfig()
-    await appStore.checkSetupStatus()
+    await fetchConfig().catch(e => console.warn("Config fetch non-fatal error:", e))
+
+    // Reconcile system state (isArmed) now that we have an active session
+    await appStore.fetchSystemState().catch(() => {})
 
     await Promise.all([
-      fleetStore.fetchFleet(),
-      fleetStore.fetchUptime(fleetStore.activeTimeframe),
-      eventsStore.fetchEvents(),
+      fleetStore.fetchFleet().catch(e => console.error("Fleet fetch error:", e)),
+      fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(e => console.error("Uptime fetch error:", e)),
+      eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
     ])
 
     wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
@@ -60,9 +62,9 @@ const loadAppData = async () => {
     wsService.on('onReconnect', async () => {
       console.log("WebSocket Reconnected: Syncing missed data...")
       await Promise.all([
-        fleetStore.fetchFleet(),
-        fleetStore.fetchUptime(fleetStore.activeTimeframe),
-        eventsStore.fetchEvents(),
+        fleetStore.fetchFleet().catch(() => {}),
+        fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(() => {}),
+        eventsStore.fetchEvents().catch(() => {}),
       ])
     })
 
@@ -72,13 +74,8 @@ const loadAppData = async () => {
 
     wsService.connect()
 
-    appStore.isAuthenticated = true
-    appStore.isInitialized = true
-
   } catch (e) {
-    console.error("Failed to load application data:", e)
-    appStore.isAuthenticated = true
-    appStore.isInitialized = true
+    console.error("Critical failure during loadAppData:", e)
   }
 }
 
@@ -86,43 +83,31 @@ const checkAuthAndInit = async () => {
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('debug') === 'setup') {
     appStore.requiresSetup = true
-    appStore.isAuthenticated = false
     return
   }
 
   try {
-    const needsSetup = await appStore.checkRequiresSetup()
-    if (needsSetup) {
-      appStore.requiresSetup = true
-      appStore.isAuthenticated = false
+    await appStore.initAppStore()
+
+    if (appStore.requiresSetup) {
       return
     }
 
-    appStore.requiresSetup = false
-
-    const authenticated = await appStore.checkSystemState()
-    if (!authenticated) {
-      appStore.isAuthenticated = false
+    if (appStore.bootstrapError) {
       return
     }
-
-    await loadAppData()
 
   } catch (e) {
     console.error("Hub connection error:", e)
-    appStore.isAuthenticated = false
   }
 }
 
-const onLoginSuccess = async () => {
-  appStore.requiresSetup = false
-  await loadAppData()
-}
-
-const onSetupComplete = async () => {
-  appStore.requiresSetup = false
-  await loadAppData()
-}
+watch(() => appStore.isAuthenticated, (isAuth) => {
+  if (isAuth) {
+    appStore.requiresSetup = false
+    loadAppData()
+  }
+})
 
 const toggleTheme = () => {
   const html = document.documentElement
@@ -158,12 +143,22 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="appStore.requiresSetup" class="h-screen bg-bg">
-    <Setup @setup-complete="onSetupComplete" @toggle-theme="toggleTheme" />
+  <div v-if="!appStore.isInitialized" class="h-screen bg-bg flex items-center justify-center z-50">
+     <div class="animate-pulse flex flex-col items-center gap-4">
+         <svg class="w-10 h-10 text-primary-main animate-spin" fill="none" viewBox="0 0 24 24">
+             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+         </svg>
+         <span class="text-text-m font-medium tracking-wide">Initializing Sentinel...</span>
+     </div>
+  </div>
+
+  <div v-else-if="appStore.requiresSetup" class="h-screen bg-bg">
+    <Setup @toggle-theme="toggleTheme" />
   </div>
 
   <div v-else-if="!appStore.isAuthenticated" class="h-screen bg-bg">
-    <Login @login-success="onLoginSuccess" @toggle-theme="toggleTheme" />
+    <Login @toggle-theme="toggleTheme" />
   </div>
 
   <div v-else class="flex h-screen overflow-hidden bg-bg text-text-h transition-colors duration-200">
