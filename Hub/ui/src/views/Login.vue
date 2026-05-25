@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue'
-import { useAppStore } from '../stores/app'
+import { useAppStore } from '../stores/System/app'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseCard from '../components/ui/layout/BaseCard.vue'

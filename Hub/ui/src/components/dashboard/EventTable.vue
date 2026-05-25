@@ -1,9 +1,9 @@
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useAppStore } from '../../stores/app'
-import { useEventsStore } from '../../stores/events'
-import { useFleetStore } from '../../stores/fleet'
+import { useAppStore } from '../../stores/System/app'
+import { useEventsStore } from '../../stores/Events/events'
+import { useFleetStore } from '../../stores/Fleet/fleet'
 import { formatSensorId } from '../../utils/formatSensorId'
 
 

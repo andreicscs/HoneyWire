@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useFleetStore } from './fleet'
-import { useAppStore } from './app'
+import { useFleetStore } from '../Fleet/fleet'
+import { useAppStore } from '../System/app'
 
 /**
  * Events Store (Telemetry State)

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { useAppStore } from '../stores/app'
+import { useAppStore } from '../stores/System/app'
 import { useConfig } from '../api/useConfig'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseInput from '../components/ui/forms/BaseInput.vue'

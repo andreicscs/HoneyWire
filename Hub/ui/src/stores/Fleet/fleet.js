@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { api } from '../api/client'
+import { api } from '../../api/client'
 
 export const useFleetStore = defineStore('fleet', () => {
   // --- 1. AUTHORITATIVE BACKEND SNAPSHOT STATE ---

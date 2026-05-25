@@ -13,9 +13,9 @@ import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
 
 import { useConfig } from './api/useConfig'
-import { useAppStore } from './stores/app'
-import { useFleetStore } from './stores/fleet'
-import { useEventsStore } from './stores/events'
+import { useAppStore } from './stores/System/app'
+import { useFleetStore } from './stores/Fleet/fleet'
+import { useEventsStore } from './stores/Events/events'
 import { HoneyWireWS } from './services/ws'
 
 const { fetchConfig } = useConfig()

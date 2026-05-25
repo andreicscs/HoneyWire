@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useFleetStore } from '../../stores/fleet'
+import { useFleetStore } from '../../stores/Fleet/fleet'
 import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'

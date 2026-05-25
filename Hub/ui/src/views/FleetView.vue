@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useAppStore } from '../stores/app'
-import { useFleetStore } from '../stores/fleet'
+import { useAppStore } from '../stores/System/app'
+import { useFleetStore } from '../stores/Fleet/fleet'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
 import BaseWidget from '../components/ui/layout/BaseWidget.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useFleetStore } from '../../stores/fleet'
+import { useFleetStore } from '../../stores/Fleet/fleet'
 import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 

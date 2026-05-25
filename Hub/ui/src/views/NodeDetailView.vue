@@ -1,8 +1,8 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
-import { useAppStore } from '../stores/app'
-import { useFleetStore } from '../stores/fleet'
-import { useEventsStore } from '../stores/events'
+import { useAppStore } from '../stores/System/app'
+import { useFleetStore } from '../stores/Fleet/fleet'
+import { useEventsStore } from '../stores/Events/events'
 import { useConfig } from '../api/useConfig'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
