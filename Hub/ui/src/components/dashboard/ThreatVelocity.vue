@@ -169,8 +169,6 @@ onMounted(async () => {
         }
     })
     themeObserver.observe(document.documentElement, { attributes: true })
-
-    rolloverTicker = setInterval(checkBucketRollover, 15000);
 })
 
 // TRIGGER 1: Context Changes (User clicks filters)
