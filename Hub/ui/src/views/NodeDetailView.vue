@@ -16,7 +16,7 @@ const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
 const { config } = useConfig()
 
-const selectedNodeId = computed(() => fleetStore.selectedNode)
+const selectedNodeId = computed(() => fleetStore.selectedNodeId)
 
 // --- NODE STATE ---
 const node = computed(() => fleetStore.getNode(selectedNodeId.value))
@@ -258,18 +258,18 @@ const sortedEnvVars = computed(() => {
 // --- SENSOR ACTIONS (delegated to store) ---
 
 const handleToggleSensorSilence = async (sensor) => {
-  if (!node.value?.id || !sensor.id) return
+  if (!node.value?.id || !sensor.sensorId) return
   try {
-    await fleetStore.toggleSilence(node.value.id, sensor.id, !sensor.isSilenced)
+    await fleetStore.toggleSilence(node.value.id, sensor.sensorId, !sensor.isSilenced)
   } catch (err) {
     alert('Unable to change sensor silence state. Please try again.')
   }
 }
 
 const handleRemoveSensor = async (sensor) => {
-  if (!node.value?.id || !sensor.id) return
+  if (!node.value?.id || !sensor.sensorId) return
   try {
-    await fleetStore.removeSensor(node.value.id, sensor.id)
+    await fleetStore.removeSensor(node.value.id, sensor.sensorId)
   } catch (err) {
     alert('Could not remove sensor. Please try again.')
   }
@@ -407,7 +407,7 @@ const editSensor = (installedSensor) => {
   const apiKey = node.value?.apiKey
   selectedSensor.value = manifest
   isEditingSensor.value = true
-  editingSensorId.value = installedSensor.id
+  editingSensorId.value = installedSensor.sensorId
   activeTab.value = 'config'
   envVarValues.value = {}
   envVarValues.value['HW_SEVERITY'] = 'critical'
@@ -671,7 +671,7 @@ const applyHighlighting = () => {
 
             <div>
                 <h3 class="text-sm font-semibold text-text-h mb-4 mt-2">Deployed Sensors</h3>
-                <div v-if="node.installedSensors.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                <div v-if="node.installedSensors?.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     <div v-for="sensor in node.installedSensors" :key="sensor.id" class="bg-bg-surface border border-border-default rounded-lg p-4 flex flex-col group hover:border-text-m transition-colors shadow-sm relative overflow-hidden">
                         
                         <div class="absolute top-0 left-0 right-0 h-1 transition-colors" :class="sensor.status === 'up' ? 'bg-success-main' : 'bg-danger-main'"></div>

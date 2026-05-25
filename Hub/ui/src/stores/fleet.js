@@ -3,25 +3,136 @@ import { ref, computed } from 'vue'
 import { api } from '../api/client'
 
 export const useFleetStore = defineStore('fleet', () => {
-  // --- STATE ---
-  const nodes = ref([])
-  const uptimeData = ref([])
-  const selectedNode = ref(null)
-  const selectedSensor = ref(null)
+  // --- 1. AUTHORITATIVE BACKEND SNAPSHOT STATE ---
+  const nodesById = ref({})
+  const sensorsById = ref({})
+  
+  // --- 2. FRONTEND OPERATIONAL UI STATE ---
+  const pendingNodeActions = ref(new Map())
+  const pendingSensorActions = ref(new Map())
+  const selectedNodeId = ref(null)
+  const selectedSensorId = ref(null)
   const activeTimeframe = ref('24H')
+  
+  // Existing state for uptime
+  const uptimeData = ref([])
+
+  // --- 3. TRANSPORT CONTROL (Race Condition Protection) ---
+  const abortControllers = new Map()
+
+  // --- UI METADATA HELPERS ---
+  const markNodeAction = (nodeId, action) => {
+    const current = pendingNodeActions.value.get(nodeId) || new Set()
+    current.add(action)
+    pendingNodeActions.value = new Map(pendingNodeActions.value).set(nodeId, current)
+  }
+
+  const clearNodeAction = (nodeId, action) => {
+    const current = pendingNodeActions.value.get(nodeId)
+    if (!current) return
+    current.delete(action)
+    const next = new Map(pendingNodeActions.value)
+    if (current.size === 0) next.delete(nodeId)
+    else next.set(nodeId, current)
+    pendingNodeActions.value = next
+  }
+
+  const isNodeActionPending = (nodeId, action) => {
+    return pendingNodeActions.value.get(nodeId)?.has(action) || false
+  }
+
+  // --- THE 3 MUTATION GATEKEEPERS ---
+  const commitStructuralSnapshot = (nextNodes, nextSensors) => {
+    nodesById.value = nextNodes
+    sensorsById.value = nextSensors
+  }
+
+  const patchNode = (nodeId, patch) => {
+    const existing = nodesById.value[nodeId]
+    if (!existing) return null
+    const previousState = { ...existing }
+    nodesById.value[nodeId] = { ...existing, ...patch }
+    return previousState
+  }
+
+  const patchSensor = (compositeSensorId, patch) => {
+    const existing = sensorsById.value[compositeSensorId]
+    if (!existing) return null
+    const previousState = { ...existing }
+    sensorsById.value[compositeSensorId] = { ...existing, ...patch }
+    return previousState
+  }
+
+  // --- DYNAMIC READ MODELS (Selectors) ---
+  const sensorsByNodeId = computed(() => {
+    const map = {}
+    for (const s of Object.values(sensorsById.value)) {
+      (map[s.nodeId] ||= []).push(s)
+    }
+    return map
+  })
+
+  const nodes = computed(() => {
+    return Object.values(nodesById.value).map(node => ({
+      ...node,
+      installedSensors: sensorsByNodeId.value[node.id] || []
+    }))
+  })
+
+  const getNode = (id) => {
+    const node = nodesById.value[id]
+    if (!node) return null
+    return {
+      ...node,
+      installedSensors: sensorsByNodeId.value[node.id] || []
+    }
+  }
+
+  const getSensor = (nodeId, rawSensorId) => {
+    if (!nodeId || !rawSensorId) return null
+    return sensorsById.value[`${nodeId}:${rawSensorId}`] || null
+  }
+
+  // Computed properties for selected targets - Exported as Objects (Option A)
+  const selectedNode = computed(() => getNode(selectedNodeId.value))
+  const selectedSensor = computed(() => {
+    if (!selectedNodeId.value || !selectedSensorId.value) return null;
+    return sensorsById.value[selectedSensorId.value] || null;
+  })
 
   // --- NORMALIZATION ---
-
-  const normalizeSensor = (raw) => {
-    if (!raw) return null
+  const normalizeNodeData = (raw) => {
+    const id = raw.node_id ?? raw.id
+    if (!id) return null
     return {
-      ...raw,
-      id: raw.id || raw.sensor_id || raw.name,
-      name: raw.name || raw.sensor_id || raw.id,
-      display: raw.display || raw.custom_name || raw.name || raw.sensor_id || raw.id,
+      id,
+      alias: raw.alias || raw.name || 'Unnamed Node', 
+      status: raw.status || 'unknown',
+      hasPendingConfig: raw.hasPendingConfig ?? raw.pending_config ?? raw.has_pending_config ?? false,
+      lastHeartbeat: raw.lastHeartbeat || raw.last_heartbeat || null,
+      publicIp: raw.publicIp || raw.public_ip || null,
+      privateIp: raw.privateIp || raw.private_ip || null,
+      tags: raw.tags || [],
+      apiKey: raw.apiKey || raw.api_key || null,
+      activeRevision: raw.activeRevision || raw.active_revision || '',
+      desiredRevision: raw.desiredRevision || raw.desired_revision || '',
+      lastEvent: raw.lastEvent || raw.last_event || 'Never',
+    }
+  }
+
+  const normalizeSensorData = (raw, nodeId) => {
+    const rawId = raw.sensor_id ?? raw.id
+    if (!rawId) return null
+    const id = `${nodeId}:${rawId}`
+    return {
+      id,
+      sensorId: rawId,
+      nodeId,
+      name: raw.name || raw.sensor_id || rawId,
+      display: raw.display || raw.custom_name || raw.name || raw.sensor_id || rawId,
       status: raw.status || 'down',
-      events24h: raw.events24h ?? raw.events_24h ?? 0,
       isSilenced: raw.isSilenced ?? raw.is_silenced ?? false,
+      events24h: raw.events24h ?? raw.events_24h ?? 0,
       osi: raw.osi_layer || raw.osi || 'Sensor',
       icon: raw.icon || raw.icon_svg || 'M12 12h0',
       envVars: raw.envVars || raw.env_vars || {},
@@ -30,147 +141,150 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
-  const normalizeNode = (raw) => {
-    if (!raw) return null
-    return {
-      ...raw,
-      id: raw.id || raw.node_id || raw.nodeId,
-      alias: raw.alias || raw.name || 'Unnamed Node',
-      status: raw.status || 'unknown',
-      publicIp: raw.publicIp || raw.public_ip || null,
-      privateIp: raw.privateIp || raw.private_ip || null,
-      tags: raw.tags || [],
-      apiKey: raw.apiKey || raw.api_key || null,
-      hasPendingConfig: raw.hasPendingConfig ?? raw.pending_config ?? raw.has_pending_config ?? false,
-      activeRevision: raw.activeRevision || raw.active_revision || '',
-      desiredRevision: raw.desiredRevision || raw.desired_revision || '',
-      lastEvent: raw.lastEvent || raw.last_event || 'Never',
-      lastHeartbeat: raw.lastHeartbeat || raw.last_heartbeat || null,
-      installedSensors: (raw.installedSensors || raw.installed_sensors || []).map(normalizeSensor),
-    }
-  }
-
-  // --- MERGE HELPERS ---
-
-  const mergeSensor = (existing, incoming) => {
-    Object.assign(existing, incoming)
-  }
-
-  const mergeNode = (existing, incoming) => {
-    const incomingSensors = incoming.installedSensors || []
-    if (!existing.installedSensors) existing.installedSensors = []
-    const existingSensors = existing.installedSensors
-
-    const incomingSensorIds = new Set(incomingSensors.map(s => s.id))
-
-    incomingSensors.forEach(newSensor => {
-      const existingSensor = existingSensors.find(s => s.id === newSensor.id)
-      if (existingSensor) {
-        mergeSensor(existingSensor, newSensor)
-      } else {
-        existingSensors.push(newSensor)
-      }
-    })
-
-    for (let i = existingSensors.length - 1; i >= 0; i--) {
-      if (!incomingSensorIds.has(existingSensors[i].id)) {
-        existingSensors.splice(i, 1)
-      }
-    }
-
-    // Copy properties safely to preserve Vue 3 Proxy array identity.
-    // This prevents breaking the reactive reference that components are watching.
-    for (const key of Object.keys(incoming)) {
-      if (key !== 'installedSensors') {
-        existing[key] = incoming[key]
-      }
-    }
-  }
-
-  // --- INDEXED ACCESS ---
-
-  const nodeMap = computed(() => {
-    const map = {}
-    for (const node of nodes.value) {
-      map[node.id] = node
-    }
-    return map
-  })
-
-  const sensorIndex = computed(() => {
-    const map = {}
-    for (const node of nodes.value) {
-      const sensors = {}
-      for (const sensor of (node.installedSensors || [])) {
-        sensors[sensor.id] = sensor
-      }
-      map[node.id] = sensors
-    }
-    return map
-  })
-
-  const getNode = (nodeId) => nodeMap.value[nodeId] || null
-  const getSensor = (nodeId, sensorId) => sensorIndex.value[nodeId]?.[sensorId] || null
-
-  // --- GETTERS ---
-
-  const overallUptime = computed(() => {
-    // Use the overall_uptime from the API response if available
-    if (uptimeData.value && uptimeData.value.summary && typeof uptimeData.value.summary.overall_uptime === 'number') {
-      return uptimeData.value.summary.overall_uptime.toFixed(2) + '%'
-    }
-    return '0.0%'
-  })
-
-  // --- ACTIONS: FETCH ---
-
+  // --- ACTIONS: STRUCTURAL INGESTION ---
   const fetchFleet = async () => {
     try {
       const res = await api.get('/api/v1/nodes')
       const raw = await res.json() || []
-      const incoming = (Array.isArray(raw) ? raw : raw.nodes || []).map(normalizeNode)
-
-      const incomingIds = new Set(incoming.map(n => n.id))
-
-      incoming.forEach(newNode => {
-        const existing = getNode(newNode.id)
-        if (existing) {
-          mergeNode(existing, newNode)
-        } else {
-          nodes.value.push(newNode)
-        }
-      })
-
-      for (let i = nodes.value.length - 1; i >= 0; i--) {
-        if (!incomingIds.has(nodes.value[i].id)) {
-          nodes.value.splice(i, 1)
+      const incoming = Array.isArray(raw) ? raw : raw.nodes || []
+  
+      const nextNodes = {}
+      const nextSensors = {}
+  
+      for (const rawNode of incoming) {
+        const node = normalizeNodeData(rawNode)
+        if (!node) continue
+        nextNodes[node.id] = node
+  
+        const sensors = rawNode.installedSensors || rawNode.installed_sensors || []
+  
+        for (const rs of sensors) {
+          const sensor = normalizeSensorData(rs, node.id)
+          if (sensor) {
+            nextSensors[sensor.id] = sensor
+          }
         }
       }
+  
+      commitStructuralSnapshot(nextNodes, nextSensors)
     } catch (e) {
       console.error('Failed to fetch fleet data', e)
     }
   }
 
   const fetchNodeDetails = async (nodeId) => {
-    try {
-      const res = await api.get(`/api/v1/nodes/${encodeURIComponent(nodeId)}`)
-      const raw = await res.json()
-      const normalized = normalizeNode(raw)
+    if (abortControllers.has(nodeId)) abortControllers.get(nodeId).abort()
+    const controller = new AbortController()
+    abortControllers.set(nodeId, controller)
 
-      const existing = getNode(nodeId)
-      if (existing) {
-        mergeNode(existing, normalized)
-        return existing
-      } else {
-        nodes.value.push(normalized)
-        return normalized
+    try {
+      const res = await api.get(`/api/v1/nodes/${encodeURIComponent(nodeId)}`, { signal: controller.signal })
+      const rawNode = await res.json()
+      const node = normalizeNodeData(rawNode)
+      if (!node) return
+
+      const nextNodes = { ...nodesById.value, [node.id]: node }
+      const nextSensors = { ...sensorsById.value }
+
+      // O(K) Garbage Collection using the computed index
+      const oldSensors = sensorsByNodeId.value[node.id] || []
+      for (const s of oldSensors) delete nextSensors[s.id]
+
+      const rawSensors = rawNode.installedSensors || rawNode.installed_sensors || []
+      for (const rs of rawSensors) {
+        const sensor = normalizeSensorData(rs, node.id)
+        if (sensor) nextSensors[sensor.id] = sensor
       }
+
+      commitStructuralSnapshot(nextNodes, nextSensors)
     } catch (e) {
-      console.error('Failed to fetch node details:', e)
-      return null
+      if (e.name !== 'AbortError') console.error('Failed to fetch node subgraph:', e)
+    } finally {
+      if (abortControllers.get(nodeId) === controller) abortControllers.delete(nodeId)
     }
   }
 
+  // --- HIGH-FREQUENCY RUNTIME PATCHES ---
+  const handleWsUpdate = (type, payload) => {
+    if (type === 'SENSOR_HEARTBEAT') {
+      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
+      patchNode(payload.node_id, { lastHeartbeat: payload.timestamp, status: 'up' })
+      patchSensor(compositeSensorId, { lastHeartbeat: payload.timestamp, status: 'up' })
+      return
+    }
+
+    if (type === 'NEW_EVENT') {
+      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
+      patchNode(payload.node_id, { lastEvent: 'Just now' })
+      
+      const events = payload.events24h ?? payload.events_24h
+      if (events !== undefined) {
+        patchSensor(compositeSensorId, { events24h: events })
+      }
+      return
+    }
+
+    if (type === 'SILENCE_SENSOR') {
+      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
+      const targetState = payload.is_silenced ?? payload.isSilenced
+      if (targetState !== undefined) {
+        patchSensor(compositeSensorId, { isSilenced: targetState })
+      }
+      return
+    }
+
+    // Structural boundaries trigger refetches, NEVER local mapping mutations
+    if (type === 'NEW_SENSOR' || type === 'UPDATE_SENSOR' || type === 'DELETE_SENSOR' || type === 'NODE_SYNCED' || type === 'UPDATE_NODE') {
+      fetchNodeDetails(payload.node_id || payload.id)
+      return
+    }
+    
+    if (type === 'NEW_NODE' || type === 'DELETE_NODE') {
+      fetchFleet()
+      return
+    }
+  }
+
+  const deleteNode = async (nodeId) => {
+    if (!confirm(`Delete Node "${nodeId}" and ALL of its underlying sensors?`)) return
+    markNodeAction(nodeId, 'deleting')
+
+    try {
+      await api.delete(`/api/v1/nodes/${nodeId}`)
+      if (selectedNodeId.value === nodeId) {
+        selectedNodeId.value = null
+        selectedSensorId.value = null
+      }
+      await fetchFleet()
+    } catch (err) {
+      console.error('Failed to delete node:', err)
+    } finally {
+      clearNodeAction(nodeId, 'deleting')
+    }
+  }
+
+  // --- ACTIONS: SELECTION ---
+  const clearSelection = () => {
+    selectedNodeId.value = null
+    selectedSensorId.value = null
+  }
+
+  const selectTarget = (nodeId, rawSensorId = null) => {
+    const compositeId = rawSensorId ? `${nodeId}:${rawSensorId}` : null
+
+    const sameNode = selectedNodeId.value === nodeId
+    const sameSensor = selectedSensorId.value === compositeId
+
+    if (sameNode && sameSensor) {
+      clearSelection()
+      return
+    }
+
+    selectedNodeId.value = nodeId
+    selectedSensorId.value = compositeId
+  }
+
+  // --- ACTIONS: UPTIME & MANIFESTS ---
   const fetchUptime = async (timeframe) => {
     const target = timeframe || activeTimeframe.value
     try {
@@ -181,6 +295,13 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
+  const overallUptime = computed(() => {
+    if (uptimeData.value && uptimeData.value.summary && typeof uptimeData.value.summary.overall_uptime === 'number') {
+      return uptimeData.value.summary.overall_uptime.toFixed(2) + '%'
+    }
+    return '0.0%'
+  })
+
   const fetchManifests = async () => {
     try {
       const res = await api.get('/api/v1/manifests')
@@ -190,243 +311,16 @@ export const useFleetStore = defineStore('fleet', () => {
       throw err
     }
   }
-
-  // --- ACTIONS: SELECTION ---
-
-  const clearSelection = () => {
-    selectedNode.value = null
-    selectedSensor.value = null
-  }
-
-  const selectTarget = (nodeId, sensorId = null) => {
-    const sameNode = selectedNode.value === nodeId
-    const sameSensor = selectedSensor.value === sensorId
-
-    if (sameNode && sameSensor) {
-      clearSelection()
-      return
-    }
-
-    selectedNode.value = nodeId
-    selectedSensor.value = sensorId
-  }
-
-  // --- ACTIONS: NODE MUTATIONS ---
-
-  const createNode = async (alias, tags = []) => {
-    try {
-      const res = await api.post('/api/v1/nodes', { alias, tags })
-      const data = await res.json()
-
-      // Optimistic add — partial node, background fetch fills details
-      const partialNode = normalizeNode({
-        id: data.node_id || data.nodeId || data.id,
-        alias,
-        tags,
-        status: 'pending',
-        apiKey: data.api_key || data.apiKey || data.key,
-        installedSensors: [],
-      })
-      nodes.value.push(partialNode)
-
-      // Background refresh for full details
-      fetchNodeDetails(partialNode.id)
-
-      return {
-        nodeId: partialNode.id,
-        apiKey: partialNode.apiKey,
-      }
-    } catch (err) {
-      console.error('Failed to create node:', err)
-      throw err
-    }
-  }
-
-  const deleteNode = async (nodeId) => {
-    if (!confirm(`Delete Node "${nodeId}" and ALL of its underlying sensors?`)) return
-
-    const previousIdx = nodes.value.findIndex(n => n.id === nodeId)
-    const previous = previousIdx !== -1 ? nodes.value[previousIdx] : null
-
-    if (previousIdx !== -1) nodes.value.splice(previousIdx, 1)
-    if (selectedNode.value === nodeId) clearSelection()
-
-    try {
-      await api.delete(`/api/v1/nodes/${nodeId}`)
-    } catch (err) {
-      console.error('Failed to delete node:', err)
-      if (previous && previousIdx !== -1) {
-        nodes.value.splice(previousIdx, 0, previous)
-      }
-      fetchFleet()
-    }
-  }
-
-  const updateNode = async (nodeId, payload) => {
-    const node = getNode(nodeId)
-    if (!node) return
-
-    const previous = {
-      alias: node.alias,
-      tags: [...node.tags],
-      publicIp: node.publicIp,
-      privateIp: node.privateIp,
-    }
-
-    if (payload.alias !== undefined) node.alias = payload.alias
-    if (payload.tags !== undefined) node.tags = payload.tags
-    if (payload.publicIp !== undefined) node.publicIp = payload.publicIp
-    if (payload.privateIp !== undefined) node.privateIp = payload.privateIp
-
-    try {
-      await api.patch(`/api/v1/nodes/${nodeId}`, payload)
-    } catch (err) {
-      Object.assign(node, previous)
-      console.error('Failed to update node:', err)
-      throw err
-    }
-  }
-
-  // --- ACTIONS: SENSOR MUTATIONS ---
-
-  const addSensor = async (nodeId, { sensorId, customName, configValues }) => {
-    const node = getNode(nodeId)
-    if (!node) return
-
-    const optimisticSensor = normalizeSensor({
-      id: sensorId,
-      name: customName || sensorId,
-      display: customName || sensorId,
-      status: 'pending',
-      events24h: 0,
-      isSilenced: false,
-      osi: 'Sensor',
-      icon: 'M12 12h0',
-      lastHeartbeat: null,
-    })
-
-    node.installedSensors = node.installedSensors || []
-    node.installedSensors.push(optimisticSensor)
-    node.hasPendingConfig = true
-
-    try {
-      await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors`, {
-        sensor_id: sensorId,
-        custom_name: customName || sensorId,
-        config_values: configValues,
-      })
-      fetchNodeDetails(nodeId)
-    } catch (err) {
-      const idx = node.installedSensors.findIndex(s => s.id === sensorId)
-      if (idx !== -1) node.installedSensors.splice(idx, 1)
-      node.hasPendingConfig = false
-      console.error('Failed to add sensor:', err)
-      throw err
-    }
-  }
-
-  const updateSensor = async (nodeId, sensorId, { customName, configValues }) => {
-    const node = getNode(nodeId)
-    if (!node) return
-
-    const sensor = getSensor(nodeId, sensorId)
-    if (!sensor) return
-
-    const previous = { ...sensor }
-    const previousPending = node.hasPendingConfig
-
-    sensor.display = customName || sensorId
-    sensor.envVars = configValues
-    node.hasPendingConfig = true
-
-    try {
-      await api.put(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(sensorId)}`, {
-        custom_name: customName || sensorId,
-        config_values: configValues,
-      })
-      fetchNodeDetails(nodeId)
-    } catch (err) {
-      mergeSensor(sensor, previous)
-      node.hasPendingConfig = previousPending
-      console.error('Failed to update sensor:', err)
-      throw err
-    }
-  }
-
-  const removeSensor = async (nodeId, sensorId) => {
-    if (!confirm('Remove this sensor? The node will be marked for deployment sync.')) return
-
-    const node = getNode(nodeId)
-    if (!node) return
-
-    const sensorIdx = node.installedSensors?.findIndex(s => s.id === sensorId) ?? -1
-    const previous = sensorIdx !== -1 ? { ...node.installedSensors[sensorIdx] } : null
-
-    if (sensorIdx !== -1) node.installedSensors.splice(sensorIdx, 1)
-    node.hasPendingConfig = true
-
-    if (selectedSensor.value === sensorId) selectedSensor.value = null
-
-    try {
-      await api.delete(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(sensorId)}`)
-    } catch (err) {
-      if (previous && sensorIdx !== -1) {
-        node.installedSensors.splice(sensorIdx, 0, previous)
-        node.hasPendingConfig = false
-      }
-      console.error('Failed to remove sensor:', err)
-      throw err
-    }
-  }
-
-  const toggleSilence = async (nodeId, sensorId, targetState) => {
-    const sensor = getSensor(nodeId, sensorId)
-    if (!sensor) return
-
-    const previous = sensor.isSilenced
-    sensor.isSilenced = targetState
-
-    try {
-      await api.patch(`/api/v1/nodes/${nodeId}/sensors/${sensorId}/silence`, {
-        is_silenced: targetState,
-      })
-    } catch (err) {
-      sensor.isSilenced = previous
-      console.error('Failed to toggle sensor silence:', err)
-      throw err
-    }
-  }
-
-  const silenceNode = async (nodeId) => {
-    const node = getNode(nodeId)
-    if (!node?.installedSensors?.length) return
-
-    const allSilenced = node.installedSensors.every(s => s.isSilenced)
-    const targetState = !allSilenced
-
-    const previousStates = node.installedSensors.map(s => s.isSilenced)
-    node.installedSensors.forEach(s => { s.isSilenced = targetState })
-
-    try {
-      await Promise.all(node.installedSensors.map(s =>
-        api.patch(`/api/v1/nodes/${nodeId}/sensors/${s.id}/silence`, {
-          is_silenced: targetState,
-        })
-      ))
-    } catch (err) {
-      node.installedSensors.forEach((s, i) => { s.isSilenced = previousStates[i] })
-      console.error('Failed to silence node:', err)
-      throw err
-    }
-  }
-
+  
   // --- ACTIONS: COMPOSE / SYNC ---
-
   const fetchCompose = async (apiKey) => {
     try {
       const res = await api.request('/api/v1/nodes/compose', {
         headers: { Authorization: `Bearer ${apiKey}` },
       })
+      if (!res.ok) {
+        throw new Error(`Failed to fetch compose YAML: ${res.statusText}`)
+      }
       return await res.text()
     } catch (err) {
       console.error('Failed to fetch compose:', err)
@@ -446,132 +340,173 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const syncNode = async (nodeId) => {
     const node = getNode(nodeId)
-    if (!node?.apiKey) {
+    if (!node) {
+      throw new Error(`Unable to sync: node ${nodeId} not found`)
+    }
+    if (!node.apiKey) {
       throw new Error('Unable to sync: missing node API key')
     }
 
     const composeYaml = await fetchCompose(node.apiKey)
-    node.hasPendingConfig = false
+    patchNode(nodeId, { hasPendingConfig: false })
     fetchNodeDetails(nodeId)
 
     return composeYaml
   }
 
-  // --- WEBSOCKET HANDLER ---
-
-  const handleWsUpdate = (type, payload) => {
-    if (type === 'SENSOR_HEARTBEAT') {
-      const node = getNode(payload.node_id)
-      if (node) {
-        node.lastHeartbeat = payload.timestamp
-        node.status = 'up'
-        const sensor = getSensor(payload.node_id, payload.sensor_id)
-        if (sensor) {
-          sensor.lastHeartbeat = payload.timestamp
-          sensor.status = 'up'
-        }
+  // --- ACTIONS: NODE MUTATIONS ---
+  const createNode = async (alias, tags = []) => {
+    try {
+      const res = await api.post('/api/v1/nodes', { alias, tags })
+      const data = await res.json()
+      
+      const nodeId = data.node_id || data.nodeId || data.id
+      const apiKey = data.api_key || data.apiKey || data.key
+      
+      await fetchFleet()
+      
+      return {
+        nodeId,
+        apiKey,
       }
-      return
-    }
-
-    if (type === 'SILENCE_SENSOR') {
-      const sensor = getSensor(payload.node_id, payload.sensor_id)
-      if (sensor) {
-        sensor.isSilenced = payload.is_silenced ?? payload.isSilenced ?? sensor.isSilenced
-      }
-      return
-    }
-
-    if (type === 'NEW_SENSOR') {
-      const node = getNode(payload.node_id)
-      if (node && payload.sensor) {
-        const sensorId = payload.sensor.id || payload.sensor.sensor_id
-        const exists = getSensor(payload.node_id, sensorId)
-        if (!exists) {
-          node.installedSensors = node.installedSensors || []
-          node.installedSensors.push(normalizeSensor(payload.sensor))
-        }
-        node.hasPendingConfig = true
-      }
-      return
-    }
-
-    if (type === 'DELETE_SENSOR') {
-      const node = getNode(payload.node_id)
-      if (node && payload.sensor_id) {
-        const idx = node.installedSensors?.findIndex(s => s.id === payload.sensor_id) ?? -1
-        if (idx !== -1) node.installedSensors.splice(idx, 1)
-        node.hasPendingConfig = true
-      }
-      return
-    }
-
-    if (type === 'NODE_SYNCED') {
-      const node = getNode(payload.node_id)
-      if (node) {
-        node.hasPendingConfig = false
-        if (payload.active_revision) node.activeRevision = payload.active_revision
-        if (payload.desired_revision !== undefined) node.desiredRevision = payload.desired_revision
-        // Guarantee UI is 100% synced with the newly deployed sensors
-        fetchNodeDetails(payload.node_id)
-      }
-      return
-    }
-
-    if (type === 'UPDATE_NODE') {
-      if (payload.trigger_refresh) {
-        fetchNodeDetails(payload.id)
-        return
-      }
-
-      const normalized = normalizeNode(payload)
-      const targetNode = getNode(normalized.id)
-      if (targetNode) mergeNode(targetNode, normalized)
-      return
-    }
-
-    if (type === 'DELETE_NODE') {
-      const idx = nodes.value.findIndex(n => n.id === payload.node_id)
-      if (idx !== -1) nodes.value.splice(idx, 1)
-      if (selectedNode.value === payload.node_id) clearSelection()
-      return
-    }
-
-    if (type === 'NEW_NODE') {
-      const nodeId = payload.id || payload.node_id || payload.nodeId
-      const exists = getNode(nodeId)
-      if (!exists) {
-        nodes.value.push(normalizeNode(payload))
-      }
-      if (nodeId) fetchNodeDetails(nodeId)
-      return
-    }
-
-    if (type === 'NEW_EVENT') {
-      if (payload.node_id && payload.sensor_id) {
-        const node = getNode(payload.node_id)
-        if (node) {
-          const sensor = getSensor(payload.node_id, payload.sensor_id)
-          if (sensor) sensor.events24h = (sensor.events24h || 0) + 1
-          node.lastEvent = 'Just now'
-        }
-      } else {
-        fetchFleet()
-      }
-      return
+    } catch (err) {
+      console.error('Failed to create node:', err)
+      throw err
     }
   }
 
+  const updateNode = async (nodeId, payload) => {
+    try {
+      // Optimistic update using rollback cache
+      const previousState = patchNode(nodeId, {
+        alias: payload.alias !== undefined ? payload.alias : undefined,
+        tags: payload.tags !== undefined ? payload.tags : undefined,
+        publicIp: payload.publicIp !== undefined ? payload.publicIp : undefined,
+        privateIp: payload.privateIp !== undefined ? payload.privateIp : undefined,
+      })
+
+      await api.patch(`/api/v1/nodes/${nodeId}`, payload)
+    } catch (err) {
+      if (previousState) patchNode(nodeId, previousState)
+      console.error('Failed to update node:', err)
+      throw err
+    }
+  }
+
+  // --- ACTIONS: SENSOR MUTATIONS ---
+  const addSensor = async (nodeId, { sensorId: rawSensorId, customName, configValues }) => {
+    try {
+      await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors`, {
+        sensor_id: rawSensorId,
+        custom_name: customName || rawSensorId,
+        config_values: configValues,
+      })
+      fetchNodeDetails(nodeId)
+    } catch (err) {
+      console.error('Failed to add sensor:', err)
+      throw err
+    }
+  }
+
+  const updateSensor = async (nodeId, rawSensorId, { customName, configValues }) => {
+    const sensor = getSensor(nodeId, rawSensorId)
+    if (!sensor) return
+    try {
+      await api.put(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`, {
+        custom_name: customName || rawSensorId,
+        config_values: configValues,
+      })
+      fetchNodeDetails(nodeId)
+    } catch (err) {
+      console.error('Failed to update sensor:', err)
+      throw err
+    }
+  }
+
+  const removeSensor = async (nodeId, rawSensorId) => {
+    if (!confirm('Remove this sensor? The node will be marked for deployment sync.')) return
+    const sensor = getSensor(nodeId, rawSensorId)
+    if (!sensor) return
+
+    try {
+      await api.delete(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`)
+      fetchNodeDetails(nodeId)
+      const compositeId = `${nodeId}:${rawSensorId}`
+      if (selectedSensorId.value === compositeId) selectedSensorId.value = null
+    } catch (err) {
+      console.error('Failed to remove sensor:', err)
+      throw err
+    }
+  }
+
+  const toggleSilence = async (nodeId, rawSensorId, targetState) => {
+    const sensor = getSensor(nodeId, rawSensorId)
+    if (!sensor) return
+
+    const previousState = patchSensor(sensor.id, { isSilenced: targetState })
+
+    try {
+      await api.patch(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/silence`, {
+        is_silenced: targetState,
+      })
+    } catch (err) {
+      if (previousState) patchSensor(sensor.id, previousState)
+      console.error('Failed to toggle sensor silence:', err)
+      throw err
+    }
+  }
+
+  const silenceNode = async (nodeId) => {
+    const nodeSensors = sensorsByNodeId.value[nodeId] || []
+    if (!nodeSensors.length) return
+
+    const allSilenced = nodeSensors.every(s => s.isSilenced)
+    const targetState = !allSilenced
+
+    const prevStates = new Map()
+    nodeSensors.forEach(s => {
+      const prev = patchSensor(s.id, { isSilenced: targetState })
+      prevStates.set(s.id, prev)
+    })
+
+    try {
+      await Promise.all(nodeSensors.map(s =>
+        api.patch(`/api/v1/nodes/${nodeId}/sensors/${encodeURIComponent(s.sensorId)}/silence`, {
+          is_silenced: targetState,
+        })
+      ))
+    } catch (err) {
+      nodeSensors.forEach(s => {
+        patchSensor(s.id, prevStates.get(s.id))
+      })
+      console.error('Failed to silence node:', err)
+      throw err
+    }
+  }
+
+  // --- Phase 8: Exports ---
   return {
-    nodes, uptimeData, selectedNode, selectedSensor, activeTimeframe,
-    overallUptime, nodeMap, sensorIndex,
+    // State
+    nodesById, sensorsById,
+    selectedNodeId, selectedSensorId, activeTimeframe, uptimeData,
+    pendingNodeActions, pendingSensorActions,
+    // Aliases
+    selectedNode, selectedSensor,
+    
+    // Computed / Projection
+    nodes, sensorsByNodeId, overallUptime,
+    
+    // Getters
     getNode, getSensor,
+    isNodeActionPending,
+
+    // Actions
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
     selectTarget, clearSelection,
     createNode, deleteNode, updateNode,
     addSensor, updateSensor, removeSensor, toggleSilence, silenceNode,
     fetchCompose, generateCompose, syncNode,
     handleWsUpdate,
-    normalizeSensor, normalizeNode,
+    normalizeSensorData, normalizeNodeData,
   }
 })

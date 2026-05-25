@@ -18,7 +18,7 @@ const canScrollDown = ref(false)
 const worstWarningBelow = ref(null)
 
 const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
-const handleForget = (nodeId, sensorId) => fleetStore.deleteSensor(nodeId, sensorId)
+const handleForget = (nodeId, sensorId) => fleetStore.removeSensor(nodeId, sensorId)
 
 const checkScroll = () => {
     if (!scrollArea.value) return
@@ -160,9 +160,9 @@ const legendItems = [
                 <div v-for="group in hydratedGroups" :key="group.node_id" :id="'group-' + group.node_id"
                     class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"
                     :class="{
-                        'border-select-group-border bg-select-group-bg': selectedNode === group.node_id && !selectedSensor,
-                        'border-transparent': selectedNode !== group.node_id || selectedSensor,
-                        'opacity-50': (selectedNode || selectedSensor) && selectedNode !== group.node_id
+                        'border-select-group-border bg-select-group-bg': selectedNode?.id === group.node_id && !selectedSensor,
+                        'border-transparent': selectedNode?.id !== group.node_id || selectedSensor,
+                        'opacity-50': (selectedNode || selectedSensor) && selectedNode?.id !== group.node_id
                     }">
                      
                     <div class="px-1.5 mb-1 flex items-center gap-2 group/header"
@@ -180,9 +180,9 @@ const legendItems = [
                     <div v-for="sensor in group.sensors" :key="sensor.node_id + '-' + sensor.sensor_id" :id="'row-' + sensor.node_id + '-' + sensor.sensor_id" 
                         class="flex items-center w-full transition-all duration-normal px-1.5 h-7 rounded-md border"
                         :class="{
-                            'opacity-50': selectedSensor && (selectedSensor !== sensor.sensor_id || selectedNode !== sensor.node_id),
-                            'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor === sensor.sensor_id && selectedNode === sensor.node_id,
-                            'border-transparent': !selectedSensor || (selectedSensor !== sensor.sensor_id || selectedNode !== sensor.node_id),
+                            'opacity-50': selectedSensor && (selectedSensor?.sensorId !== sensor.sensor_id || selectedNode?.id !== sensor.node_id),
+                            'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor?.sensorId === sensor.sensor_id && selectedNode?.id === sensor.node_id,
+                            'border-transparent': !selectedSensor || (selectedSensor?.sensorId !== sensor.sensor_id || selectedNode?.id !== sensor.node_id),
                             'has-warnings': sensor.status !== 'up' && sensor.status !== 'nodata'
                         }"
                         :data-worst-status="sensor.status !== 'up' && sensor.status !== 'nodata' ? sensor.status : null"
@@ -215,7 +215,7 @@ const legendItems = [
                             
                             <button @click="fleetStore.selectTarget(sensor.node_id, sensor.sensor_id)"
                                 class="font-mono text-left transition-colors cursor-pointer rounded flex items-center gap-1.5 max-w-[calc(100%-28px)] text-sm"
-                                :class="selectedSensor === sensor.sensor_id && selectedNode === sensor.node_id ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
+                                :class="selectedSensor?.sensorId === sensor.sensor_id && selectedNode?.id === sensor.node_id ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
                                 :title="`Node: ${group.node_alias || group.node_id}`">
                                 <span class="truncate">{{ formatSensorId(sensor.sensor_id) }}</span>
                                 

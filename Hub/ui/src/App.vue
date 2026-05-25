@@ -27,7 +27,7 @@ const { currentView, viewingArchive } = storeToRefs(appStore)
 
 watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor],
   ([isArchived, node, sensor]) => {
-    eventsStore.fetchEvents(isArchived, node, sensor)
+    eventsStore.fetchEvents(isArchived, node?.id, sensor?.sensorId)
 })
 
 watch(() => fleetStore.activeTimeframe, (newTimeframe) => {

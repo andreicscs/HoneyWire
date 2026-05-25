@@ -245,9 +245,9 @@ const closeDeployModal = () => {
 const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
 const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
-const handleOpenNodeDetail = (nodeId) => {
-    fleetStore.selectedNode = nodeId
-    appStore.setView('node-detail')
+const openNodeDetail = (nodeId) => {
+    fleetStore.selectTarget(nodeId)
+    appStore.navigate('node-detail')
 }
 
 // --- Copy Animation (ephemeral UI) ---
@@ -263,6 +263,12 @@ const handleCopy = async (id, text) => {
         console.error('Failed to copy text', err)
     }
 }
+
+const handleOpenNodeDetail = (nodeId) => {
+    fleetStore.selectTarget(nodeId)
+    appStore.setView('node-detail')
+}
+
 </script>
 
 <template>
@@ -334,7 +340,7 @@ const handleCopy = async (id, text) => {
 
         <div v-else class="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-max">
             
-            <BaseWidget v-for="node in displayNodes" :key="node.id" class="flex flex-col h-full min-h-[280px]">
+            <BaseWidget v-for="node in displayNodes" :key="node.id" class="flex flex-col h-full min-h-[280px] transition-all duration-[var(--duration-fast)]" :class="{ 'opacity-50 pointer-events-none': fleetStore.isNodeActionPending(node.id, 'deleting') }">
                 
                 <template #header>
                     <div class="flex items-start justify-between w-full">
@@ -376,7 +382,7 @@ const handleCopy = async (id, text) => {
                                 {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
                             </button>
                             <button @click="handleForgetNode(node.id)" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">
-                                Delete Node
+                                <span v-if="fleetStore.isNodeActionPending(node.id, 'deleting')">Deleting...</span><span v-else>Delete Node</span>
                             </button>
                         </BaseMeatballMenu>
                     </div>

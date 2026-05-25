@@ -52,7 +52,7 @@ const checkScroll = () => {
     showOfflineWarning.value = lastWarning.getBoundingClientRect().right > (container.getBoundingClientRect().right + 5)
 }
 
-watch(() => selectedNode.value, (newVal) => {
+watch(() => selectedNode.value?.id, (newVal) => {
     nextTick(() => {
         const el = document.getElementById(newVal ? `pill-${newVal}` : 'pill-all')
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
@@ -61,7 +61,7 @@ watch(() => selectedNode.value, (newVal) => {
 
 watch(() => selectedSensor.value, (newVal) => {
     nextTick(() => {
-        const elId = newVal && selectedNode.value ? `pill-${selectedNode.value}` : 'pill-all'
+        const elId = newVal && selectedNode.value?.id ? `pill-${selectedNode.value?.id}` : 'pill-all'
         const el = document.getElementById(elId)
         if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     })
@@ -92,13 +92,13 @@ onMounted(() => nextTick(checkScroll))
                         <div v-for="n in activeNodes" :key="n.node_id" :id="'pill-' + n.node_id"
                             class="shrink-0 relative flex items-center rounded-md border transition-all duration-normal shadow-sm group/pill"
                             :class="[
-                                (selectedNode === n.node_id && !selectedSensor) ? 'bg-primary-selected text-primary-text border-primary-selected' : 
-                                (selectedNode === n.node_id && selectedSensor) ? 'bg-highlight-bg border-highlight-border text-highlight-text ring-1 ring-highlight-ring' : 
+                                (selectedNode?.id === n.node_id && !selectedSensor) ? 'bg-primary-selected text-primary-text border-primary-selected' : 
+                                (selectedNode?.id === n.node_id && selectedSensor) ? 'bg-highlight-bg border-highlight-border text-highlight-text ring-1 ring-highlight-ring' : 
                                 'bg-secondary-main border-secondary-border text-text-m hover:bg-secondary-hover hover:text-text-h',
                                 
                                 ['down', 'degraded'].includes(n.status) ? 'has-warnings' : '',
                                 
-                                (selectedNode && selectedNode !== n.node_id) ? 'opacity-70' : ''
+                                (selectedNode && selectedNode?.id !== n.node_id) ? 'opacity-70' : ''
                             ]">
                              
                             <div @click="fleetStore.selectTarget(n.node_id, null)" class="flex items-center gap-2 pl-2.5 py-1 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">
@@ -109,7 +109,7 @@ onMounted(() => nextTick(checkScroll))
 
                             <BaseMeatballMenu 
                                 :id="`node-${n.node_id}`" 
-                                :inverted="selectedNode === n.node_id && !selectedSensor"
+                                :inverted="selectedNode?.id === n.node_id && !selectedSensor"
                                 class="mx-2 opacity-50 group-hover/pill:opacity-100 transition-opacity"
                             >
                                 <button @click="handleSilenceNode(n.node_id)" 

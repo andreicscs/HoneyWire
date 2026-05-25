@@ -120,8 +120,8 @@ const updateData = () => {
 const fetchContextualProjection = () => {
     eventsStore.fetchThreatVelocityProjection(
         velocityTimeframe.value,
-        selectedNode.value,
-        selectedSensor.value,
+        selectedNode.value?.id,
+        selectedSensor.value?.sensorId,
         viewingArchive.value
     );
 }

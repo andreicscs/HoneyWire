@@ -27,14 +27,16 @@ export const useEventsStore = defineStore('events', () => {
   const isFetchingThreatVelocityProjection = ref(false)
   const lastVelocityInvalidation = ref(null)
 
+  // Store injections must live at the top-level setup scope to maintain pure reactivity tracking
+  const fleetStore = useFleetStore()
+  const appStore = useAppStore()
+
   // --- GETTERS ---
   /**
    * Return events filtered by the fleet store's selectedNode and selectedSensor
    * Composite Key filtering: if both are selected, filter by both.
    */
   const filteredEvents = computed(() => {
-    const fleetStore = useFleetStore()
-    const appStore = useAppStore()
     const { selectedNode, selectedSensor } = fleetStore
     const isArchiveView = appStore.viewingArchive
 
@@ -42,9 +44,10 @@ export const useEventsStore = defineStore('events', () => {
     // (Assuming the backend returns a mix, or 'is_archived' property exists)
     // If your backend only returns one type based on the fetch URL, skip this local filter 
     // and let the URL param handle it. But doing it locally ensures safety.
-    let currentEvents = events.value.filter(e => 
-        isArchiveView ? e.is_archived === true || e.is_archived === 1 : e.is_archived === false || e.is_archived === 0 || e.is_archived === undefined
-    )
+    let currentEvents = events.value.filter(e => {
+        const isArchived = e.is_archived === true || e.is_archived === 1
+        return isArchiveView ? isArchived : !isArchived
+    })
 
     // 2. No node/sensor filter: return events
     if (!selectedNode && !selectedSensor) {
@@ -53,13 +56,13 @@ export const useEventsStore = defineStore('events', () => {
 
     // 3. Node selected but no sensor: filter by node only
     if (selectedNode && !selectedSensor) {
-      return currentEvents.filter(e => e.node_id === selectedNode)
+      return currentEvents.filter(e => e.node_id === selectedNode?.id)
     }
 
     // 4. Both selected
     if (selectedNode && selectedSensor) {
       return currentEvents.filter(
-        e => e.node_id === selectedNode && e.sensor_id === selectedSensor
+        e => e.node_id === selectedNode?.id && e.sensor_id === selectedSensor?.sensorId
       )
     }
 
@@ -119,7 +122,6 @@ export const useEventsStore = defineStore('events', () => {
     severityAbortController = new AbortController();
 
     try {
-      const appStore = useAppStore()
       const viewingArchive = appStore.viewingArchive
       const params = new URLSearchParams({ timeframe });
       if (nodeId) params.append('node', nodeId);
@@ -248,7 +250,7 @@ export const useEventsStore = defineStore('events', () => {
 
       // Refetch to update the list
       const fleetStore = useFleetStore()
-      await fetchEvents(false, fleetStore.selectedNode, fleetStore.selectedSensor)
+      await fetchEvents(false, fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
     } catch (err) {
       console.error('Failed to archive all events:', err)
       alert('Failed to archive events. Please try again.')
@@ -270,8 +272,8 @@ export const useEventsStore = defineStore('events', () => {
    * @param {object} payload - Event payload from WebSocket
    */
   const handleWsEvent = (payload) => {
-    const fleetStore = useFleetStore()
-    const { selectedNode, selectedSensor } = fleetStore
+    const selectedNode = fleetStore.selectedNode
+    const selectedSensor = fleetStore.selectedSensor
 
     // Always increment unread count (event came from backend regardless)
     unreadCount.value++
@@ -282,28 +284,27 @@ export const useEventsStore = defineStore('events', () => {
 
     // 2. If node is selected but no sensor, match node only
     const nodeOnlyMatch =
-      selectedNode && !selectedSensor && payload.node_id === selectedNode
+      selectedNode && !selectedSensor && payload.node_id === selectedNode?.id
 
     // 3. COMPOSITE KEY: If specific sensor is selected, match BOTH node AND sensor
     const sensorMatch =
       selectedSensor &&
       selectedNode &&
-      payload.node_id === selectedNode &&
-      payload.sensor_id === selectedSensor
+      payload.node_id === selectedNode?.id &&
+      payload.sensor_id === selectedSensor?.sensorId
 
     // Add event to the front if it matches the current filter
     if (noFilter || nodeOnlyMatch || sensorMatch) {
       events.value.unshift(payload)
     }
 
-    const appStore = useAppStore();
     const affectsCurrentView = 
       (!appStore.viewingArchive) &&
-      (!selectedNode || selectedNode === payload.node_id) &&
-      (!selectedSensor || selectedSensor === payload.sensor_id);
+      (!selectedNode || selectedNode?.id === payload.node_id) &&
+      (!selectedSensor || selectedSensor?.sensorId === payload.sensor_id);
 
     if (affectsCurrentView) {
-      fetchSeverityProjection('alltime', selectedNode, selectedSensor);
+      fetchSeverityProjection('alltime', selectedNode?.id, selectedSensor?.sensorId);
       invalidateThreatVelocityProjection();
     }
   }

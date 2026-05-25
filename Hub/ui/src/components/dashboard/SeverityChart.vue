@@ -126,8 +126,8 @@ onMounted(() => {
 
 watch(
     () => [selectedNode.value, selectedSensor.value, appStore.viewingArchive],
-    ([nodeId, sensorId]) => {
-        eventsStore.fetchSeverityProjection('alltime', nodeId, sensorId)
+    ([node, sensor]) => {
+        eventsStore.fetchSeverityProjection('alltime', node?.id, sensor?.sensorId)
     },
     { immediate: true }
 )
