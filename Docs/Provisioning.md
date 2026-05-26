@@ -123,6 +123,7 @@ Every generated deployment bundle receives a unique configuration revision:
 ```text
 HW_CONFIG_REV=rev_xxxxxxxx
 ```
+rev_xxxxxxxx is a deterministic 8-char string for tracking config state.
 
 This revision is embedded into all deployed sensors.
 
