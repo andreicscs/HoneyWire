@@ -156,7 +156,7 @@
       "user": "65532:65532",
       "init_containers": [
         {
-          "name": "decoy-provisioner",
+          "name": "fim-decoy-provisioner",
           "image": "192.168.1.11:5000/honeywire-filecanary:dev",
           "command": "/app/file-canary init",
           "user": "0:0",

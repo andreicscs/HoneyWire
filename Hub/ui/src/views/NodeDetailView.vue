@@ -449,7 +449,6 @@ const fetchYamlFromHub = async () => {
 
   try {
     rawCompose.value = await fleetStore.generateCompose({
-      node_id: node.value.id,
       hub_endpoint: config.hubEndpoint || window.location.origin,
       hub_key: apiKey || '<YOUR_HW_NODE_KEY>',
       sensors: [{
