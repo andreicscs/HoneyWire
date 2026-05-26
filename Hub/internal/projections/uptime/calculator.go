@@ -34,7 +34,10 @@ func CalculateParams(timeframe string, now time.Time) UptimeCalculationParams {
 		numBlocks, delta, expectedPings = 24, time.Hour, 60
 	}
 
-	cutoff := now.Add(-delta * time.Duration(numBlocks)).Truncate(time.Minute)
+	// Align the grid to the delta boundary to prevent phase-shift visual jitter,
+	// and ensure the final block always encompasses 'now'.
+	cutoff := now.Truncate(delta).Add(-delta * time.Duration(numBlocks-1))
+
 	return UptimeCalculationParams{
 		NumBlocks:     numBlocks,
 		Delta:         delta,
@@ -119,6 +122,9 @@ func CalculateBlockStatus(
 			}
 		}
 
+		// Strict 85% SLA threshold
+		acceptablePings := targetPings * 0.85
+
 		if blockIndex == params.NumBlocks-1 {
 			if isLiveOffline {
 				status, label = "down", "Offline"
@@ -129,7 +135,7 @@ func CalculateBlockStatus(
 				}
 				maxPossiblePings := pings + remainingDuration.Minutes()
 
-				if maxPossiblePings < (targetPings * 0.85) {
+				if maxPossiblePings < acceptablePings {
 					status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
 				} else {
 					status, label = "up", "Online"
@@ -138,7 +144,7 @@ func CalculateBlockStatus(
 		} else {
 			if pings == 0 && targetPings >= 1 {
 				status, label = "down", "Offline"
-			} else if targetPings > 0 && pings < (targetPings*0.85) {
+			} else if targetPings > 0 && pings < acceptablePings {
 				status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
 			} else {
 				status, label = "up", "Online"
