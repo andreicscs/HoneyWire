@@ -55,10 +55,14 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 	// 3. Build heartbeat history
 	history := BuildHeartbeatHistory(sensors, heartbeats, params)
 
-	// 4. Build a map for fast node lookup by ID
+	// 4. Build a map for fast node lookup by ID and live status
 	nodesMap := make(map[string]models.Node)
+	sensorLiveStatusMap := make(map[string]string)
 	for _, node := range nodes {
 		nodesMap[node.ID] = node
+		for _, ns := range node.InstalledSensors {
+			sensorLiveStatusMap[node.ID+":"+ns.ID] = ns.Status
+		}
 	}
 
 	// 5. Group sensors by NodeID and build DTOs
@@ -88,15 +92,21 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 			sensorHistory = make([]float64, params.NumBlocks)
 		}
 
-		blocks := GenerateBlocks(sensor, sensorHistory, params, criteria.Timeframe, criteria.Now)
+		isLiveOffline := sensorLiveStatusMap[historyKey] == "down"
 
-		// Determine sensor status from the most recent block
-		sensorStatus := "up"
-		if len(blocks) > 0 {
-			lastBlock := blocks[len(blocks)-1]
-			sensorStatus = lastBlock.Status
-			if sensorStatus == "nodata" {
-				sensorStatus = "up" // Treat nodata as up for status display
+		blocks := GenerateBlocks(sensor, sensorHistory, params, criteria.Timeframe, criteria.Now, isLiveOffline)
+
+		// Determine sensor status from the most recent block or live status
+		sensorStatus := sensorLiveStatusMap[historyKey]
+		if sensorStatus == "" {
+			if len(blocks) > 0 {
+				lastBlock := blocks[len(blocks)-1]
+				sensorStatus = lastBlock.Status
+				if sensorStatus == "nodata" {
+					sensorStatus = "up" // Treat nodata as up for status display
+				}
+			} else {
+				sensorStatus = "up"
 			}
 		}
 
@@ -143,7 +153,7 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 	sortGroups(groups)
 
 	// 8. Calculate overall uptime
-	overallUptime := CalculateOverallUptime(sensors, history, params, criteria.Now)
+	overallUptime := CalculateOverallUptime(sensors, history, params, criteria.Now, sensorLiveStatusMap)
 
 	// 9. Build response
 	response := &UptimeResponse{

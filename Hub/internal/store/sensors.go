@@ -173,6 +173,34 @@ func (s *SQLiteStore) UpdateNodeLastHeartbeat(nodeID, sensorID, timestamp string
 
 // MarkSensorOffline artificially ages a sensor's heartbeat to instantly mark it as 'down'
 func (s *SQLiteStore) MarkSensorOffline(nodeID, sensorID, offlineTime string) error {
-	_, err := s.DB.Exec(`UPDATE node_sensors SET last_heartbeat = ?, updated_at = ? WHERE node_id = ? AND sensor_id = ?`, offlineTime, offlineTime, nodeID, sensorID)
-	return err
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Mark the specific sensor as offline
+	if _, err := tx.Exec(`UPDATE node_sensors SET last_heartbeat = ?, updated_at = ? WHERE node_id = ? AND sensor_id = ?`, offlineTime, offlineTime, nodeID, sensorID); err != nil {
+		return err
+	}
+
+	// 2. Check if any other sensors on this node are still online
+	var onlineCount int
+	onlineCutoff := time.Now().UTC().Add(-60 * time.Second).Format(time.RFC3339)
+
+	// Count sensors that have had a heartbeat in the last 60 seconds.
+	// The sensor we just marked offline will not be included in this count.
+	err = tx.QueryRow(`SELECT COUNT(*) FROM node_sensors WHERE node_id = ? AND last_heartbeat >= ?`, nodeID, onlineCutoff).Scan(&onlineCount)
+	if err != nil {
+		return err
+	}
+
+	// 3. If no sensors are left online, mark the parent node as offline too.
+	if onlineCount == 0 {
+		if _, err := tx.Exec(`UPDATE nodes SET last_heartbeat = ? WHERE id = ?`, offlineTime, nodeID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

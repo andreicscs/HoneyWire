@@ -69,6 +69,26 @@ func deriveStatus(lastHeartbeat *string) string {
 	return "up"
 }
 
+// deriveCompositeNodeStatus determines the overall node status based on its base network status and installed sensors
+func deriveCompositeNodeStatus(baseStatus string, sensors []models.NodeSensor) string {
+	if baseStatus != "up" || len(sensors) == 0 {
+		return baseStatus
+	}
+	onlineCount := 0
+	for _, s := range sensors {
+		if s.Status == "up" {
+			onlineCount++
+		}
+	}
+	if onlineCount == 0 {
+		return "down"
+	}
+	if onlineCount < len(sensors) {
+		return "degraded"
+	}
+	return "up"
+}
+
 // GetNodes returns a list of all nodes and their installed sensors for the Fleet Dashboard
 func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 	rows, err := s.DB.Query(`
@@ -105,7 +125,7 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 
 		// Subquery to fetch sensors for this specific node
 		sensorRows, err := s.DB.Query(`
-			SELECT sensor_id, custom_name, config_values, is_silenced 
+			SELECT sensor_id, custom_name, config_values, is_silenced, last_heartbeat 
 			FROM node_sensors WHERE node_id = ?`, n.ID)
 		if err != nil {
 			return nil, err
@@ -115,20 +135,25 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 			var ns models.NodeSensor
 			var configStr string
 			var silencedInt int
+			var lastHb sql.NullString
 
-			if err := sensorRows.Scan(&ns.Name, &ns.Display, &configStr, &silencedInt); err != nil {
+			if err := sensorRows.Scan(&ns.Name, &ns.Display, &configStr, &silencedInt, &lastHb); err != nil {
 				sensorRows.Close()
 				return nil, err
 			}
 
 			ns.ID = ns.Name // Use catalog ID for frontend keys
 			ns.IsSilenced = silencedInt == 1
-			ns.Status = n.Status // Sensor status matches parent node status for now
+			if lastHb.Valid {
+				ns.LastHeartbeat = &lastHb.String
+			}
+			ns.Status = deriveStatus(ns.LastHeartbeat)
 			json.Unmarshal([]byte(configStr), &ns.EnvVars)
 			n.InstalledSensors = append(n.InstalledSensors, ns)
 		}
 		sensorRows.Close()
 
+		n.Status = deriveCompositeNodeStatus(n.Status, n.InstalledSensors)
 		nodes = append(nodes, n)
 	}
 
@@ -212,6 +237,8 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 
 		node.InstalledSensors = append(node.InstalledSensors, ns)
 	}
+
+	node.Status = deriveCompositeNodeStatus(node.Status, node.InstalledSensors)
 
 	return &node, nil
 }

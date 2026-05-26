@@ -97,6 +97,7 @@ func CalculateBlockStatus(
 	pings float64,
 	params UptimeCalculationParams,
 	blockIndex int,
+	isLiveOffline bool,
 ) BlockStatus {
 	status, label := "", ""
 
@@ -116,24 +117,32 @@ func CalculateBlockStatus(
 			if targetPings < 1 && activeDuration > 0 {
 				targetPings = 1
 			}
-		} else if blockIndex == params.NumBlocks-1 {
-			// For the most recent block, use actual elapsed time
-			activeDuration := now.Sub(blockStart)
-			targetPings = activeDuration.Minutes()
-			if targetPings > params.ExpectedPings {
-				targetPings = params.ExpectedPings
-			}
-			if targetPings < 1 && activeDuration > 0 {
-				targetPings = 1
-			}
 		}
 
-		if pings == 0 && targetPings >= 1 {
-			status, label = "down", "Offline"
-		} else if targetPings > 0 && pings < (targetPings*0.85) {
-			status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
+		if blockIndex == params.NumBlocks-1 {
+			if isLiveOffline {
+				status, label = "down", "Offline"
+			} else {
+				remainingDuration := blockEnd.Sub(now)
+				if remainingDuration < 0 {
+					remainingDuration = 0
+				}
+				maxPossiblePings := pings + remainingDuration.Minutes()
+
+				if maxPossiblePings < (targetPings * 0.85) {
+					status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
+				} else {
+					status, label = "up", "Online"
+				}
+			}
 		} else {
-			status, label = "up", "Online"
+			if pings == 0 && targetPings >= 1 {
+				status, label = "down", "Offline"
+			} else if targetPings > 0 && pings < (targetPings*0.85) {
+				status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
+			} else {
+				status, label = "up", "Online"
+			}
 		}
 	}
 
@@ -147,6 +156,7 @@ func GenerateBlocks(
 	params UptimeCalculationParams,
 	timeframe string,
 	now time.Time,
+	isLiveOffline bool,
 ) []UptimeBlock {
 	firstSeenParsed, _ := time.Parse(time.RFC3339, sensorData.FirstSeen)
 	blocks := make([]UptimeBlock, params.NumBlocks)
@@ -158,7 +168,7 @@ func GenerateBlocks(
 		stepsAgo := params.NumBlocks - 1 - i
 		timeLabel := formatTimeLabel(stepsAgo, params.Delta, timeframe)
 
-		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, history[i], params, i)
+		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, history[i], params, i, isLiveOffline)
 		blocks[i] = UptimeBlock{
 			Status:    blockStatus.Status,
 			Label:     blockStatus.Label,
@@ -210,7 +220,7 @@ func ResolveWorstStatus(statuses []string) string {
 }
 
 // CalculateOverallUptime computes the fleet-wide uptime percentage
-func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string][]float64, params UptimeCalculationParams, now time.Time) float64 {
+func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string][]float64, params UptimeCalculationParams, now time.Time, sensorLiveStatusMap map[string]string) float64 {
 	if len(sensors) == 0 {
 		return 100.0
 	}
@@ -226,12 +236,13 @@ func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string
 		}
 
 		firstSeenParsed, _ := time.Parse(time.RFC3339, sensor.FirstSeen)
+		isLiveOffline := sensorLiveStatusMap[historyKey] == "down"
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 			blockEnd := blockStart.Add(params.Delta)
 
-			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, sensorHistory[i], params, i)
+			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, sensorHistory[i], params, i, isLiveOffline)
 			if blockStatus.Status == "nodata" {
 				continue
 			}

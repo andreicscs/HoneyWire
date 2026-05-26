@@ -103,10 +103,20 @@ const hydrateGroupsWithLiveStatus = (groups) => {
                 else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
             }
 
-            // Pure visual hydration for the row indicator.
-            // We completely stop mutating sensor.blocks here, letting the 
-            // backend own the strict mathematical history.
-            return { ...sensor, node_id: group.node_id, isOnline: isLiveOnline }
+            const blocks = [...(sensor.blocks || [])]
+            if (blocks.length > 0) {
+                const lastIdx = blocks.length - 1
+                const lastBlock = { ...blocks[lastIdx] }
+                
+                if (!isLiveOnline) {
+                    lastBlock.status = 'down'
+                } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
+                    lastBlock.status = 'up'
+                }
+                blocks[lastIdx] = lastBlock
+            }
+
+            return { ...sensor, node_id: group.node_id, isOnline: isLiveOnline, blocks }
         })
     }))
 }
