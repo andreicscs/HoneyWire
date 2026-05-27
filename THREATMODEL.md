@@ -307,6 +307,7 @@ However:
 - Hub is assumed secure at time of operation
 - Hub runs in controlled environment
 - Hub is protected by authentication and OS controls
+- Hub is behind reverse proxy running on HTTPS
 
 If Hub is compromised:
 - future deployments MAY be malicious
