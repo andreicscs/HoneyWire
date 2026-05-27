@@ -786,6 +786,10 @@ const applyHighlighting = () => {
                                 </button>
                                 
                                 <div v-show="showManualSync" class="mt-4 space-y-4">
+                                    <p class="text-sm text-danger-main">
+                                        Docker Compose v5.0.0+ is strictly required.
+                                    </p>
+                                    
                                     <p class="text-sm text-text-m">
                                         Save the following configuration to <code class="px-1.5 py-0.5 bg-bg-inset border border-border-default rounded text-xs font-mono">/opt/honeywire/sensors/honeywire-compose.yml</code>.
                                     </p>
