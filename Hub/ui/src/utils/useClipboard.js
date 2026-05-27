@@ -21,8 +21,10 @@ export function useClipboard() {
                 document.body.removeChild(textArea)
                 if (!successful) throw new Error('Fallback copy failed')
             }
-            copiedStates.value[id] = true
-            setTimeout(() => { copiedStates.value[id] = false }, 2000)
+            copiedStates.value = { ...copiedStates.value, [id]: true }
+            setTimeout(() => { 
+                copiedStates.value = { ...copiedStates.value, [id]: false }
+            }, 2000)
         } catch (err) {
             console.error('Failed to copy text', err)
             alert('Your browser blocked clipboard access due to an insecure HTTP context. Please copy manually.')

@@ -12,12 +12,6 @@ const { nodes, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetSto
 const scrollArea = ref(null)
 const showOfflineWarning = ref(false)
 
-const isNodeSilenced = (node) => {
-    // V2 Alignment: Read from installedSensors and match naming convention
-    if (!node || !node.sensors || !node.sensors.length) return false
-    return node.sensors.every(s => s.isSilenced)
-}
-
 const activeNodes = computed(() => {
     // V2 Alignment: Directly map over the nodes array from our V2 store
     return nodes.value.map(node => {
@@ -114,12 +108,12 @@ onMounted(() => nextTick(checkScroll))
                             >
                                 <button @click="handleSilenceNode(n.node_id)" 
                                         class="w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 text-text-m hover:bg-secondary-hover transition-colors group"
-                                        :class="isNodeSilenced(n) ? 'text-archive-text hover:bg-archive-bg' : ' hover:text-text-h'">
+                                        :class="fleetStore.isNodeSilenced(n.node_id) ? 'text-archive-text hover:bg-archive-bg' : ' hover:text-text-h'">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path v-if="!isNodeSilenced(n)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-                                        <path v-if="isNodeSilenced(n)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
+                                        <path v-if="!fleetStore.isNodeSilenced(n.node_id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                                        <path v-if="fleetStore.isNodeSilenced(n.node_id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                     </svg>
-                                    {{ isNodeSilenced(n) ? 'Unsilence Node' : 'Silence Node' }}
+                                    {{ fleetStore.isNodeSilenced(n.node_id) ? 'Unsilence Node' : 'Silence Node' }}
                                 </button>
                                 
                                 <button @click="handleForgetNode(n.node_id)" 

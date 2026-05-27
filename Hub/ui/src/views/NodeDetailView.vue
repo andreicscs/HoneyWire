@@ -564,10 +564,11 @@ const applyHighlighting = () => {
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                         Manage Key
                     </BaseButton>
-                    <BaseMeatballMenu id="node-super-menu">
+                    <BaseMeatballMenu id="node-super-menu">            
                         <button @click="handleSilenceNode" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
-                            {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
+                            {{ fleetStore.isNodeSilenced(node.id) ? 'Unsilence Node' : 'Silence Node' }}
                         </button>
+                        
                         <button @click="handleDeleteNode" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Delete Node</button>
                     </BaseMeatballMenu>
                 </div>

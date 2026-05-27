@@ -114,7 +114,7 @@ const clearLogs = async () => {
             <button @click="appStore.viewingArchive = !appStore.viewingArchive" 
                     type="button"
                     class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all border shadow-sm outline-none"
-                    :class="viewingArchive ? 'bg-archive-bg text-archive-text border-archive-border hover:bg-archive-hover hover:text-white' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text'">
+                    :class="viewingArchive ? 'bg-archive-bg text-archive-text border-archive-border hover:bg-archive-hover' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text'">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
                     :class="sidebarOpen ? 'max-w-[120px] ml-2 opacity-100' : 'max-w-0 ml-0 opacity-0'">
@@ -124,7 +124,7 @@ const clearLogs = async () => {
 
             <button @click="clearLogs" 
                     type="button"
-                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all shadow-sm border outline-none bg-danger-bg text-danger-text border-danger-border hover:bg-danger-hover hover:text-white"
+                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all shadow-sm border outline-none bg-danger-bg text-danger-text border-danger-border hover:bg-danger-hover"
                     :title="!sidebarOpen ? 'Purge Logs' : ''">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"

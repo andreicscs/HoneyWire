@@ -52,7 +52,7 @@ const toggleTheme = () => {
             <button v-show="unreadCount > 0" @click="eventsStore.markAllRead()"
                     type="button"
                     aria-label="Mark all events as read"
-                    class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md text-xs  mr-1 bg-danger-bg text-danger-text border border-danger-border transition-colors hover:bg-danger-hover hover:text-white focus:outline-none shadow-sm">
+                    class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md text-xs  mr-1 bg-danger-bg text-danger-text border border-danger-border transition-colors hover:bg-danger-hover focus:outline-none shadow-sm">
                 <span class="w-1.5 h-1.5 rounded-full bg-danger-main animate-pulse"></span>
                 <span>{{ unreadCount }} Unread</span>
             </button>

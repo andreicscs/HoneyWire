@@ -105,6 +105,14 @@ watch(activeEnvVar, () => {
     applyHighlighting();
 });
 
+watch([activeTab, selectedSensor], async ([tab, sensor]) => {
+    if (tab === 'compose' && sensor) {
+        await nextTick()
+        const inputs = document.querySelectorAll('.config-input')
+        if (inputs.length > 0) inputs[0].focus()
+    }
+})
+
 // --- ACTIONS ---
 const openSensor = (sensor) => {
     selectedSensor.value = sensor
@@ -348,7 +356,7 @@ const applyHighlighting = () => {
                                                     :placeholder="getUIDefault(env.default)"
                                                     @focus="activeEnvVar = env.name"
                                                     @blur="activeEnvVar = null"
-                                                    class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50"
+                                                class="w-full px-3 py-2 text-base text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50 config-input"
                                                 />
                                                 <p class="text-sm text-text-m">{{ env.description }}</p>
                                             </div>

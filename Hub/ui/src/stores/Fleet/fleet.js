@@ -484,6 +484,12 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
+  const isNodeSilenced = (nodeId) => {
+    const nodeSensors = sensorsByNodeId.value[nodeId] || []
+    if (!nodeSensors.length) return false
+    return nodeSensors.every(s => s.isSilenced)
+  }
+
   // --- Phase 8: Exports ---
   return {
     // State
@@ -498,7 +504,7 @@ export const useFleetStore = defineStore('fleet', () => {
     
     // Getters
     getNode, getSensor,
-    isNodeActionPending,
+    isNodeActionPending, isNodeSilenced,
 
     // Actions
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,

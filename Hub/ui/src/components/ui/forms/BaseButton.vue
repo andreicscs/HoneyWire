@@ -23,7 +23,7 @@ defineProps({
             'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h shadow-sm disabled:bg-disabled-bg disabled:text-disabled-text disabled:border-disabled-border': variant === 'secondary',
             
             /* DANGER */
-            'bg-danger-main text-white border-danger-border hover:bg-danger-hover shadow-sm disabled:bg-disabled-bg disabled:text-disabled-text disabled:border-disabled-border': variant === 'danger',
+            'bg-danger-main border-danger-border hover:bg-danger-hover shadow-sm disabled:bg-disabled-bg disabled:text-disabled-text disabled:border-disabled-border': variant === 'danger',
             
             /* GHOST (Invisible until hovered) */
             'bg-transparent border-transparent text-secondary-text hover:text-text-h hover:bg-secondary-hover shadow-none disabled:text-disabled-text': variant === 'ghost'
