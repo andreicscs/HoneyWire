@@ -14,6 +14,9 @@ import (
 func HandleRelink(args []string) error {
 	cli.PrintSectionHeader("HoneyWire Relink", cli.Yellow)
 
+	var backupPath string
+	hasBackup := false
+
 	if existing, err := app.LoadConfig(app.ConfigPath); err == nil {
 		fmt.Printf("    %sExisting node detected:%s\n", cli.Cyan, cli.Reset)
 		fmt.Printf("      Node ID: %s\n", existing.NodeID)
@@ -26,11 +29,43 @@ func HandleRelink(args []string) error {
 			return nil
 		}
 
-		if err := os.Remove(app.ConfigPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to remove existing config: %w", err)
+		backupPath = app.ConfigPath + ".bak"
+		if data, err := os.ReadFile(app.ConfigPath); err == nil {
+			if err := os.WriteFile(backupPath, data, 0600); err != nil {
+				fmt.Printf("    %s[!] Warning: failed to backup current config: %v%s\n", cli.Yellow, err, cli.Reset)
+			} else {
+				hasBackup = true
+			}
 		}
 	}
 
+	err := executeRelink(args)
+
+	if err != nil {
+		if hasBackup {
+			fmt.Printf("\n%s[!] Relink failed. Attempting rollback...%s\n", cli.Yellow, cli.Reset)
+			if data, readErr := os.ReadFile(backupPath); readErr == nil {
+				if writeErr := os.WriteFile(app.ConfigPath, data, 0600); writeErr != nil {
+					fmt.Printf("%s[!] Rollback also failed: %v%s\n", cli.Red, writeErr, cli.Reset)
+					fmt.Printf("    Manual recovery may be required at: %s\n", app.ConfigPath)
+				} else {
+					fmt.Printf("%s[*] Rolled back to previous configuration.%s\n", cli.Yellow, cli.Reset)
+				}
+			} else {
+				fmt.Printf("%s[!] Rollback failed to read backup: %v%s\n", cli.Red, readErr, cli.Reset)
+			}
+		}
+		return err
+	}
+
+	if hasBackup {
+		os.Remove(backupPath)
+	}
+
+	return nil
+}
+
+func executeRelink(args []string) error {
 	var hubURL, apiKey string
 	if len(args) > 0 {
 		hubURL = args[0]
