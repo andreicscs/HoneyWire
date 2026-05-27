@@ -1,163 +1,160 @@
 package deploy
 
 import (
-	"bufio"
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"time"
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "os/exec"
+    "strconv"
+    "strings"
+    "time"
 
-	"github.com/honeywire/wizard/internal/cli"
+    "github.com/honeywire/wizard/internal/cli"
 )
 
-const commandTimeout = 30 * time.Second
+const (
+	DeployDir       = "/opt/honeywire/sensors"
+	ComposeFile     = "honeywire-compose.yml"
+	ProjectName     = "honeywire"
+	ComposeMinVer  = "5.0.0"
+    commandTimeout = 10 * time.Second
+)
+
+type composeInfo struct {
+    Version string `json:"version"`
+}
 
 func GetDockerCommand() ([]string, error) {
-	if _, err := exec.LookPath("docker"); err != nil {
-		return handleMissingDocker()
-	}
+    // ValidateDockerState now performs the full check:
+    // 1. Docker binary check
+    // 2. Daemon responsiveness
+    // 3. Compose version verification
+    cmd, err := ValidateDockerState()
+    if err != nil {
+        // Because ValidateDockerState returns an error already formatted 
+        // by generateRemediationError, we can return it directly.
+        return nil, err
+    }
 
-	if err := checkDaemon(); err != nil {
-		return nil, err
-	}
+    return cmd, nil
+}
 
-	if cmd, err := findCompose(); err == nil {
-		return cmd, nil
-	}
+func ValidateDockerState() ([]string, error) {
+    if _, err := exec.LookPath("docker"); err != nil {
+        return nil, generateRemediationError("Docker Engine is not installed.", err)
+    }
 
-	return installCompose()
+    if err := checkDaemon(); err != nil {
+        return nil, err
+    }
+
+    cmd, err := validateComposeVersion()
+    if err != nil {
+        return nil, err
+    }
+
+    return cmd, nil
 }
 
 func checkDaemon() error {
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
-	defer cancel()
+    ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+    defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "info")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker is installed, but the daemon is not running.\nPlease start it (e.g., 'sudo systemctl start docker') and try again")
-	}
-	return nil
+    var stderr bytes.Buffer
+    cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{json .}}")
+    cmd.Stderr = &stderr
+
+    if err := cmd.Run(); err != nil {
+        reason := fmt.Sprintf("Docker daemon is unresponsive. Ensure it is running.\n    Details: %s", strings.TrimSpace(stderr.String()))
+        // We pass the actual system error to generateRemediationError now
+        return generateRemediationError(reason, err)
+    }
+    return nil
 }
 
-func findCompose() ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func validateComposeVersion() ([]string, error) {
+    ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+    defer cancel()
 
-	if cmd := exec.CommandContext(ctx, "docker", "compose", "version"); cmd.Run() == nil {
-		return []string{"docker", "compose"}, nil
-	}
-	if cmd := exec.CommandContext(ctx, "docker-compose", "version"); cmd.Run() == nil {
-		return []string{"docker-compose"}, nil
-	}
-	return nil, fmt.Errorf("compose not found")
+    var outb, errb bytes.Buffer
+    cmd := exec.CommandContext(ctx, "docker", "compose", "version", "--format", "json")
+    cmd.Stdout = &outb
+    cmd.Stderr = &errb
+
+    if err := cmd.Run(); err != nil {
+        reason := fmt.Sprintf("Docker Compose plugin is missing or malfunctioning.\n    Details: %s", strings.TrimSpace(errb.String()))
+        return nil, generateRemediationError(reason, err)
+    }
+
+    var info composeInfo
+    if err := json.Unmarshal(outb.Bytes(), &info); err != nil {
+        return nil, fmt.Errorf("failed to parse docker compose version output: %w", err)
+    }
+
+    cleanVer := strings.TrimPrefix(info.Version, "v")
+
+    if !isVersionSufficient(cleanVer, ComposeMinVer) {
+        reason := fmt.Sprintf("Docker Compose is outdated (v%s). v%s+ is strictly required.", cleanVer, ComposeMinVer)
+        return nil, generateRemediationError(reason, nil)
+    }
+
+    return []string{"docker", "compose"}, nil
 }
 
-func installCompose() ([]string, error) {
-	fmt.Printf("\n    %s⚠️ Docker is running, but the Compose plugin is missing.%s\n\n", cli.Yellow, cli.Reset)
+// generateRemediationError formats an actionable error message.
+func generateRemediationError(reason string, originalErr error) error {
+    var sb strings.Builder
 
-	fmt.Printf("    Recommended install methods:\n")
-	fmt.Printf("      Ubuntu/Debian:  sudo apt-get install docker-compose-plugin\n")
-	fmt.Printf("      Fedora:         sudo dnf install docker-compose-plugin\n")
-	fmt.Printf("      Arch:           sudo pacman -S docker-compose\n")
-	fmt.Printf("      Manual:         https://docs.docker.com/compose/install/\n\n")
+    sb.WriteString(fmt.Sprintf("\n    %s❌ Deployment Aborted: %s%s\n", cli.Red, reason, cli.Reset))
+    
+    // Inject the real system error (e.g., "permission denied") so you don't lose debugging context
+    if originalErr != nil {
+        sb.WriteString(fmt.Sprintf("    %sSystem Error: %v%s\n", cli.Dim, originalErr, cli.Reset))
+    }
 
-	arch := runtime.GOARCH
-	var dockerArch string
-	switch arch {
-	case "amd64":
-		dockerArch = "x86_64"
-	case "arm64":
-		dockerArch = "aarch64"
-	default:
-		return nil, fmt.Errorf("automatic Compose installation is not available for architecture '%s'.\nPlease install docker-compose manually: https://docs.docker.com/compose/install/", arch)
-	}
+    sb.WriteString(fmt.Sprintf("    %sHoneyWire requires Docker Compose v%s+ to securely orchestrate honeypot lifecycles.%s\n\n", cli.Dim, ComposeMinVer, cli.Reset))
+    
+    sb.WriteString(fmt.Sprintf("    %sPlease run the official upgrade command for your OS:%s\n", cli.Cyan, cli.Reset))
+    sb.WriteString("      Ubuntu/Debian:  sudo apt-get update && sudo apt-get install docker-compose-plugin\n")
+    sb.WriteString("      Fedora:         sudo dnf upgrade docker-compose-plugin\n")
+    sb.WriteString("      Arch:           sudo pacman -Syu docker-compose\n\n")
 
-	fmt.Printf("    Download and install the official Compose plugin binary (%s) after SHA-256 verification? [y/N]: ", dockerArch)
+    sb.WriteString(fmt.Sprintf("    %sIf you installed Docker manually, update the binary:%s\n", cli.Cyan, cli.Reset))
+    sb.WriteString(fmt.Sprintf("      curl -SL https://github.com/docker/compose/releases/download/v%s/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose\n", ComposeMinVer))
+    sb.WriteString("      chmod +x /usr/local/lib/docker/cli-plugins/docker-compose\n")
 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("failed to read input: %w", err)
-	}
-	if strings.TrimSpace(strings.ToLower(input)) != "y" {
-		return nil, fmt.Errorf("deployment aborted: Docker Compose plugin is required")
-	}
-
-	fmt.Printf("\n    %s⚙️ Downloading and verifying official Compose plugin...%s\n", cli.Cyan, cli.Reset)
-
-	binaryName := fmt.Sprintf("docker-compose-linux-%s", dockerArch)
-	binaryURL := fmt.Sprintf("https://github.com/docker/compose/releases/download/%s/%s", ComposeVersion, binaryName)
-
-	result, err := FetchWithRemoteChecksum(binaryURL)
-	if err != nil {
-		return nil, fmt.Errorf("download or verification failed: %w", err)
-	}
-	defer result.Cleanup()
-
-	pluginDir := "/usr/local/lib/docker/cli-plugins"
-	destPath := filepath.Join(pluginDir, "docker-compose")
-
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create plugin directory: %w", err)
-	}
-
-	if err := copyFile(result.Path, destPath); err != nil {
-		return nil, fmt.Errorf("failed to install compose binary: %w", err)
-	}
-
-	if err := os.Chmod(destPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to set compose binary permissions: %w", err)
-	}
-
-	fmt.Printf("    %s✅ Compose plugin installed.%s\n", cli.Green, cli.Reset)
-	return []string{"docker", "compose"}, nil
+    return fmt.Errorf(sb.String())
 }
 
-func handleMissingDocker() ([]string, error) {
-	fmt.Printf("\n    %s⚠️ Docker is not installed on this system.%s\n", cli.Yellow, cli.Reset)
-	fmt.Printf("    %sHoneyWire requires Docker to safely isolate the honeypot sensors.%s\n\n", cli.Dim, cli.Reset)
+// -----------------------------------------------------------------------------
+// UTILITIES
+// -----------------------------------------------------------------------------
 
-	fmt.Printf("    Recommended install methods:\n")
-	fmt.Printf("      Ubuntu/Debian:  sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin\n")
-	fmt.Printf("      Fedora:         sudo dnf install docker-ce docker-ce-cli containerd.io docker-compose-plugin\n")
-	fmt.Printf("      Arch:           sudo pacman -S docker docker-compose\n")
-	fmt.Printf("      Manual:         https://docs.docker.com/engine/install/\n\n")
+func isVersionSufficient(current, minimum string) bool {
+    currParts := parseVersionString(current)
+    minParts := parseVersionString(minimum)
 
-	fmt.Printf("    Download and execute Docker's official installation script after SHA-256 verification? [y/N]: ")
+    for i := 0; i < 3; i++ {
+        if currParts[i] > minParts[i] {
+            return true
+        }
+        if currParts[i] < minParts[i] {
+            return false
+        }
+    }
+    return true 
+}
 
-	reader := bufio.NewReader(os.Stdin)
-	input, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("failed to read input: %w", err)
-	}
-	if strings.TrimSpace(strings.ToLower(input)) != "y" {
-		return nil, fmt.Errorf("deployment aborted: Docker is required to isolate sensors")
-	}
-
-	fmt.Printf("\n    %s⚙️ Downloading and verifying Docker install script...%s\n", cli.Cyan, cli.Reset)
-
-	result, err := FetchWithRemoteChecksum(DockerScriptURL)
-	if err != nil {
-		return nil, fmt.Errorf("download or verification failed: %w", err)
-	}
-	defer result.Cleanup()
-
-	fmt.Printf("      ↳ Checksum verified. Executing install script...%s%s\n", cli.Dim, cli.Reset)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "sh", result.Path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("Docker installation failed: %w", err)
-	}
-
-	fmt.Printf("    %s✅ Docker installed.%s\n", cli.Green, cli.Reset)
-	return []string{"docker", "compose"}, nil
+func parseVersionString(v string) [3]int {
+    var parts [3]int
+    segments := strings.Split(strings.TrimPrefix(v, "v"), ".")
+    
+    for i := 0; i < len(segments) && i < 3; i++ {
+        cleanSeg := strings.Split(segments[i], "-")[0] 
+        if val, err := strconv.Atoi(cleanSeg); err == nil {
+            parts[i] = val
+        }
+    }
+    return parts
 }

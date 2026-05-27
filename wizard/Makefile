@@ -52,10 +52,7 @@ define deploy_target
 	scp build/wizard root@$($(2)):/root/wizard
 
 	ssh root@$($(2)) '\
-		chmod +x /root/wizard && \
-		rm -f /etc/honeywire/config.json && \
-		HW_DASHBOARD_PASSWORD="$(HUB_PASSWORD)" \
-		/root/wizard --link $(HUB_URL) \
+		chmod +x /root/wizard
 	'
 endef
 
