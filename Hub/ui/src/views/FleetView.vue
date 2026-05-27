@@ -9,6 +9,7 @@ import BaseMeatballMenu from '../components/ui/navigation/BaseMeatballMenu.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseModal from '../components/ui/feedback/BaseModal.vue'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
+import { useClipboard } from '../utils/useClipboard'
 
 const appStore = useAppStore()
 const fleetStore = useFleetStore()
@@ -246,18 +247,7 @@ const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
 const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
 // --- Copy Animation (ephemeral UI) ---
-const copiedStates = ref({})
-
-const handleCopy = async (id, text) => {
-    if (!text) return
-    try {
-        await navigator.clipboard.writeText(text)
-        copiedStates.value[id] = true
-        setTimeout(() => { copiedStates.value[id] = false }, 2000)
-    } catch (err) {
-        console.error('Failed to copy text', err)
-    }
-}
+const { copiedStates, handleCopy } = useClipboard()
 
 const handleOpenNodeDetail = (nodeId) => {
     fleetStore.selectTarget(nodeId, null, false)

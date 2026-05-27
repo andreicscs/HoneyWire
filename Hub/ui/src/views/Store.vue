@@ -2,6 +2,7 @@
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useConfig } from '../api/useConfig'
 import PageHeader from '../components/ui/layout/PageHeader.vue' // Adjust path if needed
+import { useClipboard } from '../utils/useClipboard'
 
 const { config } = useConfig()
 
@@ -18,6 +19,7 @@ const fetchError = ref(false)
 const rawCompose = ref('')
 const highlightedCompose = ref('')
 const composePre = ref(null) 
+const { copiedStates, handleCopy } = useClipboard()
 
 const isSeverityOpen = ref(false)
 
@@ -194,24 +196,6 @@ const applyHighlighting = () => {
         }
     });
 }
-
-const copyToClipboard = () => {
-    if (!selectedSensor.value) return
-    navigator.clipboard.writeText(rawCompose.value)
-
-    const btn = document.getElementById('copy-btn')
-    const originalText = btn.innerHTML
-    
-    btn.innerHTML = 'Copied!'
-    btn.classList.add('bg-success-bg', 'text-success-text', 'border-success-border')
-    btn.classList.remove('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-h')
-    
-    setTimeout(() => { 
-        btn.innerHTML = originalText 
-        btn.classList.remove('bg-success-bg', 'text-success-text', 'border-success-border')
-        btn.classList.add('bg-secondary-main', 'text-secondary-text', 'border-secondary-border', 'hover:bg-secondary-hover', 'hover:text-text-h')
-    }, 2000)
-}
 </script>
 
 <template>
@@ -380,9 +364,10 @@ const copyToClipboard = () => {
                                         class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-5 rounded-md text-sm font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"
                                     ></pre>
                                     
-                                    <button id="copy-btn" @click="copyToClipboard"
-                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:bg-secondary-hover hover:text-text-h text-sm font-medium transition-colors duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none">
-                                        Copy
+                                    <button @click="handleCopy('store-compose', rawCompose)"
+                                            class="absolute top-4 right-6 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none"
+                                            :class="copiedStates['store-compose'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                        {{ copiedStates['store-compose'] ? 'Copied!' : 'Copy' }}
                                     </button>
                                 </div>
                             </div>

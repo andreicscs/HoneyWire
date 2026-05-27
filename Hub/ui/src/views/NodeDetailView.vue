@@ -9,6 +9,7 @@ import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../components/ui/navigation/BaseMeatballMenu.vue'
 import BaseModal from '../components/ui/feedback/BaseModal.vue'
 import { formatSensorId } from '../utils/formatSensorId'
+import { useClipboard } from '../utils/useClipboard'
 
 
 const appStore = useAppStore()
@@ -192,18 +193,7 @@ const syncCommand = computed(() => {
 })
 
 // --- COPY STATE (ephemeral UI) ---
-const copiedStates = ref({})
-
-const handleCopy = async (id, text) => {
-    if (!text) return
-    try {
-        await navigator.clipboard.writeText(text)
-        copiedStates.value[id] = true
-        setTimeout(() => { copiedStates.value[id] = false }, 2000)
-    } catch (err) {
-        console.error('Failed to copy text', err)
-    }
-}
+const { copiedStates, handleCopy } = useClipboard()
 
 // --- FORMATTERS ---
 const formatEventType = (type) => type ? type.replace(/_/g, ' ') : ''
