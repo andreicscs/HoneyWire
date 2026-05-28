@@ -1,215 +1,240 @@
 /**
  * HoneyWireWS
- * 
- * Standalone WebSocket service for real-time event streaming.
- * Decoupled from Vue reactivity - uses callbacks/event emitters to pass data to stores.
- * 
- * Features:
- * - Automatic reconnection with exponential backoff
- * - JSON message parsing
- * - Callback-based event dispatch
- * - No direct Vue ref imports
+ * * Standalone, production-ready WebSocket service for real-time event streaming.
+ * Decoupled from Vue reactivity - uses an Event-Emitter pattern to pass data to stores.
  */
-
 export class HoneyWireWS {
   constructor(baseUrl = window.location.origin) {
-    this.baseUrl = baseUrl
-    this.ws = null
-    this.isDestroyed = false
-    this.retryCount = 0
-    this.maxRetries = 10
-    this.retryDelay = 3000
-    this.healthCheckInterval = null
+    this.baseUrl = baseUrl;
+    this.ws = null;
+    this.isDestroyed = false;
+    
+    // Reconnection State
+    this.retryCount = 0;
+    this.maxRetries = 15;
+    this.baseRetryDelay = 2000;
+    this.maxRetryDelay = 30000;
+    this.reconnectTimeoutId = null;
 
-    // Event callbacks: will be set by the caller
+    // Heartbeat State
+    this.pingIntervalMs = 25000; // 25s (Common proxy timeout limit is 30s)
+    this.pongTimeoutMs = 5000;    // Wait 5s for backend response
+    this.pingIntervalId = null;
+    this.pongTimeoutId = null;
+
+    // Outbound Queue (if messages need to be sent during reconnection)
+    this.sendQueue = [];
+
+    // Map WebSocket message string codes to callback keys
+    this.eventMapping = {
+      'NEW_EVENT': 'onNewEvent',
+      'SENSOR_HEARTBEAT': 'onSensorHeartbeat',
+      'SYNC_CHARTS': 'onSyncCharts',
+      'NEW_SENSOR': 'onNewSensor',
+      'DELETE_SENSOR': 'onDeleteSensor',
+      'SILENCE_SENSOR': 'onSilenceSensor',
+      'NEW_NODE': 'onNewNode',
+      'UPDATE_NODE': 'onUpdateNode',
+      'DELETE_NODE': 'onDeleteNode',
+      'NODE_SYNCED': 'onNodeSynced'
+    };
+
+    // Callback registry
     this.callbacks = {
-      onNewEvent: null,
-      onSensorHeartbeat: null,
-      onNewSensor: null,
-      onDeleteSensor: null,
-      onSilenceSensor: null,
       onReconnect: null,
-      onSyncCharts: null,
-      onNewNode: null,
-      onUpdateNode: null,
-      onDeleteNode: null,
-      onNodeSynced: null,
-    }
+      onDisconnect: null,
+      onError: null,
+      ...Object.values(this.eventMapping).reduce((acc, curr) => ({ ...acc, [curr]: null }), {})
+    };
   }
 
   /**
-   * Register a callback for a specific message type
-   * @param {string} eventType - e.g., 'onNewEvent', 'onSensorHeartbeat'
-   * @param {Function} callback - Function to call with (payload)
+   * Register a callback for a specific message or lifecycle event
    */
   on(eventType, callback) {
-    if (this.callbacks.hasOwnProperty(eventType)) {
-      this.callbacks[eventType] = callback
+    if (Object.prototype.hasOwnProperty.call(this.callbacks, eventType)) {
+      this.callbacks[eventType] = callback;
+    } else {
+      console.warn(`WebSocket: Registering fallback handler for unmapped hook: "${eventType}"`);
+      this.callbacks[eventType] = callback;
     }
   }
 
   /**
-   * Establish WebSocket connection with automatic reconnect
+   * Establish WebSocket connection with automatic handling
    */
   connect() {
-    if (this.isDestroyed) {
-      console.warn('WebSocket: Cannot connect after destroy()')
-      return
+    if (this.isDestroyed) return;
+
+    // Clean up any stray timeouts/existing connections safely first
+    this._clearReconnection();
+    this._stopHeartbeat();
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      this.ws.close();
     }
 
     if (this.retryCount >= this.maxRetries) {
-      console.error(
-        `WebSocket: Max retries (${this.maxRetries}) reached, stopping reconnection attempts`
-      )
-      return
+      console.error(`WebSocket: Max retries (${this.maxRetries}) reached. Stopping.`);
+      if (this.callbacks.onError) this.callbacks.onError(new Error('Max retries reached'));
+      return;
     }
 
-    const protocol = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws`
+    const protocol = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const host = this.baseUrl.replace(/^https?:\/\//, '');
+    const wsUrl = `${protocol}//${host}/api/v1/ws`;
 
-    console.log(`WebSocket: Connecting to ${wsUrl}`)
-
-    this.ws = new WebSocket(wsUrl)
+    this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('WebSocket: Connected')
-      
-      // If retryCount > 0, it means we dropped and just successfully reconnected
-      if (this.retryCount > 0 && this.callbacks.onReconnect) {
-        this.callbacks.onReconnect()
+      if (this.isDestroyed) {
+        this.disconnect();
+        return;
       }
       
-      this.retryCount = 0
-      this.retryDelay = 3000
-    }
+      const wasReconnecting = this.retryCount > 0;
+      this.retryCount = 0;
+      
+      this._startHeartbeat();
+      this._flushQueue();
+
+      if (wasReconnecting && this.callbacks.onReconnect) {
+        this.callbacks.onReconnect();
+      }
+    };
 
     this.ws.onmessage = (event) => {
-      this._handleMessage(event)
-    }
+      this._handleMessage(event);
+    };
 
     this.ws.onerror = (error) => {
-      console.error('WebSocket: Error', error)
-    }
+      if (this.callbacks.onError) this.callbacks.onError(error);
+    };
 
-    this.ws.onclose = () => {
-      console.warn('WebSocket: Disconnected')
+    this.ws.onclose = (event) => {
+      this._stopHeartbeat();
+      
+      if (this.callbacks.onDisconnect) {
+        this.callbacks.onDisconnect(event);
+      }
+
       if (!this.isDestroyed) {
-        this._scheduleReconnect()
+        this._scheduleReconnect();
       }
-    }
+    };
   }
 
   /**
-   * Parse incoming message and dispatch to registered callbacks
-   * @private
+   * Send data out to the server safely, queuing if offline
    */
-  _handleMessage(event) {
-    try {
-      const data = JSON.parse(event.data)
-      console.log('WebSocket: Message', data.type, data.payload)
+  send(type, payload = {}) {
+    const messageStr = JSON.stringify({ type, payload });
 
-      switch (data.type) {
-        case 'NEW_EVENT':
-          if (this.callbacks.onNewEvent) {
-            this.callbacks.onNewEvent(data.payload)
-          }
-          break
-
-        case 'SENSOR_HEARTBEAT':
-          if (this.callbacks.onSensorHeartbeat) {
-            this.callbacks.onSensorHeartbeat(data.payload)
-          }
-          break
-        
-        case 'SYNC_CHARTS':
-         if (this.callbacks.onSyncCharts) this.callbacks.onSyncCharts()
-         break
-
-        case 'NEW_SENSOR':
-          if (this.callbacks.onNewSensor) {
-            this.callbacks.onNewSensor(data.payload)
-          }
-          break
-
-        case 'DELETE_SENSOR':
-          if (this.callbacks.onDeleteSensor) {
-            this.callbacks.onDeleteSensor(data.payload)
-          }
-          break
-
-        case 'SILENCE_SENSOR':
-          if (this.callbacks.onSilenceSensor) {
-            this.callbacks.onSilenceSensor(data.payload)
-          }
-          break
-        case 'NEW_NODE':
-          if (this.callbacks.onNewNode) {
-            this.callbacks.onNewNode(data.payload)
-          }
-          break
-
-        case 'UPDATE_NODE':
-          if (this.callbacks.onUpdateNode) {
-            this.callbacks.onUpdateNode(data.payload)
-          }
-          break
-
-        case 'DELETE_NODE':
-          if (this.callbacks.onDeleteNode) {
-            this.callbacks.onDeleteNode(data.payload)
-          }
-          break
-        case 'NODE_SYNCED':
-          if (this.callbacks.onNodeSynced) {
-            this.callbacks.onNodeSynced(data.payload)
-          }
-          break
-
-        default:
-          console.warn(`WebSocket: Unknown message type: ${data.type}`)
-      }
-    } catch (error) {
-      console.error('WebSocket: Parse error', error, event.data)
+    if (this.isConnected()) {
+      this.ws.send(messageStr);
+    } else if (!this.isDestroyed) {
+      this.sendQueue.push(messageStr);
     }
   }
 
   /**
-   * Schedule a reconnection attempt with exponential backoff
-   * @private
-   */
-  _scheduleReconnect() {
-    this.retryCount++
-    console.warn(
-      `WebSocket: Retry ${this.retryCount}/${this.maxRetries} in ${this.retryDelay}ms`
-    )
-
-    setTimeout(() => {
-      this.connect()
-    }, this.retryDelay)
-
-    // Exponential backoff: double the delay, capped at 30s
-    this.retryDelay = Math.min(this.retryDelay * 2, 30000)
-  }
-
-  /**
-   * Close the WebSocket and clean up
-   */
-  disconnect() {
-    this.isDestroyed = true
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval)
-    }
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
-    }
-  }
-
-  /**
-   * Check the current connection state
-   * @returns {boolean}
+   * Check connection status safely
    */
   isConnected() {
-    return this.ws && this.ws.readyState === WebSocket.OPEN
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Total Teardown
+   */
+  disconnect() {
+    this.isDestroyed = true;
+    this._clearReconnection();
+    this._stopHeartbeat();
+    this.sendQueue = [];
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+
+  /**
+   * Private Engine Methods
+   */
+
+  _handleMessage(event) {
+    // Any message received (including your SYNC_CHARTS broadcast) resets our sanity timer
+    this._startHeartbeat(); 
+
+    try {
+      const data = JSON.parse(event.data);
+      const callbackName = this.eventMapping[data.type];
+      if (callbackName && this.callbacks[callbackName]) {
+        this.callbacks[callbackName](data.payload);
+      }
+    } catch (e) {
+      // Gracefully catch frames that aren't JSON
+    }
+  }
+
+  _scheduleReconnect() {
+    if (this.reconnectTimeoutId) return; // Block stacked racing timeouts
+
+    this.retryCount++;
+    
+    // Exponential Backoff calculation + Jitter (random variance between 0-1000ms)
+    const backoffDelay = Math.min(
+      this.baseRetryDelay * Math.pow(2, this.retryCount - 1), 
+      this.maxRetryDelay
+    );
+    const jitter = Math.random() * 1000;
+    const finalDelay = backoffDelay + jitter;
+
+    this.reconnectTimeoutId = setTimeout(() => {
+      this.reconnectTimeoutId = null;
+      this.connect();
+    }, finalDelay);
+  }
+
+  _clearReconnection() {
+    if (this.reconnectTimeoutId) {
+      clearTimeout(this.reconnectTimeoutId);
+      this.reconnectTimeoutId = null;
+    }
+  }
+
+_startHeartbeat() {
+  this._stopHeartbeat();
+
+  // If we don't hear a single word from the server for 35 seconds, 
+  // assume the connection is dead and force-close it.
+  this.pongTimeoutId = setTimeout(() => {
+    console.warn('WebSocket: Silent connection detected. Terminating.');
+    if (this.ws) this.ws.close();
+  }, 35000); 
+}
+
+  _resetPongTimeout() {
+    if (this.pongTimeoutId) {
+      clearTimeout(this.pongTimeoutId);
+      this.pongTimeoutId = null;
+    }
+  }
+
+  _stopHeartbeat() {
+    if (this.pingIntervalId) clearInterval(this.pingIntervalId);
+    this._resetPongTimeout();
+    this.pingIntervalId = null;
+  }
+
+  _flushQueue() {
+    while (this.sendQueue.length > 0 && this.isConnected()) {
+      const msg = this.sendQueue.shift();
+      this.ws.send(msg);
+    }
   }
 }

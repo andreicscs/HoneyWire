@@ -82,12 +82,40 @@ func (h *Handler) getRealIP(r *http.Request) string {
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		log.Printf("[ERROR] WS Upgrade failed: %v\n", err)
 		return
 	}
 
 	h.clientsMu.Lock()
 	h.clients[conn] = true
 	h.clientsMu.Unlock()
+
+
+	const pingPeriod = 20 * time.Second
+    const writeWait = 10 * time.Second
+    const readWait = 25 * time.Second // Must be greater than pingPeriod
+
+	conn.SetReadDeadline(time.Now().Add(readWait))
+    conn.SetPongHandler(func(string) error {
+        conn.SetReadDeadline(time.Now().Add(readWait))
+        return nil
+    })
+
+	// Goroutine for keeping the connection alive by sending periodic pings
+    go func() {
+        ticker := time.NewTicker(pingPeriod)
+        defer func() {
+            ticker.Stop()
+            conn.Close()
+        }()
+
+        for range ticker.C {
+            // Send a native control frame Ping (Opcode 0x9)
+            if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+                return
+            }
+        }
+    }()
 
 	go func() {
 		defer func() {
