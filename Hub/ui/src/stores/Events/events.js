@@ -9,7 +9,7 @@ import { useAppStore } from '../System/app'
  * Manages event data, filtering by fleet selection, and real-time updates.
  * 
  * CRITICAL: filteredEvents and handleWsEvent use composite keys:
- * node_id AND sensor_id must be checked together.
+ * nodeId AND sensorId must be checked together.
  */
 
 let severityAbortController = null;
@@ -38,14 +38,12 @@ export const useEventsStore = defineStore('events', () => {
    */
   const filteredEvents = computed(() => {
     const { selectedNode, selectedSensor } = fleetStore
-    const isArchiveView = appStore.viewingArchive
+    // Explicitly unwrap or access the value to ensure reactive dependency tracking
+    const isArchiveView = !!appStore.viewingArchive
 
     // 1. First, filter by Archive State
-    // (Assuming the backend returns a mix, or 'is_archived' property exists)
-    // If your backend only returns one type based on the fetch URL, skip this local filter 
-    // and let the URL param handle it. But doing it locally ensures safety.
     let currentEvents = events.value.filter(e => {
-        const isArchived = e.is_archived === true || e.is_archived === 1
+        const isArchived = e.isArchived === true || e.isArchived === 1
         return isArchiveView ? isArchived : !isArchived
     })
 
@@ -56,13 +54,13 @@ export const useEventsStore = defineStore('events', () => {
 
     // 3. Node selected but no sensor: filter by node only
     if (selectedNode && !selectedSensor) {
-      return currentEvents.filter(e => e.node_id === selectedNode?.id)
+      return currentEvents.filter(e => e.nodeId === selectedNode?.id)
     }
 
     // 4. Both selected
     if (selectedNode && selectedSensor) {
       return currentEvents.filter(
-        e => e.node_id === selectedNode?.id && e.sensor_id === selectedSensor?.sensorId
+        e => e.nodeId === selectedNode?.id && e.sensorId === selectedSensor?.sensorId
       )
     }
 
@@ -97,11 +95,11 @@ export const useEventsStore = defineStore('events', () => {
       url.searchParams.append('archived', isArchived)
 
       if (nodeId) {
-        url.searchParams.append('node_id', nodeId)
+        url.searchParams.append('nodeId', nodeId)
       }
 
       if (sensorId) {
-        url.searchParams.append('sensor_id', sensorId)
+        url.searchParams.append('sensorId', sensorId)
       }
 
       const res = await fetch(url.toString()).then(r => r.json())
@@ -150,8 +148,8 @@ export const useEventsStore = defineStore('events', () => {
     try {
       isFetchingThreatVelocityProjection.value = true;
       const params = new URLSearchParams({ timeframe, archived: viewingArchive ? 'true' : 'false' });
-      if (nodeId) params.append('node_id', nodeId);
-      if (sensorId) params.append('sensor_id', sensorId);
+      if (nodeId) params.append('nodeId', nodeId);
+      if (sensorId) params.append('sensorId', sensorId);
 
       const response = await fetch(`/api/v1/events/velocity?${params.toString()}`, {
         signal: velocityAbortController.signal
@@ -178,7 +176,7 @@ export const useEventsStore = defineStore('events', () => {
       const response = await fetch('/api/v1/events/read', { method: 'PATCH' })
       if (!response.ok) throw new Error(`Server error: ${response.status}`)
 
-      events.value.forEach(e => (e.is_read = 1))
+      events.value.forEach(e => (e.isRead = 1))
       unreadCount.value = 0
     } catch (err) {
       console.error('Failed to mark all events as read:', err)
@@ -192,10 +190,10 @@ export const useEventsStore = defineStore('events', () => {
    */
   const markEventRead = async (eventId) => {
     const ev = events.value.find(e => e.id === eventId)
-    if (!ev || ev.is_read) return
+    if (!ev || ev.isRead) return
 
-    const wasRead = ev.is_read
-    ev.is_read = true
+    const wasRead = ev.isRead
+    ev.isRead = true
     unreadCount.value = Math.max(0, unreadCount.value - 1)
 
     try {
@@ -204,7 +202,7 @@ export const useEventsStore = defineStore('events', () => {
       })
       if (!response.ok) throw new Error(`Server error: ${response.status}`)
     } catch (err) {
-      ev.is_read = wasRead
+      ev.isRead = wasRead
       unreadCount.value = Math.max(0, unreadCount.value + 1)
       console.error('Failed to mark event as read:', err)
     }
@@ -268,7 +266,7 @@ export const useEventsStore = defineStore('events', () => {
   /**
    * Handle a new event from WebSocket
    * Prepends event and increments unread count only if it matches current filters
-   * COMPOSITE KEY enforcement: node_id AND sensor_id must both match for sensor filter
+   * COMPOSITE KEY enforcement: nodeId AND sensorId must both match for sensor filter
    * @param {object} payload - Event payload from WebSocket
    */
   const handleWsEvent = (payload) => {
@@ -284,14 +282,14 @@ export const useEventsStore = defineStore('events', () => {
 
     // 2. If node is selected but no sensor, match node only
     const nodeOnlyMatch =
-      selectedNode && !selectedSensor && payload.node_id === selectedNode?.id
+      selectedNode && !selectedSensor && payload.nodeId === selectedNode?.id
 
     // 3. COMPOSITE KEY: If specific sensor is selected, match BOTH node AND sensor
     const sensorMatch =
       selectedSensor &&
       selectedNode &&
-      payload.node_id === selectedNode?.id &&
-      payload.sensor_id === selectedSensor?.sensorId
+      payload.nodeId === selectedNode?.id &&
+      payload.sensorId === selectedSensor?.sensorId
 
     // Add event to the front if it matches the current filter
     if (noFilter || nodeOnlyMatch || sensorMatch) {
@@ -300,8 +298,8 @@ export const useEventsStore = defineStore('events', () => {
 
     const affectsCurrentView = 
       (!appStore.viewingArchive) &&
-      (!selectedNode || selectedNode?.id === payload.node_id) &&
-      (!selectedSensor || selectedSensor?.sensorId === payload.sensor_id);
+      (!selectedNode || selectedNode?.id === payload.nodeId) &&
+      (!selectedSensor || selectedSensor?.sensorId === payload.sensorId);
 
     if (affectsCurrentView) {
       fetchSeverityProjection('alltime', selectedNode?.id, selectedSensor?.sensorId);

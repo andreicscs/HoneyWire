@@ -51,15 +51,15 @@ func SetupRouter(h *Handler) (*chi.Mux, error) {
 		// --- Node & Fleet Management ---
 		r.Post("/api/v1/nodes", h.CreateNode)
 		r.Get("/api/v1/nodes", h.GetNodes)
-		r.Get("/api/v1/nodes/{id}", h.GetNodeDetails)
-		r.Patch("/api/v1/nodes/{id}", h.UpdateNode)
-		r.Delete("/api/v1/nodes/{id}", h.DeleteNode)
+		r.Get("/api/v1/nodes/{nodeId}", h.GetNodeDetails)
+		r.Patch("/api/v1/nodes/{nodeId}", h.UpdateNode)
+		r.Delete("/api/v1/nodes/{nodeId}", h.DeleteNode)
 
 		// --- Sensor Management ---
-		r.Post("/api/v1/nodes/{id}/sensors", h.AddNodeSensor)
-		r.Put("/api/v1/nodes/{id}/sensors/{sensor_id}", h.EditNodeSensor)
-		r.Delete("/api/v1/nodes/{id}/sensors/{sensor_id}", h.DeleteNodeSensor)
-		r.Patch("/api/v1/nodes/{id}/sensors/{sensor_id}/silence", h.ToggleSilence)
+		r.Post("/api/v1/nodes/{nodeId}/sensors", h.AddNodeSensor)
+		r.Put("/api/v1/nodes/{nodeId}/sensors/{sensorId}", h.EditNodeSensor)
+		r.Delete("/api/v1/nodes/{nodeId}/sensors/{sensorId}", h.DeleteNodeSensor)
+		r.Patch("/api/v1/nodes/{nodeId}/sensors/{sensorId}/silence", h.ToggleSilence)
 
 		// System Configuration & Danger Zone
 		r.Get("/api/v1/config", h.GetConfig)
@@ -78,9 +78,9 @@ func SetupRouter(h *Handler) (*chi.Mux, error) {
 		// Event Management
 		r.Get("/api/v1/events/unread", h.GetUnreadCount)
 		r.Patch("/api/v1/events/read", h.MarkEventsRead)
-		r.Patch("/api/v1/events/{event_id}/read", h.MarkSingleEventRead)
+		r.Patch("/api/v1/events/{eventId}/read", h.MarkSingleEventRead)
 		r.Delete("/api/v1/events", h.ClearEvents)
-		r.Patch("/api/v1/events/{event_id}/archive", h.ArchiveEvent)
+		r.Patch("/api/v1/events/{eventId}/archive", h.ArchiveEvent)
 		r.Patch("/api/v1/events/archive-all", h.ArchiveAll)
 	})
 

@@ -21,7 +21,7 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if hb.SensorID == "" {
-		RespondError(w, "sensor_id is required", http.StatusBadRequest)
+		RespondError(w, "sensorId is required", http.StatusBadRequest)
 		return
 	}
 
@@ -65,13 +65,13 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	// 3. Broadcasts
 	if justSynced {
 		h.broadcastWS("NODE_SYNCED", map[string]string{
-			"node_id": nodeID,
+			"nodeId": nodeID,
 		})
 	}
 
 	h.broadcastWS("SENSOR_HEARTBEAT", map[string]string{
-		"node_id":   nodeID,
-		"sensor_id": hb.SensorID,
+		"nodeId":   nodeID,
+		"sensorId": hb.SensorID,
 		"timestamp": nowStr,
 	})
 
@@ -80,7 +80,7 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SensorID string `json:"sensor_id"`
+		SensorID string `json:"sensorId"`
 		Reason   string `json:"reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -89,7 +89,7 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.SensorID == "" {
-		RespondError(w, "sensor_id is required", http.StatusBadRequest)
+		RespondError(w, "sensorId is required", http.StatusBadRequest)
 		return
 	}
 
@@ -99,7 +99,7 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Push last_heartbeat 2 hours into the past to instantly force deriveStatus() to return "down"
+	// Push lastHeartbeat 2 hours into the past to instantly force deriveStatus() to return "down"
 	offlineTime := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
 
 	if err := h.Store.MarkSensorOffline(nodeID, req.SensorID, offlineTime); err != nil {
@@ -111,7 +111,7 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Sensor %s on node %s went offline gracefully (Reason: %s)", req.SensorID, nodeID, req.Reason)
 
 	h.broadcastWS("UPDATE_NODE", map[string]interface{}{
-		"id":              nodeID,
+		"nodeId":              nodeID,
 		"trigger_refresh": true,
 	})
 
@@ -120,11 +120,11 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	// Extract both IDs from the updated URL route
-	nodeID := chi.URLParam(r, "id")
-	sensorID := chi.URLParam(r, "sensor_id")
+	nodeID := chi.URLParam(r, "nodeId")
+	sensorID := chi.URLParam(r, "sensorId")
 
 	var req struct {
-		IsSilenced bool `json:"is_silenced"`
+		IsSilenced bool `json:"isSilenced"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, "Invalid JSON", http.StatusBadRequest)
@@ -142,16 +142,16 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.broadcastWS("SILENCE_SENSOR", map[string]interface{}{
-		"node_id":     nodeID,
-		"sensor_id":   sensorID,
-		"is_silenced": req.IsSilenced,
+		"nodeId":     nodeID,
+		"sensorId":   sensorID,
+		"isSilenced": req.IsSilenced,
 	})
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"status":      "success",
-		"node_id":     nodeID,
-		"sensor_id":   sensorID,
-		"is_silenced": req.IsSilenced,
+		"nodeId":     nodeID,
+		"sensorId":   sensorID,
+		"isSilenced": req.IsSilenced,
 	})
 }
 

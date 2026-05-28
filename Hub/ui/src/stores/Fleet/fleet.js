@@ -102,42 +102,42 @@ export const useFleetStore = defineStore('fleet', () => {
 
   // --- NORMALIZATION ---
   const normalizeNodeData = (raw) => {
-    const id = raw.node_id ?? raw.id
+    const id = raw.nodeId
     if (!id) return null
     return {
       id,
-      alias: raw.alias || raw.name || 'Unnamed Node', 
+      alias: raw.alias || 'Unnamed Node', 
       status: raw.status || 'unknown',
-      hasPendingConfig: raw.hasPendingConfig ?? raw.pending_config ?? raw.has_pending_config ?? false,
-      lastHeartbeat: raw.lastHeartbeat || raw.last_heartbeat || null,
-      publicIp: raw.publicIp || raw.public_ip || null,
-      privateIp: raw.privateIp || raw.private_ip || null,
+      hasPendingConfig: raw.hasPendingConfig ?? false,
+      lastHeartbeat: raw.lastHeartbeat || null,
+      publicIp: raw.publicIp || null,
+      privateIp: raw.privateIp || null,
       tags: raw.tags || [],
-      apiKey: raw.apiKey || raw.api_key || null,
-      activeRevision: raw.activeRevision || raw.active_revision || '',
-      desiredRevision: raw.desiredRevision || raw.desired_revision || '',
-      lastEvent: raw.lastEvent || raw.last_event || 'Never',
+      apiKey: raw.apiKey || null,
+      activeRevision: raw.activeRevision || '',
+      desiredRevision: raw.desiredRevision || '',
+      lastEvent: raw.lastEvent || 'Never',
     }
   }
 
   const normalizeSensorData = (raw, nodeId) => {
-    const rawId = raw.sensor_id ?? raw.id
+    const rawId = raw.sensorId
     if (!rawId) return null
     const id = `${nodeId}:${rawId}`
     return {
       id,
       sensorId: rawId,
       nodeId,
-      name: raw.name || raw.sensor_id || rawId,
-      display: raw.display || raw.custom_name || raw.name || raw.sensor_id || rawId,
+      name: raw.name || rawId,
+      display: raw.display || raw.customName || raw.name || rawId,
       status: raw.status || 'down',
-      isSilenced: raw.isSilenced ?? raw.is_silenced ?? false,
-      events24h: raw.events24h ?? raw.events_24h ?? 0,
-      osi: raw.osi_layer || raw.osi || 'Sensor',
-      icon: raw.icon || raw.icon_svg || 'M12 12h0',
-      envVars: raw.envVars || raw.env_vars || {},
+      isSilenced: raw.isSilenced ?? false,
+      events24h: raw.events24h ?? 0,
+      osi: raw.osi_layer || 'Sensor',
+      icon: raw.icon_svg || 'M12 12h0', //TODO add default icon for sensors
+      envVars: raw.env_vars || {},
       metadata: raw.metadata || {},
-      lastHeartbeat: raw.lastHeartbeat || raw.last_heartbeat || null,
+      lastHeartbeat: raw.lastHeartbeat || null,
     }
   }
 
@@ -156,7 +156,7 @@ export const useFleetStore = defineStore('fleet', () => {
         if (!node) continue
         nextNodes[node.id] = node
   
-        const sensors = rawNode.installedSensors || rawNode.installed_sensors || []
+        const sensors = rawNode.installedSensors || []
   
         for (const rs of sensors) {
           const sensor = normalizeSensorData(rs, node.id)
@@ -190,7 +190,7 @@ export const useFleetStore = defineStore('fleet', () => {
       const oldSensors = sensorsByNodeId.value[node.id] || []
       for (const s of oldSensors) delete nextSensors[s.id]
 
-      const rawSensors = rawNode.installedSensors || rawNode.installed_sensors || []
+      const rawSensors = rawNode.installedSensors || []
       for (const rs of rawSensors) {
         const sensor = normalizeSensorData(rs, node.id)
         if (sensor) nextSensors[sensor.id] = sensor
@@ -207,17 +207,17 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- HIGH-FREQUENCY RUNTIME PATCHES ---
   const handleWsUpdate = (type, payload) => {
     if (type === 'SENSOR_HEARTBEAT') {
-      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
-      patchNode(payload.node_id, { lastHeartbeat: payload.timestamp, status: 'up' })
+      const compositeSensorId = `${payload.nodeId}:${payload.sensorId}`
+      patchNode(payload.nodeId, { lastHeartbeat: payload.timestamp, status: 'up' })
       patchSensor(compositeSensorId, { lastHeartbeat: payload.timestamp, status: 'up' })
       return
     }
 
     if (type === 'NEW_EVENT') {
-      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
-      patchNode(payload.node_id, { lastEvent: 'Just now' })
+      const compositeSensorId = `${payload.nodeId}:${payload.sensorId}`
+      patchNode(payload.nodeId, { lastEvent: 'Just now' })
       
-      const events = payload.events24h ?? payload.events_24h
+      const events = payload.events24h
       if (events !== undefined) {
         patchSensor(compositeSensorId, { events24h: events })
       }
@@ -225,8 +225,8 @@ export const useFleetStore = defineStore('fleet', () => {
     }
 
     if (type === 'SILENCE_SENSOR') {
-      const compositeSensorId = `${payload.node_id}:${payload.sensor_id}`
-      const targetState = payload.is_silenced ?? payload.isSilenced
+      const compositeSensorId = `${payload.nodeId}:${payload.sensorId}`
+      const targetState = payload.isSilenced
       if (targetState !== undefined) {
         patchSensor(compositeSensorId, { isSilenced: targetState })
       }
@@ -235,7 +235,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
     // Structural boundaries trigger refetches, NEVER local mapping mutations
     if (type === 'NEW_SENSOR' || type === 'UPDATE_SENSOR' || type === 'DELETE_SENSOR' || type === 'NODE_SYNCED' || type === 'UPDATE_NODE') {
-      fetchNodeDetails(payload.node_id || payload.id)
+      fetchNodeDetails(payload.nodeId)
       return
     }
     
@@ -360,8 +360,8 @@ export const useFleetStore = defineStore('fleet', () => {
       const res = await api.post('/api/v1/nodes', { alias, tags })
       const data = await res.json()
       
-      const nodeId = data.node_id || data.nodeId || data.id
-      const apiKey = data.api_key || data.apiKey || data.key
+      const nodeId = data.nodeId
+      const apiKey = data.apiKey
       
       await fetchFleet()
       
@@ -397,9 +397,9 @@ export const useFleetStore = defineStore('fleet', () => {
   const addSensor = async (nodeId, { sensorId: rawSensorId, customName, configValues }) => {
     try {
       await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors`, {
-        sensor_id: rawSensorId,
-        custom_name: customName || rawSensorId,
-        config_values: configValues,
+        sensorId: rawSensorId,
+        customName: customName || rawSensorId,
+        configValues: configValues,
       })
       fetchNodeDetails(nodeId)
     } catch (err) {
@@ -413,8 +413,8 @@ export const useFleetStore = defineStore('fleet', () => {
     if (!sensor) return
     try {
       await api.put(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`, {
-        custom_name: customName || rawSensorId,
-        config_values: configValues,
+        customName: customName || rawSensorId,
+        configValues: configValues,
       })
       fetchNodeDetails(nodeId)
     } catch (err) {
@@ -447,7 +447,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
     try {
       await api.patch(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/silence`, {
-        is_silenced: targetState,
+        isSilenced: targetState,
       })
     } catch (err) {
       if (previousState) patchSensor(sensor.id, previousState)
@@ -472,7 +472,7 @@ export const useFleetStore = defineStore('fleet', () => {
     try {
       await Promise.all(nodeSensors.map(s =>
         api.patch(`/api/v1/nodes/${nodeId}/sensors/${encodeURIComponent(s.sensorId)}/silence`, {
-          is_silenced: targetState,
+          isSilenced: targetState,
         })
       ))
     } catch (err) {

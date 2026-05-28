@@ -192,31 +192,31 @@ const hydrateGroupsWithLiveStatus = (groups) => {
 ```json
 {
   "timeframe": "24H",
-  "generated_at": "2026-05-23T14:30:00Z",
+  "generatedAt": "2026-05-23T14:30:00Z",
   "summary": {
-    "overall_uptime": 99.52
+    "overallUptime": 99.52
   },
   "groups": [
     {
-      "node_id": "prod-server-1",
-      "node_alias": "Production Primary",
-      "worst_status": "up",
+      "nodeId": "prod-server-1",
+      "nodeAlias": "Production Primary",
+      "worstStatus": "up",
       "sensors": [
         {
-          "sensor_id": "hw-tcp-tarpit",
-          "display_name": "TCP Tarpit",
+          "sensorId": "hw-tcp-tarpit",
+          "displayName": "TCP Tarpit",
           "status": "up",
-          "is_silenced": false,
+          "isSilenced": false,
           "blocks": [
             {
               "status": "up",
               "label": "Online",
-              "time_label": "Current"
+              "timeLabel": "Current"
             },
             {
               "status": "up",
               "label": "Online",
-              "time_label": "1 hours ago"
+              "timeLabel": "1 hours ago"
             }
           ]
         }

@@ -30,12 +30,3 @@ func (c *NodeConfig) Validate() error {
 	}
 	return nil
 }
-
-type LegacyNodeConfig struct {
-	HubURL          string `json:"hub_url"`
-	NodeID          string `json:"node_id"`
-	NodeKey         string `json:"node_key"`
-	APIKey          string `json:"api_key"`
-	HubKey          string `json:"hub_key,omitempty"`
-	DashboardCookie string `json:"dashboard_cookie,omitempty"`
-}

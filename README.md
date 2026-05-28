@@ -59,12 +59,12 @@ Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a *
 
 ```json
 {
-  "contract_version": "1.0",
+  "contractVersion": "1.0",
   "severity": "critical",
-  "event_trigger": "malformed_jwt_detected",
+  "eventTrigger": "malformed_jwt_detected",
   "source": "104.28.19.12",
   "target": "Auth Gateway",
-  "sensor_id": "core-dpi-engine",  
+  "sensorId": "core-dpi-engine",  
   "details": {
     "protocol": "TCP",
     "headers_stripped": true,

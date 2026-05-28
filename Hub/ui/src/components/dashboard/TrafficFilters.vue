@@ -6,21 +6,19 @@ import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 
 const fleetStore = useFleetStore()
-// V2 Alignment: Swap 'sensors' out for 'nodes'
 const { nodes, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
 const scrollArea = ref(null)
 const showOfflineWarning = ref(false)
 
 const activeNodes = computed(() => {
-    // V2 Alignment: Directly map over the nodes array from our V2 store
     return nodes.value.map(node => {
         const sensorsList = node.installedSensors || []
         const total = sensorsList.length
         const online = sensorsList.filter(s => s.status === 'up').length
 
         return {
-            node_id: node.id,
+            nodeId: node.id,
             alias: node.alias,
             sensors: sensorsList,
             total,
@@ -31,7 +29,6 @@ const activeNodes = computed(() => {
 })
 
 const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
-// V2 Alignment: Call deleteNode instead of the deprecated forgetNode action
 const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
 
 const checkScroll = () => {
@@ -83,40 +80,40 @@ onMounted(() => nextTick(checkScroll))
                             </button>
                         </div>
 
-                        <div v-for="n in activeNodes" :key="n.node_id" :id="'pill-' + n.node_id"
+                        <div v-for="n in activeNodes" :key="n.nodeId" :id="'pill-' + n.nodeId"
                             class="shrink-0 relative flex items-center rounded-md border transition-all duration-normal shadow-sm group/pill"
                             :class="[
-                                (selectedNode?.id === n.node_id && !selectedSensor) ? 'bg-primary-selected text-primary-text border-primary-selected' : 
-                                (selectedNode?.id === n.node_id && selectedSensor) ? 'bg-highlight-bg border-highlight-border text-highlight-text ring-1 ring-highlight-ring' : 
+                                (selectedNode?.id === n.nodeId && !selectedSensor) ? 'bg-primary-selected text-primary-text border-primary-selected' : 
+                                (selectedNode?.id === n.nodeId && selectedSensor) ? 'bg-highlight-bg border-highlight-border text-highlight-text ring-1 ring-highlight-ring' : 
                                 'bg-secondary-main border-secondary-border text-text-m hover:bg-secondary-hover hover:text-text-h',
                                 
                                 ['down', 'degraded'].includes(n.status) ? 'has-warnings' : '',
                                 
-                                (selectedNode && selectedNode?.id !== n.node_id) ? 'opacity-70' : ''
+                                (selectedNode && selectedNode?.id !== n.nodeId) ? 'opacity-70' : ''
                             ]">
                              
-                            <div @click="fleetStore.selectTarget(n.node_id, null)" class="flex items-center gap-2 pl-2.5 py-1 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">
+                            <div @click="fleetStore.selectTarget(n.nodeId, null)" class="flex items-center gap-2 pl-2.5 py-1 cursor-pointer flex-1" :title="`${n.online}/${n.total} Sensors Online`">
                                 <BaseStatusDot :status="n.status" />
                                 <span class="font-mono text-sm pointer-events-none">{{ n.alias }}</span>
                                 <span class="text-sm opacity-60 ml-0.5">[{{n.total}}]</span>
                             </div>
 
                             <BaseMeatballMenu 
-                                :id="`node-${n.node_id}`" 
-                                :inverted="selectedNode?.id === n.node_id && !selectedSensor"
+                                :id="`node-${n.nodeId}`" 
+                                :inverted="selectedNode?.id === n.nodeId && !selectedSensor"
                                 class="mx-2 opacity-50 group-hover/pill:opacity-100 transition-opacity"
                             >
-                                <button @click="handleSilenceNode(n.node_id)" 
+                                <button @click="handleSilenceNode(n.nodeId)" 
                                         class="w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 text-text-m hover:bg-secondary-hover transition-colors group"
-                                        :class="fleetStore.isNodeSilenced(n.node_id) ? 'text-archive-text hover:bg-archive-bg' : ' hover:text-text-h'">
+                                        :class="fleetStore.isNodeSilenced(n.nodeId) ? 'text-archive-text hover:bg-archive-bg' : ' hover:text-text-h'">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path v-if="!fleetStore.isNodeSilenced(n.node_id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-                                        <path v-if="fleetStore.isNodeSilenced(n.node_id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
+                                        <path v-if="!fleetStore.isNodeSilenced(n.nodeId)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                                        <path v-if="fleetStore.isNodeSilenced(n.nodeId)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                     </svg>
-                                    {{ fleetStore.isNodeSilenced(n.node_id) ? 'Unsilence Node' : 'Silence Node' }}
+                                    {{ fleetStore.isNodeSilenced(n.nodeId) ? 'Unsilence Node' : 'Silence Node' }}
                                 </button>
                                 
-                                <button @click="handleForgetNode(n.node_id)" 
+                                <button @click="handleForgetNode(n.nodeId)" 
                                         class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />

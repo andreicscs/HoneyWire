@@ -30,22 +30,14 @@ func LoadConfig(path string) (*NodeConfig, error) {
 		return &cfg, nil
 	}
 
-	var legacy LegacyNodeConfig
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return nil, fmt.Errorf("config file is neither new nor legacy format: %w", err)
-	}
-
-	apiKey := legacy.APIKey
+	apiKey := cfg.APIKey
 	if apiKey == "" {
-		apiKey = legacy.NodeKey
-	}
-	if apiKey == "" {
-		return nil, fmt.Errorf("config file contains no api_key or node_key")
+		return nil, fmt.Errorf("config file contains no api_key")
 	}
 
 	cfg = NodeConfig{
-		HubURL: legacy.HubURL,
-		NodeID: legacy.NodeID,
+		HubURL: cfg.HubURL,
+		NodeID: cfg.NodeID,
 		APIKey: apiKey,
 	}
 

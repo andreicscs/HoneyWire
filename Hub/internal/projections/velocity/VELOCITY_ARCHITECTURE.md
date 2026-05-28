@@ -61,15 +61,15 @@ Defines the flat API contract returned to the frontend. Unlike Severity, Velocit
 ```go
 type ThreatVelocityProjection struct {
     Timeframe        string             `json:"timeframe"`
-    BucketSizeMs     int64              `json:"bucket_size_ms"`
-    GeneratedAt      int64              `json:"generated_at"`
+    BucketSizeMs     int64              `json:"bucketSizeMs"`
+    GeneratedAt      int64              `json:"generatedAt"`
 
-    BucketTimestamps []int64            `json:"bucket_timestamps"` // Raw epoch timestamps
+    BucketTimestamps []int64            `json:"bucketTimestamps"` // Raw epoch timestamps
     Labels           []string           `json:"labels"`            // X-axis labels (e.g., "Now", "-2m")
-    ExactTimes       []string           `json:"exact_times"`       // Tooltip timestamps
+    ExactTimes       []string           `json:"exactTimes"`       // Tooltip timestamps
 
     Series           map[string][]int   `json:"series"`            // Map of severity to bucketed counts
-    RecentEventCount int                `json:"recent_event_count"`
+    RecentEventCount int                `json:"recentEventCount"`
 }
 ```
 
@@ -216,8 +216,8 @@ Returns time-bucketed velocity analytics for the fleet.
 | Parameter | Description |
 |---|---|
 | `timeframe` | Timeframe filter (`1H`, `24H`, `7D`, `30D`) (default: `24H`) |
-| `node_id` | Filter by node ID (optional) |
-| `sensor_id` | Filter by sensor ID (optional) |
+| `nodeId` | Filter by node ID (optional) |
+| `sensorId` | Filter by sensor ID (optional) |
 | `archived` | Include archived events (`true` or `false`) (default: `false`) |
 
 ---
@@ -227,11 +227,11 @@ Returns time-bucketed velocity analytics for the fleet.
 ```json
 {
   "timeframe": "24H",
-  "bucket_size_ms": 3600000,
-  "generated_at": 1716552000000,
-  "bucket_timestamps": [1716465600000, 1716469200000],
+  "bucketSizeMs": 3600000,
+  "generatedAt": 1716552000000,
+  "bucketTimestamps": [1716465600000, 1716469200000],
   "labels": ["-23h", "-22h", "Now"],
-  "exact_times": ["May 23, 08:00 AM", "May 23, 09:00 AM"],
+  "exactTimes": ["May 23, 08:00 AM", "May 23, 09:00 AM"],
   "series": {
     "critical": [0, 1, 0],
     "high": [2, 0, 5],
@@ -239,6 +239,6 @@ Returns time-bucketed velocity analytics for the fleet.
     "low": [0, 0, 0],
     "info": [1, 3, 2]
   },
-  "recent_event_count": 14
+  "recentEventCount": 14
 }
 ```

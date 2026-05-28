@@ -49,7 +49,7 @@ const manifestMap = computed(() => {
   const map = new Map()
   for (const s of sensors.value) {
     map.set(s.id, s)
-    map.set(s.sensor_id, s)
+    map.set(s.sensorId, s)
     map.set(s.name, s)
   }
   return map
@@ -58,7 +58,7 @@ const manifestMap = computed(() => {
 const getManifestForSensor = (installedSensor) => {
   const manifest = manifestMap.value.get(installedSensor.id)
     || manifestMap.value.get(installedSensor.name)
-    || manifestMap.value.get(installedSensor.sensor_id)
+    || manifestMap.value.get(installedSensor.sensorId)
   return manifest
 }
 
@@ -280,7 +280,7 @@ const handleApplySensor = async () => {
       })
     } else {
       await fleetStore.addSensor(node.value.id, {
-        sensorId: selectedSensor.value.id || selectedSensor.value.sensor_id || selectedSensor.value.name,
+        sensorId: selectedSensor.value.id || selectedSensor.value.sensorId || selectedSensor.value.name,
         customName: selectedSensor.value.name || selectedSensor.value.id,
         configValues: safeEnvValues,
       })
@@ -345,9 +345,9 @@ const recentActivity = computed(() => {
     id: e.id,
     time: timeAgo(e.timestamp),
     severity: e.severity || 'info',
-    event_trigger: e.event_trigger || 'Alert',
+    eventTrigger: e.eventTrigger || 'Alert',
     source: e.source || 'Unknown',
-    sensor_id: e.sensor_id || ''
+    sensorId: e.sensorId || ''
   }))
 })
 
@@ -439,11 +439,11 @@ const fetchYamlFromHub = async () => {
 
   try {
     rawCompose.value = await fleetStore.generateCompose({
-      hub_endpoint: config.hubEndpoint || window.location.origin,
-      hub_key: apiKey || '<YOUR_HW_NODE_KEY>',
+      hubEndpoint: config.hubEndpoint || window.location.origin,
+      hubKey: apiKey || '<YOUR_HW_NODE_KEY>',
       sensors: [{
-        sensor_id: selectedSensor.value.id,
-        env_values: safeEnvValues,
+        sensorId: selectedSensor.value.id,
+        envValues: safeEnvValues,
         manifest: selectedSensor.value
       }]
     })
@@ -638,7 +638,7 @@ const applyHighlighting = () => {
                                     </td>
                                     
                                     <td class="px-3 py-2 border-b border-border-default">
-                                        <span class="text-sm text-text-h font-medium capitalize">{{ formatEventType(event.event_trigger) }}</span>
+                                        <span class="text-sm text-text-h font-medium capitalize">{{ formatEventType(event.eventTrigger) }}</span>
                                     </td>
 
                                     <td class="px-3 py-2 border-b border-border-default">
@@ -646,7 +646,7 @@ const applyHighlighting = () => {
                                     </td>
 
                                     <td class="px-3 py-2 border-b border-border-default">
-                                        <span class="text-sm text-text-m font-mono truncate block max-w-[80px]">{{ formatSensorId(event.sensor_id) }}</span>
+                                        <span class="text-sm text-text-m font-mono truncate block max-w-[80px]">{{ formatSensorId(event.sensorId) }}</span>
                                     </td>
                                     
                                     <td class="px-3 py-2 border-b border-border-default text-right">

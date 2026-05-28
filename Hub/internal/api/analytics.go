@@ -15,8 +15,8 @@ func (h *Handler) GetVelocityAnalytics(w http.ResponseWriter, r *http.Request) {
 		timeframe = "24H"
 	}
 
-	nodeID := r.URL.Query().Get("node_id")
-	sensorID := r.URL.Query().Get("sensor_id")
+	nodeID := r.URL.Query().Get("nodeId")
+	sensorID := r.URL.Query().Get("sensorId")
 	viewingArchiveStr := r.URL.Query().Get("archived")
 	viewingArchive := 0
 	if viewingArchiveStr == "true" || viewingArchiveStr == "1" {

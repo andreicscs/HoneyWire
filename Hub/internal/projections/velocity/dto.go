@@ -2,13 +2,13 @@ package velocity
 
 type ThreatVelocityProjection struct {
 	Timeframe        string           `json:"timeframe"`
-	BucketSizeMs     int64            `json:"bucket_size_ms"`
-	GeneratedAt      int64            `json:"generated_at"`
+	BucketSizeMs     int64            `json:"bucketSizeMs"`
+	GeneratedAt      int64            `json:"generatedAt"`
 
-	BucketTimestamps []int64          `json:"bucket_timestamps"` // Raw epoch timestamps
+	BucketTimestamps []int64          `json:"bucketTimestamps"` // Raw epoch timestamps
 	Labels           []string         `json:"labels"`
-	ExactTimes       []string         `json:"exact_times"`
+	ExactTimes       []string         `json:"exactTimes"`
 
 	Series           map[string][]int `json:"series"`
-	RecentEventCount int              `json:"recent_event_count"`
+	RecentEventCount int              `json:"recentEventCount"`
 }

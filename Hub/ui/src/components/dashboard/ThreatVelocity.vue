@@ -50,7 +50,7 @@ const initChart = () => {
                     mode: 'index', 
                     intersect: false, 
                     callbacks: {
-                        title: (context) => projection.value?.exact_times?.[context[0].dataIndex] || '',
+                        title: (context) => projection.value?.exactTimes?.[context[0].dataIndex] || '',
                         labelColor: (context) => {
                             return { borderColor: context.dataset.borderColor, backgroundColor: context.dataset.borderColor }
                         }
@@ -129,9 +129,9 @@ const fetchContextualProjection = () => {
 const scheduleNextRollover = () => {
     // Clear any existing timeout so they don't pile up
     if (rolloverTimeout) clearTimeout(rolloverTimeout)
-    if (!projection.value?.bucket_size_ms) return
+    if (!projection.value?.bucketSizeMs) return
 
-    const bucketMs = projection.value.bucket_size_ms
+    const bucketMs = projection.value.bucketSizeMs
     const now = Date.now()
     
     // Find the exact millisecond of the next bucket boundary
@@ -190,7 +190,7 @@ watch(
 
 // TRIGGER 3: Snapshot Arrives (Refetch completed)
 watch(
-    () => projection.value?.generated_at,
+    () => projection.value?.generatedAt,
     (newVal) => {
         if (newVal) {
             updateData();
@@ -221,8 +221,8 @@ const legendItems = [
                 <div>
                     <h3 class="text-base font-medium text-text-h">Events Velocity</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
-                        <span class="text-sm transition-colors" :class="(projection?.recent_event_count || 0) > 0 ? 'text-critical' : 'text-success-main'">
-                            {{ projection?.recent_event_count || 0 }}
+                        <span class="text-sm transition-colors" :class="(projection?.recentEventCount || 0) > 0 ? 'text-critical' : 'text-success-main'">
+                            {{ projection?.recentEventCount || 0 }}
                         </span>
                         <span class="text-sm text-text-m">Events Recorded</span>
                     </div>
@@ -233,7 +233,7 @@ const legendItems = [
         </template>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full">
-            <div v-if="(!projection || projection.recent_event_count === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
+            <div v-if="(!projection || projection.recentEventCount === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>
             <canvas ref="chartCanvas" class="w-full h-full relative z-0"></canvas>

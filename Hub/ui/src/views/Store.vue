@@ -151,12 +151,12 @@ const fetchYamlFromHub = async () => {
     );
 
     const payload = {
-        node_id: "${HW_NODE_ID}",
-        hub_endpoint: config.hubEndpoint || window.location.origin,
-        hub_key: config.hubKey || '<YOUR_HW_HUB_KEY>',
+        nodeId: "${HW_NODE_ID}",
+        hubEndpoint: config.hubEndpoint || window.location.origin,
+        hubKey: config.hubKey || '<YOUR_HW_HUB_KEY>',
         sensors: [{
-            sensor_id: selectedSensor.value.id,
-            env_values: safeEnvValues,
+            sensorId: selectedSensor.value.id,
+            envValues: safeEnvValues,
             manifest: selectedSensor.value
         }]
     };

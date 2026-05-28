@@ -22,7 +22,7 @@ const expandedRows = ref(new Set())
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
 
-// Resolve node_id → alias for display
+// Resolve nodeId → alias for display
 const getNodeAlias = (nodeId) => {
     if (!nodeId) return 'Unassigned'
     const node = fleet.value.find(n => n.id === nodeId)
@@ -46,7 +46,7 @@ const toggleRow = async (id) => {
     if (isExpanding) {
         newSet.add(id)
         const eventTarget = events.value.find(e => e.id === id)
-        if (eventTarget && !eventTarget.is_read) eventsStore.markEventRead(id)
+        if (eventTarget && !eventTarget.isRead) eventsStore.markEventRead(id)
     } else {
         newSet.delete(id)
     }
@@ -73,10 +73,10 @@ const sortedEvents = computed(() => {
             valA = scores[valA.toLowerCase()] || 0
             valB = scores[valB.toLowerCase()] || 0
         }
-        if (sortCol.value === 'node_id') {
-            // Sort by alias for display consistency, fallback to node_id
-            valA = getNodeAlias(a.node_id)
-            valB = getNodeAlias(b.node_id)
+        if (sortCol.value === 'nodeId') {
+            // Sort by alias for display consistency, fallback to nodeId
+            valA = getNodeAlias(a.nodeId)
+            valB = getNodeAlias(b.nodeId)
         }
         if (valA < valB) return sortDesc.value ? 1 : -1
         if (valA > valB) return sortDesc.value ? -1 : 1
@@ -174,9 +174,9 @@ const formatTime = (timestamp) => {
                                 <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'severity' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('severity') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
-                        <th @click="toggleSort('event_trigger')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by event trigger type">
+                        <th @click="toggleSort('eventTrigger')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by event trigger type">
                             <div class="flex items-center gap-1.5">Event Trigger
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'event_trigger' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('event_trigger') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
+                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'eventTrigger' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('eventTrigger') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
                         <th @click="toggleSort('source')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by source">
@@ -190,15 +190,15 @@ const formatTime = (timestamp) => {
                             </div>
                         </th>
                         
-                        <th @click="toggleSort('sensor_id')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by sensor id">
+                        <th @click="toggleSort('sensorId')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by sensor id">
                             <div class="flex items-center gap-1.5">Sensor
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'sensor_id' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('sensor_id') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
+                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'sensorId' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('sensorId') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
 
-                        <th @click="toggleSort('node_id')" class="px-4 py-3 text-right cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by node">
+                        <th @click="toggleSort('nodeId')" class="px-4 py-3 text-right cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by node">
                             <div class="flex items-center justify-end gap-1.5">Node
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'node_id' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('node_id') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
+                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'nodeId' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('nodeId') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
                             </div>
                         </th>
 
@@ -228,21 +228,21 @@ const formatTime = (timestamp) => {
                             </td>
 
                             <td class="px-3 py-3 flex items-center gap-3" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'">
-                                <div v-show="!event.is_read" class="w-1.5 h-1.5 rounded-full bg-danger-main shrink-0 animate-pulse"></div>
+                                <div v-show="!event.isRead" class="w-1.5 h-1.5 rounded-full bg-danger-main shrink-0 animate-pulse"></div>
                                 <span class="px-2 py-0.5 rounded border text-base bg-bg-surface whitespace-nowrap capitalize" 
                                       :style="{ borderColor: `var(--color-${event.severity.toLowerCase()})`, color: `var(--color-${event.severity.toLowerCase()})` }">
                                     {{ event.severity }}
                                 </span>
                             </td>
                             
-                            <td class="px-4 py-3 text-base font-base text-text-h capitalize max-w-[140px] md:max-w-[200px] lg:max-w-md xl:max-w-2xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="formatEventType(event.event_trigger)">{{ formatEventType(event.event_trigger) }}</td>
+                            <td class="px-4 py-3 text-base font-base text-text-h capitalize max-w-[140px] md:max-w-[200px] lg:max-w-md xl:max-w-2xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="formatEventType(event.eventTrigger)">{{ formatEventType(event.eventTrigger) }}</td>
                             
                             <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.source">{{ event.source }}</td>
                             <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.target">{{ event.target }}</td>
                             
-                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.sensor_id">{{ formatSensorId(event.sensor_id) }}</td>
+                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.sensorId">{{ formatSensorId(event.sensorId) }}</td>
                             
-                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono w-[160px] min-w-[160px] max-w-[160px] truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.node_id || 'Unassigned'">{{ getNodeAlias(event.node_id) }}</td>
+                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono w-[160px] min-w-[160px] max-w-[160px] truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.nodeId || 'Unassigned'">{{ getNodeAlias(event.nodeId) }}</td>
                             
                             <td class="px-5 py-3 text-base text-right text-text-m font-mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             

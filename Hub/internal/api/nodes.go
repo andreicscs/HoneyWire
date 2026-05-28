@@ -41,10 +41,10 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.broadcastWS("NEW_NODE", map[string]string{"node_id": nodeID})
+	h.broadcastWS("NEW_NODE", map[string]string{"nodeId": nodeID})
 
 	SendJSON(w, http.StatusCreated, map[string]interface{}{
-		"node_id": nodeID,
+		"nodeId": nodeID,
 		"apiKey":  apiKey,
 		"alias":   req.Alias,
 	})
@@ -54,7 +54,7 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 // UpdateNode handles UI requests to edit a Node's metadata
 // Route: PATCH /api/v1/nodes/{id}
 func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
+	nodeID := chi.URLParam(r, "nodeId")
 
 	var req struct {
 		Alias     string   `json:"alias"`
@@ -84,7 +84,7 @@ func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Optional: Broadcast WS to UI to instantly update the Fleet grid
-	h.broadcastWS("UPDATE_NODE", map[string]string{"node_id": nodeID})
+	h.broadcastWS("UPDATE_NODE", map[string]string{"nodeId": nodeID})
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
@@ -103,7 +103,7 @@ func (h *Handler) GetNodes(w http.ResponseWriter, r *http.Request) {
 
 // GetNodeDetails handles GET /api/v1/nodes/{id}
 func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
+	nodeID := chi.URLParam(r, "nodeId")
 
 	node, err := h.Store.GetNodeDetails(nodeID)
 	if err != nil {
@@ -112,7 +112,7 @@ func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
-		"id":               node.ID,
+		"nodeId":           node.ID,
 		"alias":            node.Alias,
 		"apiKey":           node.APIKey,
 		"activeRevision":   node.ActiveRevision,
@@ -129,12 +129,12 @@ func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 
 // AddNodeSensor handles POST /api/v1/nodes/{id}/sensors
 func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
+	nodeID := chi.URLParam(r, "nodeId")
 
 	var req struct {
-		SensorID     string                 `json:"sensor_id"`
-		CustomName   string                 `json:"custom_name"`
-		ConfigValues map[string]interface{} `json:"config_values"`
+		SensorID     string                 `json:"sensorId"`
+		CustomName   string                 `json:"customName"`
+		ConfigValues map[string]interface{} `json:"configValues"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -143,7 +143,7 @@ func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.SensorID == "" || req.CustomName == "" {
-		RespondError(w, "sensor_id and custom_name are required", http.StatusBadRequest)
+		RespondError(w, "sensorId and customName are required", http.StatusBadRequest)
 		return
 	}
 
@@ -158,14 +158,14 @@ func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Sensor added, node pending sync"})
 }
 
-// EditNodeSensor handles PUT /api/v1/nodes/{id}/sensors/{sensor_id}
+// EditNodeSensor handles PUT /api/v1/nodes/{id}/sensors/{sensorId}
 func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
-	sensorID := chi.URLParam(r, "sensor_id")
+	nodeID := chi.URLParam(r, "nodeId")
+	sensorID := chi.URLParam(r, "sensorId")
 
 	var req struct {
-		CustomName   string                 `json:"custom_name"`
-		ConfigValues map[string]interface{} `json:"config_values"`
+		CustomName   string                 `json:"customName"`
+		ConfigValues map[string]interface{} `json:"configValues"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -183,10 +183,10 @@ func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// DeleteNodeSensor handles DELETE /api/v1/nodes/{id}/sensors/{sensor_id}
+// DeleteNodeSensor handles DELETE /api/v1/nodes/{id}/sensors/{sensorId}
 func (h *Handler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
-	sensorID := chi.URLParam(r, "sensor_id")
+	nodeID := chi.URLParam(r, "nodeId")
+	sensorID := chi.URLParam(r, "sensorId")
 
 	if err := h.Store.RemoveNodeSensor(nodeID, sensorID); err != nil {
 		RespondError(w, "Failed to remove sensor", http.StatusInternalServerError)
@@ -205,7 +205,7 @@ func (h *Handler) evaluateNodeSyncState(nodeID string) {
 		if newHash == nodeDetails.ActiveRevision {
 			h.Store.ClearNodePendingConfig(nodeID)
 			h.broadcastWS("NODE_SYNCED", map[string]string{
-				"node_id": nodeID,
+				"nodeId": nodeID,
 			})
 		}
 	}
@@ -229,7 +229,7 @@ func generateRevisionHash(sensors []models.NodeSensor) string {
 
 // DeleteNode handles DELETE /api/v1/nodes/{id}
 func (h *Handler) DeleteNode(w http.ResponseWriter, r *http.Request) {
-	nodeID := chi.URLParam(r, "id")
+	nodeID := chi.URLParam(r, "nodeId")
 
 	if err := h.Store.DeleteNode(nodeID); err != nil {
 		RespondError(w, "Failed to delete node", http.StatusInternalServerError)
@@ -237,7 +237,7 @@ func (h *Handler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Broadcast WS to UI to instantly remove the row from the Fleet grid
-	h.broadcastWS("DELETE_NODE", map[string]string{"node_id": nodeID})
+	h.broadcastWS("DELETE_NODE", map[string]string{"nodeId": nodeID})
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
@@ -264,7 +264,7 @@ func (h *Handler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
-		"id":               node.ID,
+		"nodeId":           node.ID,
 		"alias":            node.Alias,
 		"activeRevision":   node.ActiveRevision,
 		"desiredRevision":  node.DesiredRevision,

@@ -23,7 +23,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if e.SensorID == "" {
-		RespondError(w, "sensor_id is required", http.StatusBadRequest)
+		RespondError(w, "sensorId is required", http.StatusBadRequest)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	detailsJSON, _ := json.Marshal(e.Details)
 	e.NodeID = nodeID
 
-	// Insert event with composite key reference (node_id, sensor_id)
+	// Insert event with composite key reference (nodeId, sensorId)
 	lastInsertID, err := h.Store.InsertEvent(&e, nowStr, string(detailsJSON))
 	if err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY") {
@@ -62,7 +62,7 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	e.ID = lastInsertID
 	e.Timestamp = nowStr
 
-	// update node and sensor last_heartbeat (an event proves it is alive)
+	// update node and sensor lastHeartbeat (an event proves it is alive)
 	h.Store.UpdateNodeLastHeartbeat(nodeID, e.SensorID, nowStr)
 
 	// Check if sensor is silenced
@@ -95,8 +95,8 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 		isArchived = 1
 	}
 
-	nodeID := r.URL.Query().Get("node_id")
-	sensorID := r.URL.Query().Get("sensor_id")
+	nodeID := r.URL.Query().Get("nodeId")
+	sensorID := r.URL.Query().Get("sensorId")
 
 	events, err := h.Store.GetEvents(isArchived, nodeID, sensorID)
 	if err != nil {
@@ -116,7 +116,7 @@ func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) MarkSingleEventRead(w http.ResponseWriter, r *http.Request) {
-	eventID := chi.URLParam(r, "event_id")
+	eventID := chi.URLParam(r, "eventId")
 	if err := h.Store.MarkEventRead(eventID); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
@@ -133,7 +133,7 @@ func (h *Handler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ArchiveEvent(w http.ResponseWriter, r *http.Request) {
-	eventID := chi.URLParam(r, "event_id")
+	eventID := chi.URLParam(r, "eventId")
 	if err := h.Store.ArchiveEvent(eventID); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return

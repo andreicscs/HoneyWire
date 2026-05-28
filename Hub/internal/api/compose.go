@@ -19,14 +19,14 @@ import (
 // --- INCOMING REQUEST PAYLOADS ---
 
 type DeployableSensor struct {
-	SensorID  string                `json:"sensor_id"`
-	EnvValues map[string]string     `json:"env_values"`
+	SensorID  string                `json:"sensorId"`
+	EnvValues map[string]string     `json:"envValues"`
 	Manifest  models.SensorManifest `json:"manifest"`
 }
 
 type ComposeReq struct {
-	HubEndpoint string             `json:"hub_endpoint"`
-	HubKey      string             `json:"hub_key"`
+	HubEndpoint string             `json:"hubEndpoint"`
+	HubKey      string             `json:"hubKey"`
 	Sensors     []DeployableSensor `json:"sensors"`
 }
 

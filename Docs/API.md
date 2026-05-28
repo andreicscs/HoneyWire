@@ -68,8 +68,8 @@ If `HW_DASHBOARD_PASSWORD` is set, setup is blocked.
 ```json
 {
   "password": "super_secure_password123",
-  "hub_endpoint": "https://honeywire.my-domain.com",
-  "hub_key": "hw_sk_randomstring"
+  "hubEndpoint": "https://honeywire.my-domain.com",
+  "hubKey": "hw_sk_randomstring"
 }
 ```
 
@@ -111,12 +111,12 @@ Generates a `docker-compose.yml` preview from the selected sensor manifests and 
 **Request:**
 ```json
 {
-  "hub_endpoint": "https://hub.honeywire.local",
-  "hub_key": "hub_key_abc",
+  "hubEndpoint": "https://honeywire.my-domain.com",
+  "hubKey": "hub_key_abc",
   "sensors": [
     {
-      "sensor_id": "alpha-node-01",
-      "env_values": {
+      "sensorId": "alpha-node-01",
+      "envValues": {
         "HW_SEVERITY": "medium"
       },
       "manifest": { ... }
@@ -153,11 +153,11 @@ Creates a new node entry and returns the generated node credentials.
 
 Returns all registered nodes and their installed sensors. Each node includes current status, heartbeat metadata, and pending config state.
 
-#### GET /api/v1/nodes/{id}
+#### GET /api/v1/nodes/{nodeId}
 
 Returns details for a single node, including installed sensors and per-sensor event counts.
 
-#### PATCH /api/v1/nodes/{id}
+#### PATCH /api/v1/nodes/{nodeId}
 
 Updates a node's alias, tags, public IP, or private IP.
 
@@ -171,48 +171,48 @@ Updates a node's alias, tags, public IP, or private IP.
 }
 ```
 
-#### DELETE /api/v1/nodes/{id}
+#### DELETE /api/v1/nodes/{nodeId}
 
 Deletes a node and cascades to remove its sensors, event history, and heartbeat records.
 
-#### POST /api/v1/nodes/{id}/sensors
+#### POST /api/v1/nodes/{nodeId}/sensors
 
 Adds a sensor to a node and flags the node as pending configuration sync.
 
 **Request:**
 ```json
 {
-  "sensor_id": "hw-tcp-tarpit",
-  "custom_name": "TCP Tarpit",
-  "config_values": {
+  "sensorId": "hw-tcp-tarpit",
+  "customName": "TCP Tarpit",
+  "configValues": {
     "HW_SEVERITY": "high"
   }
 }
 ```
 
-#### PUT /api/v1/nodes/{id}/sensors/{sensor_id}
+#### PUT /api/v1/nodes/{nodeId}/sensors/{sensorId}
 
 Updates a sensor's custom name and config values and marks the parent node pending sync.
 
-#### DELETE /api/v1/nodes/{id}/sensors/{sensor_id}
+#### DELETE /api/v1/nodes/{nodeId}/sensors/{sensorId}
 
 Removes a sensor from the node and marks the node pending sync.
 
-#### PATCH /api/v1/nodes/{id}/sensors/{sensor_id}/silence
+#### PATCH /api/v1/nodes/{nodeId}/sensors/{sensorId}/silence
 
 Toggles a sensor's silence state. Silenced sensors still log events but suppress push notifications.
 
 **Request:**
 ```json
-{ "is_silenced": true }
+{ "isSilenced": true }
 ```
 
 **Response:**
 ```json
 {
   "status": "success",
-  "sensor_id": "hw-tcp-tarpit",
-  "is_silenced": true
+  "sensorId": "hw-tcp-tarpit",
+  "isSilenced": true
 }
 ```
 
@@ -319,18 +319,18 @@ Returns a list of events, newest first.
 
 **Query parameters:**
 - `archived` — `true` or `false` (default: `false`)
-- `node_id` — filter by node ID
-- `sensor_id` — filter by sensor ID
+- `nodeId` — filter by node ID
+- `sensorId` — filter by sensor ID
 
 ### PATCH /api/v1/events/read
 
 Marks all active events as read.
 
-### PATCH /api/v1/events/{event_id}/read
+### PATCH /api/v1/events/{eventId}/read
 
 Marks a single event as read.
 
-### PATCH /api/v1/events/{event_id}/archive
+### PATCH /api/v1/events/{eventId}/archive
 
 Archives a single event and marks it as read.
 
@@ -369,25 +369,38 @@ Returns severity distribution analytics for the fleet.
 - `sensor` — filter by sensor ID (optional)
 - `viewingArchive` — `true`, `1`, `false`, or `0` (default: `false`)
 
+**Example Response:**
+```json
+{
+  "timeframe": "24H",
+  "total": 80,
+  "critical": 5,
+  "high": 12,
+  "medium": 25,
+  "low": 8,
+  "info": 30
+}
+```
+
 ### GET /api/v1/events/velocity
 
 Returns time-bucketed velocity analytics for the fleet.
 
 **Query parameters:**
 - `timeframe` — timeframe filter (`1H`, `24H`, `7D`, `30D`) (default: `24H`)
-- `node_id` — filter by node ID (optional)
-- `sensor_id` — filter by sensor ID (optional)
+- `nodeId` — filter by node ID (optional)
+- `sensorId` — filter by sensor ID (optional)
 - `archived` — include archived events (`true` or `false`) (default: `false`)
 
 **Example Response:**
 ```json
 {
-  "timeframe": "24H",
-  "bucket_size_ms": 3600000,
-  "generated_at": 1716552000000,
-  "bucket_timestamps": [1716465600000, 1716469200000],
+  "timeframe": "24H", 
+  "bucketSizeMs": 3600000,
+  "generatedAt": 1716552000000,
+  "bucketTimestamps": [1716465600000, 1716469200000],
   "labels": ["-23h", "-22h", "Now"],
-  "exact_times": ["May 23, 08:00 AM", "May 23, 09:00 AM"],
+  "exactTimes": ["May 23, 08:00 AM", "May 23, 09:00 AM"],
   "series": {
     "critical": [0, 1, 0],
     "high": [2, 0, 5],
@@ -395,7 +408,7 @@ Returns time-bucketed velocity analytics for the fleet.
     "low": [0, 0, 0],
     "info": [1, 3, 2]
   },
-  "recent_event_count": 14
+  "recentEventCount": 14
 }
 ```
 
@@ -407,6 +420,66 @@ Returns uptime blocks for fleet health charts.
 
 **Query parameters:**
 - `timeframe` — `1H`, `24H`, `7D`, `30D` (default: `24H`)
+
+**Example Response:**
+```json
+{
+  "timeframe": "24H", 
+  "generatedAt": "2024-05-24T10:00:00Z",
+  "summary": {
+    "overallUptime": 98.5
+  },
+  "groups": [
+    {
+      "nodeId": "node-alpha",
+      "nodeAlias": "Production Web Server",
+      "worstStatus": "degraded",
+      "sensors": [
+        {
+          "sensorId": "hw-tcp-tarpit",
+          "displayName": "TCP Tarpit",
+          "status": "up",
+          "isSilenced": false,
+          "blocks": [
+            { "status": "up", "label": "Online", "timeLabel": "-23h" },
+            { "status": "up", "label": "Online", "timeLabel": "-22h" },
+            { "status": "up", "label": "Online", "timeLabel": "Current" }
+          ]
+        },
+        {
+          "sensorId": "hw-file-canary",
+          "displayName": "File Integrity Monitor",
+          "status": "degraded",
+          "isSilenced": false,
+          "blocks": [
+            { "status": "up", "label": "Online", "timeLabel": "-23h" },
+            { "status": "degraded", "label": "Degraded (50/60 pings)", "timeLabel": "-22h" },
+            { "status": "up", "label": "Online", "timeLabel": "Current" }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeId": "node-beta",
+      "nodeAlias": "Dev Database",
+      "worstStatus": "down",
+      "sensors": [
+        {
+          "sensorId": "hw-network-scan",
+          "displayName": "Network Scan Detector",
+          "status": "down",
+          "isSilenced": true,
+          "blocks": [
+            { "status": "down", "label": "Offline", "timeLabel": "-23h" },
+            { "status": "down", "label": "Offline", "timeLabel": "-22h" },
+            { "status": "down", "label": "Offline", "timeLabel": "Current" }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## Node Compose
 
@@ -429,7 +502,7 @@ Reports a sensor heartbeat and updates runtime metadata.
 **Request:**
 ```json
 {
-  "sensor_id": "alpha-node-01",
+  "sensorId": "alpha-node-01",
   "metadata": {
     "agent_version": "1.0.0",
     "contract_version": "1.0",
@@ -451,9 +524,9 @@ Reports an intrusion event to the Hub.
 **Request:**
 ```json
 {
-  "contract_version": "1.0",
-  "sensor_id": "core-dpi-engine",
-  "event_trigger": "malformed_jwt_detected",
+  "contractVersion": "1.0",
+  "sensorId": "core-dpi-engine",
+  "eventTrigger": "malformed_jwt_detected",
   "severity": "critical",
   "source": "104.28.19.12",
   "target": "Auth Gateway",

@@ -243,13 +243,8 @@ type createNodeRequest struct {
 	Tags  []string `json:"tags,omitempty"`
 }
 
-type createNodeResponse struct {
-	APIKey string `json:"api_key"`
-	Alias  string `json:"alias"`
-}
-
 type NodeInfo struct {
-	NodeID           string       `json:"id"`
+	NodeID           string       `json:"nodeId"`
 	Alias            string       `json:"alias"`
 	Tags             []string     `json:"tags"`
 	Status           string       `json:"status"`
@@ -260,15 +255,15 @@ type NodeInfo struct {
 }
 
 type SensorInfo struct {
-	SensorID   string `json:"id"`
+	SensorID   string `json:"sensorId"`
 	CustomName string `json:"display"`
 	IsSilenced bool   `json:"isSilenced"`
 }
 
 type addSensorRequest struct {
-	SensorID     string            `json:"sensor_id"`
-	CustomName   string            `json:"custom_name"`
-	ConfigValues map[string]string `json:"config_values"`
+	SensorID     string            `json:"sensorId"`
+	CustomName   string            `json:"customName"`
+	ConfigValues map[string]string `json:"configValues"`
 }
 
 func FetchManifests(source string) ([]*schema.SensorManifest, error) {

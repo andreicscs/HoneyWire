@@ -41,8 +41,8 @@ Creates a new logical infrastructure node inside the HoneyWire fleet.
 
 ```json
 {
-  "node_id": "node-e0d6d6ca",
-  "api_key": "hw_key_xxxxxxxxx",
+  "nodeId": "node-e0d6d6ca",
+  "apiKey": "hw_key_xxxxxxxxx",
   "alias": "smb-gateway"
 }
 ```
@@ -77,9 +77,9 @@ Assigns a sensor configuration to a node.
 
 ```json
 {
-  "sensor_id": "hw-sensor-tcp-tarpit",
-  "custom_name": "Credential Trap",
-  "config_values": {
+  "sensorId": "hw-sensor-tcp-tarpit",
+  "customName": "Credential Trap",
+  "configValues": {
     "HW_DECOY_PORTS": "2222,3306",
     "HW_TARPIT_MODE": "hold"
   }

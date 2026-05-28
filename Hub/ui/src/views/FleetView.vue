@@ -22,7 +22,7 @@ const manifestMap = computed(() => {
     const map = new Map()
     for (const s of manifestData.value) {
         map.set(s.id, s)
-        map.set(s.sensor_id, s)
+        map.set(s.sensorId, s)
         map.set(s.name, s)
     }
     return map
@@ -31,7 +31,7 @@ const manifestMap = computed(() => {
 const getOsiForSensor = (installedSensor) => {
     const manifest = manifestMap.value.get(installedSensor.id)
         || manifestMap.value.get(installedSensor.name)
-        || manifestMap.value.get(installedSensor.sensor_id)
+        || manifestMap.value.get(installedSensor.sensorId)
     return manifest?.osi_layer || installedSensor.osi || 'Other'
 }
 

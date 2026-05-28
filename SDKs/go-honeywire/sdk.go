@@ -125,7 +125,7 @@ func (s *Sensor) heartbeatLoop() {
 
 func (s *Sensor) sendHeartbeat() {
 	payload := map[string]any{
-		"sensor_id": s.SensorID,
+		"sensorId": s.SensorID,
 		"metadata": map[string]string{
 			"agent_version":    s.AgentVersion,
 			"contract_version": s.hubContractVersion,
@@ -148,10 +148,10 @@ func (s *Sensor) sendHeartbeat() {
 func (s *Sensor) ReportEvent(severity, trigger, source, target string, details map[string]any) bool {
 	_ = severity // Ignore hardcoded severity, use configured HW_SEVERITY
 	payload := map[string]any{
-		"contract_version": s.hubContractVersion,
-		"sensor_id":        s.SensorID,
+		"contractVersion": 	s.hubContractVersion,
+		"sensorId":        	s.SensorID,
 		"severity":         s.Severity,
-		"event_trigger":    trigger,
+		"eventTrigger":   	trigger,
 		"source":           source,
 		"target":           target,
 		"details":          details,
@@ -180,7 +180,7 @@ func (s *Sensor) GoOffline(reason string) {
 	fastClient := &http.Client{Timeout: 2 * time.Second}
 
 	payload := map[string]any{
-		"sensor_id": s.SensorID,
+		"sensorId": s.SensorID,
 		"reason":    reason,
 	}
 

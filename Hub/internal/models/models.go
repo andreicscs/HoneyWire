@@ -20,32 +20,31 @@ type ConfigPayload struct {
 	SiemProtocol    string   `json:"siem_protocol"`
 }
 
-// Event represents an incoming alert from a sensor
 type Event struct {
-	ID              int                    `json:"id,omitempty"`
-	NodeID          string                 `json:"node_id,omitempty"`
-	SensorID        string                 `json:"sensor_id"` // Catalog ID (e.g. hw-tcp-tarpit)`
-	Timestamp       string                 `json:"timestamp"`
-	ContractVersion string                 `json:"contract_version"`
-	EventTrigger    string                 `json:"event_trigger"`
-	Severity        string                 `json:"severity"`
-	Source          string                 `json:"source"`
-	Target          string                 `json:"target"`
-	Details         map[string]interface{} `json:"details"`
-	IsRead          bool                   `json:"is_read"`
-	IsArchived      bool                   `json:"is_archived"`
-	Count           int                    `json:"count"`
+    ID              int                    `json:"id,omitempty"`
+    NodeID          string                 `json:"nodeId,omitempty"`
+    SensorID        string                 `json:"sensorId"`       
+    Timestamp       string                 `json:"timestamp"`
+    ContractVersion string                 `json:"contractVersion"`
+    EventTrigger    string                 `json:"eventTrigger"`   
+    Severity        string                 `json:"severity"`
+    Source          string                 `json:"source"`
+    Target          string                 `json:"target"`
+    Details         map[string]interface{} `json:"details"`
+    IsRead          bool                   `json:"isRead"`         
+    IsArchived      bool                   `json:"isArchived"`     
+    Count           int                    `json:"count"`
 }
 
 // Heartbeat represents a routine ping from a sensor
 type Heartbeat struct {
-	SensorID string                 `json:"sensor_id"`
+	SensorID string                 `json:"sensorId"`
 	Metadata map[string]interface{} `json:"metadata"` // Contains HW_CONFIG_REV
 }
 
 // Node represents a physical server managing sensors
 type Node struct {
-	ID               string       `json:"id"`
+	ID               string       `json:"nodeId"`
 	Alias            string       `json:"alias"`
 	APIKey           string       `json:"apiKey"`
 	ActiveRevision   string       `json:"activeRevision,omitempty"`
@@ -61,8 +60,8 @@ type Node struct {
 
 // NodeSensor represents a deployed sensor on a node
 type NodeSensor struct {
-	ID            string                 `json:"id"`
-	NodeID        string                 `json:"node_id"`
+	ID            string                 `json:"sensorId"`
+	NodeID        string                 `json:"nodeId"`
 	Name          string                 `json:"name"`
 	Display       string                 `json:"display"`
 	Status        string                 `json:"status"`
@@ -77,6 +76,9 @@ type NodeSensor struct {
 type SystemState struct {
 	IsArmed bool `json:"is_armed"`
 }
+
+
+// *** manifests ***
 
 type SensorManifest struct {
 	ID                 string        `json:"id"`
