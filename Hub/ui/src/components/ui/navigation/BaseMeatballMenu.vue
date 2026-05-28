@@ -38,7 +38,27 @@ const toggle = () => {
         activeMenuId.value = null
     } else {
         const rect = triggerRef.value.getBoundingClientRect()
-        menuPos.value = { top: rect.bottom + 6 + 'px', left: rect.left + 'px' }
+        const dropdownWidth = 144 // Tailwind's w-36 is 9rem = 144px
+        const windowWidth = window.innerWidth
+
+        // Check if expanding to the right would go off-screen
+        const fitsRight = rect.left + dropdownWidth <= windowWidth
+
+        let calculatedLeft = rect.left
+        if (!fitsRight) {
+            // Align the right edge of the dropdown with the right edge of the trigger
+            calculatedLeft = rect.right - dropdownWidth
+            
+            // Safety check: if it's too wide for the screen altogether, pin it to the left edge (0px)
+            if (calculatedLeft < 0) {
+                calculatedLeft = 0
+            }
+        }
+
+        menuPos.value = { 
+            top: rect.bottom + 6 + 'px', 
+            left: calculatedLeft + 'px' 
+        }
         activeMenuId.value = props.id
     }
 }
