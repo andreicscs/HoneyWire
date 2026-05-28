@@ -226,7 +226,6 @@ Returns runtime configuration loaded from SQLite.
 ```json
 {
   "hub_endpoint": "https://honeywire.my-domain.com",
-  "hub_key": "hw_sk_randomstring",
   "auto_archive_days": 90,
   "auto_purge_days": 180,
   "webhook_url": "",
@@ -243,7 +242,6 @@ Updates runtime settings. Only supported fields are applied. This endpoint also 
 
 **Supported fields:**
 - `hub_endpoint`
-- `hub_key`
 - `auto_archive_days`
 - `auto_purge_days`
 - `webhook_url`
