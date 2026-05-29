@@ -5,20 +5,23 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/store"
 )
 
+type SessionValidator interface {
+	IsValid(string) bool
+}
+
 // UIAuthMiddleware strictly requires a valid session cookie for ALL dashboard routes
-func UIAuthMiddleware(sessionStore *auth.SessionStore) func(http.Handler) http.Handler {
+func UIAuthMiddleware(sessionValidator SessionValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(auth.CookieName)
-			if err != nil || !sessionStore.IsValid(cookie.Value) {
+			cookie, err := r.Cookie(AuthCookieName)
+			if err != nil || !sessionValidator.IsValid(cookie.Value) {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}

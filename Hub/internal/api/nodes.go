@@ -6,11 +6,21 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/honeywire/hub/internal/services/node"
 )
 
 // CreateNode handles UI-first node creation
 // Route: POST /api/v1/nodes
-func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
+type NodeHandler struct {
+	service *node.Service
+	Auth    *AuthHandler
+}
+
+func NewNodeHandler(svc *node.Service, auth *AuthHandler) *NodeHandler {
+	return &NodeHandler{service: svc, Auth: auth}
+}
+
+func (h *NodeHandler) CreateNode(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Alias string   `json:"alias"`
 		Tags  []string `json:"tags"`
@@ -26,7 +36,7 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID, apiKey, err := h.NodeService.CreateNode(req.Alias, req.Tags)
+	nodeID, apiKey, err := h.service.CreateNode(req.Alias, req.Tags)
 	if err != nil {
 		RespondError(w, "Failed to create node in database", http.StatusInternalServerError)
 		return
@@ -41,7 +51,7 @@ func (h *Handler) CreateNode(w http.ResponseWriter, r *http.Request) {
 
 // UpdateNode handles UI requests to edit a Node's metadata
 // Route: PATCH /api/v1/nodes/{id}
-func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
 	var req struct {
@@ -61,7 +71,7 @@ func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.NodeService.UpdateNode(nodeID, req.Alias, req.Tags, req.PublicIP, req.PrivateIP); err != nil {
+	if err := h.service.UpdateNode(nodeID, req.Alias, req.Tags, req.PublicIP, req.PrivateIP); err != nil {
 		RespondError(w, "Failed to update node", http.StatusInternalServerError)
 		return
 	}
@@ -70,8 +80,8 @@ func (h *Handler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetNodes handles GET /api/v1/nodes
-func (h *Handler) GetNodes(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.NodeService.GetNodes()
+func (h *NodeHandler) GetNodes(w http.ResponseWriter, r *http.Request) {
+	nodes, err := h.service.GetNodes()
 	if err != nil {
 		log.Printf("[ERROR] GetNodes failed: %v\n", err)
 		RespondError(w, "Failed to fetch fleet nodes", http.StatusInternalServerError)
@@ -82,10 +92,10 @@ func (h *Handler) GetNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetNodeDetails handles GET /api/v1/nodes/{id}
-func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
-	node, err := h.NodeService.GetNodeDetails(nodeID)
+	node, err := h.service.GetNodeDetails(nodeID)
 	if err != nil {
 		RespondError(w, "Node not found", http.StatusNotFound)
 		return
@@ -108,7 +118,7 @@ func (h *Handler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 }
 
 // AddNodeSensor handles POST /api/v1/nodes/{id}/sensors
-func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
 	var req struct {
@@ -127,7 +137,7 @@ func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.NodeService.AddSensor(nodeID, req.SensorID, req.CustomName, req.ConfigValues); err != nil {
+	if err := h.service.AddSensor(nodeID, req.SensorID, req.CustomName, req.ConfigValues); err != nil {
 		RespondError(w, "Failed to add sensor. It may already be installed on this node.", http.StatusInternalServerError)
 		return
 	}
@@ -136,7 +146,7 @@ func (h *Handler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 }
 
 // EditNodeSensor handles PUT /api/v1/nodes/{id}/sensors/{sensorId}
-func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
 
@@ -150,7 +160,7 @@ func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.NodeService.EditSensor(nodeID, sensorID, req.CustomName, req.ConfigValues); err != nil {
+	if err := h.service.EditSensor(nodeID, sensorID, req.CustomName, req.ConfigValues); err != nil {
 		RespondError(w, "Failed to update sensor", http.StatusInternalServerError)
 		return
 	}
@@ -159,11 +169,11 @@ func (h *Handler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteNodeSensor handles DELETE /api/v1/nodes/{id}/sensors/{sensorId}
-func (h *Handler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
 
-	if err := h.NodeService.DeleteSensor(nodeID, sensorID); err != nil {
+	if err := h.service.DeleteSensor(nodeID, sensorID); err != nil {
 		RespondError(w, "Failed to remove sensor", http.StatusInternalServerError)
 		return
 	}
@@ -172,10 +182,10 @@ func (h *Handler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteNode handles DELETE /api/v1/nodes/{id}
-func (h *Handler) DeleteNode(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
-	if err := h.NodeService.DeleteNode(nodeID); err != nil {
+	if err := h.service.DeleteNode(nodeID); err != nil {
 		RespondError(w, "Failed to delete node", http.StatusInternalServerError)
 		return
 	}
@@ -185,10 +195,10 @@ func (h *Handler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 
 // GetCurrentNode handles GET /api/v1/nodes/me
 // Used by wizard agents authenticated via Bearer token
-func (h *Handler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
+func (h *NodeHandler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
 
 	// Authenticate via Bearer token
-	nodeID, err := h.authenticateNodeRequest(r)
+	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
 
 	if err != nil {
 		RespondError(w, err.Error(), http.StatusUnauthorized)
@@ -196,7 +206,7 @@ func (h *Handler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch full node details
-	node, err := h.NodeService.GetNodeDetails(nodeID)
+	node, err := h.service.GetNodeDetails(nodeID)
 
 	if err != nil {
 		RespondError(w, "Node not found", http.StatusNotFound)

@@ -2,11 +2,13 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -21,50 +23,71 @@ type WebhookPayload struct {
 	QueuedAt time.Time
 }
 
-type NotifyConfig struct {
-	IsArmed       bool
-	WebhookType   string
-	WebhookURL    string
-	WebhookEvents string
+type Service struct {
+	isArmed       bool
+	webhookType   string
+	webhookURL    string
+	webhookEvents string
+	mu            sync.RWMutex
+	webhookQueue  chan WebhookPayload
 }
 
-var CurrentConfig NotifyConfig
-
-func UpdateConfig(isArmed bool, webhookType, webhookURL, webhookEvents string) {
-	CurrentConfig.IsArmed = isArmed
-	CurrentConfig.WebhookType = webhookType
-	CurrentConfig.WebhookURL = webhookURL
-	CurrentConfig.WebhookEvents = webhookEvents
+func NewService() *Service {
+	return &Service{
+		webhookQueue: make(chan WebhookPayload, 1000),
+	}
 }
 
-func UpdateIsArmed(isArmed bool) {
-	CurrentConfig.IsArmed = isArmed
+func (s *Service) UpdateConfig(isArmed bool, webhookType, webhookURL, webhookEvents string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.isArmed = isArmed
+	s.webhookType = webhookType
+	s.webhookURL = webhookURL
+	s.webhookEvents = webhookEvents
 }
 
-var WebhookQueue = make(chan WebhookPayload, 1000)
+func (s *Service) UpdateIsArmed(isArmed bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.isArmed = isArmed
+}
 
-func StartWorker() {
+func (s *Service) StartWorker(ctx context.Context) {
+	log.Println("[Notify] Worker started.")
 	go func() {
-		for payload := range WebhookQueue {
-			sendWebhook(payload)
-			time.Sleep(500 * time.Millisecond)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("[Notify] Worker stopped.")
+				return
+			case payload := <-s.webhookQueue:
+				s.sendWebhook(payload)
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 	}()
-	log.Println("[Notify] Worker started.")
 }
 
-func Dispatch(title, message, severity string) {
-	if !CurrentConfig.IsArmed || CurrentConfig.WebhookURL == "" {
+func (s *Service) Dispatch(title, message, severity string) {
+	s.mu.RLock()
+	isArmed := s.isArmed
+	webhookURL := s.webhookURL
+	webhookEvents := s.webhookEvents
+	webhookType := s.webhookType
+	s.mu.RUnlock()
+
+	if !isArmed || webhookURL == "" {
 		return
 	}
 
-	if !strings.Contains(strings.ToLower(CurrentConfig.WebhookEvents), strings.ToLower(severity)) {
+	if !strings.Contains(strings.ToLower(webhookEvents), strings.ToLower(severity)) {
 		return
 	}
 
 	payload := WebhookPayload{
-		Type:     CurrentConfig.WebhookType,
-		URL:      CurrentConfig.WebhookURL,
+		Type:     webhookType,
+		URL:      webhookURL,
 		Title:    title,
 		Message:  message,
 		Severity: severity,
@@ -72,26 +95,26 @@ func Dispatch(title, message, severity string) {
 	}
 
 	select {
-	case WebhookQueue <- payload:
+	case s.webhookQueue <- payload:
 	default:
 		log.Println("[!] Webhook queue full, dropping notification")
 	}
 }
 
-func sendWebhook(payload WebhookPayload) {
+func (s *Service) sendWebhook(payload WebhookPayload) {
 	switch strings.ToLower(payload.Type) {
 	case "discord", "slack":
-		sendDiscordSlack(payload.URL, payload.Title, payload.Message, payload.Severity)
+		s.sendDiscordSlack(payload.URL, payload.Title, payload.Message, payload.Severity)
 	case "gotify":
-		sendGotify(payload.URL, payload.Title, payload.Message, payload.Severity)
+		s.sendGotify(payload.URL, payload.Title, payload.Message, payload.Severity)
 	case "ntfy":
 		fallthrough
 	default:
-		sendNtfy(payload.URL, payload.Title, payload.Message, payload.Severity)
+		s.sendNtfy(payload.URL, payload.Title, payload.Message, payload.Severity)
 	}
 }
 
-func sendGotify(webhookURL, title, message, severity string) {
+func (s *Service) sendGotify(webhookURL, title, message, severity string) {
 	priorities := map[string]int{"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10}
 	priority, exists := priorities[severity]
 	if !exists {
@@ -105,8 +128,6 @@ func sendGotify(webhookURL, title, message, severity string) {
 	}
 	body, _ := json.Marshal(payload)
 
-	// If the user pasted the Gotify URL as https://gotify.domain.com/message?token=XYZ,
-	// standard POSTing to it natively works without needing the separate Header.
 	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -122,7 +143,7 @@ func sendGotify(webhookURL, title, message, severity string) {
 	}
 }
 
-func sendNtfy(webhookURL, title, message, severity string) {
+func (s *Service) sendNtfy(webhookURL, title, message, severity string) {
 	priorities := map[string]string{"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5"}
 	priority, exists := priorities[severity]
 	if !exists {
@@ -142,8 +163,7 @@ func sendNtfy(webhookURL, title, message, severity string) {
 	defer resp.Body.Close()
 }
 
-func sendDiscordSlack(webhookURL, title, message, severity string) {
-	// Discord and Slack both accept basic JSON payloads with a "content" string.
+func (s *Service) sendDiscordSlack(webhookURL, title, message, severity string) {
 	icon := "⚠️"
 	if severity == "critical" || severity == "high" {
 		icon = "🚨"
@@ -165,22 +185,14 @@ func sendDiscordSlack(webhookURL, title, message, severity string) {
 	defer resp.Body.Close()
 }
 
-func FlushQueue(timeout time.Duration) error {
+func (s *Service) FlushQueue(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
-	for {
-		select {
-		case payload := <-WebhookQueue:
-			sendWebhook(payload)
-		case <-time.After(100 * time.Millisecond):
-			select {
-			case payload := <-WebhookQueue:
-				sendWebhook(payload)
-			default:
-				return nil
-			}
-		}
+	for len(s.webhookQueue) > 0 {
 		if time.Now().After(deadline) {
-			return fmt.Errorf("webhook flush timeout exceeded")
+			return fmt.Errorf("webhook flush timeout exceeded, %d events remaining", len(s.webhookQueue))
 		}
+		payload := <-s.webhookQueue
+		s.sendWebhook(payload)
 	}
+	return nil
 }

@@ -3,13 +3,22 @@ package api
 import (
 	"net/http"
 	"time"
-	
+
 	"github.com/honeywire/hub/internal/projections/severity"
 	"github.com/honeywire/hub/internal/projections/uptime"
 	"github.com/honeywire/hub/internal/projections/velocity"
+	"github.com/honeywire/hub/internal/store"
 )
 
-func (h *Handler) GetVelocityAnalytics(w http.ResponseWriter, r *http.Request) {
+type AnalyticsHandler struct {
+	Store *store.SQLiteStore
+}
+
+func NewAnalyticsHandler(store *store.SQLiteStore) *AnalyticsHandler {
+	return &AnalyticsHandler{Store: store}
+}
+
+func (h *AnalyticsHandler) GetVelocityAnalytics(w http.ResponseWriter, r *http.Request) {
 	timeframe := r.URL.Query().Get("timeframe")
 	if timeframe == "" {
 		timeframe = "24H"
@@ -33,7 +42,7 @@ func (h *Handler) GetVelocityAnalytics(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, projection)
 }
 
-func (h *Handler) GetSeverityAnalytics(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetSeverityAnalytics(w http.ResponseWriter, r *http.Request) {
 	timeframe := r.URL.Query().Get("timeframe")
 	if timeframe == "" {
 		timeframe = "alltime"
@@ -58,7 +67,7 @@ func (h *Handler) GetSeverityAnalytics(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUptime handles GET /api/v1/uptime and returns the fleet uptime projection
-func (h *Handler) GetUptime(w http.ResponseWriter, r *http.Request) {
+func (h *AnalyticsHandler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	// Parse timeframe from query string (default to 24H)
 	timeframe := r.URL.Query().Get("timeframe")
 	if timeframe == "" {

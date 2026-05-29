@@ -14,8 +14,18 @@ import (
 	"github.com/honeywire/hub/internal/compose/security"
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/services/node"
+	"github.com/honeywire/hub/internal/store"
 	"gopkg.in/yaml.v3"
 )
+
+
+type ComposeHandler struct {
+	Store *store.SQLiteStore
+}
+
+func NewComposeHandler(store *store.SQLiteStore) *ComposeHandler {
+	return &ComposeHandler{Store: store}
+}
 
 // --- INCOMING REQUEST PAYLOADS ---
 
@@ -135,7 +145,7 @@ func fetchManifestBytes() ([]byte, error) {
 
 // GetNodeCompose generates the official docker-compose.yml for a specific agent
 // Authentication: Bearer <API_KEY>
-func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
+func (h *ComposeHandler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 
 	authHeader := r.Header.Get("Authorization")
 
@@ -275,7 +285,7 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 // PREVIEW COMPOSE API
 // -----------------------------------------------------------------------------
 
-func (h *Handler) GenerateCompose(w http.ResponseWriter, r *http.Request) {
+func (h *ComposeHandler) GenerateCompose(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	var req ComposeReq

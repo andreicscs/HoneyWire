@@ -5,11 +5,21 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/models"
+	"github.com/honeywire/hub/internal/services/sensor"
 )
 
-func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
+type SensorHandler struct {
+	service          *sensor.Service
+	Auth             *AuthHandler
+	SessionValidator SessionValidator
+}
+
+func NewSensorHandler(svc *sensor.Service, auth *AuthHandler, sessVal SessionValidator) *SensorHandler {
+	return &SensorHandler{service: svc, Auth: auth, SessionValidator: sessVal}
+}
+
+func (h *SensorHandler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	var hb models.Heartbeat
 	if err := json.NewDecoder(r.Body).Decode(&hb); err != nil {
 		RespondError(w, "Invalid JSON body", http.StatusBadRequest)
@@ -21,14 +31,14 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID, err := h.authenticateNodeRequest(r)
+	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
 	if err != nil {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	// Hand off to the Service layer
-	if err := h.SensorService.ProcessHeartbeat(nodeID, hb.SensorID, hb.Metadata); err != nil {
+	if err := h.service.ProcessHeartbeat(nodeID, hb.SensorID, hb.Metadata); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -36,7 +46,7 @@ func (h *Handler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "alive"})
 }
 
-func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
+func (h *SensorHandler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SensorID string `json:"sensorId"`
 		Reason   string `json:"reason"`
@@ -51,13 +61,13 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID, err := h.authenticateNodeRequest(r)
+	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
 	if err != nil {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if err := h.SensorService.ProcessOffline(nodeID, req.SensorID, req.Reason); err != nil {
+	if err := h.service.ProcessOffline(nodeID, req.SensorID, req.Reason); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -65,7 +75,7 @@ func (h *Handler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "offline_acknowledged"})
 }
 
-func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
+func (h *SensorHandler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
 
@@ -77,7 +87,7 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.SensorService.ToggleSilence(nodeID, sensorID, req.IsSilenced); err != nil {
+	if err := h.service.ToggleSilence(nodeID, sensorID, req.IsSilenced); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -92,23 +102,23 @@ func (h *Handler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 
 // GetManifests fetches the sensor manifest JSON.
 // Note: Authentication strategies generally stay in the HTTP layer since they interact directly with headers/cookies.
-func (h *Handler) GetManifests(w http.ResponseWriter, r *http.Request) {
+func (h *SensorHandler) GetManifests(w http.ResponseWriter, r *http.Request) {
 	isAuthenticated := false
 
 	// 1. Try Node API Key Auth
 	if r.Header.Get("Authorization") == "" && r.URL.Query().Get("key") != "" {
 		r.Header.Set("Authorization", "Bearer "+r.URL.Query().Get("key"))
 	}
-	_, err := h.authenticateNodeRequest(r)
+	_, err := h.Auth.AuthenticateNodeRequest(r)
 	if err == nil {
 		isAuthenticated = true
 	}
 
 	// 2. Try UI Session Auth (Fallback)
 	if !isAuthenticated {
-		cookie, err := r.Cookie(auth.CookieName)
+		cookie, err := r.Cookie(AuthCookieName)
 		if err == nil && cookie.Value != "" {
-			if h.SessionStore.IsValid(cookie.Value) {
+			if h.SessionValidator.IsValid(cookie.Value) {
 				isAuthenticated = true
 			}
 		}

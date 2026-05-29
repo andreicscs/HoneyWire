@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"sync"
@@ -94,4 +95,18 @@ func (s *Service) Broadcast(msgType string, payload interface{}) {
 		c.Close()
 	}
 	s.clientsMu.Unlock()
+}
+
+func (s *Service) StartChartSyncBroadcaster(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.Broadcast("SYNC_CHARTS", nil)
+		}
+	}
 }

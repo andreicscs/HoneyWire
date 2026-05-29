@@ -2,19 +2,25 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
-	"github.com/honeywire/hub/internal/notify"
-	"github.com/honeywire/hub/internal/siem"
+	"github.com/honeywire/hub/internal/services/config"
+	"github.com/honeywire/hub/internal/services/event"
 )
 
-func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
+type EventHandler struct {
+	service *event.Service
+	Cfg     *config.Config
+	Auth    *AuthHandler
+}
+
+func NewEventHandler(svc *event.Service, cfg *config.Config, auth *AuthHandler) *EventHandler {
+	return &EventHandler{service: svc, Cfg: cfg, Auth: auth}
+}
+
+func (h *EventHandler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	var e models.Event
 	if err := json.NewDecoder(r.Body).Decode(&e); err != nil {
 		RespondError(w, "Invalid JSON body", http.StatusBadRequest)
@@ -28,67 +34,30 @@ func (h *Handler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Per-node authentication (API Key -> nodeID)
-	nodeID, err := h.authenticateNodeRequest(r)
+	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
 
 	if err != nil {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Version check
-	hubMajor := strings.Split(h.Cfg.Version, ".")[0]
-	agentMajor := strings.Split(e.ContractVersion, ".")[0]
-	if agentMajor == "" || hubMajor != agentMajor {
-		RespondError(w, "Upgrade Required", http.StatusUpgradeRequired)
-		return
-	}
-
-	nowStr := time.Now().UTC().Format(time.RFC3339)
-	detailsJSON, _ := json.Marshal(e.Details)
-	e.NodeID = nodeID
-
-	// Insert event with composite key reference (nodeId, sensorId)
-	lastInsertID, err := h.Store.InsertEvent(&e, nowStr, string(detailsJSON))
-	if err != nil {
-		if strings.Contains(err.Error(), "FOREIGN KEY") {
+	if err := h.service.ProcessEvent(&e, nodeID); err != nil {
+		if err.Error() == "upgrade required" {
+			RespondError(w, "Upgrade Required", http.StatusUpgradeRequired)
+			return
+		}
+		if err.Error() == "sensor_not_registered" {
 			RespondError(w, "Sensor is not registered", http.StatusNotFound)
 			return
 		}
-		log.Printf("[ERROR] Failed to insert event for node %s/sensor %s: %v", nodeID, e.SensorID, err)
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
-	e.ID = lastInsertID
-	e.Timestamp = nowStr
-
-	// update node and sensor lastHeartbeat (an event proves it is alive)
-	h.Store.UpdateNodeLastHeartbeat(nodeID, e.SensorID, nowStr)
-
-	// Check if sensor is silenced
-	isSilenced, err := h.Store.IsSensorSilenced(nodeID, e.SensorID)
-	if err != nil {
-		log.Printf("[WARNING] Failed to check silence status for node %s/sensor %s: %v", nodeID, e.SensorID, err)
-	}
-
-	if !isSilenced {
-		title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
-		message := fmt.Sprintf("Trigger: %s\nSource: %s\nTarget: %s", e.EventTrigger, e.Source, e.Target)
-		notify.Dispatch(title, message, e.Severity)
-	}
-
-	select {
-	case siem.EventQueue <- e:
-		// Successfully queued for SIEM forwarder
-	default:
-		log.Println("[!] SIEM Queue full, dropping event")
-	}
-
-	h.broadcastWS("NEW_EVENT", e)
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
+func (h *EventHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	archivedParam := r.URL.Query().Get("archived")
 	isArchived := 0
 	if archivedParam == "true" {
@@ -98,7 +67,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.URL.Query().Get("nodeId")
 	sensorID := r.URL.Query().Get("sensorId")
 
-	events, err := h.Store.GetEvents(isArchived, nodeID, sensorID)
+	events, err := h.service.GetEvents(isArchived, nodeID, sensorID)
 	if err != nil {
 		RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -107,53 +76,55 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, events)
 }
 
-func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
-	count, err := h.Store.GetUnreadEventCount()
+func (h *EventHandler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
+	count, err := h.service.GetUnreadCount()
 	if err != nil {
 		count = 0
 	}
 	SendJSON(w, http.StatusOK, map[string]int{"count": count})
 }
 
-func (h *Handler) MarkSingleEventRead(w http.ResponseWriter, r *http.Request) {
+func (h *EventHandler) MarkSingleEventRead(w http.ResponseWriter, r *http.Request) {
 	eventID := chi.URLParam(r, "eventId")
-	if err := h.Store.MarkEventRead(eventID); err != nil {
+	if err := h.service.MarkSingleEventRead(eventID); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
-	if err := h.Store.MarkAllEventsRead(); err != nil {
+func (h *EventHandler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.MarkEventsRead(); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) ArchiveEvent(w http.ResponseWriter, r *http.Request) {
+func (h *EventHandler) ArchiveEvent(w http.ResponseWriter, r *http.Request) {
 	eventID := chi.URLParam(r, "eventId")
-	if err := h.Store.ArchiveEvent(eventID); err != nil {
+	if err := h.service.ArchiveEvent(eventID); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) ArchiveAll(w http.ResponseWriter, r *http.Request) {
-	if err := h.Store.ArchiveAllEvents(); err != nil {
+func (h *EventHandler) ArchiveAll(w http.ResponseWriter, r *http.Request) {
+	if err := h.service.ArchiveAll(); err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
+func (h *EventHandler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 	dryrun := r.URL.Query().Get("dryrun") == "true"
+	ip := GetRealIP(r, h.Cfg.TrustProxy)
+
+	count, err := h.service.ClearEvents(dryrun, ip)
 
 	if dryrun {
-		count, _ := h.Store.GetEventCount()
 		SendJSON(w, http.StatusOK, map[string]interface{}{
 			"status":       "success",
 			"dryrun":       true,
@@ -162,14 +133,11 @@ func (h *Handler) ClearEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := h.getRealIP(r)
-	log.Printf("[!] AUDIT: Database purged by IP %s", ip)
-
-	if err := h.Store.ClearAllEvents(); err != nil {
+	if err != nil {
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-	
+
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "success",
 		"dryrun": false,

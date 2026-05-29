@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/honeywire/hub/internal/api"
-	"github.com/honeywire/hub/internal/auth"
-	"github.com/honeywire/hub/internal/config"
-	"github.com/honeywire/hub/internal/notify"
+	"github.com/honeywire/hub/internal/services/auth"
+	"github.com/honeywire/hub/internal/services/config"
+	"github.com/honeywire/hub/internal/services/event"
 	"github.com/honeywire/hub/internal/services/node"
+	"github.com/honeywire/hub/internal/services/notify"
 	"github.com/honeywire/hub/internal/services/sensor"
+	"github.com/honeywire/hub/internal/services/siem"
 	"github.com/honeywire/hub/internal/services/websocket"
-	"github.com/honeywire/hub/internal/siem"
 	"github.com/honeywire/hub/internal/store"
 )
 
@@ -47,31 +48,55 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	sessionStore := auth.NewSessionStore()
 	wsService := websocket.NewService()
+	authService := auth.NewService(dbStore, cfg.DashboardPassword)
 	nodeSvc := node.NewService(dbStore, wsService)
 	sensorSvc := sensor.NewService(dbStore, wsService)
-	h := api.NewHandler(dbStore, cfg, sessionStore, wsService, nodeSvc, sensorSvc)
-	r, err := api.SetupRouter(h)
+	siemService := siem.NewService()
+	notifyService := notify.NewService()
+	eventSvc := event.NewService(dbStore, wsService, siemService, notifyService, cfg.Version)
+	configService := config.NewService(dbStore, authService, siemService, notifyService, cfg.DashboardPassword, cfg.Version)
+
+	authHandler := api.NewAuthHandler(authService, cfg)
+	nodeHandler := api.NewNodeHandler(nodeSvc, authHandler)
+	sensorHandler := api.NewSensorHandler(sensorSvc, authHandler, authService)
+	eventsHandler := api.NewEventHandler(eventSvc, cfg, authHandler)
+	analyticsHandler := api.NewAnalyticsHandler(dbStore)
+	configHandler := api.NewConfigHandler(configService, cfg)
+	composeHandler := api.NewComposeHandler(dbStore)
+
+	r, err := api.SetupRouter(api.RouterConfig{
+		Nodes:        nodeHandler,
+		Sensors:      sensorHandler,
+		Auth:         authHandler,
+		Events:       eventsHandler,
+		Analytics:    analyticsHandler,
+		Config:       configHandler,
+		Compose:      composeHandler,
+		WSService:    wsService,
+		SessionValidator: authService,
+	})
 	if err != nil {
 		log.Fatalf("[FATAL] Router setup failed: %v", err)
 	}
 
 	// 1. Start External Workers
-	notify.StartWorker()
-	siem.StartWorker()
-	go h.StartHealthMonitor(rootCtx)
+	go api.StartHealthMonitor(rootCtx, dbStore, wsService)
+	go wsService.StartChartSyncBroadcaster(rootCtx)
+	go authService.StartWorkers(rootCtx)
+	go siemService.StartWorker(rootCtx)
+	go notifyService.StartWorker(rootCtx)
 
 	// 2. Load Runtime Configurations Safely
 	isArmed := loadConfigSafe(dbStore, "is_armed", "false") == "true"
 	webhookType := loadConfigSafe(dbStore, "webhook_type", "ntfy")
 	webhookURL := loadConfigSafe(dbStore, "webhook_url", "")
 	webhookEvents := loadConfigSafe(dbStore, "webhook_events", "[]")
-	notify.UpdateConfig(isArmed, webhookType, webhookURL, webhookEvents)
+	notifyService.UpdateConfig(isArmed, webhookType, webhookURL, webhookEvents)
 
 	siemAddress := loadConfigSafe(dbStore, "siem_address", "")
 	siemProtocol := loadConfigSafe(dbStore, "siem_protocol", "tcp")
-	siem.UpdateConfig(siemAddress, siemProtocol)
+	siemService.UpdateConfig(siemAddress, siemProtocol)
 
 	if siemAddress != "" {
 		log.Printf("[SIEM] Configured to forward to %s via %s\n", siemAddress, siemProtocol)
@@ -113,12 +138,12 @@ func main() {
 	}
 
 	log.Println("[*] Flushing pending webhooks...")
-	if err := notify.FlushQueue(5 * time.Second); err != nil {
+	if err := notifyService.FlushQueue(5 * time.Second); err != nil {
 		log.Printf("[!] Webhook flush error: %v\n", err)
 	}
 
 	log.Println("[*] Flushing pending SIEM events...")
-	if err := siem.FlushQueue(5 * time.Second); err != nil {
+	if err := siemService.FlushQueue(5 * time.Second); err != nil {
 		log.Printf("[!] SIEM flush error: %v\n", err)
 	}
 
