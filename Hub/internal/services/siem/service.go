@@ -74,7 +74,7 @@ func (s *Service) siemPolicy(fact NetworkFact, attempt int) (SiemAction, time.Du
 
 	// Calculate robust exponential backoff + jitter for transient network drops
 	base := 2.0
-	maxDelay := 60.0 // Cap at 1 minute per retry attempt to avoid stalling too deep
+	maxDelay := 60.0
 	delay := base * math.Pow(2, float64(attempt))
 	if delay > maxDelay {
 		delay = maxDelay
@@ -131,63 +131,69 @@ func (s *Service) QueueEvent(event models.Event) {
 // WORKER ENGINE (Persistent Streams + Non-Stalling Cooldowns)
 // ============================================================================
 
+// streamSession encapsulates the active connection state for a single worker goroutine.
+// By binding methods to this struct, we eliminate pointer indirection and parameter bloat.
+// not safe for concurrent access.
+type streamSession struct {
+	conn                 net.Conn
+	currentAddr          string
+	currentProto         string
+	nextReconnectAttempt time.Time
+	service              *Service
+}
+
+// close cleanly tears down the connection
+func (sess *streamSession) close() {
+	if sess.conn != nil {
+		sess.conn.Close()
+		sess.conn = nil
+	}
+}
+
 func (s *Service) StartWorker(ctx context.Context) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
 		log.Println("[SIEM] Worker started. Listening for telemetry streams...")
 
-		var conn net.Conn
-		var currentAddr, currentProto string
-		var nextReconnectAttempt time.Time
-
-		closeConn := func() {
-			if conn != nil {
-				conn.Close()
-				conn = nil
-			}
+		// Initialize the stateful session object
+		sess := &streamSession{
+			service: s,
 		}
-		defer closeConn()
+		defer sess.close()
 
 		for {
 			select {
 			case <-ctx.Done():
 				log.Println("[SIEM] Shutdown signal received. Flushing pipeline...")
-				s.drainQueue(conn)
+				s.drainQueue(sess.conn)
 				return
 
 			case event := <-s.eventQueue:
-				s.processEventWithRetry(ctx, event, &conn, &currentAddr, &currentProto, &nextReconnectAttempt, closeConn)
+				sess.processEventWithRetry(ctx, event)
 			}
 		}
 	}()
 }
 
-func (s *Service) processEventWithRetry(
-	ctx context.Context,
-	event models.Event,
-	conn *net.Conn,
-	currentAddr, currentProto *string,
-	nextReconnectAttempt *time.Time,
-	closeConn func(),
-) {
-	msg := s.formatSyslog(event)
+func (sess *streamSession) processEventWithRetry(ctx context.Context, event models.Event) {
+	msg := sess.service.formatSyslog(event)
 
 	for attempt := 0; attempt < MaxRetriesPerEvent; attempt++ {
-		s.mu.RLock()
-		addr, proto := s.address, s.protocol
-		s.mu.RUnlock()
+		sess.service.mu.RLock()
+		addr, proto := sess.service.address, sess.service.protocol
+		sess.service.mu.RUnlock()
 
 		if addr == "" {
 			return // Exporter explicitly disabled via configuration
 		}
 
-		// Handle Stream Synchronization/Instantiation
-		if *conn == nil || addr != *currentAddr || proto != *currentProto {
+		// Handle Stream Synchronization/Instantiation cleanly
+		if sess.conn == nil || addr != sess.currentAddr || proto != sess.currentProto {
 			// Prevent aggressive dial storms against a dead receiver
-			if time.Now().Before(*nextReconnectAttempt) {
+			if time.Now().Before(sess.nextReconnectAttempt) {
 				// Cooldown active: wait out the balance using a precise context-aware timer
-				t := time.NewTimer(time.Until(*nextReconnectAttempt))
+				t := time.NewTimer(time.Until(sess.nextReconnectAttempt))
 				select {
 				case <-t.C:
 				case <-ctx.Done():
@@ -196,46 +202,46 @@ func (s *Service) processEventWithRetry(
 				}
 			}
 
-			closeConn()
+			sess.close()
 			dialConn, err := net.DialTimeout(proto, addr, 5*time.Second)
 			fact := classify(err)
 
 			if fact.IsError {
 				log.Printf("[!] SIEM Stream connection failed (%s://%s): %v", proto, addr, err)
-				*nextReconnectAttempt = time.Now().Add(2 * time.Second) // 2-second suppression cooldown
+				sess.nextReconnectAttempt = time.Now().Add(2 * time.Second) // 2-second suppression cooldown
 				
-				action, delay := s.siemPolicy(fact, attempt)
+				action, delay := sess.service.siemPolicy(fact, attempt)
 				if action == SiemDrop {
 					log.Printf("[-] Terminal configuration error. Dropping log stream position.")
 					return
 				}
 				
 				// Backoff and retry dialing for the exact same event log position
-				if s.sleepContext(ctx, delay) { return }
+				if sess.service.sleepContext(ctx, delay) { return }
 				continue
 			}
 
-			*conn = dialConn
-			*currentAddr, *currentProto = addr, proto
+			sess.conn = dialConn
+			sess.currentAddr, sess.currentProto = addr, proto
 		}
 
 		// Stream Writing Phase
-		(*conn).SetWriteDeadline(time.Now().Add(5 * time.Second))
-		_, writeErr := (*conn).Write([]byte(msg + "\n"))
+		sess.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+		_, writeErr := sess.conn.Write([]byte(msg + "\n"))
 		fact := classify(writeErr)
-		action, delay := s.siemPolicy(fact, attempt)
+		action, delay := sess.service.siemPolicy(fact, attempt)
 
 		switch action {
 		case SiemSuccess:
 			return // Log exported successfully. Advance queue position.
 		case SiemDrop:
 			log.Printf("[-] Terminal failure encountered on write. Discarding position.")
-			closeConn()
+			sess.close()
 			return
 		case SiemRetry:
 			log.Printf("[!] SIEM stream disconnected mid-write: %v. Retrying connection structure in %v...", writeErr, delay)
-			closeConn() // Kill connection to trigger a fresh dial sequence on next iteration
-			if s.sleepContext(ctx, delay) { return }
+			sess.close() // Kill connection to trigger a fresh dial sequence on next iteration
+			if sess.service.sleepContext(ctx, delay) { return }
 		}
 	}
 
