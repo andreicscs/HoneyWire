@@ -18,7 +18,7 @@ defineProps({
             <h1 v-if="size === 'md'" class="text-h1 text-text-h font-medium tracking-tight">
                 {{ title }}
             </h1>
-            <h3 v-else class="text-base tracking-wider text-text-h">
+            <h3 v-else class="text-base font-medium text-text-h">
                 {{ title }}
             </h3>
             

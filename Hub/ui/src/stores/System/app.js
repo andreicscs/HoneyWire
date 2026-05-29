@@ -38,9 +38,7 @@ export const useAppStore = defineStore('app', () => {
       console.warn(`[AppStore] Blocked invalid session transition: authenticated -> unknown`)
       return
     }
-
-    console.debug(`[AppStore] Session Transition: ${sessionState.value} -> ${nextState} (Reason: ${reason})`)
-    
+        
     sessionState.value = nextState
 
     // Centralized side-effects for being logged out

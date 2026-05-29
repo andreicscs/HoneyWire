@@ -83,6 +83,7 @@ const checkAuthAndInit = async () => {
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('debug') === 'setup') {
     appStore.requiresSetup = true
+    appStore.isInitialized = true
     return
   }
 
