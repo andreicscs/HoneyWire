@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"sync"
 
 	"github.com/honeywire/hub/internal/api"
 	"github.com/honeywire/hub/internal/services/auth"
@@ -128,9 +129,10 @@ func main() {
 	<-sigChan
 	log.Println("\n[*] Received shutdown signal. Initiating graceful shutdown...")
 
-	// Signal background workers to stop
+	// 1. Signal all background workers to stop accepting new work and begin draining
 	rootCancel()
 
+	// 2. Shut down the HTTP server (stops taking new HTTP requests)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -138,15 +140,28 @@ func main() {
 		log.Printf("[!] Server forced to shut down: %v\n", err)
 	}
 
-	log.Println("[*] Flushing pending webhooks...")
-	if err := notifyService.FlushQueue(5 * time.Second); err != nil {
-		log.Printf("[!] Webhook flush error: %v\n", err)
-	}
+	// 3. Wait for critical telemetry pipelines to flush
+	// We wait for them concurrently to speed up the shutdown process.
+	// Since both services have hard internal 5-second drain timeouts, 
+	// this is guaranteed to never hang the system indefinitely.
+	log.Println("[*] Waiting for SIEM and Notification workers to flush remaining events...")
+	
+	var shutdownWg sync.WaitGroup
+	
+	shutdownWg.Add(1)
+	go func() {
+		defer shutdownWg.Done()
+		siemService.Wait()
+	}()
+	
+	shutdownWg.Add(1)
+	go func() {
+		defer shutdownWg.Done()
+		notifyService.Wait()
+	}()
 
-	log.Println("[*] Flushing pending SIEM events...")
-	if err := siemService.FlushQueue(5 * time.Second); err != nil {
-		log.Printf("[!] SIEM flush error: %v\n", err)
-	}
+	// Block until both services confirm their WaitGroups are zero
+	shutdownWg.Wait()
 
 	log.Println("[*] Graceful shutdown complete. Goodbye!")
 }

@@ -5,21 +5,101 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"math/rand"
 	"net"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/honeywire/hub/internal/models"
 )
+
+const (
+	MaxRetriesPerEvent = 10
+)
+
+// ============================================================================
+// 1. SHARED CLASSIFIER (Pure Network Truth Layer)
+// ============================================================================
+
+type NetworkFact struct {
+	IsError     bool
+	IsTransient bool
+	Err         error
+}
+
+// classify inspects raw socket/dialer errors to determine system state.
+func classify(err error) NetworkFact {
+	if err == nil {
+		return NetworkFact{IsError: false, IsTransient: false, Err: nil}
+	}
+
+	fact := NetworkFact{
+		IsError:     true,
+		IsTransient: true, // Default raw network errors (timeouts, refusions) to transient
+		Err:         err,
+	}
+
+	// Check for known terminal configuration anomalies
+	errStr := err.Error()
+	if strings.Contains(errStr, "unknown network") || 
+	   strings.Contains(errStr, "invalid argument") {
+		fact.IsTransient = false
+	}
+
+	return fact
+}
+
+// ============================================================================
+// 2. POLICY INTERPRETER (Domain-Specific Security Logging Rules)
+// ============================================================================
+
+type SiemAction string
+
+const (
+	SiemSuccess SiemAction = "success"
+	SiemRetry   SiemAction = "retry"
+	SiemDrop    SiemAction = "drop"
+)
+
+func (s *Service) siemPolicy(fact NetworkFact, attempt int) (SiemAction, time.Duration) {
+	if !fact.IsError {
+		return SiemSuccess, 0
+	}
+	if !fact.IsTransient {
+		return SiemDrop, 0
+	}
+
+	// Calculate robust exponential backoff + jitter for transient network drops
+	base := 2.0
+	maxDelay := 60.0 // Cap at 1 minute per retry attempt to avoid stalling too deep
+	delay := base * math.Pow(2, float64(attempt))
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+	jitter := (rand.Float64() * 0.2) - 0.1
+	finalDelay := time.Duration((delay + (delay * jitter)) * float64(time.Second))
+
+	return SiemRetry, finalDelay
+}
+
+// ============================================================================
+// SERVICE CORE & CONFIGURATION
+// ============================================================================
 
 type Service struct {
 	eventQueue chan models.Event
 	address    string
 	protocol   string
 	mu         sync.RWMutex
+	wg         sync.WaitGroup
+	isDraining atomic.Bool
 }
 
 func NewService() *Service {
+	rand.Seed(time.Now().UnixNano())
 	return &Service{
 		eventQueue: make(chan models.Event, 5000),
 	}
@@ -36,40 +116,185 @@ func (s *Service) UpdateConfig(address, protocol string) {
 }
 
 func (s *Service) QueueEvent(event models.Event) {
+	if s.isDraining.Load() {
+		return
+	}
+
 	select {
 	case s.eventQueue <- event:
 	default:
-		log.Println("[!] SIEM Queue full, dropping event")
+		log.Println("[!] SIEM Pipeline saturated. Bounded queue full, dropping event.")
 	}
 }
 
+// ============================================================================
+// WORKER ENGINE (Persistent Streams + Non-Stalling Cooldowns)
+// ============================================================================
+
 func (s *Service) StartWorker(ctx context.Context) {
-	log.Println("[SIEM] Worker started. Listening for events...")
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
+		log.Println("[SIEM] Worker started. Listening for telemetry streams...")
+
+		var conn net.Conn
+		var currentAddr, currentProto string
+		var nextReconnectAttempt time.Time
+
+		closeConn := func() {
+			if conn != nil {
+				conn.Close()
+				conn = nil
+			}
+		}
+		defer closeConn()
+
 		for {
 			select {
 			case <-ctx.Done():
-				log.Println("[SIEM] Worker stopped.")
+				log.Println("[SIEM] Shutdown signal received. Flushing pipeline...")
+				s.drainQueue(conn)
 				return
+
 			case event := <-s.eventQueue:
-				s.forwardSyslog(event)
+				s.processEventWithRetry(ctx, event, &conn, &currentAddr, &currentProto, &nextReconnectAttempt, closeConn)
 			}
 		}
 	}()
 }
 
-func (s *Service) forwardSyslog(event models.Event) {
-	s.mu.RLock()
-	address := s.address
-	protocol := s.protocol
-	s.mu.RUnlock()
+func (s *Service) processEventWithRetry(
+	ctx context.Context,
+	event models.Event,
+	conn *net.Conn,
+	currentAddr, currentProto *string,
+	nextReconnectAttempt *time.Time,
+	closeConn func(),
+) {
+	msg := s.formatSyslog(event)
 
-	if address == "" {
-		return
+	for attempt := 0; attempt < MaxRetriesPerEvent; attempt++ {
+		s.mu.RLock()
+		addr, proto := s.address, s.protocol
+		s.mu.RUnlock()
+
+		if addr == "" {
+			return // Exporter explicitly disabled via configuration
+		}
+
+		// Handle Stream Synchronization/Instantiation
+		if *conn == nil || addr != *currentAddr || proto != *currentProto {
+			// Prevent aggressive dial storms against a dead receiver
+			if time.Now().Before(*nextReconnectAttempt) {
+				// Cooldown active: wait out the balance using a precise context-aware timer
+				t := time.NewTimer(time.Until(*nextReconnectAttempt))
+				select {
+				case <-t.C:
+				case <-ctx.Done():
+					t.Stop()
+					return
+				}
+			}
+
+			closeConn()
+			dialConn, err := net.DialTimeout(proto, addr, 5*time.Second)
+			fact := classify(err)
+
+			if fact.IsError {
+				log.Printf("[!] SIEM Stream connection failed (%s://%s): %v", proto, addr, err)
+				*nextReconnectAttempt = time.Now().Add(2 * time.Second) // 2-second suppression cooldown
+				
+				action, delay := s.siemPolicy(fact, attempt)
+				if action == SiemDrop {
+					log.Printf("[-] Terminal configuration error. Dropping log stream position.")
+					return
+				}
+				
+				// Backoff and retry dialing for the exact same event log position
+				if s.sleepContext(ctx, delay) { return }
+				continue
+			}
+
+			*conn = dialConn
+			*currentAddr, *currentProto = addr, proto
+		}
+
+		// Stream Writing Phase
+		(*conn).SetWriteDeadline(time.Now().Add(5 * time.Second))
+		_, writeErr := (*conn).Write([]byte(msg + "\n"))
+		fact := classify(writeErr)
+		action, delay := s.siemPolicy(fact, attempt)
+
+		switch action {
+		case SiemSuccess:
+			return // Log exported successfully. Advance queue position.
+		case SiemDrop:
+			log.Printf("[-] Terminal failure encountered on write. Discarding position.")
+			closeConn()
+			return
+		case SiemRetry:
+			log.Printf("[!] SIEM stream disconnected mid-write: %v. Retrying connection structure in %v...", writeErr, delay)
+			closeConn() // Kill connection to trigger a fresh dial sequence on next iteration
+			if s.sleepContext(ctx, delay) { return }
+		}
 	}
 
+	log.Printf("[-] Telemetry record exceeded critical retry budget (%d). Discarding to prevent local pipeline freeze.", MaxRetriesPerEvent)
+}
+
+// ============================================================================
+// CLEAN SHUTDOWN FLUSH ENGINE
+// ============================================================================
+
+func (s *Service) drainQueue(conn net.Conn) {
+	s.isDraining.Store(true)
+
+	// Best-effort 5-second deadline to push remaining in-flight memory to disk/wire
+	timeout := time.After(5 * time.Second)
+	count := 0
+
+	for {
+		select {
+		case <-timeout:
+			log.Printf("[SIEM] Flush cutoff reached. Aborted %d buffered telemetry items.", len(s.eventQueue))
+			return
+		case event := <-s.eventQueue:
+			if conn != nil {
+				msg := s.formatSyslog(event)
+				conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+				if _, err := conn.Write([]byte(msg + "\n")); err == nil {
+					count++
+				}
+			}
+		default:
+			log.Printf("[SIEM] Telemetry stream fully synchronized. Flushed %d remaining logs.", count)
+			return
+		}
+	}
+}
+
+// ============================================================================
+// FORMATTERS & ACCURATE HISTORICAL TIMELINES
+// ============================================================================
+
+func (s *Service) formatSyslog(event models.Event) string {
 	priority := syslogPriority(event.Severity)
-	timestamp := time.Now().Format("Jan 02 15:04:05")
+	var t time.Time
+	if event.Timestamp == "" {
+		t = time.Now()
+	} else {
+		// Attempt to parse the string (Assuming standard RFC3339 format)
+		parsedTime, err := time.Parse(time.RFC3339, event.Timestamp)
+		if err != nil {
+			// Fallback to now if the string is malformed
+			t = time.Now()
+		} else {
+			t = parsedTime
+		}
+	}
+	
+	timestamp := t.Format("Jan 02 15:04:05")
+
 	hostname := "honeywire"
 	tag := "honeywire-sensor"
 
@@ -78,46 +303,9 @@ func (s *Service) forwardSyslog(event models.Event) {
 		detailsJSON = []byte("{}")
 	}
 
-	msg := fmt.Sprintf("<%d>%s %s %s[%d]: [%s] Trigger: %s | Source: %s | Target: %s | Sensor: %s | Details: %s",
+	return fmt.Sprintf("<%d>%s %s %s[%d]: [%s] Trigger: %s | Source: %s | Target: %s | Sensor: %s | Details: %s",
 		priority, timestamp, hostname, tag, event.ID, event.Severity,
 		event.EventTrigger, event.Source, event.Target, event.SensorID, string(detailsJSON))
-
-	switch protocol {
-	case "tcp":
-		s.forwardTCP(address, msg)
-	case "udp":
-		s.forwardUDP(address, msg)
-	default:
-		log.Printf("[!] Unknown SIEM protocol: %s", protocol)
-	}
-}
-
-func (s *Service) forwardTCP(address, message string) {
-	dialer := net.Dialer{Timeout: 5 * time.Second}
-	conn, err := dialer.Dial("tcp", address)
-	if err != nil {
-		log.Printf("[!] SIEM TCP connection failed: %v", err)
-		return
-	}
-	defer conn.Close()
-	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	if _, err := conn.Write([]byte(message + "\n")); err != nil {
-		log.Printf("[!] SIEM TCP write failed: %v", err)
-	}
-}
-
-func (s *Service) forwardUDP(address, message string) {
-	dialer := net.Dialer{Timeout: 5 * time.Second}
-	conn, err := dialer.Dial("udp", address)
-	if err != nil {
-		log.Printf("[!] SIEM UDP connection failed: %v", err)
-		return
-	}
-	defer conn.Close()
-	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	if _, err := conn.Write([]byte(message + "\n")); err != nil {
-		log.Printf("[!] SIEM UDP write failed: %v", err)
-	}
 }
 
 func syslogPriority(severity string) int {
@@ -136,14 +324,18 @@ func syslogPriority(severity string) int {
 	}
 }
 
-func (s *Service) FlushQueue(timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	for len(s.eventQueue) > 0 {
-		if time.Now().After(deadline) {
-			return fmt.Errorf("SIEM flush timeout exceeded, %d events remaining", len(s.eventQueue))
-		}
-		event := <-s.eventQueue
-		s.forwardSyslog(event)
+// helper to clean up select-block boilerplate across retry systems
+func (s *Service) sleepContext(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	select {
+	case <-t.C:
+		return false
+	case <-ctx.Done():
+		t.Stop()
+		return true
 	}
-	return nil
+}
+
+func (s *Service) Wait() {
+	s.wg.Wait()
 }
