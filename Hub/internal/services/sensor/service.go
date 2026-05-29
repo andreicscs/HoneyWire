@@ -1,6 +1,7 @@
 package sensor
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"strings"
@@ -13,6 +14,7 @@ type Store interface {
 	InsertHeartbeat(nodeID, sensorID, minuteBucket string) error
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
+	GetTransitionedOfflineNodes(offlineThreshold time.Duration, lastCheck time.Time) (map[string]bool, error)
 }
 
 // Broadcaster defines how the service sends real-time updates
@@ -73,6 +75,38 @@ func (s *Service) ProcessHeartbeat(nodeID, sensorID string, metadata map[string]
 	})
 
 	return nil
+}
+
+func (s *Service) StartHealthMonitor(ctx context.Context) {
+	log.Println("[INFO] Starting background health monitor...")
+
+	tickerPeriod := 30 * time.Second
+	ticker := time.NewTicker(tickerPeriod)
+	defer ticker.Stop()
+
+	// Offset lastCheck by the ticker period so the first run catches recent drops
+	lastCheck := time.Now().UTC().Add(-tickerPeriod)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[INFO] Health monitor stopped")
+			return
+		case t := <-ticker.C:
+			offlineThreshold := 60 * time.Second
+			updatedNodeIDs, err := s.store.GetTransitionedOfflineNodes(offlineThreshold, lastCheck)
+
+			if err == nil {
+				for nodeID := range updatedNodeIDs {
+					s.broadcaster.Broadcast("UPDATE_NODE", map[string]interface{}{
+						"id":              nodeID,
+						"trigger_refresh": true,
+					})
+				}
+			}
+			lastCheck = t.UTC()
+		}
+	}
 }
 
 // ProcessOffline graceful forces a sensor into an offline state

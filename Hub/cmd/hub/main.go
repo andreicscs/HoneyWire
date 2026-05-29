@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/honeywire/hub/internal/api"
 	"github.com/honeywire/hub/internal/services/auth"
+	composesvc "github.com/honeywire/hub/internal/services/compose"
 	"github.com/honeywire/hub/internal/services/config"
 	"github.com/honeywire/hub/internal/services/event"
 	"github.com/honeywire/hub/internal/services/node"
@@ -56,32 +56,34 @@ func main() {
 	notifyService := notify.NewService()
 	eventSvc := event.NewService(dbStore, wsService, siemService, notifyService, cfg.Version)
 	configService := config.NewService(dbStore, authService, siemService, notifyService, cfg.DashboardPassword, cfg.Version)
+	composeService := composesvc.NewService(dbStore)
 
 	authHandler := api.NewAuthHandler(authService, cfg)
-	nodeHandler := api.NewNodeHandler(nodeSvc, authHandler)
-	sensorHandler := api.NewSensorHandler(sensorSvc, authHandler, authService)
-	eventsHandler := api.NewEventHandler(eventSvc, cfg, authHandler)
+	nodeHandler := api.NewNodeHandler(nodeSvc)
+	sensorHandler := api.NewSensorHandler(sensorSvc, composeService)
+	eventsHandler := api.NewEventHandler(eventSvc, cfg)
 	analyticsHandler := api.NewAnalyticsHandler(dbStore)
 	configHandler := api.NewConfigHandler(configService, cfg)
-	composeHandler := api.NewComposeHandler(dbStore)
+	composeHandler := api.NewComposeHandler(composeService)
 
 	r, err := api.SetupRouter(api.RouterConfig{
-		Nodes:        nodeHandler,
-		Sensors:      sensorHandler,
-		Auth:         authHandler,
-		Events:       eventsHandler,
-		Analytics:    analyticsHandler,
-		Config:       configHandler,
-		Compose:      composeHandler,
-		WSService:    wsService,
-		SessionValidator: authService,
+		Nodes:             nodeHandler,
+		Sensors:           sensorHandler,
+		Auth:              authHandler,
+		Events:            eventsHandler,
+		Analytics:         analyticsHandler,
+		Config:            configHandler,
+		Compose:           composeHandler,
+		WSService:         wsService,
+		SessionValidator:  authService,
+		NodeAuthenticator: authService,
 	})
 	if err != nil {
 		log.Fatalf("[FATAL] Router setup failed: %v", err)
 	}
 
 	// 1. Start External Workers
-	go api.StartHealthMonitor(rootCtx, dbStore, wsService)
+	go sensorSvc.StartHealthMonitor(rootCtx)
 	go wsService.StartChartSyncBroadcaster(rootCtx)
 	go authService.StartWorkers(rootCtx)
 	go siemService.StartWorker(rootCtx)
@@ -104,8 +106,7 @@ func main() {
 		log.Println("[SIEM] Forwarding disabled (no address configured).")
 	}
 
-	// 3. Start Database Retention Worker (cancelable)
-	go startRetentionWorker(rootCtx, dbStore)
+	go eventSvc.StartRetentionWorker(rootCtx)
 
 	// 4. Start HTTP Server
 	server := &http.Server{
@@ -148,28 +149,4 @@ func main() {
 	}
 
 	log.Println("[*] Graceful shutdown complete. Goodbye!")
-}
-
-// startRetentionWorker wakes up periodically to archive/purge old events based on DB settings
-func startRetentionWorker(ctx context.Context, s *store.SQLiteStore) {
-	// Wake up every hour to check retention
-	ticker := time.NewTicker(1 * time.Hour)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[Retention] worker stopped")
-			return
-		case <-ticker.C:
-			archiveDays, _ := strconv.Atoi(loadConfigSafe(s, "auto_archive_days", "0"))
-			purgeDays, _ := strconv.Atoi(loadConfigSafe(s, "auto_purge_days", "0"))
-
-			if archiveDays > 0 || purgeDays > 0 {
-				if err := s.EnforceRetention(archiveDays, purgeDays); err != nil {
-					log.Printf("[WARNING] Event retention task failed: %v", err)
-				}
-			}
-		}
-	}
 }

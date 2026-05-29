@@ -6,17 +6,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/honeywire/hub/internal/models"
+	composesvc "github.com/honeywire/hub/internal/services/compose"
 	"github.com/honeywire/hub/internal/services/sensor"
 )
 
 type SensorHandler struct {
-	service          *sensor.Service
-	Auth             *AuthHandler
-	SessionValidator SessionValidator
+	service        *sensor.Service
+	composeService *composesvc.Service
 }
 
-func NewSensorHandler(svc *sensor.Service, auth *AuthHandler, sessVal SessionValidator) *SensorHandler {
-	return &SensorHandler{service: svc, Auth: auth, SessionValidator: sessVal}
+func NewSensorHandler(svc *sensor.Service, composeSvc *composesvc.Service) *SensorHandler {
+	return &SensorHandler{service: svc, composeService: composeSvc}
 }
 
 func (h *SensorHandler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request) {
@@ -31,8 +31,8 @@ func (h *SensorHandler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
-	if err != nil {
+	nodeID := NodeIDFromContext(r.Context())
+	if nodeID == "" {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -61,8 +61,8 @@ func (h *SensorHandler) ReceiveOffline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
-	if err != nil {
+	nodeID := NodeIDFromContext(r.Context())
+	if nodeID == "" {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -101,36 +101,8 @@ func (h *SensorHandler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetManifests fetches the sensor manifest JSON.
-// Note: Authentication strategies generally stay in the HTTP layer since they interact directly with headers/cookies.
 func (h *SensorHandler) GetManifests(w http.ResponseWriter, r *http.Request) {
-	isAuthenticated := false
-
-	// 1. Try Node API Key Auth
-	if r.Header.Get("Authorization") == "" && r.URL.Query().Get("key") != "" {
-		r.Header.Set("Authorization", "Bearer "+r.URL.Query().Get("key"))
-	}
-	_, err := h.Auth.AuthenticateNodeRequest(r)
-	if err == nil {
-		isAuthenticated = true
-	}
-
-	// 2. Try UI Session Auth (Fallback)
-	if !isAuthenticated {
-		cookie, err := r.Cookie(AuthCookieName)
-		if err == nil && cookie.Value != "" {
-			if h.SessionValidator.IsValid(cookie.Value) {
-				isAuthenticated = true
-			}
-		}
-	}
-
-	if !isAuthenticated {
-		RespondError(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Assuming fetchManifestBytes is defined elsewhere in the api package
-	body, err := fetchManifestBytes()
+	body, err := h.composeService.FetchManifestBytes()
 	if err != nil {
 		RespondError(w, "Failed to reach manifest registry", http.StatusBadGateway)
 		return

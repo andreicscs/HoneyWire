@@ -2,9 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/honeywire/hub/internal/services/auth"
 	"github.com/honeywire/hub/internal/services/config"
@@ -73,20 +71,4 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-// AuthenticateNodeRequest is used by other handlers to validate agent requests.
-func (h *AuthHandler) AuthenticateNodeRequest(r *http.Request) (string, error) {
-
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		return "", errors.New("missing authorization header")
-	}
-
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", errors.New("invalid authorization format")
-	}
-
-	return h.service.AuthenticateNodeRequest(parts[1])
 }

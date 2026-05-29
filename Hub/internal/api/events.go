@@ -13,11 +13,10 @@ import (
 type EventHandler struct {
 	service *event.Service
 	Cfg     *config.Config
-	Auth    *AuthHandler
 }
 
-func NewEventHandler(svc *event.Service, cfg *config.Config, auth *AuthHandler) *EventHandler {
-	return &EventHandler{service: svc, Cfg: cfg, Auth: auth}
+func NewEventHandler(svc *event.Service, cfg *config.Config) *EventHandler {
+	return &EventHandler{service: svc, Cfg: cfg}
 }
 
 func (h *EventHandler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
@@ -33,10 +32,9 @@ func (h *EventHandler) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-node authentication (API Key -> nodeID)
-	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
+	nodeID := NodeIDFromContext(r.Context())
 
-	if err != nil {
+	if nodeID == "" {
 		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}

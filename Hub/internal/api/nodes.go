@@ -13,11 +13,10 @@ import (
 // Route: POST /api/v1/nodes
 type NodeHandler struct {
 	service *node.Service
-	Auth    *AuthHandler
 }
 
-func NewNodeHandler(svc *node.Service, auth *AuthHandler) *NodeHandler {
-	return &NodeHandler{service: svc, Auth: auth}
+func NewNodeHandler(svc *node.Service) *NodeHandler {
+	return &NodeHandler{service: svc}
 }
 
 func (h *NodeHandler) CreateNode(w http.ResponseWriter, r *http.Request) {
@@ -197,11 +196,10 @@ func (h *NodeHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 // Used by wizard agents authenticated via Bearer token
 func (h *NodeHandler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
 
-	// Authenticate via Bearer token
-	nodeID, err := h.Auth.AuthenticateNodeRequest(r)
+	nodeID := NodeIDFromContext(r.Context())
 
-	if err != nil {
-		RespondError(w, err.Error(), http.StatusUnauthorized)
+	if nodeID == "" {
+		RespondError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 

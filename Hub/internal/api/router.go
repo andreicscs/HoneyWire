@@ -28,15 +28,16 @@ func ErrorOnlyLogger(next http.Handler) http.Handler {
 }
 
 type RouterConfig struct {
-	Nodes            *NodeHandler
-	Sensors          *SensorHandler
-	Auth             *AuthHandler
-	Events           *EventHandler
-	Analytics        *AnalyticsHandler
-	Config           *ConfigHandler
-	Compose          *ComposeHandler
-	WSService        *websocket.Service
-	SessionValidator SessionValidator
+	Nodes             *NodeHandler
+	Sensors           *SensorHandler
+	Auth              *AuthHandler
+	Events            *EventHandler
+	Analytics         *AnalyticsHandler
+	Config            *ConfigHandler
+	Compose           *ComposeHandler
+	WSService         *websocket.Service
+	SessionValidator  SessionValidator
+	NodeAuthenticator NodeAuthenticator
 }
 
 func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
@@ -98,14 +99,16 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 	})
 
 	// --- Wizard & Telemetry Endpoints ---
-	// Authentication is handled via API Key (Bearer Token) inside the handler
-	r.Get("/api/v1/nodes/me", cfg.Nodes.GetCurrentNode)        // node whoami based on api key.
-	r.Get("/api/v1/nodes/compose", cfg.Compose.GetNodeCompose) // aggreagates all generated compose files for a node's sensors
-	r.Post("/api/v1/heartbeat", cfg.Sensors.ReceiveHeartbeat)
-	r.Post("/api/v1/offline", cfg.Sensors.ReceiveOffline)
-	r.Post("/api/v1/event", cfg.Events.ReceiveEvent)
+	r.Group(func(r chi.Router) {
+		r.Use(AgentAuthMiddleware(cfg.NodeAuthenticator))
+		r.Get("/api/v1/nodes/me", cfg.Nodes.GetCurrentNode)
+		r.Get("/api/v1/nodes/compose", cfg.Compose.GetNodeCompose)
+		r.Post("/api/v1/heartbeat", cfg.Sensors.ReceiveHeartbeat)
+		r.Post("/api/v1/offline", cfg.Sensors.ReceiveOffline)
+		r.Post("/api/v1/event", cfg.Events.ReceiveEvent)
+	})
 
-	r.Get("/api/v1/manifests", cfg.Sensors.GetManifests) // Fetches catalog (Dual Auth)
+	r.With(DualAuthMiddleware(cfg.SessionValidator, cfg.NodeAuthenticator)).Get("/api/v1/manifests", cfg.Sensors.GetManifests)
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

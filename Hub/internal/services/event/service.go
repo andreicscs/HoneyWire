@@ -1,9 +1,11 @@
 package event
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +24,8 @@ type Store interface {
 	ArchiveAllEvents() error
 	GetEventCount() (int, error)
 	ClearAllEvents() error
+	GetConfigValue(key string) (string, error)
+	EnforceRetention(archiveDays, purgeDays int) error
 }
 
 type Broadcaster interface {
@@ -116,4 +120,30 @@ func (s *Service) ClearEvents(dryrun bool, ip string) (int, error) {
 	}
 	log.Printf("[!] AUDIT: Database purged by IP %s", ip)
 	return 0, s.store.ClearAllEvents()
+}
+
+func (s *Service) StartRetentionWorker(ctx context.Context) {
+	// Wake up every hour to check retention
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[Retention] worker stopped")
+			return
+		case <-ticker.C:
+			archiveStr, _ := s.store.GetConfigValue("auto_archive_days")
+			purgeStr, _ := s.store.GetConfigValue("auto_purge_days")
+
+			archiveDays, _ := strconv.Atoi(archiveStr)
+			purgeDays, _ := strconv.Atoi(purgeStr)
+
+			if archiveDays > 0 || purgeDays > 0 {
+				if err := s.store.EnforceRetention(archiveDays, purgeDays); err != nil {
+					log.Printf("[WARNING] Event retention task failed: %v", err)
+				}
+			}
+		}
+	}
 }
