@@ -164,7 +164,6 @@ func reportFileEvent(
 	path string,
 ) {
 	hw.ReportEvent(
-		hw.Severity,
 		trigger,
 		"Local OS",
 		filepath.Base(path),

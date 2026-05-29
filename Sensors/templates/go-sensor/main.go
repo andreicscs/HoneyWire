@@ -70,11 +70,10 @@ func runSensor(ctx context.Context, hw *sdk.Sensor) {
 
 			// Send the alert to the Hub using the SDK's built-in method
 			hw.ReportEvent(
-				severity,                  // 1. Severity
-				"custom_anomaly_detected", // 2. Event Trigger
-				sourceIP,                  // 3. Source
-				target,                    // 4. Target
-				map[string]any{            // 5. Details
+				"custom_anomaly_detected", // 1. Event Trigger
+				sourceIP,                  // 2. Source
+				target,                    // 3. Target
+				map[string]any{            // 4. Details
 					"attack_type":  "example_probe",
 					"raw_payload":  "GET /etc/passwd HTTP/1.1",
 					"action_taken": "logged",

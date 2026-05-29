@@ -133,7 +133,6 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 			log.Printf("[!] Port scan detected from %s: %v", srcIP, uniquePortsList)
 
 			hw.ReportEvent(
-				"high",
 				"network_scan_detected",
 				srcIP,
 				"Multiple Ports",

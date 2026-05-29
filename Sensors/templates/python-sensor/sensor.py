@@ -41,7 +41,6 @@ class MyCustomSensor(HoneyWireSensor):
                 await asyncio.to_thread(
                     self.report_event,
                     event_trigger="custom_anomaly_detected",
-                    severity=self.severity,
                     source="192.168.1.100", # Replace with actual IP
                     target=self.target,
                     details=details

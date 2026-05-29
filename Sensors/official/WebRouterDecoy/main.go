@@ -132,7 +132,6 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[!] Login attempt from %s (User: %s)", srcIP, username)
 
 	hw.ReportEvent(
-		"critical",
 		"web_login_attempt",
 		srcIP,
 		"Web Interface",

@@ -143,7 +143,6 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 	duration := time.Since(start).Seconds()
 
 	hw.ReportEvent(
-		"high",
 		"tcp_connection",
 		srcIP,
 		fmt.Sprintf("Port %d", port),

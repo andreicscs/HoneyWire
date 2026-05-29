@@ -83,7 +83,6 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 		log.Printf("[+] ICMP Echo Request from %s (seq=%d size=%d)", sourceIP, echo.Seq, n)
 
 		hw.ReportEvent(
-			"high",
 			"icmp_ping_received",
 			sourceIP,
 			"ICMP Listener",
