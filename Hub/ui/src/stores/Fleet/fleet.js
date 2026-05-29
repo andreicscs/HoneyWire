@@ -133,9 +133,7 @@ export const useFleetStore = defineStore('fleet', () => {
       status: raw.status || 'down',
       isSilenced: raw.isSilenced ?? false,
       events24h: raw.events24h ?? 0,
-      osi: raw.osi_layer || 'Sensor',
-      icon: raw.icon_svg || 'M12 12h0', //TODO add default icon for sensors
-      envVars: raw.env_vars || {},
+      envVars: raw.envVars || {},
       metadata: raw.metadata || {},
       lastHeartbeat: raw.lastHeartbeat || null,
     }
