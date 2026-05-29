@@ -14,6 +14,9 @@ import (
 	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/config"
 	"github.com/honeywire/hub/internal/notify"
+	"github.com/honeywire/hub/internal/services/node"
+	"github.com/honeywire/hub/internal/services/sensor"
+	"github.com/honeywire/hub/internal/services/websocket"
 	"github.com/honeywire/hub/internal/siem"
 	"github.com/honeywire/hub/internal/store"
 )
@@ -45,7 +48,10 @@ func main() {
 	defer rootCancel()
 
 	sessionStore := auth.NewSessionStore()
-	h := api.NewHandler(dbStore, cfg, sessionStore)
+	wsService := websocket.NewService()
+	nodeSvc := node.NewService(dbStore, wsService)
+	sensorSvc := sensor.NewService(dbStore, wsService)
+	h := api.NewHandler(dbStore, cfg, sessionStore, wsService, nodeSvc, sensorSvc)
 	r, err := api.SetupRouter(h)
 	if err != nil {
 		log.Fatalf("[FATAL] Router setup failed: %v", err)

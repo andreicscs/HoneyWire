@@ -13,6 +13,7 @@ import (
 	"github.com/honeywire/hub/internal/compose"
 	"github.com/honeywire/hub/internal/compose/security"
 	"github.com/honeywire/hub/internal/models"
+	"github.com/honeywire/hub/internal/services/node"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,7 +30,6 @@ type ComposeReq struct {
 	HubKey      string             `json:"hubKey"`
 	Sensors     []DeployableSensor `json:"sensors"`
 }
-
 
 // --- OUTGOING COMPOSE STRUCTS ---
 
@@ -125,7 +125,6 @@ func fetchManifestBytes() ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-
 // -----------------------------------------------------------------------------
 // COMPOSE GENERATOR
 // -----------------------------------------------------------------------------
@@ -133,7 +132,6 @@ func fetchManifestBytes() ([]byte, error) {
 // -----------------------------------------------------------------------------
 // NODE-SPECIFIC COMPOSE GENERATION
 // -----------------------------------------------------------------------------
-
 
 // GetNodeCompose generates the official docker-compose.yml for a specific agent
 // Authentication: Bearer <API_KEY>
@@ -191,7 +189,7 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 
 	if effectiveRevision == "" && nodeDetails.HasPendingConfig {
 
-		effectiveRevision = generateRevisionHash(nodeDetails.InstalledSensors)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors)
 
 		if err := h.Store.SetNodeDesiredRevision(nodeID, effectiveRevision); err != nil {
 			RespondError(w, "Failed to allocate node revision", http.StatusInternalServerError)
@@ -208,7 +206,7 @@ func (h *Handler) GetNodeCompose(w http.ResponseWriter, r *http.Request) {
 	// Final bootstrap fallback
 
 	if effectiveRevision == "" {
-		effectiveRevision = generateRevisionHash(nodeDetails.InstalledSensors)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors)
 	}
 	manifests, fetchErr := fetchStrictCatalogManifests()
 	if fetchErr != nil {
@@ -312,7 +310,7 @@ func (h *Handler) GenerateCompose(w http.ResponseWriter, r *http.Request) {
 		svcCompose := compose.BuildService(s.SensorID, s.Manifest, envMap)
 		finalCompose.Services = append(finalCompose.Services, svcCompose.Services...)
 	}
-	
+
 	yamlData, err := yaml.Marshal(&finalCompose)
 
 	if err != nil {

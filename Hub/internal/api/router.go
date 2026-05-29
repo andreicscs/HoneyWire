@@ -43,7 +43,7 @@ func SetupRouter(h *Handler) (*chi.Mux, error) {
 	r.Group(func(r chi.Router) {
 		r.Use(UIAuthMiddleware(h.SessionStore))
 
-		r.Get("/api/v1/ws", h.ServeWS)
+		r.Get("/api/v1/ws", h.WSService.HandleWS)
 
 		// UI Compose Preview
 		r.Post("/api/v1/compose/generate", h.GenerateCompose) // Used by UI modal for live preview

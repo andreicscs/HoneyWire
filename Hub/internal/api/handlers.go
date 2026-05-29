@@ -10,37 +10,36 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/honeywire/hub/internal/auth"
 	"github.com/honeywire/hub/internal/config"
+	"github.com/honeywire/hub/internal/services/node"
+	"github.com/honeywire/hub/internal/services/sensor"
+	"github.com/honeywire/hub/internal/services/websocket"
 	"github.com/honeywire/hub/internal/store"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 type Handler struct {
-	Store        *store.SQLiteStore
-	Cfg          *config.Config
-	SessionStore *auth.SessionStore
+	Store         *store.SQLiteStore
+	Cfg           *config.Config
+	SessionStore  *auth.SessionStore
+	WSService     *websocket.Service
+	NodeService   *node.Service
+	SensorService *sensor.Service
 
-	clients       map[*websocket.Conn]bool
-	clientsMu     sync.Mutex
 	authTracker   map[string]*loginState
 	authMutex     sync.Mutex
 	nodeAuthCache sync.Map
 }
 
-func NewHandler(s *store.SQLiteStore, cfg *config.Config, sess *auth.SessionStore) *Handler {
+func NewHandler(s *store.SQLiteStore, cfg *config.Config, sess *auth.SessionStore, ws *websocket.Service, nodeSvc *node.Service, sensorSvc *sensor.Service) *Handler {
 	h := &Handler{
-		Store:        s,
-		Cfg:          cfg,
-		SessionStore: sess,
-		clients:      make(map[*websocket.Conn]bool),
-		authTracker:  make(map[string]*loginState),
+		Store:         s,
+		Cfg:           cfg,
+		SessionStore:  sess,
+		WSService:     ws,
+		NodeService:   nodeSvc,
+		SensorService: sensorSvc,
+		authTracker:   make(map[string]*loginState),
 	}
 	go h.cleanupAuthTracker()
 	go h.startChartSyncBroadcaster()
@@ -79,76 +78,9 @@ func (h *Handler) getRealIP(r *http.Request) string {
 
 // --- WebSocket ---
 
-func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("[ERROR] WS Upgrade failed: %v\n", err)
-		return
-	}
-
-	h.clientsMu.Lock()
-	h.clients[conn] = true
-	h.clientsMu.Unlock()
-
-
-	const pingPeriod = 20 * time.Second
-    const writeWait = 10 * time.Second
-    const readWait = 25 * time.Second // Must be greater than pingPeriod
-
-	conn.SetReadDeadline(time.Now().Add(readWait))
-    conn.SetPongHandler(func(string) error {
-        conn.SetReadDeadline(time.Now().Add(readWait))
-        return nil
-    })
-
-	// Goroutine for keeping the connection alive by sending periodic pings
-    go func() {
-        ticker := time.NewTicker(pingPeriod)
-        defer func() {
-            ticker.Stop()
-            conn.Close()
-        }()
-
-        for range ticker.C {
-            // Send a native control frame Ping (Opcode 0x9)
-            if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-                return
-            }
-        }
-    }()
-
-	go func() {
-		defer func() {
-			h.clientsMu.Lock()
-			delete(h.clients, conn)
-			h.clientsMu.Unlock()
-			conn.Close()
-		}()
-		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
-				break
-			}
-		}
-	}()
-}
-
+// TODO Legacy helper to bridge older API endpoints until they are moved to Domain Services
 func (h *Handler) broadcastWS(msgType string, payload interface{}) {
-	var deadClients []*websocket.Conn
-	h.clientsMu.Lock()
-	for client := range h.clients {
-		err := client.WriteJSON(map[string]interface{}{
-			"type":    msgType,
-			"payload": payload,
-		})
-		if err != nil {
-			deadClients = append(deadClients, client)
-		}
-	}
-	for _, c := range deadClients {
-		delete(h.clients, c)
-		c.Close()
-	}
-	h.clientsMu.Unlock()
+	h.WSService.Broadcast(msgType, payload)
 }
 
 // Run this in a goroutine when your server starts
