@@ -45,7 +45,7 @@ internal/
 │       └── projection.go
 │
 ├── api/
-│   └── analytics_handler.go
+│   └── analytics.go
 ```
 
 ---
