@@ -16,8 +16,10 @@ func HandleRelink(args []string) error {
 
 	var backupPath string
 	hasBackup := false
+	var defaultHubURL string
 
 	if existing, err := app.LoadConfig(app.ConfigPath); err == nil {
+		defaultHubURL = existing.HubURL
 		fmt.Printf("    %sExisting node detected:%s\n", cli.Cyan, cli.Reset)
 		fmt.Printf("      Node ID: %s\n", existing.NodeID)
 		fmt.Printf("      Hub:     %s\n\n", existing.HubURL)
@@ -39,7 +41,7 @@ func HandleRelink(args []string) error {
 		}
 	}
 
-	err := executeRelink(args)
+	err := executeRelink(args, defaultHubURL)
 
 	if err != nil {
 		if hasBackup {
@@ -65,7 +67,7 @@ func HandleRelink(args []string) error {
 	return nil
 }
 
-func executeRelink(args []string) error {
+func executeRelink(args []string, defaultHubURL string) error {
 	var hubURL, apiKey string
 	if len(args) > 0 {
 		hubURL = args[0]
@@ -78,7 +80,14 @@ func executeRelink(args []string) error {
 		if !cli.IsTerminal() {
 			return fmt.Errorf("Hub URL required but stdin is not a terminal. Provide as argument: wizard relink <hub_url>")
 		}
-		hubURL, _ = cli.PromptInput("    Hub URL: ")
+		if defaultHubURL != "" {
+			hubURL, _ = cli.PromptInput(fmt.Sprintf("    Hub URL [%s]: ", defaultHubURL))
+			if strings.TrimSpace(hubURL) == "" {
+				hubURL = defaultHubURL
+			}
+		} else {
+			hubURL, _ = cli.PromptInput("    Hub URL: ")
+		}
 	}
 	if hubURL == "" {
 		return fmt.Errorf("Hub URL is required")

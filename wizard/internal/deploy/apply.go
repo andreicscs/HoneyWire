@@ -55,10 +55,29 @@ func Apply(ctx context.Context, composeData []byte) error {
 		return fmt.Errorf("failed to swap compose file: %w", err)
 	}
 
+	// Explicitly pull latest images before starting
+	fmt.Printf("%s[*] Pulling latest container images...%s\n", cli.Cyan, cli.Reset)
+	
+	pullCtx, pullCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer pullCancel()
+
+	pullArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "pull")
+	pullCmd := exec.CommandContext(pullCtx, pullArgs[0], pullArgs[1:]...)
+	pullCmd.Dir = DeployDir
+	pullCmd.Stdout = os.Stdout
+	pullCmd.Stderr = os.Stderr
+
+	if err := pullCmd.Run(); err != nil {
+		// If pulling fails (e.g., registry down, no internet), you might want to log it
+		// but continue to try 'up' with whatever local images you have as a fallback.
+		// Alternatively, you can return an error here to halt deployment.
+		fmt.Printf("%s[!] Warning: Failed to pull latest images. Continuing with local cache. Error: %v%s\n", cli.Yellow, err, cli.Reset)
+	}
+
 	upCtx, upCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer upCancel()
 
-	upArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--remove-orphans")
+	upArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--pull", "always", "--remove-orphans")
 	upCmd := exec.CommandContext(upCtx, upArgs[0], upArgs[1:]...)
 	upCmd.Dir = DeployDir
 	upCmd.Stdout = os.Stdout
