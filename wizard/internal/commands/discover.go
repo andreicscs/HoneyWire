@@ -40,9 +40,9 @@ func HandleDiscover(force bool) error {
 	cli.PrintSectionHeader("HoneyWire Discover", cli.Cyan)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
 	installed, err := app.Hub.FetchInstalledSensors(ctx, app.Config.NodeID, app.Config.APIKey)
+	cancel() // Release context immediately after network call
+
 	if err != nil {
 		fmt.Printf("%s[!] Warning: Could not fetch installed sensors from Hub: %v%s\n", cli.Yellow, err, cli.Reset)
 		fmt.Printf("%s    Continuing without duplicate detection.%s\n\n", cli.Dim, cli.Reset)
@@ -167,12 +167,12 @@ promptLoop:
 func applySuggestions(app *app.App, recs []*discovery.Recommendation, dockerMap map[int]string) error {
 	fmt.Printf("\n    %s[*] Dashboard auth required to register sensors.%s\n", cli.Cyan, cli.Reset)
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	if err := app.RequireDashboardAuth(ctx); err != nil {
+	if err := app.RequireDashboardAuth(); err != nil {
 		return fmt.Errorf("dashboard authentication required: %w", err)
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
 	fmt.Printf("    %s[*] Registering sensors with Hub...%s\n", cli.Cyan, cli.Reset)
 	for _, rec := range recs {

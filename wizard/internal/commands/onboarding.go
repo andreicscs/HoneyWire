@@ -14,10 +14,8 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 		}
 	} else {
 		if appInstance, err := loadApp(); err == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-			defer cancel()
 			fmt.Printf("\n    %s[*] Dashboard auth required to provision a new node.%s\n", cli.Cyan, cli.Reset)
-			if authErr := appInstance.RequireDashboardAuth(ctx); authErr != nil {
+			if authErr := appInstance.RequireDashboardAuth(); authErr != nil {
 				return fmt.Errorf("dashboard authentication required: %w", authErr)
 			}
 		}
@@ -46,9 +44,9 @@ func HandleInteractiveMenu(force bool) error {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
 	nodeInfo, err := app.Hub.GetCurrentNode(ctx, app.Config.APIKey)
+	cancel() // Release context immediately after network call
+
 	if err != nil {
 		fmt.Printf("%s[!] Warning: Could not reach Hub: %v%s\n\n", cli.Yellow, err, cli.Reset)
 	}

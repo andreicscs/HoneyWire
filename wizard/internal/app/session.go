@@ -47,13 +47,15 @@ func (a *App) Random() *rand.Rand {
 	return a.rng
 }
 
-func (a *App) RequireDashboardAuth(ctx context.Context) error {
+func (a *App) RequireDashboardAuth() error {
 	if a.HasDashboardAuth() {
 		return nil
 	}
 
 	if envPW := os.Getenv("HW_DASHBOARD_PASSWORD"); envPW != "" {
-		cookie, err := a.Hub.AuthenticateDashboard(ctx, envPW)
+		authCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cookie, err := a.Hub.AuthenticateDashboard(authCtx, envPW)
 		if err != nil {
 			return fmt.Errorf("authentication via HW_DASHBOARD_PASSWORD failed: %w", err)
 		}

@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "\n%s✖ Fatal Error: %v%s\n", cli.Red, err, cli.Reset)
+		fmt.Fprintf(os.Stderr, "\n%sFatal Error: %v%s\n", cli.Red, err, cli.Reset)
 		os.Exit(1)
 	}
 }
