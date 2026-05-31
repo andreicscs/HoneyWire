@@ -168,6 +168,7 @@ const editingSensorId = ref(null)
 const activeTab = ref('readme')
 const envVarValues = ref({})
 const activeEnvVar = ref(null)
+const openBooleanDropdown = ref(null)
 const isSeverityOpen = ref(false)
 const rawCompose = ref('')
 const highlightedCompose = ref('')
@@ -220,13 +221,39 @@ const selectSeverity = (val) => { envVarValues.value['HW_SEVERITY'] = val; close
 
 // --- ENV VAR HELPERS ---
 const getUIDefault = (def) => {
-  if (!def) return ''
-  if (!def.includes('{{')) return def
-  const elseMatch = def.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
+  if (def === undefined || def === null) return ''
+  const strDef = String(def)
+  if (!strDef.includes('{{')) return strDef
+  const elseMatch = strDef.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
   if (elseMatch) return elseMatch[1].trim()
-  const funcMatch = def.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
+  const funcMatch = strDef.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
   if (funcMatch) return funcMatch[1].trim()
   return ''
+}
+
+const getEnvType = (env) => {
+  if (env.type === 'boolean' || env.type === 'bool') return 'boolean'
+  if (env.type === 'int' || env.type === 'number') return 'number'
+  
+  const def = getUIDefault(env.default).trim()
+  if (def === 'true' || def === 'false') return 'boolean'
+  if (def !== '' && !isNaN(Number(def))) return 'number'
+  
+  return 'text'
+}
+
+const incrementEnvVar = (envName, defaultVal) => {
+  const current = envVarValues.value[envName] !== undefined && envVarValues.value[envName] !== '' 
+    ? envVarValues.value[envName] 
+    : getUIDefault(defaultVal)
+  envVarValues.value[envName] = String(Number(current || 0) + 1)
+}
+
+const decrementEnvVar = (envName, defaultVal) => {
+  const current = envVarValues.value[envName] !== undefined && envVarValues.value[envName] !== '' 
+    ? envVarValues.value[envName] 
+    : getUIDefault(defaultVal)
+  envVarValues.value[envName] = String(Number(current || 0) - 1)
 }
 
 const coreVars = ['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SENSOR_ID', 'HW_SEVERITY', 'HW_TEST_MODE', 'HW_LOG_LEVEL']
@@ -882,7 +909,41 @@ const applyHighlighting = () => {
                                         <template v-for="env in sortedEnvVars" :key="env.name">
                                             <div v-if="env.name !== 'HW_SEVERITY'" class="space-y-1">
                                                 <label class="block text-sm text-text-h mb-0.5">{{ env.name }}</label>
-                                                <input v-model="envVarValues[env.name]" :type="env.type === 'int' ? 'number' : 'text'" :placeholder="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" class="w-full px-3 py-2 text-sm text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50" />
+                                                <div v-if="getEnvType(env) === 'boolean'" class="relative w-full">
+                                                    <div @click="openBooleanDropdown = openBooleanDropdown === env.name ? null : env.name" class="w-full px-3 py-2 text-sm bg-input-bg border rounded-md cursor-pointer flex justify-between items-center transition-all duration-[var(--duration-fast)] shadow-sm select-none" :class="openBooleanDropdown === env.name ? 'border-primary-main ring-1 ring-focus-ring' : 'border-input-border hover:border-border-default'">
+                                                        <span v-if="String(envVarValues[env.name] !== undefined && envVarValues[env.name] !== '' ? envVarValues[env.name] : getUIDefault(env.default)) === 'true'" class="text-success-main font-medium flex items-center gap-2">
+                                                            <span class="w-2 h-2 rounded-full bg-success-main"></span>true
+                                                        </span>
+                                                        <span v-else-if="String(envVarValues[env.name] !== undefined && envVarValues[env.name] !== '' ? envVarValues[env.name] : getUIDefault(env.default)) === 'false'" class="text-danger-main font-medium flex items-center gap-2">
+                                                            <span class="w-2 h-2 rounded-full bg-danger-main"></span>false
+                                                        </span>
+                                                        <span v-else class="text-text-m font-medium flex items-center gap-2">
+                                                            <span class="w-2 h-2 rounded-full bg-border-default"></span>Select...
+                                                        </span>
+                                                        <svg class="w-4 h-4 text-text-m transition-transform duration-200" :class="openBooleanDropdown === env.name ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                    </div>
+                                                    
+                                                    <div v-if="openBooleanDropdown === env.name" @click="openBooleanDropdown = null" class="fixed inset-0 z-[var(--z-elevated)]"></div>
+
+                                                    <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
+                                                        <ul v-if="openBooleanDropdown === env.name" class="absolute z-[var(--z-dropdown)] w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden">
+                                                            <li @click="envVarValues[env.name] = 'true'; openBooleanDropdown = null" class="px-3 py-2 cursor-pointer transition-colors text-sm font-medium duration-[var(--duration-fast)] flex items-center gap-2 text-success-main hover:bg-success-bg border border-transparent hover:border-success-border/50">
+                                                                <span class="w-2 h-2 rounded-full bg-success-main"></span>true
+                                                            </li>
+                                                            <li @click="envVarValues[env.name] = 'false'; openBooleanDropdown = null" class="px-3 py-2 cursor-pointer transition-colors text-sm font-medium duration-[var(--duration-fast)] flex items-center gap-2 text-danger-main hover:bg-danger-bg border border-transparent hover:border-danger-border/50">
+                                                                <span class="w-2 h-2 rounded-full bg-danger-main"></span>false
+                                                            </li>
+                                                        </ul>
+                                                    </transition>
+                                                </div>
+                                                <div v-else-if="getEnvType(env) === 'number'" class="relative w-full flex items-center">
+                                                    <input v-model="envVarValues[env.name]" type="number" :placeholder="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" class="w-full pl-3 pr-10 py-2 text-sm text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                                    <div class="absolute right-1 top-1 bottom-1 flex flex-col border-l border-input-border w-7">
+                                                        <button tabindex="-1" @click.prevent="incrementEnvVar(env.name, env.default)" class="flex-1 flex items-center justify-center text-text-m hover:text-text-h hover:bg-secondary-hover transition-colors rounded-tr-md outline-none border-b border-input-border"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"></path></svg></button>
+                                                        <button tabindex="-1" @click.prevent="decrementEnvVar(env.name, env.default)" class="flex-1 flex items-center justify-center text-text-m hover:text-text-h hover:bg-secondary-hover transition-colors rounded-br-md outline-none"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg></button>
+                                                    </div>
+                                                </div>
+                                                <input v-else v-model="envVarValues[env.name]" type="text" :placeholder="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" class="w-full px-3 py-2 text-sm text-text-h bg-input-bg border border-input-border rounded-md focus:outline-none focus:border-primary-main focus:ring-1 focus:ring-focus-ring transition-all duration-[var(--duration-fast)] shadow-sm placeholder:text-text-m/50" />
                                                 <p class="text-sm text-text-m mt-1">{{ env.description }}</p>
                                             </div>
                                         </template>
