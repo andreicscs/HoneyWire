@@ -528,7 +528,7 @@ const handleOpenNodeDetail = (nodeId) => {
                         {{ generatedNodeKey }}
                     </code>
                 </div>
-                <p class="text-sm text-text-m font-medium mt-2">Save this key — it won't be shown again.</p>
+                <p class="text-sm text-success-main font-medium mt-2">You can view this key again in the node details.</p>
             </div>
 
             <div>
