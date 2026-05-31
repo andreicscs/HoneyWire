@@ -79,6 +79,7 @@ const doSetup = async () => {
                                 type="password" 
                                 placeholder="Required" 
                                 required 
+                                autofocus
                             />
                             <BaseInput 
                                 v-model="confirmPassword" 
