@@ -70,7 +70,10 @@ func (a *App) RequireDashboardAuth(ctx context.Context) error {
 		return fmt.Errorf("failed to read password: %w", err)
 	}
 
-	cookie, err := a.Hub.AuthenticateDashboard(ctx, password)
+	// Use a fresh context
+	authCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cookie, err := a.Hub.AuthenticateDashboard(authCtx, password)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
