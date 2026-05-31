@@ -199,8 +199,10 @@ const submitFactoryReset = async () => {
                         <BaseNumberStepper 
                             v-model="settings.autoArchiveDays" 
                             label="Auto-Archive Events" 
-                            description="Move events from the Live Queue to the Archive automatically." 
-                            :min="0" :max="90" suffix="Days" 
+                            description="Move events from the Live Queue to the Archive automatically."
+                            :min="0" :max="365" 
+                            :suffix="settings.autoArchiveDays === 1 ? 'Day' : 'Days'"
+                            :class="settings.autoArchiveDays === 0 ? '[&_input]:!text-disabled-text' : ''"
                         />
                         
                         <BaseDivider />
@@ -209,7 +211,9 @@ const submitFactoryReset = async () => {
                             v-model="settings.autoPurgeDays" 
                             label="Auto-Purge Archive" 
                             description="Permanently delete archived events from the SQLite database." 
-                            :min="0" :max="365" suffix="Days" 
+                            :min="0" :max="365" 
+                            :suffix="settings.autoPurgeDays === 1 ? 'Day' : 'Days'"
+                            :class="settings.autoPurgeDays === 0 ? '[&_input]:!text-disabled-text' : ''"
                         />
                     </BaseCard>
                 </div>
