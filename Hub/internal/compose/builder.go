@@ -8,6 +8,16 @@ import (
 	"github.com/honeywire/hub/internal/models"
 )
 
+// CoreEnvVars defines the ordered list of system-reserved environment variables.
+var CoreEnvVars = []string{
+	"HW_SENSOR_ID",
+	"HW_HUB_ENDPOINT",
+	"HW_HUB_KEY",
+	"HW_CONFIG_REV",
+	"HW_TEST_MODE",
+	"HW_SEVERITY",
+}
+
 func BuildService(sensorID string, m models.SensorManifest, envMap map[string]string) *ComposeFile {
 	var compose ComposeFile
 
@@ -23,7 +33,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 
 	for _, ic := range initContainers {
 		initSvc := &ComposeService{
-			Image: ic.Image,
+			Image:   ic.Image,
 			Command: ic.Command,
 		}
 
@@ -36,7 +46,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 		if len(ic.SecurityOpt) > 0 {
 			initSvc.SecurityOpt = ic.SecurityOpt
 		}
-		
+
 		// CapAdd: defensive filtering against allowlist for init container
 		allowedCaps := map[string]bool{
 			"NET_RAW":          true,
@@ -44,7 +54,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 			"NET_ADMIN":        true,
 			"DAC_OVERRIDE":     true, // allowed for file-canary
 		}
-		
+
 		initSvc.CapAdd = []string{}
 		if ic.CapAdd != nil {
 			for _, cap := range ic.CapAdd {
@@ -87,9 +97,9 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 				sort.Strings(dirs)
 				for _, dir := range dirs {
 					composeVol := ComposeVolume{
-						Type:     "bind",
-						Source:   dir,
-						Target:   vol.TargetPrefix + dir,
+						Type:   "bind",
+						Source: dir,
+						Target: vol.TargetPrefix + dir,
 					}
 					initSvc.Volumes = append(initSvc.Volumes, composeVol)
 				}
@@ -109,7 +119,17 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 		// Inject environment variables into init container
 		var envKeys []string
 		for k := range envMap {
-			envKeys = append(envKeys, k)
+			// Init containers only need custom configuration vars.
+			isCore := false
+			for _, coreVar := range CoreEnvVars {
+				if k == coreVar {
+					isCore = true
+					break
+				}
+			}
+			if !isCore {
+				envKeys = append(envKeys, k)
+			}
 		}
 		sortEnvKeys(envKeys)
 		for _, k := range envKeys {
@@ -262,14 +282,6 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 }
 
 func sortEnvKeys(keys []string) {
-	coreOrder := []string{
-		"HW_SENSOR_ID",
-		"HW_HUB_ENDPOINT",
-		"HW_HUB_KEY",
-		"HW_CONFIG_REV",
-		"HW_TEST_MODE",
-		"HW_SEVERITY",
-	}
 	sort.Slice(keys, func(i, j int) bool {
 		k1 := keys[i]
 		k2 := keys[j]
@@ -277,7 +289,7 @@ func sortEnvKeys(keys []string) {
 		idx1 := -1
 		idx2 := -1
 
-		for idx, val := range coreOrder {
+		for idx, val := range CoreEnvVars {
 			if k1 == val {
 				idx1 = idx
 			}
