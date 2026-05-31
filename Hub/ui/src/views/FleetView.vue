@@ -485,7 +485,7 @@ const handleOpenNodeDetail = (nodeId) => {
     
     <!-- Deploy Modal -->
     <BaseModal :show="showDeployModal" @close="closeDeployModal" title="Deploy New Node">
-        <div v-if="deployStep === 1" class="space-y-5">
+        <form v-if="deployStep === 1" @submit.prevent="handleDeploySubmit" class="space-y-5">
             <p class="text-sm text-text-m leading-normal">
                 Create a logical node in the hub before installing the agent on your server.
             </p>
@@ -497,9 +497,9 @@ const handleOpenNodeDetail = (nodeId) => {
 
             <div class="flex justify-end gap-3 pt-5 border-t border-border-default mt-6">
                 <BaseButton variant="ghost" @click="closeDeployModal">Cancel</BaseButton>
-                <BaseButton variant="primary" @click="handleDeploySubmit" :disabled="!newNodeForm.alias">Create Node</BaseButton>
+                <BaseButton variant="primary" type="submit" :disabled="!newNodeForm.alias">Create Node</BaseButton>
             </div>
-        </div>
+        </form>
 
         <div v-else class="space-y-6">
             <div class="flex items-center gap-3 text-success-text bg-success-bg border border-success-border p-3.5 rounded-md">

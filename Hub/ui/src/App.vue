@@ -170,7 +170,6 @@ onUnmounted(() => {
         <Dashboard v-if="currentView === 'dashboard'" />
         <FleetView v-else-if="currentView === 'fleet'" />
         <NodeDetailView v-else-if="currentView === 'node-detail'" />
-        <Store v-else-if="currentView === 'store'" />
         <Settings v-else-if="currentView === 'settings'" />
       </div>
     </main>

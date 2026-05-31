@@ -174,6 +174,14 @@ const rawCompose = ref('')
 const highlightedCompose = ref('')
 const composePre = ref(null)
 
+watch([activeTab, selectedSensor], async ([tab, sensor]) => {
+    if (tab === 'config' && sensor) {
+        await nextTick()
+        const inputs = document.querySelectorAll('input.config-input')
+        if (inputs.length > 0) inputs[0].focus()
+    }
+})
+
 // --- MODAL STATE ---
 const showKeyModal = ref(false)
 const showSyncModal = ref(false)
@@ -750,7 +758,7 @@ const applyHighlighting = () => {
                     <div class="text-text-m select-all">{{ node.apiKey || 'Unavailable' }}</div>
                 </div>
                 <div class="flex justify-end">
-                    <BaseButton variant="secondary" @click="showKeyModal = false">Close</BaseButton>
+                    <BaseButton variant="primary" @click="showKeyModal = false">Close</BaseButton>
                 </div>
             </div>
         </BaseModal>
@@ -875,7 +883,7 @@ const applyHighlighting = () => {
                                 </div>
                             </div>
 
-                            <div v-show="activeTab === 'config'" class="p-6 md:p-8 relative h-full flex flex-col">
+                            <form v-show="activeTab === 'config'" @submit.prevent="handleApplySensor" class="p-6 md:p-8 relative h-full flex flex-col">
                                 <div class="mb-6">
                                     <h4 class="text-sm font-semibold text-text-h mb-3">Sensor Settings</h4>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -883,14 +891,14 @@ const applyHighlighting = () => {
                                         <div class="space-y-1 relative">
                                             <label class="block text-sm text-text-h mb-0.5">Alert Severity</label>
                                             <div @click="toggleSeverity" class="w-full px-3 py-2 text-sm bg-input-bg border rounded-md cursor-pointer flex justify-between items-center transition-all duration-[var(--duration-fast)] shadow-sm select-none" :class="isSeverityOpen ? 'border-primary-main ring-1 ring-focus-ring' : 'border-input-border hover:border-border-default'">
-                                                <span :class="currentSeverity.textClass" class="font-medium flex items-center gap-2"><span class="w-2 h-2 rounded-full" :class="currentSeverity.textClass.replace('text-', 'bg-')"></span>{{ currentSeverity.label }}</span>
-                                                <svg class="w-4 h-4 text-text-m" :class="isSeverityOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                <span :class="currentSeverity.textClass" class="font-medium flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0" :class="currentSeverity.textClass.replace('text-', 'bg-')"></span>{{ currentSeverity.label }}</span>
+                                                <svg class="w-4 h-4 text-text-m shrink-0 transition-transform duration-200" :class="isSeverityOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                                             </div>
                                             <div v-if="isSeverityOpen" @click="closeSeverity" class="fixed inset-0 z-[var(--z-elevated)]"></div>
                                             <transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0">
-                                                <ul v-if="isSeverityOpen" class="absolute z-[var(--z-dropdown)] w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden">
+                                                <ul v-if="isSeverityOpen" class="absolute top-full left-0 z-[var(--z-dropdown)] w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden">
                                                     <li v-for="option in severityOptions" :key="option.value" @click="selectSeverity(option.value)" class="px-3 py-2 cursor-pointer transition-colors text-sm font-medium duration-[var(--duration-fast)] flex items-center gap-2" :class="[option.textClass, option.hoverClass]">
-                                                        <span class="w-2 h-2 rounded-full" :class="option.textClass.replace('text-', 'bg-')"></span>
+                                                        <span class="w-2 h-2 rounded-full shrink-0" :class="option.textClass.replace('text-', 'bg-')"></span>
                                                         {{ option.label }}
                                                     </li>
                                                 </ul>
@@ -915,7 +923,8 @@ const applyHighlighting = () => {
                                 </div>
                                 
                                 <div class="relative flex-1 min-h-[250px] mb-6">
-                                    <button @click="handleCopy('compose-yaml', rawCompose)"
+                                    <button type="button"
+                                            @click="handleCopy('compose-yaml', rawCompose)"
                                             class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
                                             :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
                                         {{ copiedStates['compose-yaml'] ? 'Copied!' : 'Copy' }}
@@ -924,9 +933,9 @@ const applyHighlighting = () => {
                                 </div>
 
                                 <div class="mt-auto border-t border-border-default pt-4 flex justify-end">
-                                    <BaseButton variant="primary" @click="handleApplySensor" class="px-6">{{ isEditingSensor ? 'Apply Settings' : 'Add to Node' }}</BaseButton>
+                                    <BaseButton variant="primary" type="submit" class="px-6">{{ isEditingSensor ? 'Apply Settings' : 'Add to Node' }}</BaseButton>
                                 </div>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 </div>

@@ -78,18 +78,6 @@ const clearLogs = async () => {
                     <span>Fleet Management</span>
                 </div>
             </button>
-            
-            <button @click="appStore.currentView = 'store'" 
-                    type="button"
-                    class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="currentView === 'store' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
-                    :title="!sidebarOpen ? 'Sensor Store' : ''">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
-                     :class="sidebarOpen ? 'max-w-[150px] ml-3 opacity-100' : 'max-w-0 ml-0 opacity-0'">
-                    <span>Sensor Store</span>
-                </div>
-            </button>
 
             <button @click="appStore.currentView = 'settings'" 
                     type="button"

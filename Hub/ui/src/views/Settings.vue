@@ -342,6 +342,7 @@ const submitFactoryReset = async () => {
                     type="password" 
                     placeholder="Master Password" 
                     required 
+                    autofocus
                     inputClass="!border-danger-border !focus:border-danger-main"
                 />
                 
