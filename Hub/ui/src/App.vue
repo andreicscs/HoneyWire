@@ -8,7 +8,6 @@ import Dashboard from './views/Dashboard.vue'
 import FleetView from './views/FleetView.vue'
 import NodeDetailView from './views/NodeDetailView.vue'
 import Login from './views/Login.vue'
-import Store from './views/Store.vue'
 import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
 

@@ -2,9 +2,11 @@
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '../../stores/System/app'
 import { useEventsStore } from '../../stores/Events/events'
+import { useFleetStore } from '../../stores/Fleet/fleet'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
+const fleetStore = useFleetStore()
 
 const { currentView, sidebarOpen, viewingArchive, version } = storeToRefs(appStore)
 
@@ -37,6 +39,11 @@ const clearLogs = async () => {
         alert("Error purging logs.")
     }
 }
+
+const goToDashboard = () => {
+    fleetStore.clearSelection()
+    appStore.currentView = 'dashboard'
+}
 </script>
 
 <template>
@@ -55,7 +62,7 @@ const clearLogs = async () => {
             <div class="px-3 text-xs  text-text-m transition-all duration-fast overflow-hidden whitespace-nowrap"
                  :class="sidebarOpen ? 'max-h-6 opacity-100 mb-1' : 'max-h-0 opacity-0 mb-0'">Menu</div>
             
-            <button @click="appStore.currentView = 'dashboard'" 
+            <button @click="goToDashboard" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
                     :class="currentView === 'dashboard' ? 'bg-secondary-selected  shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"

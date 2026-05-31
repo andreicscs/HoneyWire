@@ -39,7 +39,6 @@ const maxSensorEvents = computed(() => {
 const topSensors = computed(() => {
   return [...(node.value?.installedSensors || [])]
     .sort((a, b) => (b.events24h || 0) - (a.events24h || 0))
-    .slice(0, 5)
 })
 
 // --- MANIFEST LOOKUP (for icon/OSI enrichment) ---
@@ -339,11 +338,18 @@ const handleDeleteNode = () => {
     }
 }
 
+const viewAllEvents = () => {
+    // Keeps the current node selected in the fleetStore to act as a filter
+    appStore.currentView = 'dashboard'
+}
+
 // --- NAVIGATION ---
 
 watch(selectedNodeId, async (value) => {
     if (!value) {
-        appStore.currentView = 'fleet'
+        if (appStore.currentView === 'node-detail') {
+            appStore.currentView = 'fleet'
+        }
         return
     }
     await Promise.all([
@@ -608,9 +614,9 @@ const applyHighlighting = () => {
 
             <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 
-                <!-- Sensor Volume (24h) -->
+                <!-- Event Volume (24h) -->
                 <div class="bg-bg-surface w-full max-w-2xl border border-border-default rounded-lg p-5 shadow-sm flex flex-col">
-                    <h3 class="text-sm font-semibold text-text-h mb-4">Sensor Volume (24h)</h3>
+                    <h3 class="text-sm font-semibold text-text-h mb-4">Event Volume (24h)</h3>
                     <div v-if="topSensors.length > 0" class="space-y-3 overflow-y-auto custom-scroll max-h-[240px] pr-1">
                         <div v-for="sensor in topSensors" :key="sensor.id">
                             <div class="flex items-center justify-between mb-1.5">
@@ -629,7 +635,7 @@ const applyHighlighting = () => {
                 <div class="bg-bg-surface border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
                     <div class="px-4 py-3 border-b border-border-default flex items-center justify-between bg-bg-surface shrink-0">
                         <h3 class="text-sm font-semibold text-text-h">Recent Activity</h3>
-                        <button class="text-sm font-medium text-text-m hover:text-text-h transition-colors">View All &rarr;</button>
+                        <button @click="viewAllEvents" class="text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none">View All &rarr;</button>
                     </div>
                     
                     <div class="flex-1 overflow-y-auto custom-scroll bg-bg-surface max-h-[240px]">
@@ -648,7 +654,7 @@ const applyHighlighting = () => {
                                     <td colspan="5" class="px-3 py-4 text-center text-sm text-text-m">No recent activity on this node.</td>
                                 </tr>
                                 <tr v-for="event in recentActivity" :key="event.id" 
-                                    class="hover:bg-secondary-hover cursor-pointer transition-colors duration-[var(--duration-fast)] relative z-0"
+                                    class="hover:bg-secondary-hover cursor-default transition-colors duration-[var(--duration-fast)] relative z-0"
                                     :class="'bleed-' + event.severity.toLowerCase()">
                                     
                                     <td class="px-3 py-2 border-b border-border-default">
@@ -683,7 +689,7 @@ const applyHighlighting = () => {
             <div>
                 <h3 class="text-sm font-semibold text-text-h mb-4 mt-2">Deployed Sensors</h3>
                 <div v-if="node.installedSensors?.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                    <div v-for="sensor in node.installedSensors" :key="sensor.id" class="bg-bg-surface border border-border-default rounded-lg p-4 flex flex-col group hover:border-text-m transition-colors shadow-sm relative overflow-hidden">
+                    <div v-for="sensor in node.installedSensors" :key="sensor.id" class="bg-bg-surface border border-border-default rounded-lg p-4 flex flex-col group transition-colors shadow-sm relative overflow-hidden">
                         
                         <div class="absolute top-0 left-0 right-0 h-1 transition-colors" :class="sensor.status === 'up' ? 'bg-success-main' : 'bg-danger-main'"></div>
 
