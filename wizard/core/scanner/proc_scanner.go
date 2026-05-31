@@ -165,7 +165,6 @@ func (p *ProcScanner) buildInodePortMap() map[string]int {
 		if err != nil {
 			continue
 		}
-		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
 		lineNum := 0
@@ -206,6 +205,7 @@ func (p *ProcScanner) buildInodePortMap() map[string]int {
 			inode := fields[9]
 			inodeToPort[inode] = int(portInt)
 		}
+		file.Close()
 	}
 
 	return inodeToPort
