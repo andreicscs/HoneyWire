@@ -7,7 +7,7 @@ import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
 </script>
 
 <template>
-    <div class="flex flex-col gap-4 sm:gap-6 h-full max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6">
+    <div class="min-h-full flex flex-col gap-4 sm:gap-6 max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
         <TrafficFilters />
 
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">
@@ -24,7 +24,7 @@ import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
             </div>
         </div>
 
-        <div class="flex-1 min-h-0 pb-6 mt-2">
+        <div class="flex-1 min-h-0 mt-2">
             <EventTable />
         </div>
     </div>

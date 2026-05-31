@@ -220,7 +220,7 @@ const applyHighlighting = () => {
 </script>
 
 <template>
-    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6">
+    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
         
         <PageHeader 
             class="mb-6 mt-4 sm:mt-6 shrink-0"
@@ -228,7 +228,7 @@ const applyHighlighting = () => {
             description="Deploy new HoneyWire nodes across your infrastructure. Click on a sensor to view documentation and deployment configurations."
         />
 
-        <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
+        <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse flex flex-col justify-between">
                 <div class="flex justify-between items-start">
                     <div class="w-12 h-12 rounded-md bg-bg-inset"></div>
@@ -247,7 +247,7 @@ const applyHighlighting = () => {
             <p class="text-base text-text-m mt-2 max-w-md">Please ensure this Hub has internet access to pull the latest sensor manifests from GitHub.</p>
         </div>
 
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-10">
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div v-for="s in sensors" :key="s.id" 
                  @click="openSensor(s)"
                  class="bg-bg-surface border border-border-default rounded-lg p-5 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all duration-normal group flex flex-col">

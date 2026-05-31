@@ -164,7 +164,7 @@ const formatTime = (timestamp) => {
             </div>
         </div>
 
-        <div class="overflow-x-auto overflow-y-auto custom-scroll max-h-[600px] lg:max-h-[700px] flex-1">
+        <div class="overflow-x-auto overflow-y-auto custom-scroll max-h-[600px] lg:max-h-[700px] flex-1 after:content-[''] after:block after:h-4 after:shrink-0">
             <table class="w-full text-left border-separate border-spacing-0" :class="{'opacity-50 pointer-events-none': isFetching}">
                 <thead class="text-base font-medium text-text-m sticky top-0 bg-bg-surface z-30 shadow-[0_1px_0_0_var(--color-border-default)] select-none">
                     <tr>

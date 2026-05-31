@@ -160,7 +160,7 @@ const submitFactoryReset = async () => {
 </script>
 
 <template>
-    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 transition-colors duration-200">
+    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6 transition-colors duration-200">
         
         <PageHeader title="System Settings" description="Manage Hub configuration, retention policies, and push notifications.">
             <template #actions>
@@ -175,11 +175,11 @@ const submitFactoryReset = async () => {
             </template>
         </PageHeader>
         
-        <div class="flex flex-col md:flex-row gap-6 pb-10 flex-1 min-h-0">
+        <div class="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
             
             <BaseVerticalNav v-model="activeTab" :tabs="settingTabs" />
 
-            <div class="flex-1 overflow-y-auto custom-scroll pr-2 space-y-6">
+            <div class="flex-1 overflow-y-auto custom-scroll pr-2 space-y-6 after:content-[''] after:block after:h-6 after:shrink-0">
                 
                 <div v-show="activeTab === 'general'">
                     <BaseCard title="Network Configuration">

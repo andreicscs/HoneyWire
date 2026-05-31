@@ -488,7 +488,7 @@ const applyHighlighting = () => {
 </script>
 
 <template>
-    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6">
+    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
         
         <div class="mt-4 sm:mt-6 mb-4 shrink-0">
             <button @click="fleetStore.clearSelection()" class="flex items-center gap-1.5 text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none w-max">
@@ -710,10 +710,15 @@ const applyHighlighting = () => {
             </div>
         </div>
 
-        <div class="shrink-0 mb-6">
+        <div class="shrink-0">
             <h2 class="text-base font-semibold text-text-h mb-4">Sensor Catalog</h2>
             <div v-if="isManifestLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div v-for="i in 4" :key="i" class="bg-bg-surface border border-border-default rounded-lg p-5 h-36 animate-pulse"></div>
+            </div>
+            <div v-else-if="fetchError" class="flex flex-col items-center justify-center py-20 text-center">
+                <svg class="w-12 h-12 text-danger-text mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <h3 class="text-base font-medium text-text-h">Unable to reach Sensor Registry</h3>
+                <p class="text-base text-text-m mt-2 max-w-md">Please ensure this Hub has connectivity access to pull the latest sensor manifests.</p>
             </div>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div v-for="s in sensors" :key="s.id" @click="openSensor(s)" class="bg-bg-surface border border-border-default rounded-lg p-4 shadow-sm hover:border-primary-main hover:shadow-md cursor-pointer transition-all duration-normal group flex flex-col">
