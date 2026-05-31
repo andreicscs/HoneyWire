@@ -437,7 +437,7 @@ const handleOpenNodeDetail = (nodeId) => {
                             </template>
                             <template v-else>
                                 <div v-for="summary in node.sensorSummary" :key="summary.type" class="relative group/tooltip">
-                                    <span class="px-2 py-1 rounded-md text-sm font-medium flex items-center gap-1.5 border border-border-default bg-secondary-main text-text-m cursor-help hover:border-text-m transition-colors">
+                                    <span class="px-2 py-1 rounded-md text-sm font-medium flex items-center gap-1.5 border border-border-default bg-secondary-main text-text-m cursor-default hover:border-text-m transition-colors">
                                         <span class="text-text-h">{{ summary.count }}</span> {{ summary.type }}
                                     </span>
 
