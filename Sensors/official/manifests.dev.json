@@ -98,7 +98,7 @@
     },
     "deployment": {
       "image": "192.168.1.11:5000/honeywire-webrouterdecoy:dev",
-      "network_mode": "bridge",
+      "network_mode": "host",
       "user": "0:0",
       "env_vars": [
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
