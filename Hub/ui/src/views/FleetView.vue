@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useAppStore } from '../stores/System/app'
 import { useFleetStore } from '../stores/Fleet/fleet'
+import type { FleetNode } from '../stores/Fleet/fleet'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
 import BaseWidget from '../components/ui/layout/BaseWidget.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
@@ -16,7 +17,7 @@ const fleetStore = useFleetStore()
 
 // --- MANIFEST CATALOG ---
 const isManifestLoading = ref(true)
-const manifestData = ref([])
+const manifestData = ref<any[]>([])
 
 const manifestMap = computed(() => {
     const map = new Map()
@@ -28,7 +29,7 @@ const manifestMap = computed(() => {
     return map
 })
 
-const getOsiForSensor = (installedSensor) => {
+const getOsiForSensor = (installedSensor: any): string => {
     const manifest = manifestMap.value.get(installedSensor.id)
         || manifestMap.value.get(installedSensor.name)
         || manifestMap.value.get(installedSensor.sensorId)
@@ -61,11 +62,11 @@ const newNodeForm = ref({ alias: '' })
 const generatedNodeKey = ref('')
 
 // --- INLINE RENAME STATE (ephemeral UI) ---
-const editingAliasNodeId = ref(null)
+const editingAliasNodeId = ref<string | null>(null)
 const rawAliasValue = ref('')
-const aliasInputRefs = ref({})
+const aliasInputRefs = ref<Record<string, HTMLInputElement>>({})
 
-const enableAliasEdit = async (node) => {
+const enableAliasEdit = async (node: FleetNode) => {
     editingAliasNodeId.value = node.id
     rawAliasValue.value = node.alias
     await nextTick()
@@ -80,7 +81,7 @@ const cancelAliasEdit = () => {
     rawAliasValue.value = ''
 }
 
-const saveAlias = async (node) => {
+const saveAlias = async (node: FleetNode) => {
     if (editingAliasNodeId.value !== node.id) return
     const val = rawAliasValue.value.trim()
     if (val && val !== node.alias) {
@@ -100,11 +101,11 @@ const saveAlias = async (node) => {
 }
 
 // --- TAGS LOGIC (ephemeral UI + store delegation) ---
-const editingTagNodeId = ref(null)
+const editingTagNodeId = ref<string | null>(null)
 const newTagValue = ref('')
-const tagInputRefs = ref({})
+const tagInputRefs = ref<Record<string, HTMLInputElement>>({})
 
-const enableTagEdit = async (nodeId) => {
+const enableTagEdit = async (nodeId: string) => {
     editingTagNodeId.value = nodeId
     await nextTick()
     if (tagInputRefs.value[nodeId]) {
@@ -117,7 +118,7 @@ const cancelTag = () => {
     newTagValue.value = ''
 }
 
-const saveTag = async (node) => {
+const saveTag = async (node: FleetNode) => {
     const val = newTagValue.value.trim()
     if (val && !node.tags.includes(val)) {
         try {
@@ -134,7 +135,7 @@ const saveTag = async (node) => {
     cancelTag()
 }
 
-const removeTag = async (node, index) => {
+const removeTag = async (node: FleetNode, index: number) => {
     const newTags = [...node.tags]
     newTags.splice(index, 1)
     try {
@@ -152,7 +153,7 @@ const removeTag = async (node, index) => {
 // --- OSI LAYER SORT ORDER ---
 const osiOrder = ['Physical', 'Data Link', 'Network', 'Transport', 'Session', 'Presentation', 'Application', 'Other']
 
-const sortOsi = (a, b) => {
+const sortOsi = (a: any, b: any) => {
     const aIdx = osiOrder.indexOf(a.type)
     const bIdx = osiOrder.indexOf(b.type)
     if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
@@ -161,8 +162,18 @@ const sortOsi = (a, b) => {
     return a.type.localeCompare(b.type)
 }
 
+// --- VIEW SPECIFIC TYPES ---
+export interface DisplayNode extends FleetNode {
+    totalSensors: number;
+    onlineSensors: number;
+    isSilenced: boolean;
+    sensorSummary: { type: string; count: number; sensors: any[] }[];
+    hasUpdate: boolean;
+    isAwaitingCheckIn: boolean;
+}
+
 // --- DATA MAPPING (presentation transform — belongs in view) ---
-const displayNodes = computed(() => {
+const displayNodes = computed<DisplayNode[]>(() => {
     if (isManifestLoading.value) {
         return fleetStore.nodes
             .filter(node => node.id && !node.id.startsWith('__pending_'))
@@ -243,13 +254,17 @@ const closeDeployModal = () => {
     }, 300)
 }
 
-const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
-const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
+const handleSilenceNode = (nodeId: string) => fleetStore.silenceNode(nodeId)
+const handleForgetNode = async (nodeId: string) => {
+    if (!confirm(`Delete Node "${nodeId}" and ALL of its underlying sensors?`)) return
+    const res = await fleetStore.deleteNode(nodeId)
+    if (!res.success) alert(res.error)
+}
 
 // --- Copy Animation (ephemeral UI) ---
-const { copiedStates, handleCopy } = useClipboard()
+const { copiedStates, handleCopy } = useClipboard() as unknown as { copiedStates: import('vue').Ref<Record<string, boolean>>, handleCopy: (key: string, val: any) => void }
 
-const handleOpenNodeDetail = (nodeId) => {
+const handleOpenNodeDetail = (nodeId: string) => {
     fleetStore.selectTarget(nodeId, null, false)
     appStore.setView('node-detail')
 }
@@ -340,7 +355,7 @@ const handleOpenNodeDetail = (nodeId) => {
                                         {{ node.alias }}
                                     </span>
                                     <input v-else
-                                        :ref="el => { if (el) aliasInputRefs[node.id] = el }"
+                                    :ref="el => { if (el) aliasInputRefs[node.id] = el as HTMLInputElement }"
                                         v-model="rawAliasValue"
                                         @keyup.enter="saveAlias(node)"
                                         @keyup.esc="cancelAliasEdit"
@@ -409,7 +424,7 @@ const handleOpenNodeDetail = (nodeId) => {
                         <div v-if="editingTagNodeId === node.id" class="relative flex items-center">
                             <span class="absolute left-2 text-text-m text-sm pointer-events-none">+</span>
                             <input 
-                                :ref="el => { if (el) tagInputRefs[node.id] = el }"
+                                        :ref="el => { if (el) tagInputRefs[node.id] = el as HTMLInputElement }"
                                 v-model="newTagValue"
                                 @keyup.enter="saveTag(node)"
                                 @keyup.esc="cancelTag"

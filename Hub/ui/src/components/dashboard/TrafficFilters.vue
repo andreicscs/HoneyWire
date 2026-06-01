@@ -1,18 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFleetStore } from '../../stores/Fleet/fleet'
+import type { FleetNode, InstalledSensor } from '../../stores/Fleet/fleet'
 import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 
 const fleetStore = useFleetStore()
-const { nodes, uptimeData, selectedNode, selectedSensor } = storeToRefs(fleetStore)
+const { nodes, selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
-const scrollArea = ref(null)
+const scrollArea = ref<HTMLElement | null>(null)
 const showOfflineWarning = ref(false)
 
-const activeNodes = computed(() => {
-    return nodes.value.map(node => {
+interface ActiveNode {
+    nodeId: string
+    alias: string
+    sensors: InstalledSensor[]
+    total: number
+    online: number
+    status: string
+}
+
+const activeNodes = computed<ActiveNode[]>(() => {
+    return nodes.value.map((node: FleetNode) => {
         const sensorsList = node.installedSensors || []
         const total = sensorsList.length
         const online = sensorsList.filter(s => s.status === 'up').length
@@ -28,13 +38,17 @@ const activeNodes = computed(() => {
     })
 })
 
-const handleSilenceNode = (nodeId) => fleetStore.silenceNode(nodeId)
-const handleForgetNode = (nodeId) => fleetStore.deleteNode(nodeId)
+const handleSilenceNode = (nodeId: string) => fleetStore.silenceNode(nodeId)
+const handleForgetNode = async (nodeId: string) => {
+    if (!confirm(`Delete Node "${nodeId}" and ALL of its underlying sensors?`)) return
+    const res = await fleetStore.deleteNode(nodeId)
+    if (!res.success) alert(res.error)
+}
 
 const checkScroll = () => {
     if (!scrollArea.value) return
     const container = scrollArea.value
-    const warningNodes = container.querySelectorAll('.has-warnings')
+    const warningNodes = container.querySelectorAll('.has-warnings') as NodeListOf<HTMLElement>
     if (warningNodes.length === 0) { 
         showOfflineWarning.value = false; 
         return 
@@ -46,15 +60,23 @@ const checkScroll = () => {
 watch(() => selectedNode.value?.id, (newVal) => {
     nextTick(() => {
         const el = document.getElementById(newVal ? `pill-${newVal}` : 'pill-all')
-        if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        if (el && scrollArea.value) {
+            const container = scrollArea.value
+            const scrollLeft = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
+            container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' })
+        }
     })
 })
 
-watch(() => selectedSensor.value, (newVal) => {
+watch(() => selectedSensor.value?.sensorId, (newSensorId) => {
     nextTick(() => {
-        const elId = newVal && selectedNode.value?.id ? `pill-${selectedNode.value?.id}` : 'pill-all'
+        const elId = newSensorId && selectedNode.value?.id ? `pill-${selectedNode.value?.id}` : 'pill-all'
         const el = document.getElementById(elId)
-        if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        if (el && scrollArea.value) {
+            const container = scrollArea.value
+            const scrollLeft = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
+            container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' })
+        }
     })
 })
 

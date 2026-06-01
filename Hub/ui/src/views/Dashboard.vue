@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import TrafficFilters from '../components/dashboard/TrafficFilters.vue'
 import SeverityChart from '../components/dashboard/SeverityChart.vue'
 import UptimeHeatmap from '../components/dashboard/UptimeHeatmap.vue'

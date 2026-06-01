@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useAppStore } from '../../stores/System/app'
-import { useEventsStore } from '../../stores/Events/events'
-import { useFleetStore } from '../../stores/Fleet/fleet'
+import { useAppStore } from '../../stores/System/app.ts'
+import { useEventsStore } from '../../stores/Events/events.ts'
+import { useFleetStore } from '../../stores/Fleet/fleet.ts'
 import { formatSensorId } from '../../utils/formatSensorId'
 
 
@@ -11,19 +11,19 @@ const appStore = useAppStore()
 const eventsStore = useEventsStore()
 const fleetStore = useFleetStore()
 
-const { viewingArchive, isFetching } = storeToRefs(appStore)
-const { filteredEvents: events } = storeToRefs(eventsStore)
+const { viewingArchive } = storeToRefs(appStore)
+const { filteredEvents: events, isFetching } = storeToRefs(eventsStore)
 const { nodes: fleet } = storeToRefs(fleetStore)
 
 const sortCol = ref('timestamp')
 const sortDesc = ref(true)
-const expandedRows = ref(new Set())
+const expandedRows = ref<Set<string>>(new Set())
 
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
 
 // Resolve nodeId → alias for display
-const getNodeAlias = (nodeId) => {
+const getNodeAlias = (nodeId: string | null) => {
     if (!nodeId) return 'Unassigned'
     const node = fleet.value.find(n => n.id === nodeId)
     return node?.alias || nodeId
@@ -34,18 +34,18 @@ watch([viewingArchive, sortCol, sortDesc, () => events.value.length], () => {
     expandedRows.value = new Set()
 })
 
-const toggleSort = (col) => {
+const toggleSort = (col: string) => {
     if (sortCol.value === col) sortDesc.value = !sortDesc.value
     else { sortCol.value = col; sortDesc.value = ['timestamp', 'severity'].includes(col) }
 }
 
-const toggleRow = async (id) => {
+const toggleRow = async (id: string) => {
     const newSet = new Set(expandedRows.value)
     const isExpanding = !newSet.has(id)
     
     if (isExpanding) {
         newSet.add(id)
-        const eventTarget = events.value.find(e => e.id === id)
+        const eventTarget = events.value.find((e: any) => e.id === id)
         if (eventTarget && !eventTarget.isRead) eventsStore.markEventRead(id)
     } else {
         newSet.delete(id)
@@ -59,19 +59,19 @@ const toggleRow = async (id) => {
     }
 }
 
-const isDownArrow = (col) => {
+const isDownArrow = (col: string) => {
     if (sortCol.value !== col) return true; 
     return ['timestamp', 'severity'].includes(col) ? sortDesc.value : !sortDesc.value;
 }
 
 const sortedEvents = computed(() => {
     return [...events.value].sort((a, b) => {
-        let valA = a[sortCol.value] || ''
-        let valB = b[sortCol.value] || ''
+        let valA: any = (a as any)[sortCol.value] || ''
+        let valB: any = (b as any)[sortCol.value] || ''
         if (sortCol.value === 'severity') {
             const scores = { critical: 5, high: 4, medium: 3, low: 2, info: 1 }
-            valA = scores[valA.toLowerCase()] || 0
-            valB = scores[valB.toLowerCase()] || 0
+            valA = scores[valA.toLowerCase() as keyof typeof scores] || 0
+            valB = scores[valB.toLowerCase() as keyof typeof scores] || 0
         }
         if (sortCol.value === 'nodeId') {
             // Sort by alias for display consistency, fallback to nodeId
@@ -104,15 +104,32 @@ const visiblePages = computed(() => {
 const prevPage = () => { if (currentPage.value > 1) currentPage.value-- }
 const nextPage = () => { if (currentPage.value < totalPages.value) currentPage.value++ }
 
+const goToPage = (page: number | string) => {
+    if (typeof page === 'number') {
+        currentPage.value = page
+    }
+}
+
+const handleArchiveAll = async () => {
+    if (!confirm('Archive all currently active events?')) return
+    const res = await eventsStore.archiveAll()
+    if (!res.success) alert(res.error)
+}
+
+const handleArchiveEvent = async (eventId: string) => {
+    const res = await eventsStore.archiveEvent(eventId)
+    if (!res.success) alert(res.error)
+}
+
 // Formatters
-const formatEventType = (type) => type ? type.replace(/_/g, ' ') : ''
-const formatString = (str) => str ? str.replace(/_/g, ' ') : ''
-const formatJson = (val) => {
+const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
+const formatString = (str: string) => str ? str.replace(/_/g, ' ') : ''
+const formatJson = (val: any) => {
     if (val === null) return 'null'
     if (val === undefined) return 'undefined'
     return typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)
 }
-const getDataType = (val) => {
+const getDataType = (val: any) => {
     if (val === null || val === undefined) return 'primitive'
     if (Array.isArray(val)) {
         if (val.length > 0 && typeof val[0] === 'object' && val[0] !== null) return 'object_array'
@@ -121,7 +138,7 @@ const getDataType = (val) => {
     if (typeof val === 'object') return 'object'
     return 'primitive'
 }
-const formatTime = (timestamp) => {
+const formatTime = (timestamp: string) => {
     if (!timestamp) return ''
     const dateObj = new Date(timestamp)
     const now = new Date()
@@ -155,7 +172,7 @@ const formatTime = (timestamp) => {
                     <span class="w-1.5 h-1.5 rounded-full bg-success-main animate-pulse shadow-[0_0_8px_var(--color-success-main)]"></span>
                     <span class="text-base font-medium tracking-wide text-text-m">Live</span>
                 </div>
-                <button v-show="!viewingArchive && events.length > 0" @click="eventsStore.archiveAll()"
+                <button v-show="!viewingArchive && events.length > 0" @click="handleArchiveAll"
                         type="button"
                         aria-label="Archive all active events"
                         class="px-2.5 py-1 rounded-md text-base font-medium transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border active:scale-95">
@@ -247,7 +264,7 @@ const formatTime = (timestamp) => {
                             <td class="px-5 py-3 text-base text-right text-text-m font-mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             
                             <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'">
-                                <button @click.stop="eventsStore.archiveEvent(event.id)"                                     
+                                <button @click.stop="handleArchiveEvent(event.id)"                                     
                                         type="button"
                                         aria-label="Archive this event"                                        
                                         class="flex items-center justify-center w-6 h-6 ml-auto rounded-md transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border"
@@ -352,7 +369,7 @@ const formatTime = (timestamp) => {
                                   class="relative inline-flex items-center px-3.5 py-1.5 text-base text-text-m border border-border-default bg-bg-surface">
                                 ...
                             </span>
-                            <button v-else @click="currentPage = page"
+                            <button v-else @click="goToPage(page)"
                                     class="relative inline-flex items-center px-3.5 py-1.5 text-base border border-border-default transition-colors focus:z-20 outline-none"
                                     :class="currentPage === page ? 'z-10 bg-primary-selected text-primary-text shadow-inner border-primary-selected' : 'bg-bg-surface text-text-m hover:bg-secondary-hover hover:text-text-h'">
                                 {{ page }}

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -24,9 +24,9 @@ const eventsStore = useEventsStore()
 
 const { isInitialized, requiresSetup, isAuthenticated, currentView, viewingArchive, bootstrapError } = storeToRefs(appStore)
 
-watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor],
-  ([isArchived, node, sensor]) => {
-    eventsStore.fetchEvents(isArchived, node?.id, sensor?.sensorId)
+watch([viewingArchive, () => fleetStore.selectedNode?.id, () => fleetStore.selectedSensor?.sensorId],
+  ([isArchived, nodeId, sensorId]) => {
+    eventsStore.fetchEvents(isArchived as boolean, (nodeId as string) || null, (sensorId as string) || null)
 })
 
 watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
@@ -48,15 +48,15 @@ const loadAppData = async () => {
       eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
     ])
 
-    wsService.on('onNewEvent', (payload) => eventsStore.handleWsEvent(payload))
-    wsService.on('onNewSensor', (payload) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
-    wsService.on('onDeleteSensor', (payload) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
-    wsService.on('onSilenceSensor', (payload) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
-    wsService.on('onSensorHeartbeat', (payload) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
-    wsService.on('onNewNode', (payload) => fleetStore.handleWsUpdate('NEW_NODE', payload))
-    wsService.on('onUpdateNode', (payload) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
-    wsService.on('onDeleteNode', (payload) => fleetStore.handleWsUpdate('DELETE_NODE', payload))
-    wsService.on('onNodeSynced', (payload) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
+    wsService.on('onNewEvent', (payload: any) => eventsStore.handleWsEvent(payload))
+    wsService.on('onNewSensor', (payload: any) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
+    wsService.on('onDeleteSensor', (payload: any) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
+    wsService.on('onSilenceSensor', (payload: any) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
+    wsService.on('onSensorHeartbeat', (payload: any) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
+    wsService.on('onNewNode', (payload: any) => fleetStore.handleWsUpdate('NEW_NODE', payload))
+    wsService.on('onUpdateNode', (payload: any) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
+    wsService.on('onDeleteNode', (payload: any) => fleetStore.handleWsUpdate('DELETE_NODE', payload))
+    wsService.on('onNodeSynced', (payload: any) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
 
     wsService.on('onReconnect', async () => {
       console.log("WebSocket Reconnected: Syncing missed data...")

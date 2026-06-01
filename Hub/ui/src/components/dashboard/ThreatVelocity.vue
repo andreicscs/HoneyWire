@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, onUnmounted, shallowRef, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
@@ -19,16 +19,17 @@ const { velocityTimeframe, viewingArchive } = storeToRefs(appStore)
 const { threatVelocityProjection: projection, isFetchingThreatVelocityProjection, lastVelocityInvalidation } = storeToRefs(eventsStore)
 const { selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
-const chartCanvas = ref(null)
-let chartInstance = shallowRef(null)
-let themeObserver = null
-let rolloverTimeout = null 
-let lastBucket = null
+const chartCanvas = ref<HTMLCanvasElement | null>(null)
+const chartInstance = shallowRef<any>(null)
+let themeObserver: MutationObserver | null = null
+let rolloverTimeout: any = null 
 
 const severities = ['critical', 'high', 'medium', 'low', 'info']
 
 const initChart = () => {
+    if (!chartCanvas.value) return
     const ctx = chartCanvas.value.getContext('2d')
+    if (!ctx) return
     chartInstance.value = new Chart(ctx, {
         type: 'line',
         data: { 
@@ -46,19 +47,19 @@ const initChart = () => {
             plugins: { 
                 legend: { display: false }, 
                 tooltip: { 
-                    ...baseTooltipConfig,
+                    ...(baseTooltipConfig as any),
                     mode: 'index', 
                     intersect: false, 
                     callbacks: {
-                        title: (context) => projection.value?.exactTimes?.[context[0].dataIndex] || '',
-                        labelColor: (context) => {
+                        title: (context: any) => projection.value?.exactTimes?.[context[0].dataIndex] || '',
+                        labelColor: (context: any) => {
                             return { borderColor: context.dataset.borderColor, backgroundColor: context.dataset.borderColor }
                         }
                     }
                 } 
             },
             scales: {
-                x: { grid: { display: false, drawBorder: false }, ticks: { maxRotation: 0, minRotation: 0, maxTicksLimit: 5, font: { size: 10, family: 'ui-monospace, monospace' }, align: 'inner' } },
+                x: { grid: { display: false }, ticks: { maxRotation: 0, minRotation: 0, maxTicksLimit: 5, font: { size: 10, family: 'ui-monospace, monospace' }, align: 'inner' } },
                 y: { 
                     display: false, 
                     beginAtZero: true,
@@ -75,9 +76,10 @@ const updateTheme = () => {
     
     const isDark = document.documentElement.classList.contains('dark')
     const ctx = chartCanvas.value.getContext('2d')
+    if (!ctx) return
     const chartHeight = chartInstance.value.chartArea?.bottom || chartInstance.value.height || 200
 
-    chartInstance.value.data.datasets.forEach((dataset, index) => {
+    chartInstance.value.data.datasets.forEach((dataset: any, index: number) => {
         const sev = severities[index]
         const baseRgb = getComputedRgb(`--sev-${sev}`) 
         
@@ -107,11 +109,11 @@ const updateData = () => {
 
     chartInstance.value.data.labels = p.labels;
     
-    chartInstance.value.data.datasets.forEach((dataset, index) => {
+    chartInstance.value.data.datasets.forEach((dataset: any, index: number) => {
         const sev = severities[index]
-        const data = p.series[sev] || []
+        const data = p.series[sev as keyof typeof p.series] || []
         dataset.data = data
-        dataset.hidden = data.every(v => v === 0)
+        dataset.hidden = data.every((v: number) => v === 0)
     })
 
     chartInstance.value.update('none');
@@ -173,7 +175,7 @@ onMounted(async () => {
 
 // TRIGGER 1: Context Changes (User clicks filters)
 watch(
-    [velocityTimeframe, selectedNode, selectedSensor, viewingArchive],
+    [velocityTimeframe, () => selectedNode.value?.id, () => selectedSensor.value?.sensorId, viewingArchive],
     fetchContextualProjection,
     { immediate: true }
 )

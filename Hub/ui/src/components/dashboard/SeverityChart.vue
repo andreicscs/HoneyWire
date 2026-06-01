@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
@@ -17,18 +17,18 @@ const appStore = useAppStore()
 const { severityProjection } = storeToRefs(eventsStore)
 const { selectedNode, selectedSensor } = storeToRefs(fleetStore)
 
-const chartCanvas = ref(null)
-let chartInstance = null
-let themeObserver = null
+const chartCanvas = ref<HTMLCanvasElement | null>(null)
+let chartInstance: any = null
+let themeObserver: MutationObserver | null = null
 
 const neonGlowPlugin = {
     id: 'neonGlow',
-    beforeDatasetsDraw(chart) {
+    beforeDatasetsDraw(chart: any) {
         if (!document.documentElement.classList.contains('dark')) return;
         const ctx = chart.ctx;
         const meta = chart.getDatasetMeta(0);
         ctx.save();
-        meta.data.forEach(arc => {
+        meta.data.forEach((arc: any) => {
             ctx.shadowColor = arc.options.backgroundColor;
             ctx.shadowBlur = 5;
             ctx.shadowOffsetX = 0;
@@ -96,10 +96,10 @@ onMounted(() => {
                 plugins: { 
                     legend: { display: false },
                     tooltip: { 
-                        ...baseTooltipConfig,
+                        ...(baseTooltipConfig as any),
                         callbacks: {
-                            labelColor: (context) => {
-                                const color = context.dataset.backgroundColor[context.dataIndex];
+                            labelColor: (context: any) => {
+                                const color = (context.dataset.backgroundColor as string[])[context.dataIndex];
                                 return { borderColor: color, backgroundColor: color }
                             }
                         }
@@ -125,9 +125,9 @@ onMounted(() => {
 })
 
 watch(
-    () => [selectedNode.value, selectedSensor.value, appStore.viewingArchive],
-    ([node, sensor]) => {
-        eventsStore.fetchSeverityProjection('alltime', node?.id, sensor?.sensorId)
+    () => [selectedNode.value?.id, selectedSensor.value?.sensorId, appStore.viewingArchive],
+    ([nodeId, sensorId]: any[]) => {
+        eventsStore.fetchSeverityProjection('alltime', nodeId || null, sensorId || null)
     },
     { immediate: true }
 )

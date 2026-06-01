@@ -1,7 +1,8 @@
-<script setup>
-import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
+<script setup lang="ts">
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFleetStore } from '../../stores/Fleet/fleet'
+import type { InstalledSensor } from '../../stores/Fleet/fleet'
 import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
@@ -11,14 +12,22 @@ import { formatSensorId } from '../../utils/formatSensorId'
 
 
 const fleetStore = useFleetStore()
-const { nodes: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe, overallUptime } = storeToRefs(fleetStore)
+const { nodes: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe } = storeToRefs(fleetStore)
 
-const scrollArea = ref(null)
+const scrollArea = ref<HTMLElement | null>(null)
 const canScrollDown = ref(false)
-const worstWarningBelow = ref(null)
+const worstWarningBelow = ref<string | null>(null)
 
-const handleSilence = (nodeId, sensorId) => fleetStore.toggleSilence(nodeId, sensorId)
-const handleForget = (nodeId, sensorId) => fleetStore.removeSensor(nodeId, sensorId)
+const handleSilence = (nodeId: string, sensorId: string) => fleetStore.toggleSilence(nodeId, sensorId, !isSilenced(nodeId, sensorId))
+const handleForget = async (nodeId: string, sensorId: string) => {
+    if (!confirm('Remove this sensor? The node will be marked for deployment sync.')) return
+    const res = await fleetStore.removeSensor(nodeId, sensorId)
+    if (res.success) {
+        await fleetStore.fetchUptime()
+    } else {
+        alert(res.error || 'Failed to remove sensor.')
+    }
+}
 
 const checkScroll = () => {
     if (!scrollArea.value) {
@@ -36,7 +45,7 @@ const checkScroll = () => {
         const containerRect = container.getBoundingClientRect()
         
         for (let i = 0; i < warningNodes.length; i++) {
-            const nodeRect = warningNodes[i].getBoundingClientRect();
+            const nodeRect = (warningNodes[i] as HTMLElement).getBoundingClientRect();
             const status = warningNodes[i].getAttribute('data-worst-status')
             
             // Add a 1px buffer to account for borders or subpixel rendering
@@ -60,19 +69,19 @@ const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
 }
 
-const isSilenced = (nodeId, sensorId) => {
-    let sensor = null
+const isSilenced = (nodeId: string, sensorId: string): boolean => {
+    let sensor: InstalledSensor | null = null
     if (typeof fleetStore.getSensor === 'function') {
         sensor = fleetStore.getSensor(nodeId, sensorId)
     }
     if (!sensor) { // Fallback for safety
         const node = fleet.value.find(n => n.id === nodeId)
-        sensor = node?.installedSensors?.find(s => s.sensorId === sensorId)
+        sensor = node?.installedSensors?.find(s => s.sensorId === sensorId) || null
     }
     return sensor ? !!sensor.isSilenced : false
 }
 
-const getRowWorstStatus = (blocks) => {
+const getRowWorstStatus = (blocks: any[]): string | null => {
     if (!blocks || !blocks.length) return null
     let worst = null
     for (let i = 0; i < blocks.length; i++) {
@@ -82,25 +91,38 @@ const getRowWorstStatus = (blocks) => {
     return worst
 }
 
+interface HydratedSensor {
+    nodeId: string
+    sensorId: string
+    isOnline: boolean
+    blocks: any[]
+    [key: string]: any
+}
+
+interface HydratedGroup {
+    nodeId: string
+    nodeAlias?: string
+    sensors: HydratedSensor[]
+    [key: string]: any
+}
+
 // Hydrate live status from fleet store for real-time feedback
-const hydrateGroupsWithLiveStatus = (groups) => {
+const hydrateGroupsWithLiveStatus = (groups: any[]): HydratedGroup[] => {
     if (!groups || !Array.isArray(groups)) return groups
 
     return groups.map(group => ({
         ...group,
-        sensors: (group.sensors || []).map(sensor => {
+        sensors: (group.sensors || []).map((sensor: any) => {
             let isLiveOnline = sensor.status === 'up'
             // O(1) lookup using the fleet store getter
-            let liveSensor = null
+            let liveSensor: InstalledSensor | null = null
             if (typeof fleetStore.getSensor === 'function') {
                 liveSensor = fleetStore.getSensor(group.nodeId, sensor.sensorId)
             }
             
             
             if (liveSensor) {
-                if (typeof liveSensor.isOnline === 'boolean') isLiveOnline = liveSensor.isOnline
-                else if (typeof liveSensor.is_online === 'boolean') isLiveOnline = liveSensor.is_online
-                else if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
+                 if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
             }
 
             const blocks = [...(sensor.blocks || [])]
@@ -122,24 +144,33 @@ const hydrateGroupsWithLiveStatus = (groups) => {
 }
 
 // Compute the hydrated groups from the API response
-const hydratedGroups = computed(() => {
+const hydratedGroups = computed<HydratedGroup[]>(() => {
     return hydrateGroupsWithLiveStatus(uptimeData.value?.groups || [])
 })
 
-watch(selectedSensor, (newVal) => {
-    if (newVal && selectedNode.value) {
+watch(() => selectedSensor.value?.sensorId, (newSensorId) => {
+    const node = selectedNode.value
+    if (newSensorId && node) {
         nextTick(() => {
-            const el = document.getElementById(`row-${selectedNode.value}-${newVal}`)
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            const el = document.getElementById(`row-${node.id}-${newSensorId}`)
+            if (el && scrollArea.value) {
+                const container = scrollArea.value
+                const scrollTop = el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2
+                container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+            }
         })
     }
 })
 
-watch(selectedNode, (newVal) => {
-    if (newVal) {
+watch(() => selectedNode.value?.id, (newNodeId) => {
+    if (newNodeId) {
         nextTick(() => {
-            const el = document.getElementById(`group-${newVal}`)
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+            const el = document.getElementById(`group-${newNodeId}`)
+            if (el && scrollArea.value) {
+                const container = scrollArea.value
+                const scrollTop = el.offsetTop - 10 // Provide a slight padding above the group header
+                container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+            }
         })
     }
 })
@@ -173,7 +204,10 @@ const legendItems = [
                     </div>
                 </div>
                 
-                <BaseTimeFilter v-model="fleetStore.activeTimeframe" />
+                <BaseTimeFilter 
+                    :model-value="activeTimeframe"
+                    @update:model-value="fleetStore.setActiveTimeframe($event)"
+                />
             </div>
         </template>
 
@@ -252,7 +286,7 @@ const legendItems = [
 
                         <div class="flex-1 flex justify-end items-center gap-[2px] overflow-hidden flex-nowrap pl-2">
                             <div v-for="(block, i) in sensor.blocks" :key="i"
-                                 class="flex-1 max-w-[8px] min-h-[20px] min-w-[2px] h-5 rounded-[2px] transition-opacity duration-[var(--duration-fast)] hover:opacity-70 cursor-pointer"
+                                 class="flex-1 max-w-[8px] min-h-[20px] min-w-[2px] h-5 rounded-[2px] transition-opacity duration-[var(--duration-fast)] hover:opacity-70 cursor-default"
                                  :class="{
                                      'bg-success-main': block.status === 'up', 
                                      'bg-critical': block.status === 'down', 

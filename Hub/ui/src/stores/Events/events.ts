@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../../api/client'
-// @ts-ignore - fleet.js is pending TypeScript migration TODO
 import { useFleetStore } from '../Fleet/fleet'
 import { useAppStore } from '../System/app'
 
@@ -16,8 +15,8 @@ export interface EventPayload {
   eventTrigger: string
   source: string
   target: string
-  isRead: boolean | number
-  isArchived: boolean | number
+  isRead: boolean
+  isArchived: boolean
   details?: Record<string, any>
 }
 
@@ -55,6 +54,15 @@ export interface EventsState {
 
 let severityAbortController: AbortController | null = null
 let velocityAbortController: AbortController | null = null
+
+// --- NORMALIZATION ---
+const normalizeEvent = (e: any): EventPayload => {
+  return {
+    ...e,
+    isRead: Boolean(e.isRead),
+    isArchived: Boolean(e.isArchived)
+  }
+}
 
 export const useEventsStore = defineStore('events', () => {
   // ==========================================
@@ -96,7 +104,7 @@ export const useEventsStore = defineStore('events', () => {
     const isArchiveView = !!appStore.viewingArchive
 
     let currentEvents = state.value.events.filter(e => {
-        const isArchived = e.isArchived === true || e.isArchived === 1
+        const isArchived = e.isArchived === true
         return isArchiveView ? isArchived : !isArchived
     })
 
@@ -140,7 +148,7 @@ export const useEventsStore = defineStore('events', () => {
       if (sensorId) params.append('sensorId', sensorId)
 
       const res = await api.get(`/api/v1/events?${params.toString()}`)
-      state.value.events = await res.json() as EventPayload[]
+      state.value.events = (await res.json() as any[]).map(normalizeEvent)
 
       await refreshUnreadCount()
     } catch (e) {
@@ -189,20 +197,21 @@ export const useEventsStore = defineStore('events', () => {
     state.value.lastVelocityInvalidation = Date.now()
   }
 
-  const markAllRead = async (): Promise<void> => {
+  const markAllRead = async (): Promise<{ success: boolean; error?: string }> => {
     try {
       await api.patch('/api/v1/events/read')
       state.value.events.forEach(e => (e.isRead = true))
       state.value.unreadCount = 0
+      return { success: true }
     } catch (err) {
       console.error('Failed to mark all events as read:', err)
-      alert('Failed to mark events as read. Please try again.')
+      return { success: false, error: 'Failed to mark events as read. Please try again.' }
     }
   }
 
-  const markEventRead = async (eventId: string): Promise<void> => {
+  const markEventRead = async (eventId: string): Promise<{ success: boolean; error?: string }> => {
     const ev = state.value.events.find(e => e.id === eventId)
-    if (!ev || ev.isRead) return
+    if (!ev || ev.isRead) return { success: true }
 
     const wasRead = ev.isRead
     ev.isRead = true
@@ -210,35 +219,38 @@ export const useEventsStore = defineStore('events', () => {
 
     try {
       await api.patch(`/api/v1/events/${eventId}/read`)
+      return { success: true }
     } catch (err) {
       ev.isRead = wasRead
       state.value.unreadCount = Math.max(0, state.value.unreadCount + 1)
       console.error('Failed to mark event as read:', err)
+      return { success: false, error: 'Failed to mark event as read.' }
     }
   }
 
-  const archiveEvent = async (eventId: string): Promise<void> => {
+  const archiveEvent = async (eventId: string): Promise<{ success: boolean; error?: string }> => {
     const originalEvents = [...state.value.events]
     try {
       await api.patch(`/api/v1/events/${eventId}/archive`)
       state.value.events = state.value.events.filter(e => e.id !== eventId)
       state.value.activeEvent = null
       await refreshUnreadCount()
+      return { success: true }
     } catch (err) {
       console.error('Failed to archive event:', err)
       state.value.events = originalEvents
-      alert('Failed to archive event. Please try again.')
+      return { success: false, error: 'Failed to archive event. Please try again.' }
     }
   }
 
-  const archiveAll = async (): Promise<void> => {
-    if (!confirm('Archive all currently active events?')) return
+  const archiveAll = async (): Promise<{ success: boolean; error?: string }> => {
     try {
       await api.patch('/api/v1/events/archive-all')
       await fetchEvents(false, fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      return { success: true }
     } catch (err) {
       console.error('Failed to archive all events:', err)
-      alert('Failed to archive events. Please try again.')
+      return { success: false, error: 'Failed to archive events. Please try again.' }
     }
   }
 
@@ -247,7 +259,9 @@ export const useEventsStore = defineStore('events', () => {
     state.value.unreadCount = 0
   }
 
-  const handleWsEvent = (payload: EventPayload): void => {
+  const handleWsEvent = (rawPayload: any): void => {
+    const payload = normalizeEvent(rawPayload)
+
     const selectedNode = fleetStore.selectedNode
     const selectedSensor = fleetStore.selectedSensor
 
