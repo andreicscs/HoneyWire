@@ -93,6 +93,10 @@ func executeRelink(args []string, defaultHubURL string) error {
 		return fmt.Errorf("Hub URL is required")
 	}
 
+	if err := warnIfHTTP(hubURL, false); err != nil {
+		return err
+	}
+
 	if apiKey != "" {
 		return linkExistingNode(hubURL, apiKey)
 	}

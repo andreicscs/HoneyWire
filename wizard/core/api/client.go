@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -266,27 +265,26 @@ type addSensorRequest struct {
 	ConfigValues map[string]string `json:"configValues"`
 }
 
-func FetchManifests(source string) ([]*schema.SensorManifest, error) {
-	if !strings.HasPrefix(source, "http") {
-		data, err := os.ReadFile(source)
-		if err != nil {
-			return nil, fmt.Errorf("local manifest error: %w", err)
-		}
-		var manifests []*schema.SensorManifest
-		err = json.Unmarshal(data, &manifests)
-		return manifests, err
+func (c *HubClient) FetchManifests(ctx context.Context, apiKey string) ([]*schema.SensorManifest, error) {
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v1/manifests", nil, map[string]string{
+		"Authorization": "Bearer " + apiKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("network error: %w", err)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(source)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("hub returned error (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	}
+
+	data, err := readBody(resp)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var manifests []*schema.SensorManifest
-	if err := json.NewDecoder(resp.Body).Decode(&manifests); err != nil {
-		return nil, err
+	if err := json.Unmarshal(data, &manifests); err != nil {
+		return nil, fmt.Errorf("failed to parse manifests: %w", err)
 	}
 
 	return manifests, nil

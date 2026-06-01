@@ -1,9 +1,12 @@
 package commands
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/honeywire/wizard/internal/app"
+	"github.com/honeywire/wizard/internal/cli"
 )
 
 const (
@@ -13,4 +16,25 @@ const (
 
 func loadApp() (*app.App, error) {
 	return app.LoadApp()
+}
+
+func warnIfHTTP(hubURL string, force bool) error {
+	if strings.HasPrefix(hubURL, "http://") {
+		fmt.Printf("\n%s⚠️  WARNING: Using HTTP (not HTTPS) for Hub communication!%s\n"+
+			"This exposes you to MITM and DNS poisoning attacks that could inject malicious containers.\n"+
+			"Attackers could:\n"+
+			"  1. Intercept DNS requests to redirect to fake Hub\n"+
+			"  2. Inject malicious sensor images\n"+
+			"  3. Gain root access to your system\n\n"+
+			"Use HTTPS in production. HTTP is only for local testing.\n\n",
+			cli.Yellow, cli.Reset,
+		)
+		if !force {
+			if !cli.ConfirmAction("Continue with HTTP anyway") {
+				return fmt.Errorf("aborted: HTTPS required for security")
+			}
+			fmt.Println()
+		}
+	}
+	return nil
 }

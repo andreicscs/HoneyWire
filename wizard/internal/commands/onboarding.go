@@ -8,6 +8,10 @@ import (
 )
 
 func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
+	if err := warnIfHTTP(hubURL, force); err != nil {
+		return err
+	}
+
 	if apiKey != "" {
 		if err := linkExistingNode(hubURL, apiKey); err != nil {
 			return err

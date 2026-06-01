@@ -13,7 +13,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/honeywire/wizard/core/api"
 	"github.com/honeywire/wizard/core/discovery"
 	"github.com/honeywire/wizard/core/scanner"
 	"github.com/honeywire/wizard/core/schema"
@@ -58,7 +57,7 @@ func HandleDiscover(force bool) error {
 		return err
 	}
 
-	recommendations, err := buildStrategy(hostState, systemState, dockerMap, app.Config, app.Random())
+	recommendations, err := buildStrategy(app, hostState, systemState, dockerMap, app.Random())
 	if err != nil {
 		return err
 	}
@@ -255,13 +254,14 @@ func auditEnvironment() (*scanner.HostState, map[int]string, *system.SystemState
 	return hostState, dockerMap, systemState, nil
 }
 
-func buildStrategy(hostState *scanner.HostState, systemState *system.SystemState, dockerMap map[int]string, nodeConfig *app.NodeConfig, rng *rand.Rand) ([]*discovery.Recommendation, error) {
+func buildStrategy(appInstance *app.App, hostState *scanner.HostState, systemState *system.SystemState, dockerMap map[int]string, rng *rand.Rand) ([]*discovery.Recommendation, error) {
 	fmt.Printf("\n%s[*] Step 3/3: Formulating Deception Strategy...%s\n", cli.Bold, cli.Reset)
 
-	// Force the Wizard to pull the manifest directly from the Hub.
-	registry := fmt.Sprintf("%s/api/v1/manifests?key=%s", strings.TrimRight(nodeConfig.HubURL, "/"), nodeConfig.APIKey)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
-	manifests, apiErr := api.FetchManifests(registry)
+	// Pull the manifest directly from the Hub using the dedicated authentication function.
+	manifests, apiErr := appInstance.Hub.FetchManifests(ctx, appInstance.Config.APIKey)
 	if apiErr != nil {
 		return nil, fmt.Errorf("Registry error: %w", apiErr)
 	}
@@ -274,7 +274,7 @@ func buildStrategy(hostState *scanner.HostState, systemState *system.SystemState
 	renderManifestTemplates(recommendations, dockerMap, hostState, rng)
 
 	for _, rec := range recommendations {
-		updateEnvVar(rec, "HW_HUB_ENDPOINT", nodeConfig.HubURL)
+		updateEnvVar(rec, "HW_HUB_ENDPOINT", appInstance.Config.HubURL)
 		updateEnvVar(rec, "HW_SENSOR_ID", rec.SensorID)
 	}
 
