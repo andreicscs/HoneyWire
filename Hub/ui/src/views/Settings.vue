@@ -64,11 +64,13 @@ const hasUnsavedChanges = computed(() => {
 
 const isSaving = ref(false)
 const saveMessage = ref('')
+const isError = ref(false)
 
 const saveSettings = async () => {
     isSaving.value = true
     saveMessage.value = ''
-    
+    isError.value = false
+
     const success = await configStore.patchConfig(settings.value)
     
     isSaving.value = false
@@ -77,7 +79,8 @@ const saveSettings = async () => {
         saveMessage.value = 'Configuration saved successfully.'
         setTimeout(() => saveMessage.value = '', 3000)
     } else {
-        saveMessage.value = 'Failed to save configuration. Check console and server logs.'
+        isError.value = true
+        saveMessage.value = 'Failed to save configuration.'
     }
 }
 
@@ -164,7 +167,14 @@ const submitFactoryReset = async () => {
         
         <PageHeader title="System Settings" description="Manage Hub configuration, retention policies, and push notifications.">
             <template #actions>
-                <span v-if="saveMessage" class="text-xs  text-success-main animate-pulse hidden sm:block">{{ saveMessage }}</span>
+                <span v-if="saveMessage && isError" class="text-xs text-danger-main hidden hidden sm:block">
+                    {{ saveMessage }}
+                </span>
+
+                <span v-else-if="saveMessage && !isError" class="text-xs text-success-main hidden sm:block">
+                    {{ saveMessage }}
+                </span>
+
                 <span v-else-if="hasUnsavedChanges" class="text-xs  text-medium animate-pulse hidden sm:flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-medium inline-block"></span> Unsaved changes
                 </span>

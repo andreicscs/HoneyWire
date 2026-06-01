@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@variant dark (&:where(.dark, .dark *)); /* <-- ADD THIS LINE */
+@variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
    HONEYWIRE DESIGN SYSTEM
@@ -28,7 +28,7 @@
   --secondary-text: oklch(45% 0.02 250);
   --secondary-border: oklch(85% 0.02 250);
 
-  --disabled-bg: oklch(92% 0.01 250);
+  --disabled-bg: oklch(90% 0.01 250);
   --disabled-text: oklch(70% 0.01 250);
   --disabled-border: oklch(60% 0.01 250);
   
@@ -45,15 +45,15 @@
   --sev-info: oklch(55% 0.02 250);
 
   --danger-main: oklch(65% 0.2 25);
-  --danger-hover: oklch(80% 0.2 25);
+  --danger-hover: oklch(85% 0.15 25);
   --danger-bg: oklch(90% 0.05 20);
   --danger-text: oklch(25% 0.1 20);
-  --danger-border: oklch(70% 0.1 20);
+  --danger-border: oklch(70% 0.2 20);
 
   --archive-text: oklch(35% 0.1 85);
-  --archive-bg: oklch(90% 0.08 85);
-  --archive-hover: oklch(80% 0.08 85);
-  --archive-border: oklch(70% 0.12 85);
+  --archive-bg: oklch(90% 0.05 85);
+  --archive-hover: oklch(85% 0.08 85);
+  --archive-border: oklch(60% 0.2 85);
 
   --success-main: oklch(65% 0.15 150);
   --success-selected: oklch(75% 0.12 150);
@@ -163,14 +163,14 @@
   --sev-info: oklch(55% 0.02 250);
  
   --danger-main: oklch(58% 0.16 25);
-  --danger-hover: oklch(48% 0.16 25);
+  --danger-hover: oklch(10% 0.16 25);
   --danger-bg: oklch(25% 0.05 25);
   --danger-text: oklch(95% 0.16 25);
   --danger-border: oklch(40% 0.1 25);
  
   --archive-text: oklch(85% 0.1 85);
-  --archive-bg: oklch(25% 0.08 85 / 0.2);
-  --archive-hover: oklch(48% 0.1 85 / 0.25);
+  --archive-bg: oklch(48% 0.1 85 / 0.25);
+  --archive-hover: oklch(15% 0.16 85 / 0.2);
   --archive-border: oklch(50% 0.15 85 / 0.3);
  
   --success-main: oklch(65% 0.15 150);
