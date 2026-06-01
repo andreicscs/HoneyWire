@@ -17,7 +17,7 @@ defineEmits(['close'])
             leave-from-class="opacity-100" 
             leave-to-class="opacity-0"
         >
-            <div v-if="show" class="fixed inset-0 z-modal flex justify-center items-center p-4 bg-black/60 backdrop-blur-sm" @click.self="$emit('close')">
+            <div v-if="show" class="fixed inset-0 z-modal flex justify-center items-center p-4 bg-black/60 backdrop-blur-sm" @mousedown.self="$emit('close')">
                 <div 
                     class="bg-bg-surface w-full max-w-sm rounded-lg shadow-lg p-[var(--space-card-p)] transform transition-all border"
                     :class="danger ? 'border-danger-border' : 'border-border-default'"
