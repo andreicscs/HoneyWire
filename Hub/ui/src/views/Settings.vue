@@ -1,7 +1,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useAppStore } from '../stores/System/app'
-import { useConfig } from '../api/useConfig'
+import { useConfigStore } from '../stores/Config/config'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseModal from '../components/ui/feedback/BaseModal.vue'
@@ -13,7 +13,7 @@ import BaseRadioGroup from '../components/ui/forms/BaseRadioGroup.vue'
 import BaseNumberStepper from '../components/ui/forms/BaseNumberStepper.vue'
 
 const appStore = useAppStore()
-const { config, patchConfig } = useConfig()
+const configStore = useConfigStore()
 const activeTab = ref('general')
 
 const settingTabs = [
@@ -38,19 +38,19 @@ const settings = ref({
 
 const initialSettings = ref(null)
 
-watch(() => config.isLoaded, (loaded) => {
+watch(() => configStore.config.isLoaded, (loaded) => {
     if (loaded) {
         const loadedSettings = {
-            hubEndpoint: config.hubEndpoint || window.location.origin,
-            autoArchiveDays: config.autoArchiveDays !== undefined ? config.autoArchiveDays : 0,
-            autoPurgeDays: config.autoPurgeDays !== undefined ? config.autoPurgeDays : 0,
-            webhookType: config.webhookType || 'ntfy',
-            webhookUrl: config.webhookUrl || '',
-            webhookEvents: config.webhookEvents && config.webhookEvents.length > 0 
-                ? [...config.webhookEvents] 
+            hubEndpoint: configStore.config.hubEndpoint || window.location.origin,
+            autoArchiveDays: configStore.config.autoArchiveDays !== undefined ? configStore.config.autoArchiveDays : 0,
+            autoPurgeDays: configStore.config.autoPurgeDays !== undefined ? configStore.config.autoPurgeDays : 0,
+            webhookType: configStore.config.webhookType || 'ntfy',
+            webhookUrl: configStore.config.webhookUrl || '',
+            webhookEvents: configStore.config.webhookEvents && configStore.config.webhookEvents.length > 0 
+                ? [...configStore.config.webhookEvents] 
                 : ['critical', 'high', 'medium', 'low', 'info'],
-            siemAddress: config.siemAddress || '',
-            siemProtocol: config.siemProtocol || 'tcp'
+            siemAddress: configStore.config.siemAddress || '',
+            siemProtocol: configStore.config.siemProtocol || 'tcp'
         }
         settings.value = JSON.parse(JSON.stringify(loadedSettings))
         initialSettings.value = JSON.parse(JSON.stringify(loadedSettings))
@@ -69,7 +69,7 @@ const saveSettings = async () => {
     isSaving.value = true
     saveMessage.value = ''
     
-    const success = await patchConfig(settings.value)
+    const success = await configStore.patchConfig(settings.value)
     
     isSaving.value = false
     if (success) {

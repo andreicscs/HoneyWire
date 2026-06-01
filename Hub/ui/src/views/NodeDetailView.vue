@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useAppStore } from '../stores/System/app'
 import { useFleetStore } from '../stores/Fleet/fleet'
 import { useEventsStore } from '../stores/Events/events'
-import { useConfig } from '../api/useConfig'
+import { useConfigStore } from '../stores/Config/config'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 import BaseStatusDot from '../components/ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../components/ui/navigation/BaseMeatballMenu.vue'
@@ -16,7 +16,7 @@ import { useClipboard } from '../utils/useClipboard'
 const appStore = useAppStore()
 const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
-const { config } = useConfig()
+const configStore = useConfigStore()
 
 const selectedNodeId = computed(() => fleetStore.selectedNodeId)
 
@@ -193,7 +193,7 @@ watch(showSyncModal, (val) => {
 
 const syncCommand = computed(() => {
     if (!node.value) return ''
-    const hubUrl = config.hubEndpoint || window.location.origin
+    const hubUrl = configStore.config.hubEndpoint || window.location.origin
     if (!node.value.lastHeartbeat) {
         return `./wizard --link ${hubUrl} ${node.value.apiKey}\n./wizard apply`
     }
@@ -334,13 +334,13 @@ const handleDeleteNode = () => {
     if (!node.value?.id) return
     if (confirm(`Delete node "${node.value.alias}"? This cannot be undone.`)) {
         fleetStore.deleteNode(node.value.id)
-        appStore.currentView = 'fleet'
+        appStore.setView('fleet')
     }
 }
 
 const viewAllEvents = () => {
     // Keeps the current node selected in the fleetStore to act as a filter
-    appStore.currentView = 'dashboard'
+    appStore.setView('dashboard')
 }
 
 // --- NAVIGATION ---
@@ -348,7 +348,7 @@ const viewAllEvents = () => {
 watch(selectedNodeId, async (value) => {
     if (!value) {
         if (appStore.currentView === 'node-detail') {
-            appStore.currentView = 'fleet'
+            appStore.setView('fleet')
         }
         return
     }
@@ -403,7 +403,7 @@ const openSensor = (sensor) => {
   activeTab.value = 'readme'
   envVarValues.value = {}
   envVarValues.value['HW_SEVERITY'] = 'critical'
-  envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin
+  envVarValues.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
   envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
   sensor.deployment?.env_vars?.forEach(env => {
     if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
@@ -428,7 +428,7 @@ const editSensor = (installedSensor) => {
   activeTab.value = 'config'
   envVarValues.value = {}
   envVarValues.value['HW_SEVERITY'] = 'critical'
-  envVarValues.value['HW_HUB_ENDPOINT'] = config.hubEndpoint || window.location.origin
+  envVarValues.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
   envVarValues.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
   
   manifest.deployment?.env_vars?.forEach(env => {
@@ -466,7 +466,7 @@ const fetchYamlFromHub = async () => {
 
   try {
     rawCompose.value = await fleetStore.generateCompose({
-      hubEndpoint: config.hubEndpoint || window.location.origin,
+      hubEndpoint: configStore.config.hubEndpoint || window.location.origin,
       hubKey: apiKey || '<YOUR_HW_NODE_KEY>',
       sensors: [{
         sensorId: selectedSensor.value.id,

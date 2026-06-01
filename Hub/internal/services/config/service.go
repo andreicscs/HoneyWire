@@ -138,18 +138,36 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 }
 
 func (s *Service) UpdateConfig(req map[string]interface{}) error {
-	if err := s.store.UpdateConfigBatch(req); err != nil {
+	// Safely map incoming camelCase API fields to snake_case DB columns
+	dbUpdates := make(map[string]interface{})
+	mapping := map[string]string{
+		"hubEndpoint":     "hub_endpoint",
+		"autoArchiveDays": "auto_archive_days",
+		"autoPurgeDays":   "auto_purge_days",
+		"webhookType":     "webhook_type",
+		"webhookUrl":      "webhook_url",
+		"webhookEvents":   "webhook_events",
+		"siemAddress":     "siem_address",
+		"siemProtocol":    "siem_protocol",
+	}
+	for camelKey, snakeKey := range mapping {
+		if val, exists := req[camelKey]; exists {
+			dbUpdates[snakeKey] = val
+		}
+	}
+
+	if err := s.store.UpdateConfigBatch(dbUpdates); err != nil {
 		return err
 	}
 
 	// Hot reload if related settings were changed
 	var siemAddress, siemProtocol string
-	if val, ok := req["siem_address"].(string); ok {
+	if val, ok := req["siemAddress"].(string); ok {
 		siemAddress = val
 	} else {
 		siemAddress, _ = s.store.GetConfigValue("siem_address")
 	}
-	if val, ok := req["siem_protocol"].(string); ok {
+	if val, ok := req["siemProtocol"].(string); ok {
 		siemProtocol = val
 	} else {
 		siemProtocol, _ = s.store.GetConfigValue("siem_protocol")

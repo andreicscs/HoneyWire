@@ -8,18 +8,6 @@ const eventsStore = useEventsStore()
 
 const { currentView, isArmed } = storeToRefs(appStore)
 const { unreadCount } = storeToRefs(eventsStore)
-
-// Note: You can eventually move this to appStore actions to keep logic centralized
-const toggleTheme = () => {
-    const html = document.documentElement
-    if (html.classList.contains('dark')) {
-        html.classList.remove('dark')
-        localStorage.setItem('theme', 'light')
-    } else {
-        html.classList.add('dark')
-        localStorage.setItem('theme', 'dark')
-    }
-}
 </script>
 
 <template>
@@ -45,7 +33,7 @@ const toggleTheme = () => {
                 <span class="text-h1 font-medium text-text-h leading-none tracking-wide">HoneyWire</span>
             </div>
             
-            <h2 class="text-base  text-text-m font-medium capitalize hidden sm:block">{{ currentView.replace('-', ' ') }}</h2>
+            <h2 class="text-base  text-text-m font-medium capitalize hidden sm:block">{{ currentView?.replace('-', ' ') }}</h2>
         </div>
         
         <div class="flex items-center gap-3">
@@ -65,7 +53,7 @@ const toggleTheme = () => {
                 <span>{{ isArmed ? 'Armed' : 'Passive' }}</span>
             </button>
 
-            <button @click="toggleTheme()" 
+            <button @click="appStore.toggleTheme()" 
                     type="button"
                     aria-label="Toggle light and dark theme"
                     class="w-8 h-8 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:text-text-h hover:bg-secondary-hover transition-colors flex items-center justify-center group overflow-hidden shadow-sm focus:outline-none">

@@ -20,7 +20,7 @@ func NewConfigHandler(svc *config.Service, cfg *config.Config) *ConfigHandler {
 
 func (h *ConfigHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
 	requiresSetup, _ := h.service.GetSetupStatus()
-	SendJSON(w, http.StatusOK, map[string]bool{"requires_setup": requiresSetup})
+	SendJSON(w, http.StatusOK, map[string]bool{"requiresSetup": requiresSetup})
 }
 
 func (h *ConfigHandler) CompleteSetup(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,16 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendJSON(w, http.StatusOK, cfg)
+	SendJSON(w, http.StatusOK, map[string]interface{}{
+		"hubEndpoint":     cfg.HubEndpoint,
+		"autoArchiveDays": cfg.AutoArchiveDays,
+		"autoPurgeDays":   cfg.AutoPurgeDays,
+		"webhookType":     cfg.WebhookType,
+		"webhookUrl":      cfg.WebhookURL,
+		"webhookEvents":   cfg.WebhookEvents,
+		"siemAddress":     cfg.SiemAddress,
+		"siemProtocol":    cfg.SiemProtocol,
+	})
 }
 
 func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +87,8 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *ConfigHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		CurrentPassword string `json:"current_password"`
-		NewPassword     string `json:"new_password"`
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, "Invalid payload", http.StatusBadRequest)
@@ -143,12 +152,12 @@ func (h *ConfigHandler) FactoryReset(w http.ResponseWriter, r *http.Request) {
 
 func (h *ConfigHandler) GetSystemState(w http.ResponseWriter, r *http.Request) {
 	isArmed, _ := h.service.GetSystemState()
-	SendJSON(w, http.StatusOK, map[string]bool{"is_armed": isArmed})
+	SendJSON(w, http.StatusOK, map[string]bool{"isArmed": isArmed})
 }
 
 func (h *ConfigHandler) SetSystemState(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IsArmed bool `json:"is_armed"`
+		IsArmed bool `json:"isArmed"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, err.Error(), http.StatusBadRequest)
@@ -160,7 +169,7 @@ func (h *ConfigHandler) SetSystemState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "is_armed": req.IsArmed})
+	SendJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "isArmed": req.IsArmed})
 }
 
 func (h *ConfigHandler) HandleVersion(w http.ResponseWriter, r *http.Request) {

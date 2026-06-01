@@ -42,7 +42,7 @@ const clearLogs = async () => {
 
 const goToDashboard = () => {
     fleetStore.clearSelection()
-    appStore.currentView = 'dashboard'
+    appStore.setView('dashboard')
 }
 </script>
 
@@ -51,7 +51,7 @@ const goToDashboard = () => {
            :class="sidebarOpen ? 'w-[240px]' : 'w-[68px]'">
         
         <div class="h-14 flex items-center px-[18px] shrink-0 mb-2">
-            <button @click="appStore.sidebarOpen = !appStore.sidebarOpen" 
+            <button @click="appStore.toggleSidebar()" 
                     type="button"
                     class="p-1.5 rounded-md text-secondary-text text-text-h hover:bg-secondary-hover transition-colors outline-none">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -74,7 +74,7 @@ const goToDashboard = () => {
                 </div>
             </button>
             
-            <button @click="appStore.currentView = 'fleet'" 
+            <button @click="appStore.setView('fleet')" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
                     :class="currentView === 'fleet' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
@@ -86,7 +86,7 @@ const goToDashboard = () => {
                 </div>
             </button>
 
-            <button @click="appStore.currentView = 'settings'" 
+            <button @click="appStore.setView('settings')" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
                     :class="currentView === 'settings' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
@@ -106,7 +106,7 @@ const goToDashboard = () => {
                      :class="sidebarOpen ? 'w-full opacity-100' : 'w-0 opacity-0'"></div>
             </div>
             
-            <button @click="appStore.viewingArchive = !appStore.viewingArchive" 
+            <button @click="appStore.toggleArchive()" 
                     type="button"
                     class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all border shadow-sm outline-none"
                     :class="viewingArchive ? 'bg-archive-bg text-archive-text border-archive-border hover:bg-archive-hover' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text'">

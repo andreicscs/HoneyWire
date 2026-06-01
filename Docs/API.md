@@ -56,7 +56,7 @@ When `HW_DASHBOARD_PASSWORD` is set, setup is considered locked and this endpoin
 
 **Response:**
 ```json
-{ "requires_setup": true }
+{ "requiresSetup": true }
 ```
 
 ### POST /api/v1/setup
@@ -220,19 +220,31 @@ Toggles a sensor's silence state. Silenced sensors still log events but suppress
 
 #### GET /api/v1/config
 
-Returns runtime configuration loaded from SQLite.
+Returns runtime configuration loaded from SQLite. 
+
+**Response Schema:**
+| Field | Type | Description |
+|-------|------|-------------|
+| `hubEndpoint` | `string` | The fully qualified URL of the Hub (e.g., `https://hub.example.com`). |
+| `autoArchiveDays` | `integer` | Days before active events are moved to the archive. `0` = Keep forever. |
+| `autoPurgeDays` | `integer` | Days before archived events are permanently deleted. `0` = Keep forever. |
+| `webhookType` | `string` | The active push notification provider (`ntfy`, `gotify`, `discord`, `slack`, `none`). |
+| `webhookUrl` | `string` | The target URL for the selected webhook provider. |
+| `webhookEvents` | `string[]` | Array of severity levels that trigger a notification (e.g., `["critical", "high"]`). |
+| `siemAddress` | `string` | Address for RFC3164 syslog forwarding (e.g., `10.0.0.50:514`). Empty if disabled. |
+| `siemProtocol` | `string` | Protocol for SIEM forwarding (`tcp`, `udp`). |
 
 **Response:**
 ```json
 {
-  "hub_endpoint": "https://honeywire.my-domain.com",
-  "auto_archive_days": 90,
-  "auto_purge_days": 180,
-  "webhook_url": "",
-  "webhook_type": "none",
-  "webhook_events": [],
-  "siem_address": "",
-  "siem_protocol": "syslog"
+  "hubEndpoint": "https://honeywire.my-domain.com",
+  "autoArchiveDays": 90,
+  "autoPurgeDays": 180,
+  "webhookType": "none",
+  "webhookUrl": "",
+  "webhookEvents": [],
+  "siemAddress": "",
+  "siemProtocol": "tcp"
 }
 ```
 
@@ -240,23 +252,23 @@ Returns runtime configuration loaded from SQLite.
 
 Updates runtime settings. Only supported fields are applied. This endpoint also hot-reloads webhook and SIEM configuration.
 
-**Supported fields:**
-- `hub_endpoint`
-- `auto_archive_days`
-- `auto_purge_days`
-- `webhook_url`
-- `webhook_type` (`ntfy`, `gotify`, `discord`, `slack`, `none`)
-- `webhook_events`
-- `siem_address`
-- `siem_protocol` (`tcp`, `udp`)
+**Accepted Fields:**
+- `hubEndpoint`
+- `autoArchiveDays`
+- `autoPurgeDays`
+- `webhookType` (`ntfy`, `gotify`, `discord`, `slack`, `none`)
+- `webhookUrl`
+- `webhookEvents`
+- `siemAddress`
+- `siemProtocol` (`tcp`, `udp`)
 
 **Request example:**
 ```json
 {
-  "auto_archive_days": 14,
-  "webhook_type": "discord",
-  "webhook_url": "https://discord.com/api/webhooks/...",
-  "webhook_events": ["critical", "high"]
+  "autoArchiveDays": 14,
+  "webhookType": "discord",
+  "webhookUrl": "https://discord.com/api/webhooks/...",
+  "webhookEvents": ["critical", "high"]
 }
 ```
 
@@ -266,7 +278,7 @@ Returns whether the Hub is armed.
 
 **Response:**
 ```json
-{ "is_armed": true }
+{ "isArmed": true }
 ```
 
 #### PATCH /api/v1/system/state
@@ -275,7 +287,7 @@ Sets the armed/disarmed state.
 
 **Request:**
 ```json
-{ "is_armed": false }
+{ "isArmed": false }
 ```
 
 #### PATCH /api/v1/system/password
@@ -285,8 +297,8 @@ Changes the dashboard admin password. When `HW_DASHBOARD_PASSWORD` is set, this 
 **Request:**
 ```json
 {
-  "current_password": "old_password",
-  "new_password": "new_password"
+  "currentPassword": "oldPassword",
+  "newPassword": "newPassword"
 }
 ```
 

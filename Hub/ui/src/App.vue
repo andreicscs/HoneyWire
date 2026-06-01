@@ -11,18 +11,18 @@ import Login from './views/Login.vue'
 import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
 
-import { useConfig } from './api/useConfig'
+import { useConfigStore } from './stores/Config/config'
 import { useAppStore } from './stores/System/app'
 import { useFleetStore } from './stores/Fleet/fleet'
 import { useEventsStore } from './stores/Events/events'
 import { HoneyWireWS } from './services/ws'
 
-const { fetchConfig } = useConfig()
+const configStore = useConfigStore()
 const appStore = useAppStore()
 const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
 
-const { currentView, viewingArchive } = storeToRefs(appStore)
+const { isInitialized, requiresSetup, isAuthenticated, currentView, viewingArchive, bootstrapError } = storeToRefs(appStore)
 
 watch([viewingArchive, () => fleetStore.selectedNode, () => fleetStore.selectedSensor],
   ([isArchived, node, sensor]) => {
@@ -37,7 +37,7 @@ const wsService = new HoneyWireWS()
 
 const loadAppData = async () => {
   try {
-    await fetchConfig().catch(e => console.warn("Config fetch non-fatal error:", e))
+    await configStore.fetchConfig().catch(e => console.warn("Config fetch non-fatal error:", e))
 
     // Reconcile system state (isArmed) now that we have an active session
     await appStore.fetchSystemState().catch(() => {})
@@ -81,19 +81,18 @@ const loadAppData = async () => {
 const checkAuthAndInit = async () => {
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('debug') === 'setup') {
-    appStore.requiresSetup = true
-    appStore.isInitialized = true
+    appStore.enableDebugSetup()
     return
   }
 
   try {
     await appStore.initAppStore()
 
-    if (appStore.requiresSetup) {
+    if (requiresSetup.value) {
       return
     }
 
-    if (appStore.bootstrapError) {
+    if (bootstrapError.value) {
       return
     }
 
@@ -102,23 +101,11 @@ const checkAuthAndInit = async () => {
   }
 }
 
-watch(() => appStore.isAuthenticated, (isAuth) => {
+watch(isAuthenticated, (isAuth) => {
   if (isAuth) {
-    appStore.requiresSetup = false
     loadAppData()
   }
 })
-
-const toggleTheme = () => {
-  const html = document.documentElement
-  if (html.classList.contains('dark')) {
-    html.classList.remove('dark')
-    localStorage.setItem('theme', 'light')
-  } else {
-    html.classList.add('dark')
-    localStorage.setItem('theme', 'dark')
-  }
-}
 
 onMounted(() => {
   // Restore saved theme before any rendering
@@ -143,7 +130,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!appStore.isInitialized" class="h-screen bg-bg flex items-center justify-center z-50">
+  <div v-if="!isInitialized" class="h-screen bg-bg flex items-center justify-center z-50">
      <div class="animate-pulse flex flex-col items-center gap-4">
          <svg class="w-10 h-10 text-primary-main animate-spin" fill="none" viewBox="0 0 24 24">
              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -153,12 +140,12 @@ onUnmounted(() => {
      </div>
   </div>
 
-  <div v-else-if="appStore.requiresSetup" class="h-screen bg-bg">
-    <Setup @toggle-theme="toggleTheme" />
+  <div v-else-if="requiresSetup" class="h-screen bg-bg">
+    <Setup @toggle-theme="appStore.toggleTheme" />
   </div>
 
-  <div v-else-if="!appStore.isAuthenticated" class="h-screen bg-bg">
-    <Login @toggle-theme="toggleTheme" />
+  <div v-else-if="!isAuthenticated" class="h-screen bg-bg">
+    <Login @toggle-theme="appStore.toggleTheme" />
   </div>
 
   <div v-else class="flex h-screen overflow-hidden bg-bg text-text-h transition-colors duration-200">

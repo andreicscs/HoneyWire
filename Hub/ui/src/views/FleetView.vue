@@ -251,7 +251,7 @@ const { copiedStates, handleCopy } = useClipboard()
 
 const handleOpenNodeDetail = (nodeId) => {
     fleetStore.selectTarget(nodeId, null, false)
-    appStore.currentView = 'node-detail'
+    appStore.setView('node-detail')
 }
 
 </script>

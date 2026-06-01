@@ -228,7 +228,10 @@ const legendItems = [
                     </div>
                 </div>
                 
-                <BaseTimeFilter v-model="appStore.velocityTimeframe" />
+                <BaseTimeFilter 
+                    :model-value="velocityTimeframe" 
+                    @update:model-value="appStore.setVelocityTimeframe($event)" 
+                />
             </div>
         </template>
 
