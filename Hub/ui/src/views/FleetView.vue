@@ -89,8 +89,8 @@ const saveAlias = async (node: FleetNode) => {
             await fleetStore.updateNode(node.id, {
                 alias: val,
                 tags: node.tags,
-                publicIp: node.publicIp,
-                privateIp: node.privateIp,
+                publicIp: node.publicIp || '',
+                privateIp: node.privateIp || ''
             })
         } catch (err) {
             // Store handles rollback
@@ -125,8 +125,8 @@ const saveTag = async (node: FleetNode) => {
             await fleetStore.updateNode(node.id, {
                 alias: node.alias,
                 tags: [...node.tags, val],
-                publicIp: node.publicIp,
-                privateIp: node.privateIp,
+                publicIp: node.publicIp || '',
+                privateIp: node.privateIp || ''
             })
         } catch (err) {
             // Store handles rollback
@@ -142,12 +142,87 @@ const removeTag = async (node: FleetNode, index: number) => {
         await fleetStore.updateNode(node.id, {
             alias: node.alias,
             tags: newTags,
-            publicIp: node.publicIp,
-            privateIp: node.privateIp,
+            publicIp: node.publicIp || '',
+            privateIp: node.privateIp || ''
         })
     } catch (err) {
         // Store handles rollback
     }
+}
+
+// --- INLINE IP EDIT STATE (ephemeral UI) ---
+const editingPubIpNodeId = ref<string | null>(null)
+const rawPubIpValue = ref('')
+const pubIpInputRefs = ref<Record<string, HTMLInputElement>>({})
+
+const enablePubIpEdit = async (node: FleetNode) => {
+    editingPubIpNodeId.value = node.id
+    rawPubIpValue.value = node.publicIp || ''
+    await nextTick()
+    if (pubIpInputRefs.value[node.id]) {
+        pubIpInputRefs.value[node.id].focus()
+        pubIpInputRefs.value[node.id].select()
+    }
+}
+
+const cancelPubIpEdit = () => {
+    editingPubIpNodeId.value = null
+    rawPubIpValue.value = ''
+}
+
+const savePubIp = async (node: FleetNode) => {
+    if (editingPubIpNodeId.value !== node.id) return
+    const val = rawPubIpValue.value.trim()
+    if (val !== (node.publicIp || '')) {
+        try {
+            await fleetStore.updateNode(node.id, {
+                alias: node.alias,
+                tags: node.tags,
+                publicIp: val,
+                privateIp: node.privateIp || ''
+            })
+        } catch (err) {
+        }
+    }
+    editingPubIpNodeId.value = null
+    rawPubIpValue.value = ''
+}
+
+const editingPrivIpNodeId = ref<string | null>(null)
+const rawPrivIpValue = ref('')
+const privIpInputRefs = ref<Record<string, HTMLInputElement>>({})
+
+const enablePrivIpEdit = async (node: FleetNode) => {
+    editingPrivIpNodeId.value = node.id
+    rawPrivIpValue.value = node.privateIp || ''
+    await nextTick()
+    if (privIpInputRefs.value[node.id]) {
+        privIpInputRefs.value[node.id].focus()
+        privIpInputRefs.value[node.id].select()
+    }
+}
+
+const cancelPrivIpEdit = () => {
+    editingPrivIpNodeId.value = null
+    rawPrivIpValue.value = ''
+}
+
+const savePrivIp = async (node: FleetNode) => {
+    if (editingPrivIpNodeId.value !== node.id) return
+    const val = rawPrivIpValue.value.trim()
+    if (val !== (node.privateIp || '')) {
+        try {
+            await fleetStore.updateNode(node.id, {
+                alias: node.alias,
+                tags: node.tags,
+                publicIp: node.publicIp || '',
+                privateIp: val
+            })
+        } catch (err) {
+        }
+    }
+    editingPrivIpNodeId.value = null
+    rawPrivIpValue.value = ''
 }
 
 // --- OSI LAYER SORT ORDER ---
@@ -402,23 +477,37 @@ const handleOpenNodeDetail = (nodeId: string) => {
                     
                     <div v-if="node.id !== 'unassigned'" class="grid grid-cols-2 gap-y-2 gap-x-4 text-sm mb-4">
                         
-                        <div @click="handleCopy(node.id + '-pub', node.publicIp)" 
-                             class="flex items-center gap-1.5 cursor-pointer transition-colors duration-[var(--duration-fast)] group/pub w-max rounded px-1 -ml-1 py-0.5 border border-transparent"
-                             :class="copiedStates[node.id + '-pub'] ? 'bg-success-bg text-success-text border-success-border' : 'text-text-m hover:text-text-h hover:bg-secondary-hover'">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                            <span class="font-mono truncate">{{ copiedStates[node.id + '-pub'] ? 'Copied!' : (node.publicIp || 'Unknown') }}</span>
+                        <div class="flex items-center gap-1.5 transition-colors duration-[var(--duration-fast)] group/pub w-max rounded px-1 -ml-1 py-0.5 border border-transparent text-text-m hover:text-text-h hover:bg-secondary-hover">
+                            <svg @click="node.publicIp ? handleCopy(node.id + '-pub', node.publicIp) : null" class="w-3.5 h-3.5 shrink-0" :class="node.publicIp ? 'cursor-pointer hover:text-primary-main' : 'opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                            <span v-if="editingPubIpNodeId !== node.id" @click="enablePubIpEdit(node)" class="font-mono truncate cursor-edit border-b border-dashed border-transparent hover:border-primary-main" :class="copiedStates[node.id + '-pub'] ? 'text-success-main' : ''" :title="copiedStates[node.id + '-pub'] ? 'Copied!' : 'Click to edit Public IP'">{{ copiedStates[node.id + '-pub'] ? 'Copied!' : (node.publicIp || 'Unknown') }}</span>
+                            <input v-else
+                                :ref="el => { if (el) pubIpInputRefs[node.id] = el as HTMLInputElement }"
+                                v-model="rawPubIpValue"
+                                @keyup.enter="savePubIp(node)"
+                                @keyup.esc="cancelPubIpEdit"
+                                @blur="savePubIp(node)"
+                                class="font-mono text-sm text-text-h bg-input-bg border border-primary-main rounded px-1 py-0 focus:outline-none ring-1 ring-focus-ring w-28 truncate"
+                                placeholder="0.0.0.0"
+                            />
                         </div>
 
-                        <div @click="handleCopy(node.id + '-priv', node.privateIp)" 
-                             class="flex items-center gap-1.5 cursor-pointer transition-colors duration-[var(--duration-fast)] group/priv w-max rounded px-1 -ml-1 py-0.5 border border-transparent"
-                             :class="copiedStates[node.id + '-priv'] ? 'bg-success-bg text-success-text border-success-border' : 'text-text-m hover:text-text-h hover:bg-secondary-hover'">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="flex items-center gap-1.5 transition-colors duration-[var(--duration-fast)] group/priv w-max rounded px-1 -ml-1 py-0.5 border border-transparent text-text-m hover:text-text-h hover:bg-secondary-hover">
+                            <svg @click="node.privateIp ? handleCopy(node.id + '-priv', node.privateIp) : null" class="w-3.5 h-3.5 shrink-0" :class="node.privateIp ? 'cursor-pointer hover:text-primary-main' : 'opacity-50'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <rect x="2" y="14" width="8" height="6" rx="2" ry="2"/>
                                 <rect x="14" y="14" width="8" height="6" rx="2" ry="2"/>
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 14v-2a2 2 0 012-2h8a2 2 0 012 2v2M12 2v8"/>
                                 <rect x="8" y="2" width="8" height="6" rx="2" ry="2"/>
                             </svg>
-                            <span class="font-mono truncate">{{ copiedStates[node.id + '-priv'] ? 'Copied!' : (node.privateIp || 'Unknown') }}</span>
+                            <span v-if="editingPrivIpNodeId !== node.id" @click="enablePrivIpEdit(node)" class="font-mono truncate cursor-edit border-b border-dashed border-transparent hover:border-primary-main" :class="copiedStates[node.id + '-priv'] ? 'text-success-main' : ''" :title="copiedStates[node.id + '-priv'] ? 'Copied!' : 'Click to edit Private IP'">{{ copiedStates[node.id + '-priv'] ? 'Copied!' : (node.privateIp || 'Unknown') }}</span>
+                            <input v-else
+                                :ref="el => { if (el) privIpInputRefs[node.id] = el as HTMLInputElement }"
+                                v-model="rawPrivIpValue"
+                                @keyup.enter="savePrivIp(node)"
+                                @keyup.esc="cancelPrivIpEdit"
+                                @blur="savePrivIp(node)"
+                                class="font-mono text-sm text-text-h bg-input-bg border border-primary-main rounded px-1 py-0 focus:outline-none ring-1 ring-focus-ring w-28 truncate"
+                                placeholder="0.0.0.0"
+                            />
                         </div>
                     </div>
 

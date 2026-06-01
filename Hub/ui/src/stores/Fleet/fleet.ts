@@ -464,12 +464,7 @@ export const useFleetStore = defineStore('fleet', () => {
   const updateNode = async (nodeId: string, payload: Partial<FleetNode>): Promise<void> => {
     let previousState: FleetNode | null = null
     try {
-      previousState = patchNode(nodeId, {
-        alias: payload.alias,
-        tags: payload.tags,
-        publicIp: payload.publicIp,
-        privateIp: payload.privateIp,
-      })
+      previousState = patchNode(nodeId, payload)
       await api.patch(`/api/v1/nodes/${nodeId}`, payload)
     } catch (err) {
       if (previousState) patchNode(nodeId, previousState)
