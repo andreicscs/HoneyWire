@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/honeywire/hub/internal/compose/security"
 	"github.com/honeywire/hub/internal/models"
 )
 
@@ -18,7 +19,7 @@ var CoreEnvVars = []string{
 	"HW_SEVERITY",
 }
 
-func BuildService(sensorID string, m models.SensorManifest, envMap map[string]string) *ComposeFile {
+func BuildService(sensorID string, m models.SensorManifest, envMap map[string]string) (*ComposeFile, error) {
 	var compose ComposeFile
 
 	// -----------------------------------------------------------------
@@ -96,6 +97,9 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 				}
 				sort.Strings(dirs)
 				for _, dir := range dirs {
+					if err := security.ValidateMountPath(dir); err != nil {
+						return nil, fmt.Errorf("dynamic volume expansion blocked for init container: %w", err)
+					}
 					composeVol := ComposeVolume{
 						Type:   "bind",
 						Source: dir,
@@ -240,6 +244,9 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 			}
 			sort.Strings(parsedFiles)
 			for _, f := range parsedFiles {
+				if err := security.ValidateMountPath(f); err != nil {
+					return nil, fmt.Errorf("dynamic volume expansion blocked for main sensor: %w", err)
+				}
 				composeVol := ComposeVolume{
 					Type:     "bind",
 					Source:   f,
@@ -278,7 +285,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 		Service: svc,
 	})
 
-	return &compose
+	return &compose, nil
 }
 
 func sortEnvKeys(keys []string) {

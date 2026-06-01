@@ -163,7 +163,11 @@ func (s *Service) GetNodeCompose(token, hostFallback string) ([]byte, error) {
 		}
 
 		envMap := composeEngine.BuildEnv(manifest, userVars, sysVars)
-		svcCompose := composeEngine.BuildService(sensor.ID, manifest, envMap)
+		svcCompose, err := composeEngine.BuildService(sensor.ID, manifest, envMap)
+		if err != nil {
+			log.Printf("[ERROR] Compose build failed for sensor %s (Node %s): %v", sensor.ID, nodeID, err)
+			return nil, fmt.Errorf("build_failed: %w", err)
+		}
 		finalCompose.Services = append(finalCompose.Services, svcCompose.Services...)
 	}
 
@@ -175,6 +179,7 @@ func (s *Service) GeneratePreviewCompose(req PreviewRequest) ([]byte, error) {
 
 	for _, sensor := range req.Sensors {
 		if valErr := security.ValidateManifest(sensor.Manifest); valErr != nil {
+			log.Printf("[ERROR] Preview manifest validation failed for sensor %s: %v", sensor.SensorID, valErr)
 			return nil, fmt.Errorf("invalid_manifest: %w", valErr)
 		}
 
@@ -190,7 +195,11 @@ func (s *Service) GeneratePreviewCompose(req PreviewRequest) ([]byte, error) {
 		envMap["HW_SENSOR_ID"] = sensor.SensorID
 		envMap["HW_TEST_MODE"] = "false"
 
-		svcCompose := composeEngine.BuildService(sensor.SensorID, sensor.Manifest, envMap)
+		svcCompose, err := composeEngine.BuildService(sensor.SensorID, sensor.Manifest, envMap)
+		if err != nil {
+			log.Printf("[ERROR] Compose preview build failed for sensor %s: %v", sensor.SensorID, err)
+			return nil, fmt.Errorf("build_failed: %w", err)
+		}
 		finalCompose.Services = append(finalCompose.Services, svcCompose.Services...)
 	}
 

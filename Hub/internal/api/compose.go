@@ -54,7 +54,7 @@ func (h *ComposeHandler) GenerateCompose(w http.ResponseWriter, r *http.Request)
 
 	yamlData, err := h.service.GeneratePreviewCompose(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

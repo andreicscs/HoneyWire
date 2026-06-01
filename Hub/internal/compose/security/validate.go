@@ -52,7 +52,7 @@ func ValidateManifest(m models.SensorManifest) error {
 			return err
 		}
 	}
-	
+
 	// Interpolation Checks
 	if containsInterpolation(m.Deployment.Image) {
 		return fmt.Errorf("SECURITY REJECT: interpolation not allowed in image")
@@ -82,13 +82,20 @@ func ValidateManifest(m models.SensorManifest) error {
 	return nil
 }
 
+func ValidateMountPath(path string) error {
+	cleanSource := filepath.Clean(path)
+	for _, prefix := range forbiddenMountPrefixes {
+		if cleanSource == prefix || strings.HasPrefix(cleanSource, prefix+"/") {
+			return fmt.Errorf("SECURITY REJECT: mount path is forbidden: %s", path)
+		}
+	}
+	return nil
+}
+
 func checkVolumeMounts(mounts []models.VolumeMount) error {
 	for _, vol := range mounts {
-		cleanSource := filepath.Clean(vol.Source)
-		for _, prefix := range forbiddenMountPrefixes {
-			if cleanSource == prefix || strings.HasPrefix(cleanSource, prefix+"/") {
-				return fmt.Errorf("SECURITY REJECT: mount path is forbidden: %s", vol.Source)
-			}
+		if err := ValidateMountPath(vol.Source); err != nil {
+			return err
 		}
 	}
 	return nil

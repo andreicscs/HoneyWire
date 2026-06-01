@@ -46,6 +46,8 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 	r.Use(ErrorOnlyLogger)
 	r.Use(middleware.Recoverer)
 
+	rateLimiter := NewRateLimiter()
+
 	// Public Endpoints
 	r.Get("/api/v1/version", cfg.Config.HandleVersion)
 	r.Post("/login", cfg.Auth.Login)
@@ -100,7 +102,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 
 	// --- Wizard & Telemetry Endpoints ---
 	r.Group(func(r chi.Router) {
-		r.Use(AgentAuthMiddleware(cfg.NodeAuthenticator))
+		r.Use(AgentAuthMiddleware(cfg.NodeAuthenticator, rateLimiter))
 		r.Get("/api/v1/nodes/me", cfg.Nodes.GetCurrentNode)
 		r.Get("/api/v1/nodes/compose", cfg.Compose.GetNodeCompose)
 		r.Post("/api/v1/heartbeat", cfg.Sensors.ReceiveHeartbeat)
@@ -108,7 +110,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Post("/api/v1/event", cfg.Events.ReceiveEvent)
 	})
 
-	r.With(DualAuthMiddleware(cfg.SessionValidator, cfg.NodeAuthenticator)).Get("/api/v1/manifests", cfg.Sensors.GetManifests)
+	r.With(DualAuthMiddleware(cfg.SessionValidator, cfg.NodeAuthenticator, rateLimiter)).Get("/api/v1/manifests", cfg.Sensors.GetManifests)
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

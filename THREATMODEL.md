@@ -191,6 +191,7 @@ However:
 - Hub re-validates all inputs independently
 - Wizard cannot override Hub-generated output
 - no deployment policy logic resides in Wizard
+- port range validation prevents local DoS from malformed `/proc` state
 
 ---
 
@@ -212,12 +213,16 @@ However:
 **Mitigations (IMPLEMENTED):**
 - capability whitelist enforcement
 - forbidden mount path denylist
-- strict validation of:
+- validation of:
   - init containers
   - volume mounts
   - command fields
 - read-only enforcement for main sensor containers
 - security-opt enforcement (`no-new-privileges`)
+- validation of dynamic volume paths during generation
+
+**Gaps:**
+- no strict command checking for init-provisioner containers
 
 ---
 
@@ -248,20 +253,26 @@ However:
 
 ---
 
-### Threat 6: Supply Chain / Image Compromise
+### Threat 6: Supply Chain Compromise (Images + Manifests)
 
-**Attacker capability:**
-- modifies container images referenced in manifests
+**Image Supply Chain Risks**
+- Attacker modifies container image at registry (requires registry compromise or MITM)
+- Manifest specifies image without digest pinning
+- Wizard deploys attacker's image
 
-**Impact:**
-- malicious runtime behavior inside sensor containers
-- silent data exfiltration
-- backdoored sensors
+**Manifest Supply Chain Risks**
+- Attacker modifies manifest at Hub or in manifest registry
+- Hub lacks manifest signing verification
+- Invalid manifest reaches Wizard
 
-**Mitigations (FUTURE):**
-- image digest pinning (required improvement)
-- registry allowlisting
-- image signature verification
+**Mitigations (Planned)**
+- Image digest pinning (required in manifests)
+- Manifest signature verification at Hub
+- Provenance tracking
+
+**Current Gaps**
+- No image digest enforcement (images pulled by tag only)
+- No manifest cryptographic signature verification
 
 ---
 
@@ -275,8 +286,18 @@ However:
 - creates confusion in security audits
 - takes hub down
 
-**Mitigations (FUTURE):**
-- Node api key rate limiting
+**Accepted Risk (Command History Exposure):**
+During the initial link, the wizard requires `--link` and `--api-key` as CLI arguments.
+`wizard --link https://hub.example.com --api-key eyJhbGc...`
+The API key is visible in `ps` output and shell history.
+
+This trade-off (Medium Risk - UX Issue) is formally accepted because:
+- It is a one-time setup operation (after that, the config file is used)
+- The operator is assumed to be in a controlled environment
+- It is standard practice for unattended bootstrap operations
+
+**Mitigations (IMPLEMENTED):**
+- **Node API Key Rate Limiting:** The Hub enforces a per-node token bucket rate limit (100 requests/minute) on all API endpoints that use node API keys for authentication. This prevents a compromised key from being used in a high-volume Denial of Service (DoS) attack against the Hub.
 
 ---
 
@@ -362,20 +383,23 @@ Therefore:
 - unsafe capability injection (allowlist enforced)
 - basic mount path escape attempts
 - interpolation-based injection attempts
+- dynamic volume path expansion via environment variables
 - untrusted Wizard influence on policy
 - schema ambiguity (strict typing enforced)
+- port number parsing validation
+- Node apikey rate limiting
+- UI login rate limiting
 
 ### Partially Mitigated:
 - init container privilege scope abuse
 - Docker runtime escape assumptions
 
-### Not Yet Fully Implemented:
+### Not Yet Implemented:
 - image digest pinning
 - registry signing enforcement
 - per-role execution sandbox model
 - image supply chain trust
 - manifest supply chain trust
-- Node apikey rate limiting
 
 ---
 

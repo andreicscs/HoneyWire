@@ -563,9 +563,10 @@ const fetchYamlFromHub = async () => {
       }]
     })
     applyHighlighting()
-  } catch (e) {
-    rawCompose.value = 'services:\n  error:\n    error_generating_yaml'
-    highlightedCompose.value = rawCompose.value
+  } catch (e: any) {
+    const msg = e.response?.data || e.message || String(e)
+    rawCompose.value = `# ERROR GENERATING PREVIEW:\n# ${msg.trim().split('\n').join('\n# ')}`
+    highlightedCompose.value = `<span class="text-danger-main font-semibold">${rawCompose.value}</span>`
   }
 }
 

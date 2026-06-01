@@ -4,6 +4,9 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
+
+	"golang.org/x/time/rate"
 )
 
 type SessionValidator interface {
@@ -17,6 +20,39 @@ type NodeAuthenticator interface {
 type contextKey string
 
 const NodeIDKey contextKey = "nodeID"
+
+// RateLimiter controls the frequency of requests on a per-node basis.
+type RateLimiter struct {
+	limiters map[string]*rate.Limiter
+	mu       sync.RWMutex
+}
+
+// NewRateLimiter creates a new rate limiter.
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{
+		limiters: make(map[string]*rate.Limiter),
+	}
+}
+
+// Allow checks if a request from a given nodeID is permitted.
+func (rl *RateLimiter) Allow(nodeID string) bool {
+	rl.mu.RLock()
+	limiter, exists := rl.limiters[nodeID]
+	rl.mu.RUnlock()
+
+	if !exists {
+		rl.mu.Lock()
+		limiter, exists = rl.limiters[nodeID]
+		if !exists {
+			// Limit: ~1.66 requests per second (100 per minute), Burst: 100
+			limiter = rate.NewLimiter(rate.Limit(100.0/60.0), 100)
+			rl.limiters[nodeID] = limiter
+		}
+		rl.mu.Unlock()
+	}
+
+	return limiter.Allow()
+}
 
 func NodeIDFromContext(ctx context.Context) string {
 	val, ok := ctx.Value(NodeIDKey).(string)
@@ -42,7 +78,7 @@ func UIAuthMiddleware(sessionValidator SessionValidator) func(http.Handler) http
 }
 
 // AgentAuthMiddleware securely validates sensor heartbeats/events via the Auth Service
-func AgentAuthMiddleware(auth NodeAuthenticator) func(http.Handler) http.Handler {
+func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := r.Header.Get("X-Api-Key")
@@ -59,6 +95,11 @@ func AgentAuthMiddleware(auth NodeAuthenticator) func(http.Handler) http.Handler
 				return
 			}
 
+			if !rateLimiter.Allow(nodeID) {
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+
 			ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -66,7 +107,7 @@ func AgentAuthMiddleware(auth NodeAuthenticator) func(http.Handler) http.Handler
 }
 
 // DualAuthMiddleware permits either UI Dashboard Sessions OR Agent API Keys
-func DualAuthMiddleware(sessionValidator SessionValidator, auth NodeAuthenticator) func(http.Handler) http.Handler {
+func DualAuthMiddleware(sessionValidator SessionValidator, auth NodeAuthenticator, rateLimiter *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -82,6 +123,11 @@ func DualAuthMiddleware(sessionValidator SessionValidator, auth NodeAuthenticato
 			}
 			if token != "" {
 				if nodeID, err := auth.AuthenticateNodeRequest(token); err == nil && nodeID != "" {
+					if !rateLimiter.Allow(nodeID) {
+						http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+						return
+					}
+
 					ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
