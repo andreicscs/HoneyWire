@@ -12,7 +12,7 @@ const eventsStore = useEventsStore()
 const fleetStore = useFleetStore()
 
 const { viewingArchive } = storeToRefs(appStore)
-const { filteredEvents: events, isFetching } = storeToRefs(eventsStore)
+const { filteredEvents: rawEvents, isFetching } = storeToRefs(eventsStore)
 const { nodes: fleet } = storeToRefs(fleetStore)
 
 const sortCol = ref('timestamp')
@@ -22,6 +22,16 @@ const expandedRows = ref<Set<string>>(new Set())
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
 
+const displayEvents = ref<any[]>([])
+
+watch([rawEvents, isFetching], ([newEvents, fetching]) => {
+    // Freeze the UI on the old data if the filter yields an empty array while fetching
+    if (fetching && newEvents.length === 0 && displayEvents.value.length > 0) {
+        return 
+    }
+    displayEvents.value = newEvents
+}, { immediate: true })
+
 // Resolve nodeId → alias for display
 const getNodeAlias = (nodeId: string | null) => {
     if (!nodeId) return 'Unassigned'
@@ -29,8 +39,8 @@ const getNodeAlias = (nodeId: string | null) => {
     return node?.alias || nodeId
 }
 
-watch([viewingArchive, sortCol, sortDesc, () => events.value.length], () => {
-    if (events.value.length === 0) currentPage.value = 1
+watch([viewingArchive, sortCol, sortDesc, () => displayEvents.value.length], () => {
+    if (displayEvents.value.length === 0) currentPage.value = 1
     expandedRows.value = new Set()
 })
 
@@ -45,7 +55,7 @@ const toggleRow = async (id: string) => {
     
     if (isExpanding) {
         newSet.add(id)
-        const eventTarget = events.value.find((e: any) => e.id === id)
+        const eventTarget = displayEvents.value.find((e: any) => e.id === id)
         if (eventTarget && !eventTarget.isRead) eventsStore.markEventRead(id)
     } else {
         newSet.delete(id)
@@ -65,7 +75,7 @@ const isDownArrow = (col: string) => {
 }
 
 const sortedEvents = computed(() => {
-    return [...events.value].sort((a, b) => {
+    return [...displayEvents.value].sort((a, b) => {
         let valA: any = (a as any)[sortCol.value] || ''
         let valB: any = (b as any)[sortCol.value] || ''
         if (sortCol.value === 'severity') {
@@ -123,7 +133,7 @@ const handleArchiveEvent = async (eventId: string) => {
 
 // Formatters
 const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
-const formatString = (str: string) => str ? str.replace(/_/g, ' ') : ''
+const formatString = (str: string | number) => str ? String(str).replace(/_/g, ' ') : ''
 const formatJson = (val: any) => {
     if (val === null) return 'null'
     if (val === undefined) return 'undefined'
@@ -172,7 +182,7 @@ const formatTime = (timestamp: string) => {
                     <span class="w-1.5 h-1.5 rounded-full bg-success-main animate-pulse shadow-[0_0_8px_var(--color-success-main)]"></span>
                     <span class="text-base font-medium tracking-wide text-text-m">Live</span>
                 </div>
-                <button v-show="!viewingArchive && events.length > 0" @click="handleArchiveAll"
+                <button v-show="!viewingArchive && displayEvents.length > 0" @click="handleArchiveAll"
                         type="button"
                         aria-label="Archive all active events"
                         class="px-2.5 py-1 rounded-md text-base font-medium transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border active:scale-95">
@@ -182,7 +192,7 @@ const formatTime = (timestamp: string) => {
         </div>
 
         <div class="overflow-x-auto overflow-y-auto custom-scroll max-h-[600px] lg:max-h-[700px] flex-1 after:content-[''] after:block after:h-4 after:shrink-0">
-            <table class="w-full text-left border-separate border-spacing-0" :class="{'opacity-50 pointer-events-none': isFetching}">
+            <table class="min-w-full text-left border-separate border-spacing-0">
                 <thead class="text-base font-medium text-text-m sticky top-0 bg-bg-surface z-30 shadow-[0_1px_0_0_var(--color-border-default)] select-none">
                     <tr>
                         <th class="px-3 py-3 w-8"></th>
@@ -229,8 +239,8 @@ const formatTime = (timestamp: string) => {
                 </thead>
                 
                 <tbody class="relative z-0">
-                    <tr v-if="events.length === 0">
-                        <td :colspan="viewingArchive ? 7 : 8" class="px-5 py-8 border-b border-border-default text-center text-text-m text-base">No events detected matching criteria.</td>
+                    <tr v-if="displayEvents.length === 0 && !isFetching">
+                        <td :colspan="viewingArchive ? 8 : 9" class="px-5 py-8 border-b border-border-default text-center text-text-m text-base">No events detected matching criteria.</td>
                     </tr>
                     
                     <template v-for="event in paginatedEvents" :key="event.id">

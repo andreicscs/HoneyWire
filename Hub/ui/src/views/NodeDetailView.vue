@@ -365,10 +365,7 @@ watch(selectedNodeId, async (value) => {
         }
         return
     }
-    await Promise.all([
-        fleetStore.fetchNodeDetails(value),
-        eventsStore.fetchEvents(false, value)
-    ])
+        await fleetStore.fetchNodeDetails(value)
 }, { immediate: true })
 
 const timeAgo = (dateStr: string) => {
@@ -605,11 +602,23 @@ const applyHighlighting = () => {
                         Manage Key
                     </BaseButton>
                     <BaseMeatballMenu id="node-super-menu">            
-                        <button @click="handleSilenceNode" class="w-full text-left px-3 py-2 text-sm text-text-m hover:bg-secondary-hover hover:text-text-h transition-colors">
+                        <button @click="handleSilenceNode" 
+                                class="w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 text-text-m hover:bg-secondary-hover transition-colors group"
+                                :class="node && fleetStore.isNodeSilenced(node.id) ? 'text-archive-text hover:bg-archive-bg' : ' hover:text-text-h'">
+                            <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path v-if="node && !fleetStore.isNodeSilenced(node.id)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                                <path v-if="node && fleetStore.isNodeSilenced(node.id)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
+                            </svg>
                             {{ node ? (fleetStore.isNodeSilenced(node.id) ? 'Unsilence Node' : 'Silence Node') : 'Silence Node' }}
                         </button>
                         
-                        <button @click="handleDeleteNode" class="w-full text-left px-3 py-2 text-sm text-danger-text hover:bg-danger-bg transition-colors border-t border-border-default mt-1 pt-2">Delete Node</button>
+                        <button @click="handleDeleteNode" class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
+                            <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />
+                                <path class="origin-bottom-right transition-transform duration-normal group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                            </svg>
+                            Delete Node
+                        </button>
                     </BaseMeatballMenu>
                 </div>
             </div>
