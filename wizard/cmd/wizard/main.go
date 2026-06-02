@@ -30,7 +30,7 @@ func run() error {
 	flag.Parse()
 
 	if warning, _ := system.CheckRoot(); warning != "" {
-		return fmt.Errorf("Wizard must be run as root (sudo) for deep system access")
+		return fmt.Errorf("Wizard must be run as root (sudo) for system analysis and sensor deployment.")
 	}
 
 	if *uninstallPtr {

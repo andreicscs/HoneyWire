@@ -11,6 +11,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	procLoadAvgPath = "/proc/loadavg"
+	procMemInfoPath = "/proc/meminfo"
+	dockerPath      = "/var/lib/docker"
+	composeFilePath = "honeywire-compose.yml"
+	statfsFunc      = syscall.Statfs
+)
+
 // SystemState represents the current honeywire deployment state.
 type SystemState struct {
 	DeployedImages []string // Images currently deployed via honeywire-compose.yml
@@ -19,13 +27,13 @@ type SystemState struct {
 
 func CheckRoot() (string, error) {
 	if os.Geteuid() != 0 {
-		return "⚠️ Wizard is not running as root (UID 0). Some processes or sockets may be hidden from /proc analysis.", nil
+		return "⚠️ Wizard is not running as root (UID 0). Must be run as root to continue.", nil
 	}
 	return "", nil
 }
 
 func CheckLoad() (string, error) {
-	file, err := os.Open("/proc/loadavg")
+	file, err := os.Open(procLoadAvgPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read /proc/loadavg: %w", err)
 	}
@@ -46,12 +54,12 @@ func CheckLoad() (string, error) {
 
 func CheckDiskSpace() (string, error) {
 	var stat syscall.Statfs_t
-	path := "/var/lib/docker"
+	path := dockerPath
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		path = "/"
 	}
 
-	if err := syscall.Statfs(path, &stat); err != nil {
+	if err := statfsFunc(path, &stat); err != nil {
 		return "", fmt.Errorf("failed to statfs %s: %w", path, err)
 	}
 
@@ -65,7 +73,7 @@ func CheckDiskSpace() (string, error) {
 }
 
 func CheckMemory() (string, error) {
-	file, err := os.Open("/proc/meminfo")
+	file, err := os.Open(procMemInfoPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read /proc/meminfo: %w", err)
 	}
@@ -100,18 +108,17 @@ func LoadCurrentState() (*SystemState, error) {
 		ManagedPorts:   []int{},
 	}
 
-	composeFile := "honeywire-compose.yml"
-	data, err := os.ReadFile(composeFile)
+	data, err := os.ReadFile(composeFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return state, nil
 		}
-		return nil, fmt.Errorf("failed to read %s: %w", composeFile, err)
+		return nil, fmt.Errorf("failed to read %s: %w", composeFilePath, err)
 	}
 
 	var compose map[string]interface{}
 	if err := yaml.Unmarshal(data, &compose); err != nil {
-		return nil, fmt.Errorf("failed to parse %s: %w", composeFile, err)
+		return nil, fmt.Errorf("failed to parse %s: %w", composeFilePath, err)
 	}
 
 	services, ok := compose["services"].(map[string]interface{})

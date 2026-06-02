@@ -15,6 +15,8 @@ import (
 // It correlates processes to ports via inode matching.
 type ProcScanner struct {
 	ignoreList map[string]bool
+	procPath   string
+	netFiles   []string
 }
 
 // NewProcScanner creates a new proc-based scanner.
@@ -53,6 +55,8 @@ func NewProcScanner() *ProcScanner {
 	}
 	return &ProcScanner{
 		ignoreList: ignoreList,
+		procPath:   "/proc",
+		netFiles:   []string{"/proc/net/tcp", "/proc/net/tcp6"},
 	}
 }
 
@@ -77,10 +81,9 @@ func (p *ProcScanner) Scan(systemState *system.SystemState) (*HostState, error) 
 	var services []Service
 	seen := make(map[string]bool) // For deduplication: "processName:port"
 
-	procDir := "/proc"
-	entries, err := os.ReadDir(procDir)
+	entries, err := os.ReadDir(p.procPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read /proc: %w", err)
+		return nil, fmt.Errorf("failed to read proc dir: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -95,7 +98,7 @@ func (p *ProcScanner) Scan(systemState *system.SystemState) (*HostState, error) 
 		}
 
 		// Read process name from /proc/[pid]/comm
-		commPath := filepath.Join(procDir, pidStr, "comm")
+		commPath := filepath.Join(p.procPath, pidStr, "comm")
 		commData, err := os.ReadFile(commPath)
 		if err != nil {
 			continue
@@ -107,7 +110,7 @@ func (p *ProcScanner) Scan(systemState *system.SystemState) (*HostState, error) 
 		}
 
 		// Iterate through /proc/[pid]/fd/ to find socket inodes
-		fdDir := filepath.Join(procDir, pidStr, "fd")
+		fdDir := filepath.Join(p.procPath, pidStr, "fd")
 		fdEntries, err := os.ReadDir(fdDir)
 		if err != nil {
 			// Permission denied, skip this process
@@ -158,9 +161,8 @@ func (p *ProcScanner) Scan(systemState *system.SystemState) (*HostState, error) 
 // buildInodePortMap creates a map of socket_inode -> port by parsing /proc/net/tcp and /proc/net/tcp6
 func (p *ProcScanner) buildInodePortMap() map[string]int {
 	inodeToPort := make(map[string]int)
-	netFiles := []string{"/proc/net/tcp", "/proc/net/tcp6"}
 
-	for _, netFile := range netFiles {
+	for _, netFile := range p.netFiles {
 		file, err := os.Open(netFile)
 		if err != nil {
 			continue
