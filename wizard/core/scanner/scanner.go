@@ -20,29 +20,3 @@ type HostState struct {
 type Scanner interface {
 	Scan(systemState *system.SystemState) (*HostState, error)
 }
-
-// MockScanner simulates discovering correlated services.
-// For the MVP, it returns: postgres on 5432, nginx on 80
-type MockScanner struct {
-	hostState *HostState
-}
-
-// Scan returns the simulated host state.
-// systemState is used to filter out already-managed services.
-func (m *MockScanner) Scan(systemState *system.SystemState) (*HostState, error) {
-	if systemState == nil {
-		return m.hostState, nil
-	}
-	// Filter out any services on managed ports
-	var filtered []Service
-	managedPortMap := make(map[int]bool)
-	for _, p := range systemState.ManagedPorts {
-		managedPortMap[p] = true
-	}
-	for _, svc := range m.hostState.Services {
-		if !managedPortMap[svc.Port] {
-			filtered = append(filtered, svc)
-		}
-	}
-	return &HostState{Services: filtered}, nil
-}
