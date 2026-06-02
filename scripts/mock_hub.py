@@ -14,7 +14,7 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             # The SDK expects a version object to confirm compatibility
             response = {"version": "1.0.0", "status": "operational"}
             self.wfile.write(json.dumps(response).encode('utf-8'))
-            print("🤝 SUCCESS: Sensor synchronized successfully via GET.")
+            print("[SYNC]       OK | Sensor handshake complete.")
         else:
             self.send_response(404)
             self.end_headers()
@@ -36,16 +36,16 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
                 
                 for key in required_keys:
                     if key not in payload:
-                        print(f"❌ FAILED: Missing required key '{key}'")
+                        print(f"[CONTRACT]   FAIL| Event rejected. Missing required key: '{key}'")
                         sys.exit(1)
                 
                 # 2. Enforce severity type (String enum or Int)
                 valid_severities = ["info", "low", "medium", "high", "critical"]
                 if not isinstance(payload['severity'], int) and payload['severity'] not in valid_severities:
-                    print(f"❌ FAILED: 'severity' ({payload['severity']}) is invalid.")
+                    print(f"[CONTRACT]   FAIL| Event rejected. Invalid severity: '{payload['severity']}'")
                     sys.exit(1)
 
-                print(f"🚩 ALERT RECEIVED: {payload['eventTrigger']} from {payload['sensorId']}")
+                print(f"[EVENT]      OK | Trigger: {payload['eventTrigger']} from {payload['sensorId']}")
                 print(json.dumps(payload, indent=2))
                 
                 self.send_response(200)
@@ -54,31 +54,31 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             elif self.path == '/api/v1/heartbeat':
                 self.send_response(200)
                 self.end_headers()
-                print(f"💓 HEARTBEAT RECEIVED from {payload.get('sensorId', 'unknown')}")
+                print(f"[HEARTBEAT]  OK | Sensor: {payload.get('sensorId', 'unknown')}")
 
             elif self.path == '/api/v1/offline':
                 self.send_response(200)
                 self.end_headers()
-                print(f"💤 OFFLINE RECEIVED from {payload.get('sensorId', 'unknown')}")
+                print(f"[OFFLINE]    OK | Sensor: {payload.get('sensorId', 'unknown')}")
             
             # Write success flag for the CI runner
             with open('/tmp/test_passed', 'w') as f:
                 f.write('success')
                 
-            print("✅ SUCCESS: Event validated. Waiting for next sensor...")
-                
         except json.JSONDecodeError:
-            print("❌ FAILED: Payload is not valid JSON.")
+            print("[ERROR]      FAIL| Payload is not valid JSON.")
             sys.exit(1)
         except Exception as e:
-            print(f"❌ FAILED: Unexpected error - {e}")
+            print(f"[ERROR]      FAIL| Unexpected error: {e}")
             sys.exit(1)
 
     def log_message(self, format, *args):
         pass
 
 if __name__ == '__main__':
-    print("🛡️ HoneyWire Mock Hub (V1.1) listening on port 8080...")
+    print("--- HoneyWire Mock Hub (V1.1) ---")
+    print("Listening on 0.0.0.0:8080...")
+    print("Awaiting sensor connections for contract validation...")
     server = http.server.HTTPServer(('0.0.0.0', 8080), MockHubHandler)
     
     # We need to stay alive for at least two requests: 

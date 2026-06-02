@@ -1,0 +1,35 @@
+name: Security Scans
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  scans:
+    name: Run Repository Security Scans
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/default"
+
+      - name: Run Trivy FS Scan
+        run: |
+          echo "Running Trivy FS Scan via Docker..."
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            aquasec/trivy:latest fs \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --vuln-type os,library \
+            --severity CRITICAL,HIGH \
+            .

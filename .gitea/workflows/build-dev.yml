@@ -31,36 +31,22 @@ jobs:
           python-version: '3.10'
 
       # -----------------------------------------------------
-      # 2. SECURITY SCANS (Runs before building)
-      # -----------------------------------------------------
-
-      - name: Run Semgrep SAST Scan
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: "p/default"
-
-      - name: Run Trivy FS Scan
-        run: |
-          echo "Running Trivy FS Scan via Docker..."
-          docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            aquasec/trivy:latest fs \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --vuln-type os,library \
-            --severity CRITICAL,HIGH \
-            .
-
-      # -----------------------------------------------------
-      # 3. BUILD, TEST, AND PUSH
+      # 2. BUILD, TEST, AND PUSH
       # -----------------------------------------------------
 
       - name: Build, Test, and Push Sensors
         env: # Bind the input to a safe environment variable first
           SENSOR_INPUT: ${{ inputs.sensor }}
         run: |
+          # ANSI Color Codes
+          RESET='\033[0m'
+          BOLD='\033[1m'
+          CYAN='\033[0;36m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[0;33m'
+          RED='\033[0;31m'
+          DIM='\033[2m'
+
           INPUT="$SENSOR_INPUT"
           if [ -z "$INPUT" ] || [ "$INPUT" == "all" ]; then
             DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
@@ -68,54 +54,54 @@ jobs:
             DIRS="$INPUT"
           fi
 
-          echo "Targeting sensors: $DIRS"
+          echo -e "${BOLD}Targeting sensors: $DIRS${RESET}"
 
           for SENSOR in $DIRS; do
             if [ -n "$SENSOR" ]; then
               SENSOR_PATH="Sensors/official/$SENSOR"
               LOWER_NAME=$(echo "$SENSOR" | tr '[:upper:]' '[:lower:]')
               TAG="192.168.1.11:5000/honeywire-$LOWER_NAME:dev"
-              
-              echo "========================================"
-              echo "🧪 STAGE 1: Go Unit Tests for $SENSOR"
-              echo "========================================"
-              
+
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}🧪 STAGE 1: Go Unit Tests for $SENSOR${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
               # Navigate to the sensor directory and run unit tests
               cd "$SENSOR_PATH"
               go test -v ./...
               # The pipeline will automatically fail and exit here if tests fail
               cd - > /dev/null
-              
-              echo "========================================"
-              echo "🍯 STAGE 2: Building Image -> $TAG"
-              echo "========================================"
-              
+
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}🍯 STAGE 2: Building Image -> $TAG${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
               docker build -t "$TAG" -f "$SENSOR_PATH/Dockerfile" .
 
-              echo "========================================"
-              echo "🤝 STAGE 3: MockHub Contract Test"
-              echo "========================================"
-              
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}🤝 STAGE 3: MockHub Contract Test${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
               # 1. Ensure clean slate
               rm -f /tmp/test_passed
-              
-              # 2. Start the MockHub in the background (Update the path to where you saved the script)
-              python scripts/mockhub.py &
+
+              # 2. Start the MockHub in the background
+              echo -e "${DIM}Starting MockHub in background...${RESET}"
+              python scripts/mock_hub.py &
               MOCK_PID=$!
-              
+
               # Give the MockHub a second to bind to port 8080
               sleep 2
-              
+
               # 3. Run the newly built sensor container
-              # Note: --network host allows the container to reach the runner's localhost:8080
-              # You may need to pass environment variables your sensor expects (e.g., -e HUB_URL=http://127.0.0.1:8080)
+              echo -e "${DIM}Launching test container...${RESET}"
               docker run -d --rm --name test-sensor --network host "$TAG"
-              
+
               # 4. Poll for the success file created by MockHub
               TIMEOUT=30
               TEST_PASSED=false
-              
-              echo "Waiting up to $TIMEOUT seconds for sensor to sync and send valid event..."
+
+              echo -e "${YELLOW}Waiting up to $TIMEOUT seconds for sensor to sync and send valid event...${RESET}"
               while [ $TIMEOUT -gt 0 ]; do
                 if [ -f /tmp/test_passed ] && grep -q 'success' /tmp/test_passed; then
                   TEST_PASSED=true
@@ -124,22 +110,22 @@ jobs:
                 sleep 1
                 TIMEOUT=$((TIMEOUT-1))
               done
-              
+
               # 5. Cleanup Testing Environment
-              echo "Cleaning up test containers and MockHub..."
+              echo -e "${DIM}Cleaning up test containers and MockHub...${RESET}"
               docker stop test-sensor || true
               kill $MOCK_PID || true
-              
+
               # 6. Evaluate Test Results
               if [ "$TEST_PASSED" = true ]; then
-                echo "✅ Integration Test Passed! Pushing image to registry..."
+                echo -e "${GREEN}✅ Integration Test Passed! Pushing image to registry...${RESET}"
                 docker push "$TAG"
               else
-                echo "❌ Integration Test Failed or Timed Out!"
-                echo "--- Sensor Container Logs ---"
+                echo -e "${RED}❌ Integration Test Failed or Timed Out!${RESET}"
+                echo -e "${YELLOW}--- Sensor Container Logs ---${RESET}"
                 docker logs test-sensor || true
                 exit 1 # Halt the entire pipeline
               fi
-              
+
             fi
           done
