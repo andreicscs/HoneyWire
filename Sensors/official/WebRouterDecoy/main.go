@@ -350,6 +350,8 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
 	// Re-render the exact same login page, but cleanly display the red error block
+    // codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
+    // nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 	fmt.Fprintf(w, loginHTML, routerBrand, "block")
 }
 

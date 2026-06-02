@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+
+	// codeql[go/insecure-randomness] Non-cryptographic use case.
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
 	"net"
 	"strings"
@@ -44,8 +47,8 @@ func classify(err error) NetworkFact {
 
 	// Check for known terminal configuration anomalies
 	errStr := err.Error()
-	if strings.Contains(errStr, "unknown network") || 
-	   strings.Contains(errStr, "invalid argument") {
+	if strings.Contains(errStr, "unknown network") ||
+		strings.Contains(errStr, "invalid argument") {
 		fact.IsTransient = false
 	}
 
@@ -79,7 +82,7 @@ func (s *Service) siemPolicy(fact NetworkFact, attempt int) (SiemAction, time.Du
 	if delay > maxDelay {
 		delay = maxDelay
 	}
-	jitter := (rand.Float64() * 0.2) - 0.1
+	jitter := (s.rng.Float64() * 0.2) - 0.1
 	finalDelay := time.Duration((delay + (delay * jitter)) * float64(time.Second))
 
 	return SiemRetry, finalDelay
@@ -93,15 +96,18 @@ type Service struct {
 	eventQueue chan models.Event
 	address    string
 	protocol   string
+	rng        *rand.Rand
 	mu         sync.RWMutex
 	wg         sync.WaitGroup
 	isDraining atomic.Bool
 }
 
 func NewService() *Service {
-	rand.Seed(time.Now().UnixNano())
 	return &Service{
 		eventQueue: make(chan models.Event, 5000),
+		// codeql[go/insecure-randomness] Non-cryptographic use case.
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -209,15 +215,17 @@ func (sess *streamSession) processEventWithRetry(ctx context.Context, event mode
 			if fact.IsError {
 				log.Printf("[!] SIEM Stream connection failed (%s://%s): %v", proto, addr, err)
 				sess.nextReconnectAttempt = time.Now().Add(2 * time.Second) // 2-second suppression cooldown
-				
+
 				action, delay := sess.service.siemPolicy(fact, attempt)
 				if action == SiemDrop {
 					log.Printf("[-] Terminal configuration error. Dropping log stream position.")
 					return
 				}
-				
+
 				// Backoff and retry dialing for the exact same event log position
-				if sess.service.sleepContext(ctx, delay) { return }
+				if sess.service.sleepContext(ctx, delay) {
+					return
+				}
 				continue
 			}
 
@@ -241,7 +249,9 @@ func (sess *streamSession) processEventWithRetry(ctx context.Context, event mode
 		case SiemRetry:
 			log.Printf("[!] SIEM stream disconnected mid-write: %v. Retrying connection structure in %v...", writeErr, delay)
 			sess.close() // Kill connection to trigger a fresh dial sequence on next iteration
-			if sess.service.sleepContext(ctx, delay) { return }
+			if sess.service.sleepContext(ctx, delay) {
+				return
+			}
 		}
 	}
 
@@ -298,7 +308,7 @@ func (s *Service) formatSyslog(event models.Event) string {
 			t = parsedTime
 		}
 	}
-	
+
 	timestamp := t.Format("Jan 02 15:04:05")
 
 	hostname := "honeywire"

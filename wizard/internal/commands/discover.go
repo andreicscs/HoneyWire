@@ -311,6 +311,8 @@ func renderManifestTemplates(recs []*discovery.Recommendation, dockerMap map[int
 	usedFiles := make(map[string]bool)
 
 	safeFilePick := func(files []string, basePath string) string {
+		// codeql[go/insecure-randomness] Non-cryptographic use case for decoy file shuffling.
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 		rng.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 		for _, f := range files {
 			if !usedFiles[f] {
@@ -320,6 +322,8 @@ func renderManifestTemplates(recs []*discovery.Recommendation, dockerMap map[int
 				}
 			}
 		}
+		// codeql[go/insecure-randomness] Non-cryptographic use case for fallback filename.
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 		fallback := fmt.Sprintf("backup_hw_%d.bak", rng.Intn(99999))
 		usedFiles[fallback] = true
 		return fallback

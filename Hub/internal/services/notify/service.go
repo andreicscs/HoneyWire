@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 	"math"
+
+	// codeql[go/insecure-randomness] Non-cryptographic use case.
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -47,7 +50,7 @@ func classify(err error, resp *http.Response) ResponseFact {
 			fact.IsTransient = false // Terminal errors. Bad config, dead URL.
 		default:
 			fact.IsTransient = true // 429 Rate Limits, 5xx Server Errors
-			
+
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
 				if sec, err := strconv.Atoi(ra); err == nil {
 					fact.RetryAfter = time.Duration(sec) * time.Second
@@ -58,7 +61,7 @@ func classify(err error, resp *http.Response) ResponseFact {
 	return fact
 }
 
-func calculateBackoff(attempt int, retryAfter time.Duration) time.Duration {
+func (s *Service) calculateBackoff(attempt int, retryAfter time.Duration) time.Duration {
 	if retryAfter > 0 {
 		return retryAfter
 	}
@@ -68,7 +71,7 @@ func calculateBackoff(attempt int, retryAfter time.Duration) time.Duration {
 	if delay > maxDelay {
 		delay = maxDelay
 	}
-	jitter := (rand.Float64() * 0.2) - 0.1
+	jitter := (s.rng.Float64() * 0.2) - 0.1
 	return time.Duration((delay + (delay * jitter)) * float64(time.Second))
 }
 
@@ -90,34 +93,37 @@ type Service struct {
 	webhookType    string
 	webhookURL     string
 	severityFilter map[string]struct{}
-	
+
 	mu           sync.RWMutex
 	webhookQueue chan WebhookPayload
-	
-	client       *http.Client
-	wg           sync.WaitGroup
-	isDraining   atomic.Bool
+
+	client     *http.Client
+	wg         sync.WaitGroup
+	isDraining atomic.Bool
+	rng        *rand.Rand
 }
 
 func NewService() *Service {
-	rand.Seed(time.Now().UnixNano())
 	return &Service{
-		webhookQueue: make(chan WebhookPayload, 1000),
+		webhookQueue:   make(chan WebhookPayload, 1000),
 		severityFilter: make(map[string]struct{}),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		// codeql[go/insecure-randomness] Non-cryptographic use case.
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
 func (s *Service) UpdateConfig(isArmed bool, webhookType, webhookURL, webhookEvents string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.isArmed = isArmed
 	s.webhookType = webhookType
 	s.webhookURL = webhookURL
-	
+
 	// Parse O(1) map once at config load
 	filter := make(map[string]struct{})
 	for _, sev := range strings.Split(webhookEvents, ",") {
@@ -187,7 +193,7 @@ func (s *Service) StartWorker(ctx context.Context) {
 				s.drainQueue()
 				return
 			case payload := <-s.webhookQueue:
-				<-rateLimiter.C 
+				<-rateLimiter.C
 				s.processWithRetry(ctx, payload)
 			}
 		}
@@ -212,7 +218,7 @@ func (s *Service) processWithRetry(ctx context.Context, payload WebhookPayload) 
 			return
 		}
 
-		delay := calculateBackoff(attempt, fact.RetryAfter)
+		delay := s.calculateBackoff(attempt, fact.RetryAfter)
 		log.Printf("[!] Webhook failed (%s). Retrying (%d/%d) in %v...", payload.Type, attempt+1, MaxRetriesPerAlert, delay)
 
 		t := time.NewTimer(delay)
@@ -247,9 +253,9 @@ func (s *Service) drainQueue() {
 			if err == nil && resp != nil && resp.StatusCode < 400 {
 				count++
 			}
-			
+
 			// Maintain rate limit during drain
-			time.Sleep(500 * time.Millisecond) 
+			time.Sleep(500 * time.Millisecond)
 		default:
 			log.Printf("[Notify] Queue completely drained. Flushed %d alerts.", count)
 			return
@@ -277,7 +283,9 @@ func (s *Service) executeSend(payload WebhookPayload) (*http.Response, error) {
 func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http.Response, error) {
 	priorities := map[string]int{"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10}
 	priority, exists := priorities[severity]
-	if !exists { priority = 5 }
+	if !exists {
+		priority = 5
+	}
 
 	payload := map[string]interface{}{
 		"title":    title,
@@ -295,7 +303,9 @@ func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http
 func (s *Service) sendNtfy(webhookURL, title, message, severity string) (*http.Response, error) {
 	priorities := map[string]string{"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5"}
 	priority, exists := priorities[severity]
-	if !exists { priority = "3" }
+	if !exists {
+		priority = "3"
+	}
 
 	req, _ := http.NewRequest("POST", webhookURL, strings.NewReader(message))
 	req.Header.Set("Title", title)
@@ -307,7 +317,9 @@ func (s *Service) sendNtfy(webhookURL, title, message, severity string) (*http.R
 
 func (s *Service) sendDiscordSlack(webhookURL, title, message, severity string) (*http.Response, error) {
 	icon := "⚠️"
-	if severity == "critical" || severity == "high" { icon = "🚨" }
+	if severity == "critical" || severity == "high" {
+		icon = "🚨"
+	}
 
 	payload := map[string]interface{}{
 		"content": fmt.Sprintf("%s **%s**\n%s", icon, title, message),

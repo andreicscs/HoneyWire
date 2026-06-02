@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
-	
+
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
@@ -116,10 +116,10 @@ func (s *Sensor) calculateBackoff(attempt int) time.Duration {
 	if delay > maxDelay {
 		delay = maxDelay
 	}
-	
+
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
-	jitter := (rand.Float64() * 0.2) - 0.1
+	jitter := (s.rng.Float64() * 0.2) - 0.1
 	finalDelay := delay + (delay * jitter)
 	return time.Duration(finalDelay * float64(time.Second))
 }
@@ -141,6 +141,7 @@ type Sensor struct {
 
 	eventCh chan map[string]any
 	stopCh  chan struct{}
+	rng     *rand.Rand
 }
 
 func NewSensor() (*Sensor, error) {
@@ -155,6 +156,9 @@ func NewSensor() (*Sensor, error) {
 		client:       &http.Client{Timeout: 10 * time.Second},
 		eventCh:      make(chan map[string]any, 1000),
 		stopCh:       make(chan struct{}),
+		// codeql[go/insecure-randomness] Non-cryptographic use case.
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	if s.HubEndpoint == "" || s.HubKey == "" || s.SensorID == "" {
