@@ -108,6 +108,8 @@ func (h *ConfigHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// codeql[go/insecure-cookie] Clearing configuration cookie.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{
 		Name:     AuthCookieName,
 		Value:    "",
@@ -139,6 +141,8 @@ func (h *ConfigHandler) FactoryReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// codeql[go/insecure-cookie] Clearing configuration cookie.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{
 		Name:     AuthCookieName,
 		Value:    "",

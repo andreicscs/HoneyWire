@@ -1071,8 +1071,9 @@ const applyHighlighting = () => {
                                             :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
                                         {{ copiedStates['compose-yaml'] ? 'Copied!' : 'Copy' }}
                                     </button>
-                                    <!-- nosemgrep: javascript.vue.security.audit.xss.templates.avoid-v-html.avoid-v-html -->
+                                    
                                     <!-- codeql[js/xss] Sanitized escapeHtml data. -->
+                                    <!-- nosemgrep: javascript.vue.security.audit.xss.templates.avoid-v-html.avoid-v-html -->
                                     <pre ref="composePre" v-html="highlightedCompose" class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-4 rounded-md text-sm font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"></pre>
                                 </div>
 
