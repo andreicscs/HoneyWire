@@ -43,9 +43,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	
+	isProd := h.Cfg.Env == "production"
 	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	// codeql[go/insecure-cookie] Dev environment toggle.
-	isProd := h.Cfg.Env == "production"
 	http.SetCookie(w, &http.Cookie{
 		Name:     AuthCookieName,
 		Value:    token,

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	"math/rand"
 	"fmt"
 	"os"

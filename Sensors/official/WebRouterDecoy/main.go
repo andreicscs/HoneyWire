@@ -301,6 +301,8 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// %[1]s = Brand, %[2]s = 'none' (hides the error banner initially)
+    // nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
+    // codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
 	fmt.Fprintf(w, loginHTML, routerBrand, "none")
 }
 

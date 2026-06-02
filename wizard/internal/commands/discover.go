@@ -3,11 +3,15 @@ package commands
 import (
 	"context"
 	"fmt"
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	// nosemgrep: go.lang.security.audit.xss.import-text-template.import-text-template
+    // codeql[go/xss] CLI tool generating local text files, not HTML.
 	"text/template"
 	"time"
 
