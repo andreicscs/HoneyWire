@@ -152,13 +152,36 @@ class HoneyWireSensor(ABC):
 
     def run_test_mode(self) -> bool:
         print("[*] Test mode: sending synthetic payload...")
-        return self.report_event(
-            event_trigger="test_mode_synthetic_alert",
-            severity="info",
-            source="CI/CD Runner",
-            target="Mock Hub",
-            details={"test_message": "Automated CI/CD check."}
-        )
+
+        # 1. Establish handshake to fetch the contract version
+        try:
+            self._sync_hub_version()
+        except Exception as e:
+            print(f"[-] Test mode sync failed: {e}")
+            return False
+
+        # 2. Synchronously send the payload to guarantee delivery before the program exits
+        normalized_severity = self._normalize_severity(self.severity)
+        
+        payload = {
+            "contractVersion": self._hub_contract_version,
+            "sensorId": self.sensor_id,
+            "severity": normalized_severity,
+            "eventTrigger": "test_mode_synthetic_alert",
+            "source": "CI/CD Runner",
+            "target": "Mock Hub",
+            "details": {"test_message": "Automated CI/CD check."}
+        }
+
+        try:
+            resp = self.client.post(f"{self.hub_endpoint}/api/v1/event", json=payload, timeout=10)
+            if resp.status_code >= 400:
+                print(f"[-] Test mode failed to send event: HTTP {resp.status_code}")
+                return False
+            return True
+        except Exception as e:
+            print(f"[-] Test mode failed to send event: {e}")
+            return False
 
     # ==========================================
     # PIPELINE A: EVENT WORKER
@@ -171,12 +194,12 @@ class HoneyWireSensor(ABC):
         normalized_severity = self._normalize_severity(self.severity)
         
         payload = {
-            "contract_version": self._hub_contract_version,
+            "contractVersion": self._hub_contract_version,
+            "sensorId": self.sensor_id,
             "severity": normalized_severity,
-            "event_trigger": event_trigger,
+            "eventTrigger": event_trigger,
             "source": source,
             "target": target,
-            "sensor_id": self.sensor_id,
             "details": details
         }
 
@@ -249,7 +272,7 @@ class HoneyWireSensor(ABC):
                     return
 
             payload = {
-                "sensor_id": self.sensor_id,
+                "sensorId": self.sensor_id,
                 "metadata": {
                     "agent_version": self.agent_version,
                     "contract_version": self._hub_contract_version,
@@ -309,7 +332,7 @@ class HoneyWireSensor(ABC):
 
     def go_offline(self, reason: str):
         payload = {
-            "sensor_id": self.sensor_id,
+            "sensorId": self.sensor_id,
             "reason": reason
         }
         try:

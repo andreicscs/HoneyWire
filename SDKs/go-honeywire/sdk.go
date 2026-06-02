@@ -184,8 +184,32 @@ func (s *Sensor) Stop() {
 
 func (s *Sensor) RunTestMode() bool {
 	log.Println("[*] Test mode: sending synthetic payload...")
-	return s.ReportEvent("test_mode_synthetic_alert", "CI/CD Runner", "Mock Hub",
-		map[string]any{"test_message": "Automated CI/CD check."})
+
+	// 1. Establish handshake to fetch the contract version
+	if err := s.syncHubVersion(); err != nil {
+		log.Printf("[-] Test mode sync failed: %v", err)
+		return false
+	}
+
+	// 2. Synchronously send the payload to guarantee delivery before the program exits
+	payload := map[string]any{
+		"contractVersion": s.hubContractVersion,
+		"sensorId":        s.SensorID,
+		"severity":        s.Severity,
+		"eventTrigger":    "test_mode_synthetic_alert",
+		"source":          "CI/CD Runner",
+		"target":          "Mock Hub",
+		"details":         map[string]any{"test_message": "Automated CI/CD check."},
+	}
+
+	resp, err := s.postToHub("/api/v1/event", payload)
+	if err != nil {
+		log.Printf("[-] Test mode failed to send event: %v", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	return resp.StatusCode < 400
 }
 
 // ==========================================
