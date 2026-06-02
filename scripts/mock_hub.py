@@ -37,13 +37,17 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
                 for key in required_keys:
                     if key not in payload:
                         print(f"[CONTRACT]   FAIL| Event rejected. Missing required key: '{key}'")
-                        sys.exit(1)
+                        self.send_response(400)
+                        self.end_headers()
+                        return
                 
                 # 2. Enforce severity type (String enum or Int)
                 valid_severities = ["info", "low", "medium", "high", "critical"]
                 if not isinstance(payload['severity'], int) and payload['severity'] not in valid_severities:
                     print(f"[CONTRACT]   FAIL| Event rejected. Invalid severity: '{payload['severity']}'")
-                    sys.exit(1)
+                    self.send_response(400)
+                    self.end_headers()
+                    return
 
                 print(f"[EVENT]      OK | Trigger: {payload['eventTrigger']} from {payload['sensorId']}")
                 print(json.dumps(payload, indent=2))
@@ -67,10 +71,12 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
                 
         except json.JSONDecodeError:
             print("[ERROR]      FAIL| Payload is not valid JSON.")
-            sys.exit(1)
+            self.send_response(400)
+            self.end_headers()
         except Exception as e:
             print(f"[ERROR]      FAIL| Unexpected error: {e}")
-            sys.exit(1)
+            self.send_response(500)
+            self.end_headers()
 
     def log_message(self, format, *args):
         pass
