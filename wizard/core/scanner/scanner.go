@@ -27,18 +27,6 @@ type MockScanner struct {
 	hostState *HostState
 }
 
-// NewMockScanner creates a new mock scanner.
-func NewMockScanner() *MockScanner {
-	return &MockScanner{
-		hostState: &HostState{
-			Services: []Service{
-				{ProcessName: "postgres", Port: 5432, PID: 1234},
-				{ProcessName: "nginx", Port: 80, PID: 5678},
-			},
-		},
-	}
-}
-
 // Scan returns the simulated host state.
 // systemState is used to filter out already-managed services.
 func (m *MockScanner) Scan(systemState *system.SystemState) (*HostState, error) {
