@@ -17,13 +17,13 @@ var upgrader = gorillaws.Upgrader{
 }
 
 type Service struct {
-	clients   map[*gorillaws.Conn]bool
+	clients   map[*gorillaws.Conn]*sync.Mutex
 	clientsMu sync.Mutex
 }
 
 func NewService() *Service {
 	return &Service{
-		clients: make(map[*gorillaws.Conn]bool),
+		clients: make(map[*gorillaws.Conn]*sync.Mutex),
 	}
 }
 
@@ -34,8 +34,10 @@ func (s *Service) HandleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	writeMu := &sync.Mutex{}
+
 	s.clientsMu.Lock()
-	s.clients[conn] = true
+	s.clients[conn] = writeMu
 	s.clientsMu.Unlock()
 
 	const pingPeriod = 20 * time.Second
@@ -57,7 +59,10 @@ func (s *Service) HandleWS(w http.ResponseWriter, r *http.Request) {
 
 		for range ticker.C {
 			// Send a native control frame Ping (Opcode 0x9)
-			if err := conn.WriteMessage(gorillaws.PingMessage, nil); err != nil {
+			writeMu.Lock()
+			err := conn.WriteMessage(gorillaws.PingMessage, nil)
+			writeMu.Unlock()
+			if err != nil {
 				return
 			}
 		}
@@ -79,22 +84,44 @@ func (s *Service) HandleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) Broadcast(msgType string, payload interface{}) {
-	var deadClients []*gorillaws.Conn
+	// Snapshot clients to avoid holding the global lock during network I/O
 	s.clientsMu.Lock()
-	for client := range s.clients {
-		err := client.WriteJSON(map[string]interface{}{
+	type clientEntry struct {
+		conn *gorillaws.Conn
+		mu   *sync.Mutex
+	}
+	snapshot := make([]clientEntry, 0, len(s.clients))
+	for conn, mu := range s.clients {
+		snapshot = append(snapshot, clientEntry{conn, mu})
+	}
+	s.clientsMu.Unlock()
+
+	var deadClients []*gorillaws.Conn
+	for _, c := range snapshot {
+		c.mu.Lock()
+		err := c.conn.WriteJSON(map[string]interface{}{
 			"type":    msgType,
 			"payload": payload,
 		})
+		c.mu.Unlock()
 		if err != nil {
-			deadClients = append(deadClients, client)
+			deadClients = append(deadClients, c.conn)
 		}
 	}
-	for _, c := range deadClients {
-		delete(s.clients, c)
-		c.Close()
+
+	// Safely prune any connections that failed during broadcast
+	if len(deadClients) > 0 {
+		s.clientsMu.Lock()
+		for _, c := range deadClients {
+			delete(s.clients, c)
+		}
+		s.clientsMu.Unlock()
+
+		// Close dead connections outside the lock to prevent internal deadlocks
+		for _, c := range deadClients {
+			c.Close()
+		}
 	}
-	s.clientsMu.Unlock()
 }
 
 func (s *Service) StartChartSyncBroadcaster(ctx context.Context) {
