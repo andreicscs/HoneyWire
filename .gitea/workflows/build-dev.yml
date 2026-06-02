@@ -63,7 +63,7 @@ jobs:
               TAG="192.168.1.11:5000/honeywire-$LOWER_NAME:dev"
 
               echo -e "\n${CYAN}========================================${RESET}"
-              echo -e "${CYAN}${BOLD}🧪 STAGE 1: Go Unit Tests for $SENSOR${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 1: Go Unit Tests for $SENSOR${RESET}"
               echo -e "${CYAN}========================================${RESET}"
 
               # Navigate to the sensor directory and run unit tests
@@ -73,13 +73,13 @@ jobs:
               cd - > /dev/null
 
               echo -e "\n${CYAN}========================================${RESET}"
-              echo -e "${CYAN}${BOLD}🍯 STAGE 2: Building Image -> $TAG${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 2: Building Image -> $TAG${RESET}"
               echo -e "${CYAN}========================================${RESET}"
 
               docker build -t "$TAG" -f "$SENSOR_PATH/Dockerfile" .
 
               echo -e "\n${CYAN}========================================${RESET}"
-              echo -e "${CYAN}${BOLD}🤝 STAGE 3: MockHub Contract Test${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 3: MockHub Contract Test${RESET}"
               echo -e "${CYAN}========================================${RESET}"
 
               # 1. Ensure clean slate
@@ -95,7 +95,13 @@ jobs:
 
               # 3. Run the newly built sensor container
               echo -e "${DIM}Launching test container...${RESET}"
-              docker run -d --rm --name test-sensor --network host "$TAG"
+              docker rm -f test-sensor 2>/dev/null || true
+              docker run -d --name test-sensor \
+                -e HW_HUB_ENDPOINT=http://127.0.0.1:8080 \
+                -e HW_HUB_KEY=ci-test-key \
+                -e HW_SENSOR_ID=ci-test-sensor \
+                -e HW_TEST_MODE=true \
+                --network host "$TAG"
 
               # 4. Poll for the success file created by MockHub
               TIMEOUT=30
@@ -120,10 +126,12 @@ jobs:
               if [ "$TEST_PASSED" = true ]; then
                 echo -e "${GREEN}✅ Integration Test Passed! Pushing image to registry...${RESET}"
                 docker push "$TAG"
+                docker rm -f test-sensor || true
               else
                 echo -e "${RED}❌ Integration Test Failed or Timed Out!${RESET}"
                 echo -e "${YELLOW}--- Sensor Container Logs ---${RESET}"
                 docker logs test-sensor || true
+                docker rm -f test-sensor || true
                 exit 1 # Halt the entire pipeline
               fi
 
