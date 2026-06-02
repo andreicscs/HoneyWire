@@ -49,6 +49,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+          token-setup-trivy: ''
 
       # -----------------------------------------------------
       # 3. BUILD, TEST, AND PUSH
