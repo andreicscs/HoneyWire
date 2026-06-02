@@ -12,6 +12,8 @@ import (
 
 func main() {
 	if err := run(); err != nil {
+		// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
+		// codeql[go/xss] Printing to CLI stdout/stderr, not HTTP.
 		fmt.Fprintf(os.Stderr, "\n%sFatal Error: %v%s\n", cli.Red, err, cli.Reset)
 		os.Exit(1)
 	}

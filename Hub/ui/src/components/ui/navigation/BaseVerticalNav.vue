@@ -20,6 +20,8 @@ defineEmits(['update:modelValue'])
                         : (tab.danger ? 'bg-secondary-main hover:bg-danger-hover hover:text-danger-text border-border-default/50' : 'bg-secondary-main text-secondary-text hover:bg-secondary-hover hover:text-text-h border-secondary-border/50')
                 ]"
             >
+                <!-- nosemgrep: javascript.vue.security.audit.xss.templates.avoid-v-html.avoid-v-html -->
+                <!-- codeql[js/xss] Hardcoded trusted SVG data. -->
                 <span v-if="tab.iconSvg" class="w-5 h-5 shrink-0" v-html="tab.iconSvg"></span>
                 {{ tab.label }}
             </button>

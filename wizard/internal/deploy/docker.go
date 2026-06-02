@@ -62,6 +62,8 @@ func checkDaemon() error {
     defer cancel()
 
     var stderr bytes.Buffer
+    // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
     cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{json .}}")
     cmd.Stderr = &stderr
 
@@ -78,6 +80,8 @@ func validateComposeVersion() ([]string, error) {
     defer cancel()
 
     var outb, errb bytes.Buffer
+    // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
     cmd := exec.CommandContext(ctx, "docker", "compose", "version", "--format", "json")
     cmd.Stdout = &outb
     cmd.Stderr = &errb

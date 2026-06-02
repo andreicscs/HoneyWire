@@ -48,7 +48,7 @@ func classify(err error, resp *http.Response) ResponseFact {
 			fact.IsTransient = false
 		default:
 			fact.IsTransient = true // 429, 5xx, etc.
-			
+
 			// Extract explicit wait instructions if the server provides them
 			if ra := resp.Header.Get("Retry-After"); ra != "" {
 				if sec, err := strconv.Atoi(ra); err == nil {
@@ -98,7 +98,7 @@ func (s *Sensor) heartbeatPolicy(fact ResponseFact) time.Duration {
 	if !fact.IsTransient {
 		return TerminalSleepInterval // State 3: Terminal Cooldown
 	}
-	
+
 	// State 2: Transient/Degraded
 	if fact.RetryAfter > BaseHeartbeatInterval {
 		return fact.RetryAfter // Hub explicitly asked for breathing room
@@ -113,6 +113,8 @@ func (s *Sensor) calculateBackoff(attempt int) time.Duration {
 	if delay > maxDelay {
 		delay = maxDelay
 	}
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	jitter := (rand.Float64() * 0.2) - 0.1
 	finalDelay := delay + (delay * jitter)
 	return time.Duration(finalDelay * float64(time.Second))
@@ -218,7 +220,7 @@ func (s *Sensor) processEvent(event map[string]any) {
 	for attempt := 0; attempt < MaxRetriesPerEvent; attempt++ {
 		resp, err := s.postToHub("/api/v1/event", event)
 		fact := classify(err, resp)
-		
+
 		if resp != nil {
 			resp.Body.Close()
 		}
@@ -266,7 +268,7 @@ func (s *Sensor) drainQueue() {
 // ==========================================
 
 func (s *Sensor) heartbeatLoop() {
-	sleepDuration := time.Duration(0) 
+	sleepDuration := time.Duration(0)
 
 	for {
 		if sleepDuration > 0 {
@@ -314,7 +316,9 @@ func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 func (s *Sensor) syncHubVersion() error {
 	for i := 0; i < 3; i++ {
 		req, err := http.NewRequest("GET", s.HubEndpoint+"/api/v1/version", nil)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		req.Header.Set("Authorization", "Bearer "+s.HubKey)
 
 		resp, err := s.client.Do(req)
@@ -358,17 +362,23 @@ func (s *Sensor) GoOffline(reason string) {
 
 func (s *Sensor) postToHub(path string, data map[string]any) (*http.Response, error) {
 	jsonData, err := json.Marshal(data)
-	if err != nil { return nil, err }
-	
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest("POST", s.HubEndpoint+path, bytes.NewReader(jsonData))
-	if err != nil { return nil, err }
-	
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.HubKey)
 	return s.client.Do(req)
 }
 
 func getEnv(key, fallback string) string {
-	if value, exists := os.LookupEnv(key); exists { return value }
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
 	return fallback
 }

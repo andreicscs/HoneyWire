@@ -55,8 +55,10 @@ jobs:
       # -----------------------------------------------------
 
       - name: Build, Test, and Push Sensors
+        env: # Bind the input to a safe environment variable first
+          SENSOR_INPUT: ${{ inputs.sensor }}
         run: |
-          INPUT="${{ inputs.sensor }}"
+          INPUT="$SENSOR_INPUT"
           if [ -z "$INPUT" ] || [ "$INPUT" == "all" ]; then
             DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
           else

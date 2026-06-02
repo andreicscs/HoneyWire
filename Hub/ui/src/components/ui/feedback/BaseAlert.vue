@@ -19,6 +19,6 @@ defineProps({
             'bg-bg-inset border-border-default text-text-m': variant === 'info'
         }"
     >
-        <p class="text-base" v-html="message"></p>
+        <p class="text-base">{{ message }}</p>
     </div>
 </template>

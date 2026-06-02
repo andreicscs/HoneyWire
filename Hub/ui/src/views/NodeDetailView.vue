@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
+import escapeHtml from 'escape-html'
 import { useAppStore } from '../stores/System/app.ts'
 import { useFleetStore } from '../stores/Fleet/fleet.ts'
 import { useEventsStore } from '../stores/Events/events.ts'
@@ -566,12 +567,14 @@ const fetchYamlFromHub = async () => {
   } catch (e: any) {
     const msg = e.response?.data || e.message || String(e)
     rawCompose.value = `# ERROR GENERATING PREVIEW:\n# ${msg.trim().split('\n').join('\n# ')}`
-    highlightedCompose.value = `<span class="text-danger-main font-semibold">${rawCompose.value}</span>`
+    // prevent xss
+    highlightedCompose.value = `<span class="text-danger-main font-semibold">${escapeHtml(rawCompose.value)}</span>`
   }
 }
 
 const applyHighlighting = () => {
-  let htmlYaml = rawCompose.value
+  // prevent xss
+  let htmlYaml = escapeHtml(rawCompose.value)
   if (activeEnvVar.value) {
     const escapedName = activeEnvVar.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const regex = new RegExp(`^.*\\b${escapedName}\\b.*$`, 'gm')

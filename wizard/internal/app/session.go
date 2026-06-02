@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
+	"fmt"
 	"os"
 	"time"
 
@@ -23,6 +23,8 @@ func NewApp(cfg *NodeConfig) *App {
 	return &App{
 		Config: cfg,
 		Hub:    api.NewClient(cfg.HubURL),
+		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+		// codeql[go/insecure-randomness] Non-cryptographic use case.
 		rng:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }

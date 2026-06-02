@@ -160,10 +160,10 @@ promptLoop:
 		}
 	}
 
-	return applySuggestions(app, recommendations, dockerMap)
+	return applySuggestions(app, recommendations)
 }
 
-func applySuggestions(app *app.App, recs []*discovery.Recommendation, dockerMap map[int]string) error {
+func applySuggestions(app *app.App, recs []*discovery.Recommendation) error {
 	fmt.Printf("\n    %s[*] Dashboard auth required to register sensors.%s\n", cli.Cyan, cli.Reset)
 
 	if err := app.RequireDashboardAuth(); err != nil {
