@@ -32,8 +32,9 @@ func Apply(ctx context.Context, composeData []byte) error {
 	defer validateCancel()
 
 	validateArgs := append(cmdBase, "-f", newComposePath, "config", "--quiet")
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	
 	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	validateCmd := exec.CommandContext(validateCtx, validateArgs[0], validateArgs[1:]...)
 	validateCmd.Dir = DeployDir
 
@@ -64,8 +65,9 @@ func Apply(ctx context.Context, composeData []byte) error {
 	defer pullCancel()
 
 	pullArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "pull")
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	
 	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	pullCmd := exec.CommandContext(pullCtx, pullArgs[0], pullArgs[1:]...)
 	pullCmd.Dir = DeployDir
 	pullCmd.Stdout = os.Stdout
@@ -82,8 +84,9 @@ func Apply(ctx context.Context, composeData []byte) error {
 	defer upCancel()
 
 	upArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--pull", "always", "--remove-orphans")
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	
 	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	upCmd := exec.CommandContext(upCtx, upArgs[0], upArgs[1:]...)
 	upCmd.Dir = DeployDir
 	upCmd.Stdout = os.Stdout

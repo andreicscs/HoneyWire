@@ -24,8 +24,8 @@ func Uninstall() error {
 	defer cancel()
 
 	args := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "down", "-v", "--remove-orphans", "--rmi", "all")
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = DeployDir
 	cmd.Stdout = os.Stdout

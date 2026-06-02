@@ -11,8 +11,9 @@ func SetupUsage() {
 
 		// Helper function centralizes the security suppressions to a single place
 		printUsage := func(format string, a ...any) {
-			// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
+			
 			// codeql[go/xss] Printing to CLI stdout/stderr, not HTTP.
+			// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 			fmt.Fprintf(out, format, a...)
 		}
 

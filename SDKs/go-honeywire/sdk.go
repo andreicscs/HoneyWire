@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log"
 	"math"
-	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+	
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
 	"net/http"
 	"os"
@@ -115,8 +116,9 @@ func (s *Sensor) calculateBackoff(attempt int) time.Duration {
 	if delay > maxDelay {
 		delay = maxDelay
 	}
-	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
+	
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
+	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	jitter := (rand.Float64() * 0.2) - 0.1
 	finalDelay := delay + (delay * jitter)
 	return time.Duration(finalDelay * float64(time.Second))
