@@ -1,8 +1,9 @@
 package sdk
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -63,7 +64,9 @@ func TestClassify(t *testing.T) {
 
 // TestEventPolicy verifies that the event retry logic adheres to state transitions
 func TestEventPolicy(t *testing.T) {
-	s := &Sensor{}
+	s := &Sensor{
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
 
 	// Case 1: Success
 	action, _ := s.eventPolicy(ResponseFact{IsError: false}, 0)
@@ -147,7 +150,9 @@ func TestReportEvent_BufferLimit(t *testing.T) {
 // TestCalculateBackoff verifies that the backoff delay increases with attempts
 // and respects the maximum cap, despite random jitter.
 func TestCalculateBackoff(t *testing.T) {
-	s := &Sensor{}
+	s := &Sensor{
+		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
 	d0 := s.calculateBackoff(0)
 	d1 := s.calculateBackoff(1)
 	d2 := s.calculateBackoff(2)
