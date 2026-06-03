@@ -534,20 +534,7 @@ Reports a sensor heartbeat and updates runtime metadata.
 Reports an intrusion event to the Hub.
 
 **Request:**
-```json
-{
-  "contractVersion": "1.0",
-  "sensorId": "core-dpi-engine",
-  "eventTrigger": "malformed_jwt_detected",
-  "severity": "critical",
-  "source": "104.28.19.12",
-  "target": "Auth Gateway",
-  "details": {
-    "protocol": "TCP",
-    "action_taken": "logged"
-  }
-}
-```
+> 📖 **[View the Universal Event Standard Contract](./architecture/dataContracts.md#1-the-universal-event-standard)**
 
 **Severity values:** `info`, `low`, `medium`, `high`, `critical`
 
@@ -559,3 +546,4 @@ Reports an intrusion event to the Hub.
 **Errors:**
 - `400 Bad Request` for invalid JSON or missing required fields.
 - `426 Upgrade Required` if the sensor major version does not match the Hub.
+Required` if the sensor major version does not match the Hub.

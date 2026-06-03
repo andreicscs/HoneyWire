@@ -101,9 +101,7 @@ class PolicyEngine:
 # ============================================================================
 
 class HoneyWireSensor(ABC):
-    def __init__(self, sensor_type: str):
-        self.sensor_type = sensor_type
-
+    def __init__(self):
         self.hub_endpoint = os.getenv("HW_HUB_ENDPOINT")
         self.hub_key = os.getenv("HW_HUB_KEY")
         self.sensor_id = os.getenv("HW_SENSOR_ID")
@@ -276,7 +274,6 @@ class HoneyWireSensor(ABC):
                 "metadata": {
                     "agent_version": self.agent_version,
                     "contract_version": self._hub_contract_version,
-                    "sensor_type": self.sensor_type,
                     "HW_CONFIG_REV": self.config_rev
                 }
             }

@@ -66,7 +66,6 @@ type VolumeMount struct {
 type PortAssignment struct {
 	EnvVarName string `json:"env_var_name"`
 	Default    int    `json:"default"`
-	AutoShift  bool   `json:"auto_shift"`
 }
 
 type ConfigVar struct {

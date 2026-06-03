@@ -6,8 +6,13 @@ TODO
 
 HoneyWire is a decentralized sensor deployment system composed of:
 
-- **Wizard (Untrusted Local Decision Tool)**
-  Performs local environment discovery and submits deployment recommendations.
+- **Wizard (Untrusted Local Orchestration Layer)**
+  Performs:
+  - host discovery
+  - manifest selection
+  - manifest transformation (env/config binding)
+  - deployment request construction
+  - compose generation request input
 
 - **Hub (Trust Anchor: Policy + Compiler + Signer)**
   Central authority responsible for:
@@ -23,6 +28,15 @@ HoneyWire is a decentralized sensor deployment system composed of:
   - volumes / mounts
   - capabilities
   - heuristics and triggers
+
+- **Deployment Intent (Wizard-generated intermediate artifact)**
+  Partially transformed manifest produced by the Wizard before Hub validation.
+  Includes:
+  - selected sensors
+  - modified environment variables
+  - host-specific configuration bindings
+
+  This artifact is NOT trusted and is treated as attacker-controllable input by the Hub.
 
 - **Deployed Sensors (Untrusted Runtime Containers)**
   Containers running in Docker with enforced restrictions and sandboxing assumptions.
@@ -45,11 +59,16 @@ It is responsible for:
 - Hub is a trust anchor, not an invulnerable system
 - compromise affects future deployments, not existing runtime execution directly
 
+Hub must validate both:
+- raw registry manifests
+- Wizard-generated deployment intents (modified manifests)
+
 ---
 
 ### 2.2 Wizard Trust Boundary (UNTRUSTED LOCAL COMPONENT)
 
-The Wizard is NOT part of the security enforcement chain.
+The Wizard is NOT part of the security enforcement chain,
+but it IS part of the deployment transformation chain.
 
 It:
 - observes local system state (processes, ports, services)
@@ -62,7 +81,7 @@ The Wizard:
 - may be manipulated to produce misleading recommendations
 
 However:
-> Wizard output never affects security policy directly — only Hub validation does.
+> Wizard output affects deployment inputs (configuration, sensor selection, environment values), but all outputs are re-validated by the Hub before final compose generation.
 
 ---
 
@@ -148,6 +167,24 @@ However:
 - interpolation rejection (`${`, `{{`, and `$` patterns)
 - Hub-side normalization before compile stage
 
+### Threat 1.5: Wizard-Manipulated Deployment Intent
+
+Attacker capability:
+- compromises Wizard OR influences its execution environment
+- modifies manifests after retrieval from Hub registry
+- injects unsafe environment variables or configuration overrides
+- selects or combines sensors in unintended ways
+
+Impact:
+- valid manifests become unsafe at deployment time
+- policy bypass via "schema-valid but semantically unsafe" configurations
+- subtle privilege escalation via configuration injection
+
+Mitigations:
+- Hub treats Wizard-generated deployment intents as fully untrusted, regardless of provenance (including registry-derived manifests)
+- full re-validation of all manifests and overrides
+- capability + mount + env validation enforced at compile stage
+
 ---
 
 ### Threat 2: Hub Compromise (ROOT TRUST FAILURE)
@@ -204,6 +241,7 @@ However:
   - host network exploitation
   - unsafe mount paths
   - injection via volume/template fields
+  - modifies Wizard-generated deployment intent before Hub validation
 
 **Impact:**
 - host compromise via container escape paths
@@ -315,8 +353,8 @@ This trade-off (Medium Risk - UX Issue) is formally accepted because:
 ## 6. Security Model Summary
 
 - Manifest → untrusted declarative DSL
-- Wizard → untrusted local recommender
-- Hub → trusted compiler + policy enforcement
+- Wizard → untrusted local orchestration + transformation layer
+- Hub → trusted policy enforcement + compilation engine (defensive against untrusted inputs)Hub → trusted compiler + policy enforcement
 - Sensors → isolated containers in potentially hostile environments
 
 ---

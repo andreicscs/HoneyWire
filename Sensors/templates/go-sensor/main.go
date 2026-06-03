@@ -13,7 +13,6 @@ import (
 
 var (
 	// Load custom configuration from environment variables
-	severity = getEnv("HW_SEVERITY", "medium")
 	target   = getEnv("HW_CUSTOM_TARGET", "/tmp/honey")
 )
 
@@ -38,7 +37,7 @@ func main() {
 	}
 	defer hw.Stop() // Cleans up the background heartbeat goroutine
 
-	log.Printf("[*] Starting Custom Go Sensor | Target: %s | Severity: %s", target, severity)
+	log.Printf("[*] Starting Custom Go Sensor | Target: %s", target)
 
 	// 4. Setup graceful shutdown via OS signals
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

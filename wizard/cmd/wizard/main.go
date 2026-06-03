@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		
+
 		// codeql[go/xss] Printing to CLI stdout/stderr, not HTTP.
 		// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 		fmt.Fprintf(os.Stderr, "\n%sFatal Error: %v%s\n", cli.Red, err, cli.Reset)

@@ -9,17 +9,16 @@ from honeywire import HoneyWireSensor
 class MyCustomSensor(HoneyWireSensor):
     def __init__(self):
         # Initialize the base class. 
-        super().__init__(sensor_type="custom")
+        super().__init__()
         
         # Custom config overrides
-        self.severity = os.getenv("HW_SEVERITY", "medium")
         self.target = os.getenv("HW_CUSTOM_TARGET", "/tmp/honey")
 
     async def monitor(self):
         """
         REQUIRED METHOD: This is the main loop of your sensor.
         """
-        print(f"[*] Starting Custom Sensor | Target: {self.target} | Severity: {self.severity}")
+        print(f"[*] Starting Custom Sensor | Target: {self.target}")
         
         try:
             while True:

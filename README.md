@@ -55,27 +55,11 @@ The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. Y
 
 By adhering to the **HoneyWire Event Standard V1.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data. 
 
-Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a **Canary Token** embedded in a PDF, an **Email Honeypot**, or a simple **TCP Port Tripwire**, just POST this JSON to the Hub:
+Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a **Canary Token** embedded in a PDF, an **Email Honeypot**, or a simple **TCP Port Tripwire**, just POST the **Universal Event Standard** JSON payload to the Hub. 
 
-```json
-{
-  "contractVersion": "1.0",
-  "severity": "critical",
-  "eventTrigger": "malformed_jwt_detected",
-  "source": "104.28.19.12",
-  "target": "Auth Gateway",
-  "sensorId": "core-dpi-engine",  
-  "details": {
-    "protocol": "TCP",
-    "headers_stripped": true,
-    "payload_sample": [
-      "Authorization: Bearer eyJhbG... [TRUNCATED]",
-      "User-Agent: curl/7.64.1"
-    ]
-  }
-}
-```
-> Note: If you build your sensor using the official HoneyWire Go SDK, this JSON formatting and delivery is handled for you automatically.
+> 📖 **[View the full Event Data Contract here](./Docs/architecture/dataContracts.md#1-the-universal-event-standard)**
+
+> Note: If you build your sensor using the official HoneyWire SDKs, this JSON formatting and delivery is handled for you automatically.
 
 *The Hub's frontend automatically translates arrays into syntax-highlighted code blocks and primitive values into clean detail tags.*
 
