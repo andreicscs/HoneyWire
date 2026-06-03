@@ -893,7 +893,7 @@ const applyHighlighting = () => {
                         <span class="text-sm text-text-h font-semibold">Node API Key</span>
                         <button @click="handleCopy('key-modal', node?.apiKey)"
                                 class="px-2.5 py-1 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 border outline-none"
-                                :class="copiedStates['key-modal'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                :class="copiedStates['key-modal'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-text-h border-secondary-border hover:bg-secondary-hover'">
                             {{ copiedStates['key-modal'] ? 'Copied!' : 'Copy' }}
                         </button>
                     </div>
@@ -955,8 +955,8 @@ const applyHighlighting = () => {
                                     
                                     <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 font-mono text-sm text-text-h overflow-auto max-h-[30vh] custom-scroll">
                                         <button @click="handleCopy('sync-yaml', syncComposeYaml)"
-                                                class="absolute top-3 right-3 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
-                                                :class="copiedStates['sync-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                                class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
+                                                :class="copiedStates['sync-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-text-h border-secondary-border hover:bg-secondary-hover'">
                                             {{ copiedStates['sync-yaml'] ? 'Copied!' : 'Copy' }}
                                         </button>
                                         <pre class="whitespace-pre-wrap break-words pr-16">{{ syncComposeYaml || 'No compose output available.' }}</pre>
@@ -967,9 +967,9 @@ const applyHighlighting = () => {
                                     </p>
 
                                     <div class="bg-bg-inset border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
-                                        <code class="text-text-h text-xs font-mono break-all leading-relaxed">cd /opt/honeywire/sensors<br/>docker compose -f honeywire-compose.yml -p honeywire up -d --remove-orphans</code>
+                                        <code class="text-text-h text-xs font-mono break-all leading-relaxed">docker compose -f /opt/honeywire/sensors/honeywire-compose.yml -p honeywire up -d --pull always --remove-orphans</code>
                                         
-                                        <button @click="handleCopy('manual-cmd', 'cd /opt/honeywire/sensors\ndocker compose -p honeywire up -d --remove-orphans')"
+                                        <button @click="handleCopy('manual-cmd', 'docker compose -f /opt/honeywire/sensors/honeywire-compose.yml -p honeywire up -d --pull always --remove-orphans')"
                                                 class="self-end px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 focus:outline-none border"
                                                 :class="copiedStates['manual-cmd'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-bg-surface text-text-h border-border-default hover:bg-secondary-hover'">
                                             {{ copiedStates['manual-cmd'] ? 'Copied!' : 'Copy' }}
@@ -1068,7 +1068,7 @@ const applyHighlighting = () => {
                                     <button type="button"
                                             @click="handleCopy('compose-yaml', rawCompose)"
                                             class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border"
-                                            :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
+                                            :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-text-h border-secondary-border hover:bg-secondary-hover'">
                                         {{ copiedStates['compose-yaml'] ? 'Copied!' : 'Copy' }}
                                     </button>
                                     
