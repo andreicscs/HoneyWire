@@ -3,6 +3,7 @@ package sensor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ type Service struct {
 	store       Store
 	broadcaster Broadcaster
 }
+
+var ErrSensorNotRegistered = errors.New("sensor not registered")
 
 func NewService(store Store, broadcaster Broadcaster) *Service {
 	return &Service{
@@ -55,8 +58,7 @@ func (s *Service) ProcessHeartbeat(nodeID, sensorID string, metadata map[string]
 
 	if err := s.store.InsertHeartbeat(nodeID, sensorID, minuteBucket); err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY") {
-			log.Printf("[INFO] Dropped heartbeat from unregistered sensor %s on node %s (pending reconciliation)", sensorID, nodeID)
-			return nil // Stop processing to prevent broadcasting ghost heartbeats to the UI
+			return ErrSensorNotRegistered
 		} else {
 			log.Printf("[WARNING] Failed to log heartbeat bucket: %v", err)
 		}

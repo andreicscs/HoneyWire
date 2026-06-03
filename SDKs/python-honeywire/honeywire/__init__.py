@@ -58,7 +58,7 @@ class EventAction(Enum):
 
 MAX_RETRIES_PER_EVENT = 7
 BASE_HEARTBEAT_INTERVAL = 30.0
-TERMINAL_SLEEP_INTERVAL = 300.0  # 5 minutes
+TERMINAL_SLEEP_INTERVAL = 3600.0  # 1 hour
 
 class PolicyEngine:
     @staticmethod

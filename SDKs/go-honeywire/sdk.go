@@ -19,7 +19,7 @@ import (
 const (
 	MaxRetriesPerEvent    = 7
 	BaseHeartbeatInterval = 30 * time.Second
-	TerminalSleepInterval = 5 * time.Minute
+	TerminalSleepInterval = 1 * time.Hour
 )
 
 // ============================================================================

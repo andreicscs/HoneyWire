@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -39,6 +40,10 @@ func (h *SensorHandler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request)
 
 	// Hand off to the Service layer
 	if err := h.service.ProcessHeartbeat(nodeID, hb.SensorID, hb.Metadata); err != nil {
+		if errors.Is(err, sensor.ErrSensorNotRegistered) {
+			RespondError(w, "Sensor not registered on this node", http.StatusNotFound)
+			return
+		}
 		RespondError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -110,7 +115,7 @@ func (h *SensorHandler) GetManifests(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	
+
 	// codeql[go/xss] Writing safe JSON/YAML API response.
 	// nosemgrep: go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
 	w.Write(body)
