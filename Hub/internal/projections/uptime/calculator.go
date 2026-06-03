@@ -162,7 +162,7 @@ func GenerateBlocks(
 	params UptimeCalculationParams,
 	timeframe string,
 	now time.Time,
-	isLiveOffline bool,
+	liveStatus string,
 ) []UptimeBlock {
 	firstSeenParsed, _ := time.Parse(time.RFC3339, sensorData.FirstSeen)
 	blocks := make([]UptimeBlock, params.NumBlocks)
@@ -174,6 +174,24 @@ func GenerateBlocks(
 		stepsAgo := params.NumBlocks - 1 - i
 		timeLabel := formatTimeLabel(stepsAgo, params.Delta, timeframe)
 
+		if liveStatus == "pending" {
+			if blockEnd.Before(firstSeenParsed) {
+				blocks[i] = UptimeBlock{
+					Status:    "nodata",
+					Label:     "No Data (Not Deployed Yet)",
+					TimeLabel: timeLabel,
+				}
+			} else {
+				blocks[i] = UptimeBlock{
+					Status:    "pending",
+					Label:     "Awaiting Initial Check-in",
+					TimeLabel: timeLabel,
+				}
+			}
+			continue
+		}
+
+		isLiveOffline := liveStatus == "down"
 		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, history[i], params, i, isLiveOffline)
 		blocks[i] = UptimeBlock{
 			Status:    blockStatus.Status,
@@ -221,6 +239,11 @@ func ResolveWorstStatus(statuses []string) string {
 			return "up"
 		}
 	}
+	for _, status := range statuses {
+		if status == "pending" {
+			return "pending"
+		}
+	}
 	// All are "nodata"
 	return ""
 }
@@ -241,8 +264,13 @@ func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string
 			continue
 		}
 
+		liveStatus := sensorLiveStatusMap[historyKey]
+		if liveStatus == "pending" {
+			continue // Pending sensors don't count against overall uptime
+		}
+
 		firstSeenParsed, _ := time.Parse(time.RFC3339, sensor.FirstSeen)
-		isLiveOffline := sensorLiveStatusMap[historyKey] == "down"
+		isLiveOffline := liveStatus == "down"
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)

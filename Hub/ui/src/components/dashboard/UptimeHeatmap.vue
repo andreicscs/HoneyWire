@@ -94,7 +94,7 @@ const getRowWorstStatus = (blocks: any[]): string | null => {
 interface HydratedSensor {
     nodeId: string
     sensorId: string
-    isOnline: boolean
+    liveStatus: string
     blocks: any[]
     [key: string]: any
 }
@@ -113,32 +113,41 @@ const hydrateGroupsWithLiveStatus = (groups: any[]): HydratedGroup[] => {
     return groups.map(group => ({
         ...group,
         sensors: (group.sensors || []).map((sensor: any) => {
-            let isLiveOnline = sensor.status === 'up'
-            // O(1) lookup using the fleet store getter
-            let liveSensor: InstalledSensor | null = null
+            let liveStatus = sensor.status || 'unknown'
             if (typeof fleetStore.getSensor === 'function') {
-                liveSensor = fleetStore.getSensor(group.nodeId, sensor.sensorId)
+                const liveSensor = fleetStore.getSensor(group.nodeId, sensor.sensorId)
+                if (liveSensor && liveSensor.status) liveStatus = liveSensor.status
             }
             
-            
-            if (liveSensor) {
-                 if (liveSensor.status) isLiveOnline = ['online', 'alive', 'up'].includes(liveSensor.status.toLowerCase())
-            }
+            const isLiveOnline = ['online', 'alive', 'up'].includes(liveStatus.toLowerCase())
+            const isPending = liveStatus.toLowerCase() === 'pending'
 
             const blocks = [...(sensor.blocks || [])]
             if (blocks.length > 0) {
-                const lastIdx = blocks.length - 1
-                const lastBlock = { ...blocks[lastIdx] }
-                
-                if (!isLiveOnline) {
-                    lastBlock.status = 'down'
-                } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
-                    lastBlock.status = 'up'
+                if (isPending) {
+                    for (let i = 0; i < blocks.length; i++) {
+                        if (blocks[i].status !== 'nodata') {
+                            blocks[i] = {
+                                ...blocks[i],
+                                status: 'pending',
+                                label: 'Awaiting Initial Check-in'
+                            }
+                        }
+                    }
+                } else {
+                    const lastIdx = blocks.length - 1
+                    const lastBlock = { ...blocks[lastIdx] }
+                    
+                    if (!isLiveOnline) {
+                        lastBlock.status = 'down'
+                    } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
+                        lastBlock.status = 'up'
+                    }
+                    blocks[lastIdx] = lastBlock
                 }
-                blocks[lastIdx] = lastBlock
             }
 
-            return { ...sensor, nodeId: group.nodeId, isOnline: isLiveOnline, blocks }
+            return { ...sensor, nodeId: group.nodeId, liveStatus: liveStatus.toLowerCase(), blocks }
         })
     }))
 }
@@ -185,7 +194,7 @@ const legendItems = [
     { label: 'Up', colorClass: 'bg-success-main' },
     { label: 'Degraded', colorClass: 'bg-high' },
     { label: 'Down', colorClass: 'bg-critical' },
-    { label: 'N/A', colorClass: 'bg-bg-inset' }
+    { label: 'Pending / N/A', colorClass: 'bg-bg-inset' }
 ]
 </script>
 
@@ -270,7 +279,7 @@ const legendItems = [
                                 </button>
                             </BaseMeatballMenu>
 
-                            <BaseStatusDot :status="sensor.isOnline ? 'up' : 'down'" />
+                            <BaseStatusDot :status="sensor.liveStatus" />
                             
                             <button @click="fleetStore.selectTarget(sensor.nodeId, sensor.sensorId)"
                                 class="font-mono text-left transition-colors cursor-pointer rounded flex items-center gap-1.5 max-w-[calc(100%-28px)] text-sm"
@@ -291,7 +300,7 @@ const legendItems = [
                                      'bg-success-main': block.status === 'up', 
                                      'bg-critical': block.status === 'down', 
                                      'bg-high': block.status === 'degraded', 
-                                     'bg-bg-inset': block.status === 'nodata' 
+                                     'bg-bg-inset': block.status === 'nodata' || block.status === 'pending'
                                  }"
                                  :title="`${block.timeLabel} - ${block.label}`">
                             </div>

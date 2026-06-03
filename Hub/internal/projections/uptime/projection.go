@@ -92,9 +92,9 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 			sensorHistory = make([]float64, params.NumBlocks)
 		}
 
-		isLiveOffline := sensorLiveStatusMap[historyKey] == "down"
+		liveStatus := sensorLiveStatusMap[historyKey]
 
-		blocks := GenerateBlocks(sensor, sensorHistory, params, criteria.Timeframe, criteria.Now, isLiveOffline)
+		blocks := GenerateBlocks(sensor, sensorHistory, params, criteria.Timeframe, criteria.Now, liveStatus)
 
 		// Determine sensor status from the most recent block or live status
 		sensorStatus := sensorLiveStatusMap[historyKey]
