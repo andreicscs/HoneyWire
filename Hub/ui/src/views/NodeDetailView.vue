@@ -22,7 +22,7 @@ const configStore = useConfigStore()
 const selectedNodeId = computed(() => fleetStore.selectedNodeId)
 
 // --- NODE STATE ---
-const node = computed(() => fleetStore.getNode(selectedNodeId.value))
+const node = computed(() => fleetStore.enrichedNodes.find(n => n.id === selectedNodeId.value) || null)
 
 // --- LAST EVENT (from events store) ---
 const lastEventTime = computed(() => {
@@ -35,23 +35,7 @@ const lastEventTime = computed(() => {
 // --- MANIFEST LOOKUP (for icon/OSI enrichment) ---
 const isManifestLoading = ref(true)
 const fetchError = ref(false)
-const sensors = ref<any[]>([])
-const manifestMap = computed(() => {
-  const map = new Map()
-  for (const s of sensors.value) {
-    map.set(s.id, s)
-    map.set(s.sensorId, s)
-    map.set(s.name, s)
-  }
-  return map
-})
-
-const getManifestForSensor = (installedSensor: any) => {
-  const manifest = manifestMap.value.get(installedSensor.id)
-    || manifestMap.value.get(installedSensor.name)
-    || manifestMap.value.get(installedSensor.sensorId)
-  return manifest
-}
+const manifests = computed(() => fleetStore.manifests)
 
 const showSensorModal = ref(false)
 const selectedSensor = ref<any>(null)
@@ -213,7 +197,7 @@ const recentActivity = computed(() => {
 onMounted(async () => {
   isManifestLoading.value = true
   try {
-    sensors.value = await fleetStore.fetchManifests()
+    await fleetStore.fetchManifests()
   } catch (error) {
     console.error(error)
     fetchError.value = true
@@ -242,7 +226,7 @@ const openSensor = (sensor: any) => {
 }
 
 const editSensor = (installedSensor: any) => {
-  const manifest = getManifestForSensor(installedSensor)
+  const manifest = manifests.value.find((m: any) => m.id === installedSensor.id || m.id === installedSensor.sensorId || m.id === installedSensor.name)
   if (!manifest) {
       alert('Sensor manifest not found')
       return
@@ -308,8 +292,6 @@ const closeSensor = () => {
 
             <NodeSensorGrid 
                 :sensors="node?.installedSensors || []" 
-                :manifests="sensors" 
-                :isManifestLoading="isManifestLoading"
                 @edit="editSensor"
                 @toggleSilence="handleToggleSensorSilence"
                 @remove="handleRemoveSensor"
@@ -318,7 +300,7 @@ const closeSensor = () => {
 
         <NodeCatalogGrid 
             v-if="node"
-            :manifests="sensors" 
+            :manifests="manifests" 
             :isLoading="isManifestLoading" 
             :fetchError="fetchError"
             @open="openSensor"

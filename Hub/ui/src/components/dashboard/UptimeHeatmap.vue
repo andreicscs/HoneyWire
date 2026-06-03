@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFleetStore } from '../../stores/Fleet/fleet'
-import type { InstalledSensor } from '../../stores/Fleet/fleet'
 import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
@@ -12,13 +11,13 @@ import { formatSensorId } from '../../utils/formatSensorId'
 
 
 const fleetStore = useFleetStore()
-const { nodes: fleet, uptimeData, selectedNode, selectedSensor, activeTimeframe } = storeToRefs(fleetStore)
+const { uptimeData, selectedNode, selectedSensor, activeTimeframe, hydratedUptimeGroups } = storeToRefs(fleetStore)
 
 const scrollArea = ref<HTMLElement | null>(null)
 const canScrollDown = ref(false)
 const worstWarningBelow = ref<string | null>(null)
 
-const handleSilence = (nodeId: string, sensorId: string) => fleetStore.toggleSilence(nodeId, sensorId, !isSilenced(nodeId, sensorId))
+const handleSilence = (nodeId: string, sensorId: string, currentlySilenced: boolean) => fleetStore.toggleSilence(nodeId, sensorId, !currentlySilenced)
 const handleForget = async (nodeId: string, sensorId: string) => {
     if (!confirm('Remove this sensor? The node will be marked for deployment sync.')) return
     const res = await fleetStore.removeSensor(nodeId, sensorId)
@@ -69,94 +68,6 @@ const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
 }
 
-const isSilenced = (nodeId: string, sensorId: string): boolean => {
-    let sensor: InstalledSensor | null = null
-    if (typeof fleetStore.getSensor === 'function') {
-        sensor = fleetStore.getSensor(nodeId, sensorId)
-    }
-    if (!sensor) { // Fallback for safety
-        const node = fleet.value.find(n => n.id === nodeId)
-        sensor = node?.installedSensors?.find(s => s.sensorId === sensorId) || null
-    }
-    return sensor ? !!sensor.isSilenced : false
-}
-
-const getRowWorstStatus = (blocks: any[]): string | null => {
-    if (!blocks || !blocks.length) return null
-    let worst = null
-    for (let i = 0; i < blocks.length; i++) {
-        if (blocks[i].status === 'down') return 'down'
-        if (blocks[i].status === 'degraded') worst = 'degraded'
-    }
-    return worst
-}
-
-interface HydratedSensor {
-    nodeId: string
-    sensorId: string
-    liveStatus: string
-    blocks: any[]
-    [key: string]: any
-}
-
-interface HydratedGroup {
-    nodeId: string
-    nodeAlias?: string
-    sensors: HydratedSensor[]
-    [key: string]: any
-}
-
-// Hydrate live status from fleet store for real-time feedback
-const hydrateGroupsWithLiveStatus = (groups: any[]): HydratedGroup[] => {
-    if (!groups || !Array.isArray(groups)) return groups
-
-    return groups.map(group => ({
-        ...group,
-        sensors: (group.sensors || []).map((sensor: any) => {
-            let liveStatus = sensor.status || 'unknown'
-            if (typeof fleetStore.getSensor === 'function') {
-                const liveSensor = fleetStore.getSensor(group.nodeId, sensor.sensorId)
-                if (liveSensor && liveSensor.status) liveStatus = liveSensor.status
-            }
-            
-            const isLiveOnline = ['online', 'alive', 'up'].includes(liveStatus.toLowerCase())
-            const isPending = liveStatus.toLowerCase() === 'pending'
-
-            const blocks = [...(sensor.blocks || [])]
-            if (blocks.length > 0) {
-                if (isPending) {
-                    for (let i = 0; i < blocks.length; i++) {
-                        if (blocks[i].status !== 'nodata') {
-                            blocks[i] = {
-                                ...blocks[i],
-                                status: 'pending',
-                                label: 'Awaiting Initial Check-in'
-                            }
-                        }
-                    }
-                } else {
-                    const lastIdx = blocks.length - 1
-                    const lastBlock = { ...blocks[lastIdx] }
-                    
-                    if (!isLiveOnline) {
-                        lastBlock.status = 'down'
-                    } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
-                        lastBlock.status = 'up'
-                    }
-                    blocks[lastIdx] = lastBlock
-                }
-            }
-
-            return { ...sensor, nodeId: group.nodeId, liveStatus: liveStatus.toLowerCase(), blocks }
-        })
-    }))
-}
-
-// Compute the hydrated groups from the API response
-const hydratedGroups = computed<HydratedGroup[]>(() => {
-    return hydrateGroupsWithLiveStatus(uptimeData.value?.groups || [])
-})
-
 watch(() => selectedSensor.value?.sensorId, (newSensorId) => {
     const node = selectedNode.value
     if (newSensorId && node) {
@@ -184,7 +95,7 @@ watch(() => selectedNode.value?.id, (newNodeId) => {
     }
 })
 
-watch(hydratedGroups, () => nextTick(checkScroll), { deep: true })
+watch(hydratedUptimeGroups, () => nextTick(checkScroll), { deep: true })
 
 onMounted(() => { 
     nextTick(checkScroll)
@@ -225,7 +136,7 @@ const legendItems = [
                 
                 <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" class="text-sm font-medium text-text-m py-4 text-center">No fleet data available.</div>
                 
-                <div v-for="group in hydratedGroups" :key="group.nodeId" :id="'group-' + group.nodeId"
+                <div v-for="group in hydratedUptimeGroups" :key="group.nodeId" :id="'group-' + group.nodeId"
                     class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"
                     :class="{
                         'border-select-group-border bg-select-group-bg': selectedNode?.id === group.nodeId && !selectedSensor,
@@ -251,22 +162,22 @@ const legendItems = [
                             'opacity-50': selectedSensor && (selectedSensor?.sensorId !== sensor.sensorId || selectedNode?.id !== sensor.nodeId),
                             'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor?.sensorId === sensor.sensorId && selectedNode?.id === sensor.nodeId,
                             'border-transparent': !selectedSensor || (selectedSensor?.sensorId !== sensor.sensorId || selectedNode?.id !== sensor.nodeId),
-                            'has-warnings': getRowWorstStatus(sensor.blocks) !== null
+                            'has-warnings': sensor.worstStatus !== null
                         }"
-                        :data-worst-status="getRowWorstStatus(sensor.blocks)"
+                        :data-worst-status="sensor.worstStatus"
                         >
                          
                         <div class="w-[180px] flex items-center gap-2 shrink-0 pr-2">
                             
                             <BaseMeatballMenu :id="`${sensor.nodeId}|${sensor.sensorId}`">
-                                <button @click="handleSilence(sensor.nodeId, sensor.sensorId)" 
+                                <button @click="handleSilence(sensor.nodeId, sensor.sensorId, sensor.isSilenced)" 
                                         class="w-full text-left px-3 py-2 text-sm text-text-m font-medium flex items-center gap-2 hover:bg-secondary-hover transition-colors group"
-                                        :class="isSilenced(sensor.nodeId, sensor.sensorId) ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
+                                        :class="sensor.isSilenced ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path v-if="!isSilenced(sensor.nodeId, sensor.sensorId)" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
-                                        <path v-if="isSilenced(sensor.nodeId, sensor.sensorId)" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
+                                        <path v-if="!sensor.isSilenced" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+                                        <path v-if="sensor.isSilenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                     </svg>
-                                    {{ isSilenced(sensor.nodeId, sensor.sensorId) ? 'Unsilence' : 'Silence Alert' }}
+                                    {{ sensor.isSilenced ? 'Unsilence' : 'Silence Alert' }}
                                 </button>
                                 
                                 <button @click="handleForget(sensor.nodeId, sensor.sensorId)" 
@@ -287,7 +198,7 @@ const legendItems = [
                                 :title="`Node: ${group.nodeAlias || group.nodeId}`">
                                 <span class="truncate">{{ formatSensorId(sensor.sensorId) }}</span>
                                 
-                                <svg v-show="isSilenced(sensor.nodeId, sensor.sensorId)" class="w-3 h-3 shrink-0 text-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <svg v-show="sensor.isSilenced" class="w-3 h-3 shrink-0 text-medium" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                                 </svg>
                             </button>

@@ -57,7 +57,7 @@
 
   --success-main: oklch(65% 0.15 150);
   --success-selected: oklch(75% 0.12 150);
-  --success-text: oklch(25% 0.08 150);
+  --success-text: oklch(45% 0.08 150);
   --success-bg: oklch(90% 0.06 150);
   --success-border: oklch(80% 0.1 150);
 

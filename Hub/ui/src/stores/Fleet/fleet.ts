@@ -79,6 +79,12 @@ export interface FleetNode {
   desiredRevision: string
   lastEvent: string
   installedSensors?: InstalledSensor[]
+  totalSensors?: number
+  onlineSensors?: number
+  isSilenced?: boolean
+  sensorSummary?: { type: string; count: number; sensors: any[] }[]
+  hasUpdate?: boolean
+  isAwaitingCheckIn?: boolean
 }
 
 export interface UptimeSummary {
@@ -179,6 +185,103 @@ export const useFleetStore = defineStore('fleet', () => {
     if (summary?.overallUptime !== undefined) return summary.overallUptime.toFixed(2) + '%'
     if (summary?.overall_uptime !== undefined) return summary.overall_uptime.toFixed(2) + '%' // Fallback
     return '0.0%'
+  })
+
+  const enrichedNodes = computed(() => {
+    const manifestMap = new Map()
+    for (const s of state.value.manifests) {
+      manifestMap.set(s.id, s)
+      manifestMap.set(s.sensorId, s)
+      manifestMap.set(s.name, s)
+    }
+
+    return nodes.value.filter(n => !n.id.startsWith('__pending_')).map(node => {
+      const sensorsList = node.installedSensors || []
+
+      const enrichedSensors = sensorsList.map(sensor => {
+        const manifest = manifestMap.get(sensor.id) || manifestMap.get(sensor.name) || manifestMap.get(sensor.sensorId)
+        return {
+          ...sensor,
+          display: manifest?.name || sensor.display || sensor.name || '',
+          icon: manifest?.icon_svg || sensor.metadata?.icon || '',
+          osi: manifest?.osi_layer || sensor.metadata?.osi || 'Other',
+          status: (node.status === 'down' && sensor.status === 'pending') ? 'down' : sensor.status
+        }
+      })
+
+      const totalSensors = enrichedSensors.length
+      const onlineSensors = enrichedSensors.filter(s => ['up', 'online'].includes((s.status || '').toLowerCase())).length
+      const isSilenced = totalSensors > 0 && enrichedSensors.every(s => s.isSilenced)
+
+      const osiGroups = new Map()
+      for (const sensor of enrichedSensors) {
+        if (!osiGroups.has(sensor.osi)) osiGroups.set(sensor.osi, [])
+        osiGroups.get(sensor.osi).push({ name: sensor.display, status: sensor.status })
+      }
+
+      const osiOrder = ['Physical', 'Data Link', 'Network', 'Transport', 'Session', 'Presentation', 'Application', 'Other']
+      const sensorSummary = totalSensors > 0
+        ? Array.from(osiGroups.entries())
+            .map(([type, groupSensors]) => ({ type, count: groupSensors.length, sensors: groupSensors }))
+            .sort((a, b) => {
+              const aIdx = osiOrder.indexOf(a.type), bIdx = osiOrder.indexOf(b.type)
+              if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+              if (aIdx !== -1) return -1
+              if (bIdx !== -1) return 1
+              return a.type.localeCompare(b.type)
+            })
+        : []
+
+      return {
+        ...node, 
+        installedSensors: enrichedSensors,
+        totalSensors, onlineSensors, isSilenced, sensorSummary,
+        hasUpdate: false,
+        isAwaitingCheckIn: node.status === 'pending' || (!node.lastHeartbeat && totalSensors === 0)
+      }
+    })
+  })
+
+  const hydratedUptimeGroups = computed(() => {
+    const groups = state.value.uptimeData?.groups || []
+    return groups.map(group => ({
+      ...group,
+      sensors: (group.sensors || []).map(sensor => {
+        let liveStatus = sensor.status || 'unknown'
+        const liveSensor = getSensor(group.nodeId, sensor.sensorId)
+        if (liveSensor && liveSensor.status) liveStatus = liveSensor.status
+
+        const isLiveOnline = ['online', 'alive', 'up'].includes(liveStatus.toLowerCase())
+        const isPending = liveStatus.toLowerCase() === 'pending'
+
+        let blocks = [...(sensor.blocks || [])]
+        let worstStatus: string | null = null
+
+        if (blocks.length > 0) {
+          if (isPending) {
+            blocks = blocks.map(b => b.status !== 'nodata' ? { ...b, status: 'pending', label: 'Awaiting Initial Check-in' } : b)
+          } else {
+            const lastIdx = blocks.length - 1
+            const lastBlock = { ...blocks[lastIdx] }
+            if (!isLiveOnline) {
+              lastBlock.status = 'down'
+            } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
+              lastBlock.status = 'up'
+            }
+            blocks[lastIdx] = lastBlock
+          }
+
+          for (let i = 0; i < blocks.length; i++) {
+            if (blocks[i].status === 'down') worstStatus = 'down'
+            else if (blocks[i].status === 'degraded' && worstStatus !== 'down') worstStatus = 'degraded'
+          }
+        }
+        
+        const isSilenced = liveSensor ? !!liveSensor.isSilenced : false
+
+        return { ...sensor, nodeId: group.nodeId, liveStatus: liveStatus.toLowerCase(), blocks, worstStatus, isSilenced }
+      })
+    }))
   })
 
   // --- UI METADATA HELPERS ---
@@ -600,7 +703,7 @@ export const useFleetStore = defineStore('fleet', () => {
     pendingNodeActions, pendingSensorActions,
     selectedNode, selectedSensor,
     nodes, sensorsByNodeId, overallUptime, manifests,
-    getNode, getSensor,
+    getNode, getSensor, hydratedUptimeGroups, enrichedNodes,
     isNodeActionPending, isNodeSilenced,
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
     selectTarget, clearSelection, setActiveTimeframe,

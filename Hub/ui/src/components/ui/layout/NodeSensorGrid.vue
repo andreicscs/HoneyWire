@@ -2,13 +2,8 @@
 import BaseMeatballMenu from '../navigation/BaseMeatballMenu.vue'
 import { formatSensorId } from '../../../utils/formatSensorId'
 
-const props = defineProps<{ sensors: any[], manifests: any[], isManifestLoading: boolean }>()
+const props = defineProps<{ sensors: any[] }>()
 defineEmits<{ (e: 'edit', sensor: any): void, (e: 'toggleSilence', sensor: any): void, (e: 'remove', sensor: any): void }>()
-
-const getManifest = (s: any) => props.manifests.find(m => m.id === s.id || m.id === s.sensorId || m.id === s.name)
-const sensorIcon = (s: any) => getManifest(s)?.icon_svg || s.icon || ''
-const sensorOsi = (s: any) => getManifest(s)?.osi_layer || s.osi || ''
-const sensorDisplayName = (s: any) => getManifest(s)?.name || s.display || s.name || ''
 </script>
 
 <template>
@@ -19,11 +14,11 @@ const sensorDisplayName = (s: any) => getManifest(s)?.name || s.display || s.nam
                 <div class="absolute top-0 left-0 right-0 h-1 transition-colors" :class="sensor.status === 'up' ? 'bg-success-main' : 'bg-danger-main'"></div>
                 <div class="flex justify-between items-start mt-1">
                     <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-8 h-8 rounded bg-bg-inset border border-border-default/50 flex items-center justify-center text-text-h shrink-0">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="sensorIcon(sensor)"></path></svg>
+                        <div class="w-8 h-8 rounded bg-bg-base border border-border-default/50 flex items-center justify-center text-text-h shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="sensor.icon"></path></svg>
                         </div>
                         <div class="min-w-0">
-                            <h4 class="text-sm font-semibold text-text-h truncate">{{ sensorDisplayName(sensor) }}</h4>
+                            <h4 class="text-sm font-semibold text-text-h truncate">{{ sensor.display }}</h4>
                             <span class="text-sm text-text-m font-mono block truncate">{{ formatSensorId(sensor.name) }}</span>
                         </div>
                     </div>
@@ -34,7 +29,7 @@ const sensorDisplayName = (s: any) => getManifest(s)?.name || s.display || s.nam
                     </BaseMeatballMenu>
                 </div>
                 <div class="mt-3 pt-3 border-t border-border-default flex justify-between items-center">
-                    <span class="px-1.5 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ sensorOsi(sensor) }}</span>
+                    <span class="px-1.5 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ sensor.osi }}</span>
                     <svg v-if="sensor.isSilenced" class="w-3.5 h-3.5 text-medium shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Alerts Silenced"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/></svg>
                 </div>
             </div>
