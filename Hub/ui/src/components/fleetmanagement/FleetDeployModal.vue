@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import BaseModal from './BaseModal.vue'
-import BaseButton from '../forms/BaseButton.vue'
-import BaseInput from '../forms/BaseInput.vue'
-import { useClipboard } from '../../../utils/useClipboard.js'
-import { useFleetStore } from '../../../stores/Fleet/fleet.ts'
+import BaseModal from '../ui/feedback/BaseModal.vue'
+import BaseButton from '../ui/forms/BaseButton.vue'
+import BaseInput from '../ui/forms/BaseInput.vue'
+import { useClipboard } from '../../utils/useClipboard.js'
+import { useFleetStore } from '../../stores/Fleet/fleet.ts'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()

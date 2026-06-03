@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
-import BaseWidget from './BaseWidget.vue'
-import BaseStatusDot from '../feedback/BaseStatusDot.vue'
-import BaseMeatballMenu from '../navigation/BaseMeatballMenu.vue'
-import { useClipboard } from '../../../utils/useClipboard'
+import BaseWidget from '../ui/layout/BaseWidget.vue'
+import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
+import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
+import { useClipboard } from '../../utils/useClipboard.js'
 
 const props = defineProps<{
     node: any,

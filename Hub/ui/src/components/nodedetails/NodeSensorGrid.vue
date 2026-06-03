@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import BaseMeatballMenu from '../navigation/BaseMeatballMenu.vue'
-import { formatSensorId } from '../../../utils/formatSensorId'
+import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
+import { formatSensorId } from '../../utils/formatSensorId'
 
 const props = defineProps<{ sensors: any[] }>()
 defineEmits<{ (e: 'edit', sensor: any): void, (e: 'toggleSilence', sensor: any): void, (e: 'remove', sensor: any): void }>()

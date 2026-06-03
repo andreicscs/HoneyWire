@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import BaseButton from '../forms/BaseButton.vue'
-import { useClipboard } from '../../../utils/useClipboard'
+import BaseButton from '../ui/forms/BaseButton.vue'
+import { useClipboard } from '../../utils/useClipboard'
 
 defineProps<{ show: boolean, syncCommand: string, syncComposeYaml: string }>()
 defineEmits<{ (e: 'close'): void }>()

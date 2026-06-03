@@ -6,13 +6,13 @@ import { useEventsStore } from '../stores/Events/events.ts'
 import { useConfigStore } from '../stores/Config/config.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
 
-import NodeDetailHeader from '../components/ui/layout/NodeDetailHeader.vue'
-import NodeStatWidgets from '../components/ui/layout/NodeStatWidgets.vue'
-import NodeSensorGrid from '../components/ui/layout/NodeSensorGrid.vue'
-import NodeCatalogGrid from '../components/ui/layout/NodeCatalogGrid.vue'
-import NodeKeyModal from '../components/ui/feedback/NodeKeyModal.vue'
-import NodeSyncModal from '../components/ui/feedback/NodeSyncModal.vue'
-import NodeSensorModal from '../components/ui/feedback/NodeSensorModal.vue'
+import NodeDetailHeader from '../components/nodedetails/NodeDetailHeader.vue'
+import NodeStatWidgets from '../components/nodedetails/NodeStatWidgets.vue'
+import NodeSensorGrid from '../components/nodedetails/NodeSensorGrid.vue'
+import NodeCatalogGrid from '../components/nodedetails/NodeCatalogGrid.vue'
+import NodeKeyModal from '../components/nodedetails/NodeKeyModal.vue'
+import NodeSyncModal from '../components/nodedetails/NodeSyncModal.vue'
+import NodeSensorModal from '../components/nodedetails/NodeSensorModal.vue'
 
 const appStore = useAppStore()
 const fleetStore = useFleetStore()

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import escapeHtml from 'escape-html'
-import BaseButton from '../forms/BaseButton.vue'
-import BaseInput from '../forms/BaseInput.vue'
-import { useClipboard } from '../../../utils/useClipboard'
-import { useFleetStore } from '../../../stores/Fleet/fleet'
-import { useConfigStore } from '../../../stores/Config/config'
+import BaseButton from '../ui/forms/BaseButton.vue'
+import BaseInput from '../ui/forms/BaseInput.vue'
+import { useClipboard } from '../../utils/useClipboard'
+import { useFleetStore } from '../../stores/Fleet/fleet'
+import { useConfigStore } from '../../stores/Config/config'
 
 const props = defineProps<{ show: boolean, sensor: any, isEditing: boolean, initialEnvVars: Record<string, any>, apiKey: string | null }>()
 const emit = defineEmits<{ (e: 'close'): void, (e: 'apply', payload: Record<string, string>): void }>()

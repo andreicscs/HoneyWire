@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAppStore } from '../stores/System/app'
-import { useFleetStore } from '../stores/Fleet/fleet'
-import type { FleetNode } from '../stores/Fleet/fleet'
+import { useAppStore } from '../stores/System/app.ts'
+import { useFleetStore } from '../stores/Fleet/fleet.ts'
+import type { FleetNode } from '../stores/Fleet/fleet.ts'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
 
-import FleetSkeleton from '../components/ui/feedback/FleetSkeleton.vue'
-import FleetDeployModal from '../components/ui/feedback/FleetDeployModal.vue'
-import FleetNodeWidget from '../components/ui/layout/FleetNodeWidget.vue'
+import FleetSkeleton from '../components/fleetmanagement/FleetSkeleton.vue'
+import FleetDeployModal from '../components/fleetmanagement/FleetDeployModal.vue'
+import FleetNodeWidget from '../components/fleetmanagement/FleetNodeWidget.vue'
 
 const appStore = useAppStore()
 const fleetStore = useFleetStore()

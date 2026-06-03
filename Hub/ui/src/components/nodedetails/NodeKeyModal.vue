@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import BaseModal from './BaseModal.vue'
-import BaseButton from '../forms/BaseButton.vue'
-import { useClipboard } from '../../../utils/useClipboard'
+import BaseModal from '../ui/feedback/BaseModal.vue'
+import BaseButton from '../ui/forms/BaseButton.vue'
+import { useClipboard } from '../../utils/useClipboard'
 
 defineProps<{ show: boolean, apiKey: string | null }>()
 defineEmits<{ (e: 'close'): void }>()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatSensorId } from '../../../utils/formatSensorId'
+import { formatSensorId } from '../../utils/formatSensorId'
 
 const props = defineProps<{
     node: any,
