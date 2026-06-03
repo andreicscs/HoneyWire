@@ -102,6 +102,7 @@ export interface FleetState {
   selectedSensorId: string | null
   activeTimeframe: string
   uptimeData: UptimeData | null
+  manifests: any[]
 }
 
 export const useFleetStore = defineStore('fleet', () => {
@@ -116,7 +117,8 @@ export const useFleetStore = defineStore('fleet', () => {
     selectedNodeId: null,
     selectedSensorId: null,
     activeTimeframe: '24H',
-    uptimeData: null
+    uptimeData: null,
+    manifests: []
   })
 
   const abortControllers = new Map<string, AbortController>()
@@ -130,6 +132,7 @@ export const useFleetStore = defineStore('fleet', () => {
   const selectedSensorId = computed(() => state.value.selectedSensorId)
   const activeTimeframe = computed(() => state.value.activeTimeframe)
   const uptimeData = computed(() => state.value.uptimeData)
+  const manifests = computed(() => state.value.manifests)
   const pendingNodeActions = computed(() => state.value.pendingNodeActions)
   const pendingSensorActions = computed(() => state.value.pendingSensorActions)
 
@@ -401,9 +404,14 @@ export const useFleetStore = defineStore('fleet', () => {
   }
 
   const fetchManifests = async (): Promise<any[]> => {
+    if (state.value.manifests.length > 0) {
+      return state.value.manifests
+    }
     try {
       const res = await api.get('/api/v1/manifests')
-      return await res.json()
+      const data = await res.json()
+      state.value.manifests = data
+      return data
     } catch (err) {
       console.error('Failed to fetch manifests:', err)
       throw err
@@ -591,7 +599,7 @@ export const useFleetStore = defineStore('fleet', () => {
     selectedNodeId, selectedSensorId, activeTimeframe, uptimeData,
     pendingNodeActions, pendingSensorActions,
     selectedNode, selectedSensor,
-    nodes, sensorsByNodeId, overallUptime,
+    nodes, sensorsByNodeId, overallUptime, manifests,
     getNode, getSensor,
     isNodeActionPending, isNodeSilenced,
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
