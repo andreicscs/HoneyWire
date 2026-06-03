@@ -138,6 +138,8 @@ watch(activeEnvVar, () => applyHighlighting())
                             </div>
                             <div class="relative flex-1 min-h-[250px] mb-6">
                                 <button type="button" @click="handleCopy('compose-yaml', rawCompose)" class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border" :class="copiedStates['compose-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-text-h border-secondary-border hover:bg-secondary-hover'">{{ copiedStates['compose-yaml'] ? 'Copied!' : 'Copy' }}</button>
+                                <!-- codeql[js/xss] Data is explicitly sanitized via escape-html before injection -->
+                                <!-- nosemgrep: javascript.vue.security.audit.xss.templates.avoid-v-html.avoid-v-html - Data is explicitly sanitized via escape-html before injection -->
                                 <pre ref="composePre" v-html="highlightedCompose" class="absolute inset-0 w-full h-full bg-bg-surface text-text-m p-4 rounded-md text-sm font-mono custom-scroll border border-border-default leading-relaxed overflow-auto focus:outline-none scroll-smooth shadow-inner"></pre>
                             </div>
                             <div class="mt-auto border-t border-border-default pt-4 flex justify-end"><BaseButton variant="primary" type="submit" class="px-6">{{ isEditing ? 'Apply Settings' : 'Add to Node' }}</BaseButton></div>
