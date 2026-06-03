@@ -59,6 +59,14 @@
           "hidden": true
         },
         {
+          "name": "HW_SENSOR_ID",
+          "description": "Unique identifier for this specific trap.",
+          "default": "hw-sensor-tcp-tarpit",
+          "type": "string",
+          "required": true,
+          "hidden": true
+        },
+        {
           "name": "HW_DECOY_PORTS",
           "description": "Comma-separated list of internal ports to tarpit.",
           "default": "2222,3306",
@@ -140,6 +148,14 @@
           "name": "HW_HUB_KEY",
           "description": "The shared Node Key.",
           "default": "__HUB_KEY__",
+          "type": "string",
+          "required": true,
+          "hidden": true
+        },
+        {
+          "name": "HW_SENSOR_ID",
+          "description": "Unique identifier for this specific trap.",
+          "default": "hw-sensor-web-router-decoy",
           "type": "string",
           "required": true,
           "hidden": true
@@ -258,6 +274,14 @@
           "hidden": true
         },
         {
+          "name": "HW_SENSOR_ID",
+          "description": "Unique identifier for this specific trap.",
+          "default": "hw-sensor-file-canary",
+          "type": "string",
+          "required": true,
+          "hidden": true
+        },
+        {
           "name": "HW_ALERT_ON_OPEN",
           "description": "Generate alerts when a file is simply read or opened (noisier).",
           "default": "false",
@@ -333,6 +357,14 @@
           "type": "string",
           "required": true,
           "hidden": true
+        },
+        {
+          "name": "HW_SENSOR_ID",
+          "description": "Unique identifier for this specific trap.",
+          "default": "hw-sensor-icmp-canary",
+          "type": "string",
+          "required": true,
+          "hidden": true
         }
       ]
     }
@@ -392,6 +424,14 @@
           "name": "HW_HUB_KEY",
           "description": "The shared Node Key.",
           "default": "__HUB_KEY__",
+          "type": "string",
+          "required": true,
+          "hidden": true
+        },
+        {
+          "name": "HW_SENSOR_ID",
+          "description": "Unique identifier for this specific trap.",
+          "default": "hw-sensor-network-scan-detector",
           "type": "string",
           "required": true,
           "hidden": true
