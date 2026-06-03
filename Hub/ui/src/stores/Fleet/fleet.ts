@@ -447,6 +447,11 @@ export const useFleetStore = defineStore('fleet', () => {
       
       if (payload.events24h !== undefined) {
         patchSensor(compositeSensorId, { events24h: payload.events24h })
+      } else {
+        const sensor = getSensor(payload.nodeId, payload.sensorId)
+        if (sensor) {
+          patchSensor(compositeSensorId, { events24h: (sensor.events24h || 0) + 1 })
+        }
       }
       return
     }

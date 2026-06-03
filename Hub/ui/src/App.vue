@@ -48,7 +48,10 @@ const loadAppData = async () => {
       eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
     ])
 
-    wsService.on('onNewEvent', (payload: any) => eventsStore.handleWsEvent(payload))
+    wsService.on('onNewEvent', (payload: any) => {
+      eventsStore.handleWsEvent(payload)
+      fleetStore.handleWsUpdate('NEW_EVENT', payload)
+    })
     wsService.on('onNewSensor', (payload: any) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
     wsService.on('onDeleteSensor', (payload: any) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
     wsService.on('onSilenceSensor', (payload: any) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
