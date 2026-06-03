@@ -69,7 +69,7 @@ func HandleInteractiveMenu(force bool) error {
 	}
 
 	fmt.Printf("    Choose action:\n\n")
-	fmt.Printf("      %s[1]%s Reconcile node against Hub's desired state\n", cli.Cyan, cli.Reset)
+	fmt.Printf("      %s[1]%s Apply Hub's state\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[2]%s Run discovery & recommendations\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[3]%s Show node status\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[4]%s Re-link node\n", cli.Cyan, cli.Reset)
