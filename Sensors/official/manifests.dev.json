@@ -34,8 +34,8 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["mysqld", "postgres", "redis-server", "mongod", "mariadb", "sshd", "docker-proxy"],
-        "ports": [3306, 5432, 6379, 27017, 22]
+        "processes": ["mysqld", "postgres", "redis-server", "mongod", "mariadb", "sshd", "docker-proxy", "memcached", "rabbitmq", "etcd"],
+        "ports": [3306, 5432, 6379, 27017, 22, 11211, 5672, 2379]
       },
       "recommendation_reason": "Critical datastore or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement attempts targeting these specific services."
     },
@@ -91,8 +91,8 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["nginx", "apache2", "httpd", "lighttpd", "docker-proxy", "traefik", "caddy"],
-        "ports": [80, 443, 8080, 8443]
+        "processes": ["nginx", "apache2", "httpd", "lighttpd", "docker-proxy", "traefik", "caddy", "envoy", "haproxy"],
+        "ports": [80, 443, 8080, 8443, 9000]
       },
       "recommendation_reason": "Live web proxy or HTTP server detected. Deploy a fake administrative panel to catch internal network snooping and directory brute-forcing."
     },
@@ -146,7 +146,7 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy"]
+        "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy", "ruby", "perl", "go"]
       },
       "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch suspicious canary file interactions or ransomware activity."
     },
@@ -212,7 +212,7 @@
     },
     "heuristics": {
       "triggers": {},
-      "recommendation_reason": "Core Network Sensor. Internal ICMP pings to managed workloads are highly suspicious and indicate an attacker mapping the subnet."
+      "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments (e.g., Uptime Kuma)."
     },
     "deployment": {
       "image": "192.168.1.11:5000/honeywire-icmpcanary:dev",
@@ -223,7 +223,7 @@
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "hw-sensor-icmp-canary", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "high", "type": "string", "required": false, "hidden": true },
+        { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "info", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true }
       ]
     }
@@ -263,7 +263,7 @@
     },
     "heuristics": {
       "triggers": {},
-      "recommendation_reason": "Core Network Sensor. Always recommended to silently detect lateral Nmap sweeps and horizontal port scanning across the network interface."
+      "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments."
     },
     "deployment": {
       "image": "192.168.1.11:5000/honeywire-networkscandetector:dev",
@@ -274,7 +274,7 @@
         { "name": "HW_HUB_ENDPOINT", "description": "The URL of your central HoneyWire Hub.", "default": "__HUB_ENDPOINT__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_HUB_KEY", "description": "The shared Node Key.", "default": "__HUB_KEY__", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SENSOR_ID", "description": "Unique identifier for this specific trap.", "default": "hw-sensor-network-scan-detector", "type": "string", "required": true, "hidden": true },
-        { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "critical", "type": "string", "required": false, "hidden": true },
+        { "name": "HW_SEVERITY", "description": "Alert severity sent to the Hub.", "default": "high", "type": "string", "required": false, "hidden": true },
         { "name": "HW_TEST_MODE", "description": "Enable CI/CD synthetic alerts.", "default": "false", "type": "string", "required": true, "hidden": true },
         { "name": "HW_SCAN_THRESHOLD", "description": "Number of ports that must be scanned to trigger detection.", "default": "5", "type": "int", "required": false, "hidden": false },
         { "name": "HW_SCAN_WINDOW", "description": "Time window in seconds for scan detection.", "default": "5", "type": "int", "required": false, "hidden": false },

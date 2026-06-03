@@ -33,8 +33,8 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["mysqld", "postgres", "redis-server", "mongod", "mariadb", "sshd", "docker-proxy"],
-        "ports": [3306, 5432, 6379, 27017, 22]
+        "processes": ["mysqld", "postgres", "redis-server", "mongod", "mariadb", "sshd", "docker-proxy", "memcached", "rabbitmq", "etcd"],
+        "ports": [3306, 5432, 6379, 27017, 22, 11211, 5672, 2379]
       },
       "recommendation_reason": "Database or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement."
     },
@@ -127,8 +127,8 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["nginx", "apache2", "httpd", "lighttpd", "docker-proxy", "traefik", "caddy"],
-        "ports": [80, 443, 8080, 8443]
+        "processes": ["nginx", "apache2", "httpd", "lighttpd", "docker-proxy", "traefik", "caddy", "envoy", "haproxy"],
+        "ports": [80, 443, 8080, 8443, 9000]
       },
       "recommendation_reason": "Web server detected. Deploy fake admin panel to catch internal network snooping."
     },
@@ -215,7 +215,7 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy"]
+        "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy", "ruby", "perl", "go"]
       },
       "recommendation_reason": "Runtime/app service detected. Deploy to catch malicious file scraping."
     },
@@ -335,7 +335,7 @@
     },
     "heuristics": {
       "triggers": {},
-      "recommendation_reason": "Core sensor. Internal pings to isolated workloads are highly suspicious."
+      "recommendation_reason": "Core Network Sensor. Generates 'Info' severity events to track subnet mapping without triggering alert fatigue from legitimate uptime monitors."
     },
     "deployment": {
       "image": "ghcr.io/andreicscs/honeywire-icmpcanary:latest",
@@ -405,7 +405,7 @@
     },
     "heuristics": {
       "triggers": {},
-      "recommendation_reason": "Core sensor. Always recommended to detect internal horizontal port scanning."
+      "recommendation_reason": "Core Network Sensor. Highly recommended to silently detect lateral Nmap sweeps and horizontal port scanning across the network interface."
     },
     "deployment": {
       "image": "ghcr.io/andreicscs/honeywire-networkscandetector:latest",
