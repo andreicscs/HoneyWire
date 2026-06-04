@@ -109,7 +109,7 @@ const handleOpenNodeDetail = (nodeId: string) => {
 
         <FleetSkeleton v-if="showSkeleton" />
 
-        <div v-else-if="!isInitialLoading && fleetStore.enrichedNodes.length === 0" class="flex-1 flex items-center justify-center text-center text-base text-text-m py-20 z-20">
+        <div v-else-if="!isInitialLoading && fleetStore.enrichedNodes.length === 0" class="flex-1 flex items-center justify-center text-center text-base text-text-m py-20">
             No nodes deployed.
         </div>
 

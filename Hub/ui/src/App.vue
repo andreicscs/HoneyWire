@@ -94,6 +94,7 @@ const loadAppData = async () => {
 }
 
 const checkAuthAndInit = async () => {
+  // TODO remove debug override before production
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('debug') === 'setup') {
     appStore.enableDebugSetup()
