@@ -19,8 +19,13 @@ const manifestData = ref<any[]>([])
 
 // --- PARALLEL LOAD ---
 const isInitialLoading = ref(true)
+const showSkeleton = ref(false)
 
 onMounted(async () => {
+    const skeletonTimer = setTimeout(() => {
+        if (isInitialLoading.value) showSkeleton.value = true
+    }, 350)
+
     try {
         const [, manifests] = await Promise.all([
             fleetStore.fetchFleet(),
@@ -31,8 +36,10 @@ onMounted(async () => {
         ])
         manifestData.value = manifests
     } finally {
+        clearTimeout(skeletonTimer)
         isManifestLoading.value = false
         isInitialLoading.value = false
+        showSkeleton.value = false
     }
 })
 
@@ -43,7 +50,7 @@ const showDeployModal = ref(false)
 // You can test the "First Startup" UI state at any time by running:
 // localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
 const isFirstStartup = computed(() => {
-    return fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true'
+    return !isInitialLoading.value && (fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true')
 })
 
 // --- ACTIONS (all delegated to store) ---
@@ -100,9 +107,13 @@ const handleOpenNodeDetail = (nodeId: string) => {
             </BaseButton>
         </div>
 
-        <FleetSkeleton v-if="isInitialLoading" />
+        <FleetSkeleton v-if="showSkeleton" />
 
-        <div v-else class="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-max">
+        <div v-else-if="!isInitialLoading && fleetStore.enrichedNodes.length === 0" class="flex-1 flex items-center justify-center text-center text-base text-text-m py-20 z-20">
+            No nodes deployed.
+        </div>
+
+        <div v-else-if="!isInitialLoading" class="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-max">
             
             <FleetNodeWidget 
                 v-for="node in fleetStore.enrichedNodes" 
