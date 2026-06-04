@@ -23,6 +23,16 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"custom_anomaly_detected",
+		"Wizard Firedrill",
+		"Mock Custom Target",
+		map[string]any{
+			"test_message": "Wizard triggered a synthetic event firedrill.",
+			"action_taken": "logged",
+		},
+	)
+
 	// 2. Handle CI/CD Test Mode
 	if hw.TestMode {
 		if hw.RunTestMode() {

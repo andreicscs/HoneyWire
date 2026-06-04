@@ -1,0 +1,77 @@
+{
+  "id": "hw-sensor-custom-template",
+  "version": "1.0.0",
+  "schema_version": "1.0",
+  "min_wizard_version": "1.0.0",
+  "name": "Custom Go Sensor",
+  "category": "custom",
+  "osi_layer": "Application Layer",
+  "icon_svg": "M12 2L2 22h20L12 2z",
+  "description": "A template for creating custom HoneyWire sensors in Go.",
+  "documentation": {
+    "summary": "This is a blueprint for writing your own HoneyWire sensors in Go. By following this template, you'll easily hook into the official Go SDK, ensuring events are synced securely with the HoneyWire Hub.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Easy SDK Integration: Automatically hooks into the event bus.",
+          "Distroless Sandbox: Enforces unprivileged execution.",
+          "Zero-Dependency Compilation: Statically compiled binary."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Unprivileged Execution: Runs completely as non-root user (UID 65532).",
+          "Kernel Capability Stripping: Drops ALL Linux kernel capabilities.",
+          "Read-Only Context: Operates in a strict distroless environment."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {},
+    "recommendation_reason": "Custom user-defined sensor blueprint."
+  },
+  "deployment": {
+    "image": "ghcr.io/yourusername/honeywire-mysensor:latest",
+    "network_mode": "bridge",
+    "user": "65532:65532",
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-custom",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_CUSTOM_TARGET",
+        "description": "Example custom variable injected into the Go runtime.",
+        "default": "/tmp/honey",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ]
+  }
+}

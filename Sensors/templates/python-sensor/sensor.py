@@ -56,6 +56,18 @@ if __name__ == "__main__":
         print(f"[!] FATAL: {e}")
         sys.exit(1)
 
+    # Register test payload for CI/CD and Wizard validation
+    sensor.set_test_payload(
+        event_trigger="custom_anomaly_detected",
+        source="192.168.1.100",
+        target=sensor.target,
+        details={
+            "attack_type": "example_probe",
+            "raw_payload": "GET /etc/passwd HTTP/1.1",
+            "test_message": "Wizard triggered a synthetic event firedrill."
+        }
+    )
+
     # 2. Handle Test Mode
     if sensor.test_mode:
         if sensor.run_test_mode():
