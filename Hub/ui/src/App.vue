@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -55,7 +55,6 @@ const loadAppData = async () => {
     // You can test the "First Startup" UI state at any time by running:
     // localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
     if ((fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true') && route.name !== 'fleet') {
-      router.push('/fleet')
       await router.push('/fleet').catch(() => {})
     }
 
@@ -148,14 +147,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!isInitialized" class="h-screen bg-bg flex items-center justify-center z-50">
   <div v-if="!isInitialized || (isAuthenticated && !isDataLoaded)" class="h-screen bg-bg flex items-center justify-center z-50">
      <div class="animate-pulse flex flex-col items-center gap-4">
          <svg class="w-10 h-10 text-primary-main animate-spin" fill="none" viewBox="0 0 24 24">
              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
          </svg>
-         <span class="text-text-m font-medium tracking-wide">Initializing...</span>
          <span class="text-text-m font-medium tracking-wide">{{ !isInitialized ? 'Initializing...' : 'Loading Telemetry...' }}</span>
      </div>
   </div>
