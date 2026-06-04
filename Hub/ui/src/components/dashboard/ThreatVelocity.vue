@@ -23,6 +23,7 @@ const chartCanvas = ref<HTMLCanvasElement | null>(null)
 const chartInstance = shallowRef<any>(null)
 let themeObserver: MutationObserver | null = null
 let rolloverTimeout: any = null 
+let isFirstRender = true
 
 const severities = ['critical', 'high', 'medium', 'low', 'info']
 
@@ -43,7 +44,7 @@ const initChart = () => {
         options: {
             responsive: true, maintainAspectRatio: false,
             layout: { padding: { top: 15, left: 0, right: 0, bottom: 0 } },
-            animation: { duration: 0 }, 
+            animation: { duration: 800, easing: 'easeOutQuart' }, 
             plugins: { 
                 legend: { display: false }, 
                 tooltip: { 
@@ -116,7 +117,12 @@ const updateData = () => {
         dataset.hidden = data.every((v: number) => v === 0)
     })
 
-    chartInstance.value.update('none');
+    if (isFirstRender) {
+        chartInstance.value.update();
+        isFirstRender = false;
+    } else {
+        chartInstance.value.update('none');
+    }
 }
 
 const fetchContextualProjection = () => {
@@ -158,6 +164,9 @@ onMounted(async () => {
     if (chartCanvas.value) {
         initChart()
         updateTheme()
+        if (projection.value?.generatedAt) {
+            updateData() // Draw immediately if data arrived before mount
+        }
     }
     
     themeObserver = new MutationObserver((mutations) => {
@@ -241,7 +250,7 @@ const legendItems = [
             <div v-if="(!projection || projection.recentEventCount === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
                 Awaiting telemetry...
             </div>
-            <canvas ref="chartCanvas" class="w-full h-full relative z-0"></canvas>
+            <canvas ref="chartCanvas" class="relative z-0"></canvas>
         </div>
 
         <template #footer>
