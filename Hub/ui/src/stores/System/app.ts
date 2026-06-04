@@ -160,16 +160,16 @@ export const useAppStore = defineStore('app', () => {
 
   // --- ACTIONS: AUTH & SETUP ---
   
-  const login = async (password: string): Promise<{ success: boolean }> => {
+  const login = async (password: string): Promise<{ success: boolean; status?: number }> => {
     state.value.authError = null
     try {
       await api.post('/login', { password })
       transitionSession('authenticated')
       return { success: true }
-    } catch (err) {
+    } catch (err: any) {
       transitionSession('unauthenticated')
       state.value.authError = 'Invalid credentials'
-      return { success: false }
+      return { success: false, status: err.status }
     }
   }
 
@@ -183,7 +183,7 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  const completeSetup = async (password: string, hubEndpoint: string): Promise<{ success: boolean }> => {
+  const completeSetup = async (password: string, hubEndpoint: string): Promise<{ success: boolean; error?: string }> => {
     state.value.setupError = null
     try {
       await api.post('/api/v1/setup', { password, hubEndpoint })
@@ -191,7 +191,7 @@ export const useAppStore = defineStore('app', () => {
       return { success: true }
     } catch (err: any) {
       state.value.setupError = err.message || 'Setup failed'
-      return { success: false }
+      return { success: false, error: err.message || 'Setup failed' }
     }
   }
 
