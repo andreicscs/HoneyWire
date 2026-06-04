@@ -247,6 +247,19 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"web_login_attempt",
+		"Wizard Firedrill",
+		"Web Interface",
+		map[string]any{
+			"test_message":       "Wizard triggered a synthetic event firedrill.",
+			"user_agent":         "HoneyWire-Firedrill/1.0",
+			"attempted_username": "admin",
+			"attempted_password": "password123",
+			"action_taken":       "logged",
+		},
+	)
+
 	// Load environment variables AFTER the SDK loads the .env file
 	port = getEnv("HW_BIND_PORT", "8080")
 	routerBrand = getEnv("HW_ROUTER_BRAND", "Enterprise")
@@ -301,10 +314,10 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// %[1]s = Brand, %[2]s = 'none' (hides the error banner initially)
-    
-    // codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
+
+	// codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
 	// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
-    fmt.Fprintf(w, loginHTML, routerBrand, "none")
+	fmt.Fprintf(w, loginHTML, routerBrand, "none")
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -350,8 +363,8 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
 	// Re-render the exact same login page, but cleanly display the red error block
-    // codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
-    // nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
+	// codeql[go/xss] Honeypot decoy rendering intentional raw HTML.
+	// nosemgrep: go.lang.security.audit.xss.no-fprintf-to-responsewriter.no-fprintf-to-responsewriter
 	fmt.Fprintf(w, loginHTML, routerBrand, "block")
 }
 

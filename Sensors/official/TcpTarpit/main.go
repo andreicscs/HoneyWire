@@ -31,8 +31,22 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"tcp_connection",
+		"Wizard Firedrill",
+		"Mock Tarpit Port",
+		map[string]any{
+			"test_message": "Wizard triggered a synthetic event firedrill.",
+			"payload":      []string{"SSH-2.0-Firedrill-Test\r\n"},
+			"duration_sec": 5.2,
+			"action_taken": "hold",
+		},
+	)
+
 	if hw.TestMode {
-		if hw.RunTestMode() { os.Exit(0) }
+		if hw.RunTestMode() {
+			os.Exit(0)
+		}
 		os.Exit(1)
 	}
 
@@ -57,8 +71,8 @@ func main() {
 
 func startListener(ctx context.Context, hw *sdk.Sensor, port int, semaphore chan struct{}) {
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	
-    var lc net.ListenConfig
+
+	var lc net.ListenConfig
 	listener, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
 		log.Printf("[!] Failed to bind to port %d: %v", port, err)
@@ -92,10 +106,12 @@ func startListener(ctx context.Context, hw *sdk.Sensor, port int, semaphore chan
 func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 	defer conn.Close()
 	start := time.Now()
-	
+
 	remoteAddr := conn.RemoteAddr().String()
 	srcIP, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil { srcIP = remoteAddr }
+	if err != nil {
+		srcIP = remoteAddr
+	}
 
 	var payload []string
 	consumedBytes := 0
@@ -117,12 +133,12 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 					conn.Write([]byte{0})
 					continue
 				}
-				break 
+				break
 			}
 
 			if n > 0 {
 				consumedBytes += n
-				
+
 				if len(payload) < maxLines {
 					text := strings.TrimSpace(strings.ToValidUTF8(string(buf[:n]), "?"))
 					if text != "" {
@@ -149,7 +165,7 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 		map[string]any{
 			"duration_sec": duration,
 			"payload":      payload,
-			"action_taken": tarpitMode, 
+			"action_taken": tarpitMode,
 		},
 	)
 }
@@ -158,12 +174,16 @@ func parsePorts(raw string) []int {
 	var ports []int
 	for _, p := range strings.Split(raw, ",") {
 		p = strings.TrimSpace(p)
-		if p == "" { continue }
+		if p == "" {
+			continue
+		}
 		if val, err := strconv.Atoi(p); err == nil {
 			ports = append(ports, val)
 		}
 	}
-	if len(ports) == 0 { return []int{2222, 3306} }
+	if len(ports) == 0 {
+		return []int{2222, 3306}
+	}
 	return ports
 }
 
@@ -174,6 +194,8 @@ func parseBanner(raw string) string {
 }
 
 func getEnv(key, fallback string) string {
-	if val, exists := os.LookupEnv(key); exists { return val }
+	if val, exists := os.LookupEnv(key); exists {
+		return val
+	}
 	return fallback
 }

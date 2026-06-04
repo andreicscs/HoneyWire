@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/honeywire/sdk-go"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-	"github.com/honeywire/sdk-go"
 )
 
 func main() {
@@ -18,6 +18,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to initialize sensor: %v", err)
 	}
+
+	hw.SetTestPayload(
+		"icmp_ping_received",
+		"Wizard Firedrill",
+		"ICMP Listener",
+		map[string]any{
+			"test_message": "Wizard triggered a synthetic event firedrill.",
+			"packet_size":  64,
+			"icmp_id":      1337,
+			"icmp_seq":     1,
+			"action_taken": "logged",
+		},
+	)
 
 	if hw.TestMode {
 		if hw.RunTestMode() {

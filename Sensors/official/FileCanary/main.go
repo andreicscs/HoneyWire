@@ -191,6 +191,18 @@ func main() {
 		log.Fatalf("FATAL: Failed to initialize sensor: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"decoy_file_tampered",
+		"Wizard Firedrill",
+		"Mock Canary File",
+		map[string]any{
+			"test_message": "Wizard triggered a synthetic event firedrill.",
+			"category":     "tamper",
+			"action":       "Decoy file modified",
+			"path":         "/canaries/mock_passwords.txt",
+		},
+	)
+
 	// Test mode
 	if hw.TestMode {
 		if hw.RunTestMode() {

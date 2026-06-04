@@ -38,6 +38,19 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"network_scan_detected",
+		"Wizard Firedrill",
+		"Multiple Ports",
+		map[string]any{
+			"test_message": "Wizard triggered a synthetic event firedrill.",
+			"ports_hit":    []uint16{22, 80, 443, 3306, 8080},
+			"count":        5,
+			"window_sec":   5.0,
+			"action_taken": "logged",
+		},
+	)
+
 	if hw.TestMode {
 		if hw.RunTestMode() {
 			os.Exit(0)
@@ -129,7 +142,7 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 	if len(uniquePortsList) >= threshold {
 		if now.Sub(state.lastAlert) > cooldown {
 			state.lastAlert = now
-			
+
 			log.Printf("[!] Port scan detected from %s: %v", srcIP, uniquePortsList)
 
 			hw.ReportEvent(
@@ -152,21 +165,29 @@ func parseIgnorePorts(raw string) map[uint16]bool {
 	ports := make(map[uint16]bool)
 	for _, p := range strings.Split(raw, ",") {
 		p = strings.TrimSpace(p)
-		if p == "" { continue }
+		if p == "" {
+			continue
+		}
 		val, err := strconv.ParseUint(p, 10, 16)
-		if err == nil { ports[uint16(val)] = true }
+		if err == nil {
+			ports[uint16(val)] = true
+		}
 	}
 	return ports
 }
 
 func getEnv(key, fallback string) string {
-	if val, exists := os.LookupEnv(key); exists { return val }
+	if val, exists := os.LookupEnv(key); exists {
+		return val
+	}
 	return fallback
 }
 
 func getEnvInt(key string, fallback int) int {
 	if val, exists := os.LookupEnv(key); exists {
-		if intVal, err := strconv.Atoi(val); err == nil { return intVal }
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
 	}
 	return fallback
 }

@@ -214,7 +214,7 @@ func (s *Sensor) listenForSignals() {
 			trigger := "test_mode_synthetic_alert"
 			source := "Wizard Live Test"
 			target := "Mock Hub"
-			details := map[string]any{"test_message": "Wizard triggered a live test event via signal."}
+			details := map[string]any{"test_message": "Wizard triggered a live test event firedrill."}
 
 			if s.testTrigger != "" {
 				trigger = s.testTrigger
