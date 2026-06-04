@@ -41,7 +41,7 @@ Located in: `internal/cli` and `internal/commands`
 - Output rendering
 - Session flow
 
-*Example Commands:* `wizard discover`, `wizard apply`, `wizard status`, `wizard --uninstall`
+*Example Commands:* `wizard discover`, `wizard apply`, `wizard status`, `wizard uninstall`
 
 ### Discovery Engine
 Located in: `core/discovery`

@@ -23,7 +23,6 @@ func main() {
 func run() error {
 	cli.SetupUsage()
 
-	uninstallPtr := flag.Bool("uninstall", false, "Tear down and remove all managed sensors from this node")
 	forcePtr := flag.Bool("force", false, "Bypass confirmation prompts (useful for automation)")
 	linkURL := flag.String("link", "", "Hub URL to link to (e.g., https://hub.honeywire.local)")
 	apiKeyPtr := flag.String("api-key", "", "Node API key (for linking to an existing node)")
@@ -34,15 +33,6 @@ func run() error {
 
 	if warning, _ := system.CheckRoot(); warning != "" {
 		return fmt.Errorf("Wizard must be run as root (sudo) for system analysis and sensor deployment.")
-	}
-
-	if *uninstallPtr {
-		err := commands.HandleTeardown(*forcePtr)
-		if err == nil {
-			fmt.Printf("\n  Some HoneyWire sensors may have created host-side artifacts or decoy files.\n")
-			fmt.Printf("    Review your deployment configuration and remove any remaining files manually if desired.\n\n")
-		}
-		return err
 	}
 
 	if *linkURL != "" {
@@ -65,6 +55,13 @@ func run() error {
 		return commands.HandleStatus()
 	case "relink":
 		return commands.HandleRelink(args[1:])
+	case "uninstall":
+		err := commands.HandleTeardown(*forcePtr)
+		if err == nil {
+			fmt.Printf("\n  Some HoneyWire sensors may have created host-side artifacts or decoy files.\n")
+			fmt.Printf("    Review your deployment configuration and remove any remaining files manually if desired.\n\n")
+		}
+		return err
 	default:
 		return fmt.Errorf("unknown command: %s", args[0])
 	}

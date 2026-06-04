@@ -69,7 +69,7 @@ make test
 To tear down managed deception infrastructure:
 
 ```bash
-./build/wizard --uninstall
+./build/wizard uninstall
 ```
 
 This safely removes the managed compose deployment and leaves the host in a clean state.

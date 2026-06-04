@@ -8,7 +8,7 @@ For a conceptual overview of how the Wizard operates, see `Docs/architecture/wiz
 
 ## 1. Adding a New CLI Command
 
-The Wizard CLI is strictly organized into operational commands (`apply`, `discover`, `status`, `relink`) and bootstrap commands (`--link`, `--uninstall`).
+The Wizard CLI is strictly organized into operational commands (`apply`, `discover`, `status`, `relink`, `uninstall`) and bootstrap commands (`--link`).
 
 If you need to add a new command (e.g., `wizard verify`):
 

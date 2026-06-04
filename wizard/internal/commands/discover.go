@@ -3,7 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
-	
+
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
@@ -11,8 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	
-    // codeql[go/xss] CLI tool generating local text files, not HTML.
+
+	// codeql[go/xss] CLI tool generating local text files, not HTML.
 	// nosemgrep: go.lang.security.audit.xss.import-text-template.import-text-template
 	"text/template"
 	"time"
@@ -85,7 +85,7 @@ promptLoop:
 			return nil
 		}
 
-		choice, err := cli.PromptInput(fmt.Sprintf("    Apply all %d sensor suggestions? (or 'e' Edit) [y/N/e]: ", len(recommendations)))
+		choice, err := cli.PromptInput(fmt.Sprintf("    Apply all %s%d%s sensor suggestions? (or 'e' Edit) [y/N/e]: ", cli.Green, len(recommendations), cli.Reset))
 		if err != nil {
 			return err
 		}
@@ -211,6 +211,16 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation) error {
 	}
 
 	fmt.Printf("    %s✅ Node reconciled. Run 'docker compose -f %s -p %s ps' to view sensors.%s\n\n", cli.Green, filepath.Join(deploy.DeployDir, deploy.ComposeFile), deploy.ProjectName, cli.Reset)
+
+	if cli.IsTerminal() {
+		if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+			return HandleFiredrill()
+		}
+		fmt.Printf("\n    %sRun 'wizard firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
+	} else {
+		fmt.Printf("    %sRun 'wizard firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
+	}
+
 	return nil
 }
 

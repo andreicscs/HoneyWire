@@ -5,7 +5,7 @@ import (
 )
 
 func ShowOnboarding() error {
-	fmt.Printf("\n%s%s=== HoneyWire Wizard v2.0 ===%s\n\n", Bold, Cyan, Reset)
+	fmt.Printf("\n%s%s=== HoneyWire Wizard ===%s\n\n", Bold, Cyan, Reset)
 	fmt.Printf("    %sNo node provisioned.%s\n\n", Red, Reset)
 	fmt.Printf("    Get started:\n\n")
 	fmt.Printf("      %swizard --link https://hub.example.com%s\n", Cyan, Reset)

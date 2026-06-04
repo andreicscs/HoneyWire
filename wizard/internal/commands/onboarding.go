@@ -55,7 +55,7 @@ func HandleInteractiveMenu(force bool) error {
 		fmt.Printf("%s[!] Warning: Could not reach Hub: %v%s\n\n", cli.Yellow, err, cli.Reset)
 	}
 
-	fmt.Printf("\n%s%s=== HoneyWire Wizard v2.0 ===%s\n\n", cli.Bold, cli.Cyan, cli.Reset)
+	fmt.Printf("\n%s%s=== HoneyWire Wizard ===%s\n\n", cli.Bold, cli.Cyan, cli.Reset)
 
 	if nodeInfo != nil {
 		fmt.Printf("    %sExisting HoneyWire node detected%s\n\n", cli.Bold, cli.Reset)
@@ -74,7 +74,8 @@ func HandleInteractiveMenu(force bool) error {
 	fmt.Printf("      %s[3]%s Show node status\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[4]%s Trigger firedrill (live test)\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[5]%s Re-link node\n", cli.Cyan, cli.Reset)
-	fmt.Printf("      %s[6]%s Exit\n\n", cli.Red, cli.Reset)
+	fmt.Printf("      %s[6]%s Uninstall node\n", cli.Red, cli.Reset)
+	fmt.Printf("      %s[7]%s Exit\n\n", cli.Dim, cli.Reset)
 
 	choice, err := cli.PromptInput("    Choice: ")
 	if err != nil {
@@ -93,6 +94,13 @@ func HandleInteractiveMenu(force bool) error {
 	case "5":
 		return HandleRelink(nil)
 	case "6":
+		err := HandleTeardown(force)
+		if err == nil {
+			fmt.Printf("\n  Some HoneyWire sensors may have created host-side artifacts or decoy files.\n")
+			fmt.Printf("    Review your deployment configuration and remove any remaining files manually if desired.\n\n")
+		}
+		return err
+	case "7":
 		fmt.Printf("\n")
 		return nil
 	default:

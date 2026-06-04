@@ -24,6 +24,7 @@ func SetupUsage() {
 		printUsage("  %sfiredrill%s  Trigger live test mode on all installed sensors\n", Cyan, Reset)
 		printUsage("  %sstatus%s     Show linked node, sync state, and installed sensors\n", Cyan, Reset)
 		printUsage("  %srelink%s     Replace local node identity with a new node\n", Cyan, Reset)
+		printUsage("  %suninstall%s  Tear down sensors and remove node identity\n", Red, Reset)
 
 		printUsage("\nBootstrap:\n")
 		printUsage("  %s--link <hub>%s                  Create new node and link to Hub\n", Cyan, Reset)
@@ -32,7 +33,6 @@ func SetupUsage() {
 		printUsage("  %s--link <hub> --api-key <key>%s  Link to existing node\n", Cyan, Reset)
 
 		printUsage("\nOther:\n")
-		printUsage("  %s--uninstall%s  Tear down sensors and remove node identity\n", Red, Reset)
 		printUsage("  %s--force%s      Bypass confirmation prompts (useful for automation)\n", Cyan, Reset)
 
 		printUsage("\nEnvironment:\n")

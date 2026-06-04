@@ -166,9 +166,12 @@ func linkExistingNode(hubURL, apiKey string) error {
 
 	if cli.IsTerminal() {
 		if cli.ConfirmAction("Apply Hub's desired state now") {
-			if err := HandleApply(); err == nil {
-				if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+			if applied, err := ApplyDesiredState(); err == nil {
+				if applied && cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
 					return HandleFiredrill()
+				}
+				if applied {
+					fmt.Printf("\n    %sRun 'wizard firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
 				}
 			}
 			return nil
@@ -245,15 +248,10 @@ func provisionNewNode(hubURL, customAlias, tagsStr string) error {
 	fmt.Printf("\n%s✅ Node provisioned and identity saved.%s\n", cli.Green, cli.Reset)
 
 	if cli.IsTerminal() {
-		if cli.ConfirmAction("Apply Hub's desired state now") {
-			if err := HandleApply(); err == nil {
-				if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
-					return HandleFiredrill()
-				}
-			}
-			return nil
+		if cli.ConfirmAction("Run host discovery now") {
+			return HandleDiscover(false)
 		}
 	}
-	fmt.Printf("    %sRun 'wizard apply' to deploy existing sensors, or 'wizard discover' to add new ones.%s\n\n", cli.Dim, cli.Reset)
+	fmt.Printf("    %sRun 'wizard discover' to audit the host and add new sensors.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
