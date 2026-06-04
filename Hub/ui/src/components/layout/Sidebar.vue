@@ -1,5 +1,6 @@
 <script setup>
 import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../../stores/System/app'
 import { useEventsStore } from '../../stores/Events/events'
 import { useFleetStore } from '../../stores/Fleet/fleet'
@@ -8,7 +9,10 @@ const appStore = useAppStore()
 const eventsStore = useEventsStore()
 const fleetStore = useFleetStore()
 
-const { currentView, sidebarOpen, viewingArchive, version } = storeToRefs(appStore)
+const route = useRoute()
+const router = useRouter()
+
+const { sidebarOpen, viewingArchive, version } = storeToRefs(appStore)
 
 const clearLogs = async () => {
     try {
@@ -32,7 +36,6 @@ const clearLogs = async () => {
             if (!response.ok) throw new Error(`Server error: ${response.status}`)
             
             eventsStore.purgeEvents()
-            fleetStore.fetchFleet() // Refresh node & sensor stats (e.g., Event Volume 24h)
             
             alert("Database purged successfully.")
         }
@@ -44,7 +47,7 @@ const clearLogs = async () => {
 
 const goToDashboard = () => {
     fleetStore.clearSelection()
-    appStore.setView('dashboard')
+    router.push('/dashboard')
 }
 </script>
 
@@ -67,7 +70,7 @@ const goToDashboard = () => {
             <button @click="goToDashboard" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="currentView === 'dashboard' ? 'bg-secondary-selected  shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
+                    :class="route.name === 'dashboard' ? 'bg-secondary-selected  shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
                     :title="!sidebarOpen ? 'Dashboard' : ''">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
@@ -76,10 +79,10 @@ const goToDashboard = () => {
                 </div>
             </button>
             
-            <button @click="appStore.setView('fleet')" 
+            <button @click="router.push('/fleet')" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="currentView === 'fleet' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
+                    :class="route.name === 'fleet' || route.name === 'node-detail' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
                     :title="!sidebarOpen ? 'Fleet Management' : ''">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
@@ -88,10 +91,10 @@ const goToDashboard = () => {
                 </div>
             </button>
 
-            <button @click="appStore.setView('settings')" 
+            <button @click="router.push('/settings')" 
                     type="button"
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="currentView === 'settings' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
+                    :class="route.name === 'settings' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
                     :title="!sidebarOpen ? 'Settings' : ''">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"

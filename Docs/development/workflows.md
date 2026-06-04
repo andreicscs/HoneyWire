@@ -55,9 +55,9 @@ HoneyWire uses CQRS-style projections for analytics to avoid complex front-end d
 2. Break down complex parts into reusable widgets in `ui/src/components/`.
 
 **Step 2: Register the View**
-*Note: HoneyWire currently does not use a dedicated frontend router. Views are conditionally rendered.*
-1. Open the main layout orchestrator (e.g., `ui/src/App.vue` or the main shell component).
-2. Add your new view to the `v-if` / `v-else-if` conditional rendering logic linked to the active UI state (like `currentView`).
+1. Open the Vue Router configuration file at `ui/src/index.ts`.
+2. Add your new view to the `routes` array using a dynamic import (e.g., `{ path: '/new-feature', name: 'new-feature', component: () => import('./views/NewFeature.vue') }`).
+3. Update navigation components (like `ui/src/components/layout/Sidebar.vue`) to use `router.push('/new-feature')` to navigate to your new page.
 
 **Step 3: Wire State Management**
 1. If the page requires complex state, create a new file in `ui/src/stores/` using Pinia.

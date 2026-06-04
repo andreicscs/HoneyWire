@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { api, ApiError } from '../../api/client'
 
 export type SessionState = 'unknown' | 'authenticated' | 'unauthenticated'
-export type ViewState = 'dashboard' | 'fleet' | 'settings' | 'node-detail'
 
 export interface SystemStatePayload {
   isArmed?: boolean
@@ -18,7 +17,6 @@ export interface AppState {
   version: string
   viewingArchive: boolean
   sidebarOpen: boolean
-  currentView: ViewState
   activeTimeframe: string
   velocityTimeframe: string
   sessionState: SessionState
@@ -36,7 +34,6 @@ export const useAppStore = defineStore('app', () => {
     version: '1.0.0',
     viewingArchive: false,
     sidebarOpen: true,
-    currentView: 'dashboard',
     activeTimeframe: '24H',
     velocityTimeframe: '24H',
     sessionState: 'unknown',
@@ -79,7 +76,6 @@ export const useAppStore = defineStore('app', () => {
   const version = computed<string>(() => state.value.version)
   const viewingArchive = computed<boolean>(() => state.value.viewingArchive)
   const sidebarOpen = computed<boolean>(() => state.value.sidebarOpen)
-  const currentView = computed<ViewState>(() => state.value.currentView)
   const activeTimeframe = computed<string>(() => state.value.activeTimeframe)
   const velocityTimeframe = computed<string>(() => state.value.velocityTimeframe)
   const sessionState = computed<SessionState>(() => state.value.sessionState)
@@ -183,7 +179,6 @@ export const useAppStore = defineStore('app', () => {
     } catch (err) {
       console.error('Logout request failed', err)
     } finally {
-      transitionSession('unauthenticated')
       window.location.href = '/'
     }
   }
@@ -263,7 +258,6 @@ export const useAppStore = defineStore('app', () => {
     }
   }
   const toggleSidebar = (): void => { state.value.sidebarOpen = !state.value.sidebarOpen }
-  const setView = (view: ViewState): void => { state.value.currentView = view }
   const toggleArchive = (): void => { state.value.viewingArchive = !state.value.viewingArchive }
   const setVelocityTimeframe = (timeframe: string): void => { state.value.velocityTimeframe = timeframe }
 
@@ -274,11 +268,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    isArmed, version, viewingArchive, sidebarOpen, currentView, 
+    isArmed, version, viewingArchive, sidebarOpen, 
     activeTimeframe, velocityTimeframe, sessionState, 
     authError, setupError, requiresSetup, isInitialized, bootstrapError,
     isAuthenticated, isReady, isBootstrapping, canAccessDashboard,
-    toggleTheme, toggleSidebar, setView, toggleArchive, setVelocityTimeframe,
+    toggleTheme, toggleSidebar, toggleArchive, setVelocityTimeframe,
     toggleArmed, changePassword, factoryReset, login, logout, completeSetup,
     initAppStore, fetchSystemState, enableDebugSetup
   }

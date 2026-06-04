@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -86,6 +87,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		// Telemetry & State (For UI Dashboards)
 		r.Get("/api/v1/events/severity", cfg.Analytics.GetSeverityAnalytics)
 		r.Get("/api/v1/events/velocity", cfg.Analytics.GetVelocityAnalytics)
+		r.Get("/api/v1/events/summary", cfg.Analytics.GetSummaryAnalytics)
 		r.Get("/api/v1/events", cfg.Events.GetEvents)
 		r.Get("/api/v1/uptime", cfg.Analytics.GetUptime)
 		r.Get("/api/v1/system/state", cfg.Config.GetSystemState)
@@ -119,7 +121,25 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 	}
 
 	fileServer := http.FileServer(http.FS(distFS))
-	r.Handle("/*", fileServer)
+	r.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. Strict API Protection: Never return HTML for missing API routes
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+
+		// 2. Check if the static file exists in the embedded filesystem
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "."
+		}
+		if _, err := fs.Stat(distFS, path); err != nil {
+			// 3. SPA Fallback: Serve index.html for frontend routes
+			r.URL.Path = "/"
+		}
+
+		fileServer.ServeHTTP(w, r)
+	}))
 
 	return r, nil
 }

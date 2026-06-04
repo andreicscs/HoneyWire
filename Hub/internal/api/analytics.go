@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/honeywire/hub/internal/projections/severity"
+	"github.com/honeywire/hub/internal/projections/summary"
 	"github.com/honeywire/hub/internal/projections/uptime"
 	"github.com/honeywire/hub/internal/projections/velocity"
 	"github.com/honeywire/hub/internal/store"
@@ -35,6 +36,34 @@ func (h *AnalyticsHandler) GetVelocityAnalytics(w http.ResponseWriter, r *http.R
 	projector := velocity.NewProjector(h.Store)
 	projection, err := projector.BuildThreatVelocityProjection(r.Context(), timeframe, nodeID, sensorID, viewingArchive)
 	if err != nil {
+		RespondError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, projection)
+}
+
+func (h *AnalyticsHandler) GetSummaryAnalytics(w http.ResponseWriter, r *http.Request) {
+	timeframe := r.URL.Query().Get("timeframe")
+	if timeframe == "" {
+		timeframe = "24H"
+	}
+	nodeID := r.URL.Query().Get("nodeId")
+	sensorID := r.URL.Query().Get("sensorId")
+
+	viewingArchiveStr := r.URL.Query().Get("archived")
+	viewingArchive := 0
+	if viewingArchiveStr == "true" || viewingArchiveStr == "1" {
+		viewingArchive = 1
+	}
+
+	projector := summary.NewProjector(h.Store)
+	projection, err := projector.BuildSummaryProjection(r.Context(), timeframe, nodeID, sensorID, viewingArchive)
+	if err != nil {
+		if err.Error() == "not_found" {
+			RespondError(w, "Node not found", http.StatusNotFound)
+			return
+		}
 		RespondError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

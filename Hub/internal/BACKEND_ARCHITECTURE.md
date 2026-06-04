@@ -41,6 +41,10 @@ The entry point for all network requests.
   * Extracts credentials (Cookies, Bearer tokens), validates them via the `auth.Service`, and attaches the resulting `nodeID` to the `http.Request` context.
 * **Router (`router.go`):**
   * Maps HTTP routes to specific Handlers and applies Middleware groups.
+  * **SPA Routing & Frontend Embedding:** The router serves the compiled Vue 3 frontend using `go:embed`. It implements a secure Single Page Application fallback:
+    1. **Strict API Protection:** Requests prefixed with `/api/` return strict 404s if unmatched, preventing HTML from leaking into API clients.
+    2. **Static Assets:** Existing static files (e.g., `.css`, `.js`) are served normally from the embedded filesystem.
+    3. **SPA Fallback:** Any unrecognized non-API route transparently falls back to `index.html`, allowing the Vue Router to manage history mode URLs (like `/dashboard`) without server-side 404 errors.
 
 ### 2. Domain Service Layer (`internal/services`)
 The brain of the application. Everything in `internal/services/*` is framework-agnostic.

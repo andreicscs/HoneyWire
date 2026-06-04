@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 
 import Sidebar from './components/layout/Sidebar.vue'
 import Header from './components/layout/Header.vue'
-import Dashboard from './views/Dashboard.vue'
-import FleetView from './views/FleetManagement.vue'
-import NodeDetailView from './views/NodeDetails.vue'
-import Login from './views/Login.vue'
-import Settings from './views/Settings.vue'
 import Setup from './views/Setup.vue'
+import Login from './views/Login.vue'
 
 import { useConfigStore } from './stores/Config/config'
 import { useAppStore } from './stores/System/app'
@@ -22,7 +19,10 @@ const appStore = useAppStore()
 const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
 
-const { isInitialized, requiresSetup, isAuthenticated, currentView, viewingArchive, bootstrapError } = storeToRefs(appStore)
+const router = useRouter()
+const route = useRoute()
+
+const { isInitialized, requiresSetup, isAuthenticated, viewingArchive, bootstrapError } = storeToRefs(appStore)
 
 watch([viewingArchive, () => fleetStore.selectedNode?.id, () => fleetStore.selectedSensor?.sensorId],
   ([isArchived, nodeId, sensorId]) => {
@@ -51,8 +51,8 @@ const loadAppData = async () => {
     // TODO: REMOVE DEBUG OVERRIDE BEFORE PRODUCTION
     // You can test the "First Startup" UI state at any time by running:
     // localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
-    if ((fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true') && appStore.currentView !== 'fleet') {
-      appStore.setView('fleet')
+    if ((fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true') && route.name !== 'fleet') {
+      router.push('/fleet')
     }
 
     wsService.on('onNewEvent', (payload: any) => {
@@ -163,10 +163,7 @@ onUnmounted(() => {
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
       <Header />
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
-        <Dashboard v-if="currentView === 'dashboard'" />
-        <FleetView v-else-if="currentView === 'fleet'" />
-        <NodeDetailView v-else-if="currentView === 'node-detail'" />
-        <Settings v-else-if="currentView === 'settings'" />
+        <router-view />
       </div>
     </main>
   </div>

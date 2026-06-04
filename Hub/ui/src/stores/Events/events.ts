@@ -41,6 +41,12 @@ export interface ThreatVelocityProjection {
   recentEventCount: number
 }
 
+export interface SummaryProjection {
+  timeframe: string
+  totalEvents: number
+  bySensor: Record<string, number>
+}
+
 export interface EventsState {
   events: EventPayload[]
   unreadCount: number
@@ -48,12 +54,15 @@ export interface EventsState {
   isFetching: boolean
   severityProjection: SeverityProjection | null
   threatVelocityProjection: ThreatVelocityProjection | null
+  summaryProjection: SummaryProjection | null
   isFetchingThreatVelocityProjection: boolean
+  isFetchingSummaryProjection: boolean
   lastVelocityInvalidation: number | null
 }
 
 let severityAbortController: AbortController | null = null
 let velocityAbortController: AbortController | null = null
+let summaryAbortController: AbortController | null = null
 
 // --- NORMALIZATION ---
 const normalizeEvent = (e: any): EventPayload => {
@@ -75,7 +84,9 @@ export const useEventsStore = defineStore('events', () => {
     isFetching: false,
     severityProjection: null,
     threatVelocityProjection: null,
+    summaryProjection: null,
     isFetchingThreatVelocityProjection: false,
+    isFetchingSummaryProjection: false,
     lastVelocityInvalidation: null
   })
 
@@ -91,7 +102,9 @@ export const useEventsStore = defineStore('events', () => {
   const isFetching = computed<boolean>(() => state.value.isFetching)
   const severityProjection = computed<SeverityProjection | null>(() => state.value.severityProjection)
   const threatVelocityProjection = computed<ThreatVelocityProjection | null>(() => state.value.threatVelocityProjection)
+  const summaryProjection = computed<SummaryProjection | null>(() => state.value.summaryProjection)
   const isFetchingThreatVelocityProjection = computed<boolean>(() => state.value.isFetchingThreatVelocityProjection)
+  const isFetchingSummaryProjection = computed<boolean>(() => state.value.isFetchingSummaryProjection)
   const lastVelocityInvalidation = computed<number | null>(() => state.value.lastVelocityInvalidation)
 
   /**
@@ -193,6 +206,25 @@ export const useEventsStore = defineStore('events', () => {
     }
   }
 
+  const fetchSummaryProjection = async (timeframe: string = '24H', nodeId: string | null = null, sensorId: string | null = null): Promise<void> => {
+    if (summaryAbortController) summaryAbortController.abort()
+    summaryAbortController = new AbortController()
+
+    try {
+      state.value.isFetchingSummaryProjection = true
+      const params = new URLSearchParams({ timeframe, archived: appStore.viewingArchive ? 'true' : 'false' })
+      if (nodeId) params.append('nodeId', nodeId)
+      if (sensorId) params.append('sensorId', sensorId)
+
+      const response = await api.get(`/api/v1/events/summary?${params.toString()}`, { signal: summaryAbortController.signal })
+      state.value.summaryProjection = (await response.json()) as SummaryProjection
+    } catch (e: any) {
+      if (e.name !== 'AbortError') console.error('Summary fetch failed:', e)
+    } finally {
+      state.value.isFetchingSummaryProjection = false
+    }
+  }
+
   const invalidateThreatVelocityProjection = (): void => {
     state.value.lastVelocityInvalidation = Date.now()
   }
@@ -260,7 +292,12 @@ export const useEventsStore = defineStore('events', () => {
 
     // Refetch analytics projections so the charts zero out
     fetchSeverityProjection('alltime', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+    fetchSummaryProjection('24H', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
     invalidateThreatVelocityProjection()
+  }
+
+  const clearSummaryProjection = (): void => {
+    state.value.summaryProjection = null
   }
 
   const handleWsEvent = (rawPayload: any): void => {
@@ -286,6 +323,7 @@ export const useEventsStore = defineStore('events', () => {
 
     if (affectsCurrentView) {
       fetchSeverityProjection('alltime', selectedNode?.id, selectedSensor?.sensorId)
+      fetchSummaryProjection('24H', selectedNode?.id, selectedSensor?.sensorId)
       invalidateThreatVelocityProjection()
     }
   }
@@ -297,18 +335,22 @@ export const useEventsStore = defineStore('events', () => {
     isFetching,
     severityProjection,
     threatVelocityProjection,
+    summaryProjection,
     isFetchingThreatVelocityProjection,
+    isFetchingSummaryProjection,
     lastVelocityInvalidation,
     filteredEvents,
     fetchEvents,
     fetchSeverityProjection,
     fetchThreatVelocityProjection,
+    fetchSummaryProjection,
     invalidateThreatVelocityProjection,
     markAllRead,
     markEventRead,
     archiveEvent,
     archiveAll,
     purgeEvents,
+    clearSummaryProjection,
     handleWsEvent,
   }
 })

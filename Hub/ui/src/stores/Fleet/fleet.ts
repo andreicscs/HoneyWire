@@ -8,7 +8,6 @@ export interface RawSensorPayload {
   customName?: string
   status?: string
   isSilenced?: boolean
-  events24h?: number
   envVars?: Record<string, any>
   metadata?: Record<string, any>
   lastHeartbeat?: string | null
@@ -59,7 +58,6 @@ export interface InstalledSensor {
   display: string
   status: string
   isSilenced: boolean
-  events24h: number
   envVars: Record<string, any>
   metadata: Record<string, any>
   lastHeartbeat: string | null
@@ -365,7 +363,6 @@ export const useFleetStore = defineStore('fleet', () => {
       display: raw.customName || rawId,
       status: raw.status || 'down',
       isSilenced: raw.isSilenced ?? false,
-      events24h: raw.events24h ?? 0,
       envVars: raw.envVars || {},
       metadata: raw.metadata || {},
       lastHeartbeat: raw.lastHeartbeat || null,
@@ -442,17 +439,7 @@ export const useFleetStore = defineStore('fleet', () => {
     }
 
     if (type === 'NEW_EVENT') {
-      const compositeSensorId = `${payload.nodeId}:${payload.sensorId}`
       patchNode(payload.nodeId, { lastEvent: 'Just now' })
-      
-      if (payload.events24h !== undefined) {
-        patchSensor(compositeSensorId, { events24h: payload.events24h })
-      } else {
-        const sensor = getSensor(payload.nodeId, payload.sensorId)
-        if (sensor) {
-          patchSensor(compositeSensorId, { events24h: (sensor.events24h || 0) + 1 })
-        }
-      }
       return
     }
 

@@ -1,12 +1,14 @@
 <script setup>
 import { storeToRefs } from 'pinia'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '../../stores/System/app'
 import { useEventsStore } from '../../stores/Events/events'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
+const route = useRoute()
 
-const { currentView, isArmed } = storeToRefs(appStore)
+const { isArmed } = storeToRefs(appStore)
 const { unreadCount } = storeToRefs(eventsStore)
 
 const handleMarkAllRead = async () => {
@@ -38,7 +40,7 @@ const handleMarkAllRead = async () => {
                 <span class="text-h1 font-medium text-text-h leading-none tracking-wide">HoneyWire</span>
             </div>
             
-            <h2 class="text-base  text-text-m font-medium capitalize hidden sm:block">{{ currentView?.replace('-', ' ') }}</h2>
+    <h2 class="text-base  text-text-m font-medium capitalize hidden sm:block">{{ String(route.name || '')?.replace('-', ' ') }}</h2>
         </div>
         
         <div class="flex items-center gap-3">

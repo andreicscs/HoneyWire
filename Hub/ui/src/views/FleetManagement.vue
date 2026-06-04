@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useAppStore } from '../stores/System/app.ts'
+import { useRouter } from 'vue-router'
 import { useFleetStore } from '../stores/Fleet/fleet.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
@@ -10,8 +10,8 @@ import FleetSkeleton from '../components/fleetmanagement/FleetSkeleton.vue'
 import FleetDeployModal from '../components/fleetmanagement/FleetDeployModal.vue'
 import FleetNodeWidget from '../components/fleetmanagement/FleetNodeWidget.vue'
 
-const appStore = useAppStore()
 const fleetStore = useFleetStore()
+const router = useRouter()
 
 // --- MANIFEST CATALOG ---
 const isManifestLoading = ref(true)
@@ -72,7 +72,7 @@ const handleForgetNode = async (nodeId: string) => {
 
 const handleOpenNodeDetail = (nodeId: string) => {
     fleetStore.selectTarget(nodeId, null, false)
-    appStore.setView('node-detail')
+    router.push({ name: 'node-detail', params: { id: nodeId } })
 }
 
 </script>

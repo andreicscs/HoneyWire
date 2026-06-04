@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted } from 'vue'
-import { useAppStore } from '../stores/System/app.ts'
+import { useRoute, useRouter } from 'vue-router'
 import { useFleetStore } from '../stores/Fleet/fleet.ts'
 import { useEventsStore } from '../stores/Events/events.ts'
+import { useAppStore } from '../stores/System/app.ts'
 import { useConfigStore } from '../stores/Config/config.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
 
@@ -14,10 +15,12 @@ import NodeKeyModal from '../components/nodedetails/NodeKeyModal.vue'
 import NodeSyncModal from '../components/nodedetails/NodeSyncModal.vue'
 import NodeSensorModal from '../components/nodedetails/NodeSensorModal.vue'
 
-const appStore = useAppStore()
 const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
 const configStore = useConfigStore()
+const appStore = useAppStore()
+const route = useRoute()
+const router = useRouter()
 
 const selectedNodeId = computed(() => fleetStore.selectedNodeId)
 
@@ -148,7 +151,7 @@ const handleDeleteNode = async () => {
     if (confirm(`Delete node "${node.value.alias}"? This cannot be undone.`)) {
         const res = await fleetStore.deleteNode(node.value.id)
         if (res.success) {
-            appStore.setView('fleet')
+            router.push('/fleet')
         } else {
             alert(res.error)
         }
@@ -157,20 +160,29 @@ const handleDeleteNode = async () => {
 
 const viewAllEvents = () => {
     // Keeps the current node selected in the fleetStore to act as a filter
-    appStore.setView('dashboard')
+    router.push('/dashboard')
 }
 
 // --- NAVIGATION ---
 
-watch(selectedNodeId, async (value) => {
-    if (!value) {
-        if (appStore.currentView === 'node-detail') {
-            appStore.setView('fleet')
+watch(() => route.params.id, async (newId, oldId) => {
+    if (newId) {
+        if (newId !== oldId) {
+            eventsStore.clearSummaryProjection()
         }
-        return
+        fleetStore.selectTarget(newId as string, null, false)
+        await Promise.all([
+            fleetStore.fetchNodeDetails(newId as string),
+            eventsStore.fetchSummaryProjection('24H', newId as string)
+        ])
     }
-        await fleetStore.fetchNodeDetails(value)
 }, { immediate: true })
+
+watch(() => appStore.viewingArchive, async () => {
+    if (route.params.id) {
+        await eventsStore.fetchSummaryProjection('24H', route.params.id as string)
+    }
+})
 
 const timeAgo = (dateStr: string) => {
     if (!dateStr) return 'Unknown'
@@ -271,7 +283,7 @@ const closeSensor = () => {
     <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
         
         <div class="mt-4 sm:mt-6 mb-4 shrink-0">
-            <button @click="fleetStore.clearSelection()" class="flex items-center gap-1.5 text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none w-max">
+            <button @click="fleetStore.clearSelection(); router.push('/fleet')" class="flex items-center gap-1.5 text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none w-max">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 Back to Fleet
             </button>

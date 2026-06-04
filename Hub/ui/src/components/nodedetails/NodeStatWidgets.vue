@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatSensorId } from '../../utils/formatSensorId'
+import { useEventsStore } from '../../stores/Events/events'
 
 const props = defineProps<{
     node: any,
@@ -11,14 +12,20 @@ const emit = defineEmits<{
     (e: 'viewAllEvents'): void
 }>()
 
+const eventsStore = useEventsStore()
+
 const maxSensorEvents = computed(() => {
-  const sensors = props.node?.installedSensors || []
-  if (sensors.length === 0) return 1
-  return Math.max(...sensors.map((s: any) => s.events24h || 0), 1)
+  const summary = eventsStore.summaryProjection
+  if (!summary || !summary.bySensor) return 1
+  const values = Object.values(summary.bySensor)
+  if (values.length === 0) return 1
+  return Math.max(...values, 1)
 })
 
 const topSensors = computed(() => {
+  const summary = eventsStore.summaryProjection
   return [...(props.node?.installedSensors || [])]
+    .map((s: any) => ({ ...s, events24h: summary?.bySensor?.[s.sensorId] || 0 }))
     .sort((a: any, b: any) => (b.events24h || 0) - (a.events24h || 0))
 })
 
