@@ -3,37 +3,36 @@ package models
 // SetupPayload represents the initial setup POST request
 type SetupPayload struct {
 	Password    string `json:"password"`
-	HubEndpoint string `json:"hub_endpoint"`
-	HubKey      string `json:"hub_key"`
+	HubEndpoint string `json:"hubEndpoint"`
+	HubKey      string `json:"hubKey"`
 }
 
 // ConfigPayload represents the runtime configuration of the Hub
 type ConfigPayload struct {
-	HubEndpoint     string   `json:"hub_endpoint"`
-	HubKey          string   `json:"hub_key"`
-	AutoArchiveDays int      `json:"auto_archive_days"`
-	AutoPurgeDays   int      `json:"auto_purge_days"`
-	WebhookURL      string   `json:"webhook_url"`
-	WebhookType     string   `json:"webhook_type"`
-	WebhookEvents   []string `json:"webhook_events"`
-	SiemAddress     string   `json:"siem_address"`
-	SiemProtocol    string   `json:"siem_protocol"`
+	HubEndpoint     string   `json:"hubEndpoint"`
+	AutoArchiveDays int      `json:"autoArchiveDays"`
+	AutoPurgeDays   int      `json:"autoPurgeDays"`
+	WebhookURL      string   `json:"webhookUrl"`
+	WebhookType     string   `json:"webhookType"`
+	WebhookEvents   []string `json:"webhookEvents"`
+	SiemAddress     string   `json:"siemAddress"`
+	SiemProtocol    string   `json:"siemProtocol"`
 }
 
 type Event struct {
-    ID              int                    `json:"id,omitempty"`
-    NodeID          string                 `json:"nodeId,omitempty"`
-    SensorID        string                 `json:"sensorId"`       
-    Timestamp       string                 `json:"timestamp"`
-    ContractVersion string                 `json:"contractVersion"`
-    EventTrigger    string                 `json:"eventTrigger"`   
-    Severity        string                 `json:"severity"`
-    Source          string                 `json:"source"`
-    Target          string                 `json:"target"`
-    Details         map[string]interface{} `json:"details"`
-    IsRead          bool                   `json:"isRead"`         
-    IsArchived      bool                   `json:"isArchived"`     
-    Count           int                    `json:"count"`
+	ID              int                    `json:"id,omitempty"`
+	NodeID          string                 `json:"nodeId,omitempty"`
+	SensorID        string                 `json:"sensorId"`
+	Timestamp       string                 `json:"timestamp"`
+	ContractVersion string                 `json:"contractVersion"`
+	EventTrigger    string                 `json:"eventTrigger"`
+	Severity        string                 `json:"severity"`
+	Source          string                 `json:"source"`
+	Target          string                 `json:"target"`
+	Details         map[string]interface{} `json:"details"`
+	IsRead          bool                   `json:"isRead"`
+	IsArchived      bool                   `json:"isArchived"`
+	Count           int                    `json:"count"`
 }
 
 // Heartbeat represents a routine ping from a sensor
@@ -72,27 +71,22 @@ type NodeSensor struct {
 	Metadata      map[string]interface{} `json:"metadata"`
 }
 
-// SystemState represents global hub settings
-type SystemState struct {
-	IsArmed bool `json:"is_armed"`
-}
-
 
 // *** manifests ***
 
 type SensorManifest struct {
-	ID                 string        `json:"id"`
-	Version            string        `json:"version"`
-	SchemaVersion      string        `json:"schema_version"`
-	MinWizardVersion   string        `json:"min_wizard_version"`
-	Name               string        `json:"name"`
-	Category           string        `json:"category"`
-	OSILayer           string        `json:"osi_layer"`
-	IconSVG            string        `json:"icon_svg"`
-	Description        string        `json:"description"`
-	Documentation      Documentation `json:"documentation"`
-	Heuristics         Heuristics    `json:"heuristics"`
-	Deployment         Deployment    `json:"deployment"`
+	ID               string        `json:"id"`
+	Version          string        `json:"version"`
+	SchemaVersion    string        `json:"schema_version"`
+	MinWizardVersion string        `json:"min_wizard_version"`
+	Name             string        `json:"name"`
+	Category         string        `json:"category"`
+	OSILayer         string        `json:"osi_layer"`
+	IconSVG          string        `json:"icon_svg"`
+	Description      string        `json:"description"`
+	Documentation    Documentation `json:"documentation"`
+	Heuristics       Heuristics    `json:"heuristics"`
+	Deployment       Deployment    `json:"deployment"`
 }
 
 type Documentation struct {

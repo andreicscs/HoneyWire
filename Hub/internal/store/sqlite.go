@@ -115,13 +115,13 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 func InitializeDefaultConfig(db *sql.DB) error {
 	defaults := map[string]string{
 		"is_armed":          "true",
-		"webhook_type":      "none",
+		"webhook_type":      "ntfy",
 		"webhook_url":       "",
-		"webhook_events":    "[]",
-		"auto_archive_days": "90",
-		"auto_purge_days":   "180",
+		"webhook_events":    "critical,high,medium,low",
+		"auto_archive_days": "0",
+		"auto_purge_days":   "0",
 		"siem_address":      "",
-		"siem_protocol":     "syslog",
+		"siem_protocol":     "tcp",
 	}
 
 	tx, err := db.Begin()
