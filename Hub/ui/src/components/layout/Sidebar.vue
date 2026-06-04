@@ -32,6 +32,8 @@ const clearLogs = async () => {
             if (!response.ok) throw new Error(`Server error: ${response.status}`)
             
             eventsStore.purgeEvents()
+            fleetStore.fetchFleet() // Refresh node & sensor stats (e.g., Event Volume 24h)
+            
             alert("Database purged successfully.")
         }
     } catch (error) {

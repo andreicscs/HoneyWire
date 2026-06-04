@@ -257,6 +257,10 @@ export const useEventsStore = defineStore('events', () => {
   const purgeEvents = (): void => {
     state.value.events = []
     state.value.unreadCount = 0
+
+    // Refetch analytics projections so the charts zero out
+    fetchSeverityProjection('alltime', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+    invalidateThreatVelocityProjection()
   }
 
   const handleWsEvent = (rawPayload: any): void => {
