@@ -187,7 +187,8 @@ export const useAppStore = defineStore('app', () => {
     state.value.setupError = null
     try {
       await api.post('/api/v1/setup', { password, hubEndpoint })
-      transitionSession('authenticated')
+      state.value.requiresSetup = false
+      transitionSession('unauthenticated')
       return { success: true }
     } catch (err: any) {
       state.value.setupError = err.message || 'Setup failed'
