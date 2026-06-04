@@ -134,7 +134,7 @@ const legendItems = [
         <div class="flex-1 relative mt-2 min-h-0 w-full">
             <div ref="scrollArea" @scroll.passive="checkScroll" class="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto custom-scroll pr-3 pb-10">
                 
-                <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" class="text-sm font-medium text-text-m py-4 text-center">No fleet data available.</div>
+                <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" class="absolute inset-0 flex items-center justify-center text-center text-base text-text-m z-20">No fleet data available.</div>
                 
                 <div v-for="group in hydratedUptimeGroups" :key="group.nodeId" :id="'group-' + group.nodeId"
                     class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"

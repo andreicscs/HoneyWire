@@ -240,7 +240,7 @@ const formatTime = (timestamp: string) => {
                 
                 <tbody class="relative z-0">
                     <tr v-if="displayEvents.length === 0 && !isFetching">
-                        <td :colspan="viewingArchive ? 8 : 9" class="px-5 py-8 border-b border-border-default text-center text-text-m text-base">No events detected matching criteria.</td>
+                        <td :colspan="viewingArchive ? 8 : 9" class="px-5 py-8 border-b border-border-default text-center text-text-m text-base">No events.</td>
                     </tr>
                     
                     <template v-for="event in paginatedEvents" :key="event.id">

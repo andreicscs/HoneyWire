@@ -247,7 +247,7 @@ const legendItems = [
         </template>
 
         <div class="flex-1 relative mt-2 min-h-0 w-full">
-            <div v-if="(!projection || projection.recentEventCount === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-sm text-text-m z-20">
+            <div v-if="(!projection || projection.recentEventCount === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-center text-base text-text-m z-20">
                 Awaiting telemetry...
             </div>
             <canvas ref="chartCanvas" class="relative z-0"></canvas>
