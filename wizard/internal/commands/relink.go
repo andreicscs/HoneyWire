@@ -115,7 +115,9 @@ func executeRelink(args []string, defaultHubURL string) error {
 
 	switch strings.TrimSpace(choice) {
 	case "1":
-		return provisionNewNode(hubURL, "", "")
+		alias, _ := cli.PromptInput("    Custom Alias (leave blank for hostname): ")
+		tags, _ := cli.PromptInput("    Tags (comma-separated, leave blank for none): ")
+		return provisionNewNode(hubURL, alias, tags)
 	case "2":
 		apiKey, err = cli.ReadPasswordMasked("    API Key: ")
 		if err != nil {
@@ -161,6 +163,17 @@ func linkExistingNode(hubURL, apiKey string) error {
 	}
 
 	fmt.Printf("\n%s✅ Linked to Hub as '%s'.%s\n", cli.Green, nodeInfo.Alias, cli.Reset)
+
+	if cli.IsTerminal() {
+		if cli.ConfirmAction("Apply Hub's desired state now") {
+			if err := HandleApply(); err == nil {
+				if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+					return HandleFiredrill()
+				}
+			}
+			return nil
+		}
+	}
 	fmt.Printf("    %sRun 'wizard apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
@@ -230,6 +243,17 @@ func provisionNewNode(hubURL, customAlias, tagsStr string) error {
 	}
 
 	fmt.Printf("\n%s✅ Node provisioned and identity saved.%s\n", cli.Green, cli.Reset)
+
+	if cli.IsTerminal() {
+		if cli.ConfirmAction("Apply Hub's desired state now") {
+			if err := HandleApply(); err == nil {
+				if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+					return HandleFiredrill()
+				}
+			}
+			return nil
+		}
+	}
 	fmt.Printf("    %sRun 'wizard apply' to deploy existing sensors, or 'wizard discover' to add new ones.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }

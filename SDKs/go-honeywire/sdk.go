@@ -12,7 +12,9 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 )
 
@@ -139,9 +141,14 @@ type Sensor struct {
 	TestMode           bool
 	client             *http.Client
 
-	eventCh chan map[string]any
-	stopCh  chan struct{}
-	rng     *rand.Rand
+	eventCh     chan map[string]any
+	stopCh      chan struct{}
+	rng         *rand.Rand
+	testPayload map[string]any
+	testTrigger string
+	testSource  string
+	testTarget  string
+	testDetails map[string]any
 }
 
 func NewSensor() (*Sensor, error) {
@@ -168,18 +175,58 @@ func NewSensor() (*Sensor, error) {
 	return s, nil
 }
 
+// SetTestPayload allows community sensors to define a realistic, protocol-specific mock payload
+func (s *Sensor) SetTestPayload(trigger, source, target string, details map[string]any) {
+	s.testPayload = map[string]any{
+		"eventTrigger": trigger,
+		"source":       source,
+		"target":       target,
+		"details":      details,
+	}
+	s.testTrigger = trigger
+	s.testSource = source
+	s.testTarget = target
+	s.testDetails = details
+}
+
 func (s *Sensor) Start() error {
 	if err := s.syncHubVersion(); err != nil {
 		return err
 	}
 	go s.eventLoop()
 	go s.heartbeatLoop()
+	go s.listenForSignals()
 	return nil
 }
 
 func (s *Sensor) Stop() {
 	close(s.stopCh)
 	s.GoOffline("graceful_shutdown")
+}
+
+func (s *Sensor) listenForSignals() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGUSR1)
+	for {
+		select {
+		case <-sigCh:
+			log.Println("[*] SIGUSR1 received: injecting test event into queue...")
+			trigger := "test_mode_synthetic_alert"
+			source := "Wizard Live Test"
+			target := "Mock Hub"
+			details := map[string]any{"test_message": "Wizard triggered a live test event via signal."}
+
+			if s.testTrigger != "" {
+				trigger = s.testTrigger
+				source = s.testSource
+				target = s.testTarget
+				details = s.testDetails
+			}
+			s.ReportEvent(trigger, source, target, details)
+		case <-s.stopCh:
+			return
+		}
+	}
 }
 
 func (s *Sensor) RunTestMode() bool {
@@ -191,15 +238,27 @@ func (s *Sensor) RunTestMode() bool {
 		return false
 	}
 
+	trigger := "test_mode_synthetic_alert"
+	source := "CI/CD Runner"
+	target := "Mock Hub"
+	details := map[string]any{"test_message": "Automated CI/CD check."}
+
+	if s.testTrigger != "" {
+		trigger = s.testTrigger
+		source = s.testSource
+		target = s.testTarget
+		details = s.testDetails
+	}
+
 	// 2. Synchronously send the payload to guarantee delivery before the program exits
 	payload := map[string]any{
 		"contractVersion": s.hubContractVersion,
 		"sensorId":        s.SensorID,
 		"severity":        s.Severity,
-		"eventTrigger":    "test_mode_synthetic_alert",
-		"source":          "CI/CD Runner",
-		"target":          "Mock Hub",
-		"details":         map[string]any{"test_message": "Automated CI/CD check."},
+		"eventTrigger":    trigger,
+		"source":          source,
+		"target":          target,
+		"details":         details,
 	}
 
 	resp, err := s.postToHub("/api/v1/event", payload)
@@ -346,6 +405,10 @@ func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 // ==========================================
 
 func (s *Sensor) syncHubVersion() error {
+	if s.hubContractVersion != "" {
+		return nil // Short-circuit if already synced
+	}
+
 	for i := 0; i < 3; i++ {
 		req, err := http.NewRequest("GET", s.HubEndpoint+"/api/v1/version", nil)
 		if err != nil {

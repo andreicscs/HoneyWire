@@ -21,7 +21,7 @@ func loadApp() (*app.App, error) {
 func warnIfHTTP(hubURL string, force bool) error {
 	if strings.HasPrefix(hubURL, "http://") {
 		fmt.Printf("\n%s⚠️  WARNING: Using HTTP (not HTTPS) for Hub communication!%s\n"+
-			"This exposes you to MITM and DNS poisoning attacks that could inject malicious containers.\n"+
+			"This exposes you to MITM and DNS poisoning attacks.\n"+
 			"Attackers could:\n"+
 			"  1. Intercept DNS requests to redirect to fake Hub\n"+
 			"  2. Inject malicious sensor images\n"+

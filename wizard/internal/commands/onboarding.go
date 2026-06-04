@@ -72,8 +72,9 @@ func HandleInteractiveMenu(force bool) error {
 	fmt.Printf("      %s[1]%s Apply Hub's state\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[2]%s Run discovery & recommendations\n", cli.Cyan, cli.Reset)
 	fmt.Printf("      %s[3]%s Show node status\n", cli.Cyan, cli.Reset)
-	fmt.Printf("      %s[4]%s Re-link node\n", cli.Cyan, cli.Reset)
-	fmt.Printf("      %s[5]%s Exit\n\n", cli.Red, cli.Reset)
+	fmt.Printf("      %s[4]%s Trigger firedrill (live test)\n", cli.Cyan, cli.Reset)
+	fmt.Printf("      %s[5]%s Re-link node\n", cli.Cyan, cli.Reset)
+	fmt.Printf("      %s[6]%s Exit\n\n", cli.Red, cli.Reset)
 
 	choice, err := cli.PromptInput("    Choice: ")
 	if err != nil {
@@ -88,8 +89,10 @@ func HandleInteractiveMenu(force bool) error {
 	case "3":
 		return HandleStatus()
 	case "4":
-		return HandleRelink(nil)
+		return HandleFiredrill()
 	case "5":
+		return HandleRelink(nil)
+	case "6":
 		fmt.Printf("\n")
 		return nil
 	default:

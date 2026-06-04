@@ -59,6 +59,8 @@ func run() error {
 		return commands.HandleApply()
 	case "discover":
 		return commands.HandleDiscover(*forcePtr)
+	case "firedrill":
+		return commands.HandleFiredrill()
 	case "status":
 		return commands.HandleStatus()
 	case "relink":

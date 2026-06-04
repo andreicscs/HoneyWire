@@ -69,3 +69,14 @@ Do not boot the entire Hub to test a sensor's data payload. Use the Mock Hub scr
     ```
 
 The Mock Hub will strictly validate your payload against the V1.0 Data Contract and print `[EVENT] OK` or provide specific failure reasons.
+
+## 5.1. Testing Methodologies (CI/CD vs Live)
+
+HoneyWire distinguishes between two distinct ways of testing a sensor payload. Because of the strict security model (no exposed APIs, no shell access), testing relies on process state rather than direct interaction:
+
+1. **Boot-Time CI/CD Testing (`HW_TEST_MODE=true`):**
+   When a sensor container boots with this flag, it acts as a short-lived execution check. It synchronously sends a test payload directly to the Hub wire (bypassing internal queues) and immediately shuts down with exit code `0`. This guarantees payload delivery before the container exits. It is strictly used for automated CI pipelines.
+
+2. **Live In-Flight Testing (`SIGUSR1`):**
+   When a sensor is actively running in production, it can be tested on-demand via the Wizard CLI (`wizard test <sensor-id>`). The Wizard sends a `SIGUSR1` Unix signal to the target Docker container.
+   Unlike the CI test, the signal handler routes the synthetic event into the sensor's asynchronous event queue (`ReportEvent()`). This ensures the test payload traverses the exact same real-world code paths (including exponential backoff, rate limits, and network retries) as a genuine intrusion event, all without interrupting the sensor's active uptime.
