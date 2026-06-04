@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useAppStore } from '../stores/System/app.ts'
 import { useFleetStore } from '../stores/Fleet/fleet.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
@@ -39,6 +39,13 @@ onMounted(async () => {
 // --- DEPLOY MODAL ---
 const showDeployModal = ref(false)
 
+// TODO: REMOVE DEBUG OVERRIDE BEFORE PRODUCTION
+// You can test the "First Startup" UI state at any time by running:
+// localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
+const isFirstStartup = computed(() => {
+    return fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true'
+})
+
 // --- ACTIONS (all delegated to store) ---
 const handleUpdateNode = async (nodeId: string, updates: Partial<FleetNode>) => {
     const node = fleetStore.getNode(nodeId)
@@ -72,13 +79,20 @@ const handleOpenNodeDetail = (nodeId: string) => {
 
 <template>
     <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+
         <div class="flex items-center justify-between shrink-0">
              <PageHeader 
                 title="Fleet Overview" 
                 description="Monitor the health and status of your deployed HoneyWire nodes across all environments. Click on a node for detailed insights and management options."
             />
             
-            <BaseButton variant="primary" class="gap-2 text-sm" @click="showDeployModal = true">
+            <BaseButton 
+                variant="primary" 
+                class="gap-2 text-sm transition-all relative" 
+                :class="{ 'animate-bounce-subtle ring-4 ring-primary-main/30 ring-offset-2 ring-offset-bg shadow-lg': isFirstStartup }"
+                @click="showDeployModal = true"
+            >
+                <span v-if="isFirstStartup" class="absolute -top-2 -right-2 flex h-4 w-4"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-main opacity-75"></span><span class="relative inline-flex rounded-full h-4 w-4 bg-primary-main"></span></span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>

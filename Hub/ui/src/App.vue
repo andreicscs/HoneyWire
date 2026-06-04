@@ -48,6 +48,13 @@ const loadAppData = async () => {
       eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
     ])
 
+    // TODO: REMOVE DEBUG OVERRIDE BEFORE PRODUCTION
+    // You can test the "First Startup" UI state at any time by running:
+    // localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
+    if ((fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true') && appStore.currentView !== 'fleet') {
+      appStore.setView('fleet')
+    }
+
     wsService.on('onNewEvent', (payload: any) => {
       eventsStore.handleWsEvent(payload)
       fleetStore.handleWsUpdate('NEW_EVENT', payload)

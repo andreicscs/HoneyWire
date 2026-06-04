@@ -570,6 +570,10 @@ export const useFleetStore = defineStore('fleet', () => {
       const res = await api.post('/api/v1/nodes', { alias, tags })
       const data = await res.json()
       await fetchFleet()
+
+      // TODO REMOVE DEBUG After the first node is successfully created, disable the "first startup" UI hints.
+      localStorage.removeItem('DEBUG_FIRST_STARTUP')
+
       return { nodeId: data.nodeId, apiKey: data.apiKey }
     } catch (err) {
       console.error('Failed to create node:', err)
