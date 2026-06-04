@@ -116,9 +116,17 @@ func CalculateBlockStatus(
 	} else {
 		targetPings := params.ExpectedPings
 
-		// Adjust expected pings if deployment occurred mid-block
-		if firstSeen.After(blockStart) && firstSeen.Before(blockEnd) {
-			activeDuration := blockEnd.Sub(firstSeen)
+		// Adjust expected pings if deployment or first check-in occurred mid-block
+		effectiveStart := blockStart
+		if firstSeen.After(effectiveStart) {
+			effectiveStart = firstSeen
+		}
+		if !firstPingTime.IsZero() && firstPingTime.After(effectiveStart) {
+			effectiveStart = firstPingTime
+		}
+
+		if effectiveStart.After(blockStart) && effectiveStart.Before(blockEnd) {
+			activeDuration := blockEnd.Sub(effectiveStart)
 			targetPings = activeDuration.Minutes()
 			if targetPings > params.ExpectedPings {
 				targetPings = params.ExpectedPings

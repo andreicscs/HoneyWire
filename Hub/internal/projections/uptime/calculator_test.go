@@ -182,6 +182,32 @@ func TestCalculateBlockStatus(t *testing.T) {
 			t.Errorf("Expected up for early partial progress, got %s", status.Status)
 		}
 	})
+
+	t.Run("FirstHeartbeatNotDegraded", func(t *testing.T) {
+		bStart := now.Add(-5 * time.Minute)
+		bEnd := bStart.Add(time.Hour)
+		firstSeen := now.Add(-2 * time.Hour)
+		firstPing := now // Just pinged right now
+
+		// 1 ping so far
+		status := CalculateBlockStatus(bStart, bEnd, now, firstSeen, firstPing, 1, params, params.NumBlocks-1, false)
+		if status.Status != "up" {
+			t.Errorf("Expected up for newly online sensor, got %s", status.Status)
+		}
+	})
+
+	t.Run("FirstHeartbeatLateInBlock", func(t *testing.T) {
+		// Current block started 55 minutes ago (only 5 mins left)
+		bStart := now.Add(-55 * time.Minute)
+		bEnd := bStart.Add(time.Hour)
+		firstSeen := now.Add(-2 * time.Hour) // Deployed 2 hours ago
+		firstPing := now                     // Just pinged right now
+
+		status := CalculateBlockStatus(bStart, bEnd, now, firstSeen, firstPing, 1, params, params.NumBlocks-1, false)
+		if status.Status != "up" {
+			t.Errorf("Expected up for newly online sensor, got %s", status.Status)
+		}
+	})
 }
 
 // ============================================================================

@@ -263,8 +263,10 @@ export const useFleetStore = defineStore('fleet', () => {
             const lastBlock = { ...blocks[lastIdx] }
             if (!isLiveOnline) {
               lastBlock.status = 'down'
-            } else if (lastBlock.status === 'down' || lastBlock.status === 'nodata') {
+              lastBlock.label = 'Offline'
+            } else if (['down', 'nodata', 'pending'].includes(lastBlock.status)) {
               lastBlock.status = 'up'
+              lastBlock.label = 'Online'
             }
             blocks[lastIdx] = lastBlock
           }
