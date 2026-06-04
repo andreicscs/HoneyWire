@@ -5,6 +5,8 @@ import math
 import random
 import threading
 import queue
+import asyncio
+import signal
 import requests
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -123,6 +125,11 @@ class HoneyWireSensor(ABC):
         self._hub_contract_version = "unknown"
         self._stop_event = threading.Event()
         self._event_queue = queue.Queue(maxsize=1000)
+        
+        self.test_trigger = ""
+        self.test_source = ""
+        self.test_target = ""
+        self.test_details = {}
 
     def _validate_required_env(self):
         if not all([self.hub_endpoint, self.hub_key, self.sensor_id]):
@@ -136,14 +143,42 @@ class HoneyWireSensor(ABC):
         print(f"[!] Warning: Invalid severity '{raw_severity}'. Defaulting to 'info'.")
         return "info"
 
+    def set_test_payload(self, trigger: str, source: str, target: str, details: dict):
+        """Set a custom payload for test mode and SIGUSR1 live testing."""
+        self.test_trigger = trigger
+        self.test_source = source
+        self.test_target = target
+        self.test_details = details
+
     async def start(self):
         self._sync_hub_version()
         
         threading.Thread(target=self._event_loop, daemon=True).start()
         threading.Thread(target=self._heartbeat_loop, daemon=True).start()
         
+        try:
+            loop = asyncio.get_running_loop()
+            loop.add_signal_handler(signal.SIGUSR1, self._handle_sigusr1)
+        except (NotImplementedError, AttributeError):
+            pass
+
         await self.monitor()
         
+    def _handle_sigusr1(self):
+        print("[*] SIGUSR1 received: injecting test event into queue...")
+        trigger = "test_mode_synthetic_alert"
+        source = "Wizard Live Test"
+        target = "Mock Hub"
+        details = {"test_message": "Wizard triggered a live test event firedrill."}
+
+        if self.test_trigger:
+            trigger = self.test_trigger
+            source = self.test_source
+            target = self.test_target
+            details = self.test_details
+
+        self.report_event(trigger, source, target, details)
+
     def stop(self):
         self._stop_event.set()
         self.go_offline("graceful_shutdown")
@@ -161,14 +196,25 @@ class HoneyWireSensor(ABC):
         # 2. Synchronously send the payload to guarantee delivery before the program exits
         normalized_severity = self._normalize_severity(self.severity)
         
+        trigger = "test_mode_synthetic_alert"
+        source = "CI/CD Runner"
+        target = "Mock Hub"
+        details = {"test_message": "Automated CI/CD check."}
+
+        if self.test_trigger:
+            trigger = self.test_trigger
+            source = self.test_source
+            target = self.test_target
+            details = self.test_details
+
         payload = {
             "contractVersion": self._hub_contract_version,
             "sensorId": self.sensor_id,
             "severity": normalized_severity,
-            "eventTrigger": "test_mode_synthetic_alert",
-            "source": "CI/CD Runner",
-            "target": "Mock Hub",
-            "details": {"test_message": "Automated CI/CD check."}
+            "eventTrigger": trigger,
+            "source": source,
+            "target": target,
+            "details": details
         }
 
         try:
