@@ -1,15 +1,20 @@
 <script setup>
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '../../stores/System/app'
 import { useEventsStore } from '../../stores/Events/events'
+import { useClipboard } from '../../utils/useClipboard.js'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
 const route = useRoute()
+const { copiedStates, handleCopy } = useClipboard()
 
 const { isArmed } = storeToRefs(appStore)
 const { unreadCount } = storeToRefs(eventsStore)
+
+const showInstallModal = ref(false)
 
 const handleMarkAllRead = async () => {
     const res = await eventsStore.markAllRead()
@@ -60,6 +65,17 @@ const handleMarkAllRead = async () => {
                 <span>{{ isArmed ? 'Armed' : 'Passive' }}</span>
             </button>
 
+            <button @click="showInstallModal = true" 
+                    type="button"
+                    title="Install Wizard"
+                    aria-label="Install Wizard"
+                    class="w-8 h-8 rounded-md bg-secondary-main border border-secondary-border text-secondary-text hover:text-text-h hover:bg-secondary-hover transition-colors flex items-center justify-center group overflow-hidden shadow-sm focus:outline-none">
+                <svg class="w-4 h-4 transition-transform duration-300 ease-out group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+            </button>
+
             <button @click="appStore.toggleTheme()" 
                     type="button"
                     aria-label="Toggle light and dark theme"
@@ -80,4 +96,29 @@ const handleMarkAllRead = async () => {
                     class="text-xs  text-secondary-text hover:text-text-h transition-colors cursor-pointer bg-transparent border-0 p-0 focus:outline-none">Exit</button>
         </div>
     </header>
+
+    <Teleport to="body">
+        <transition enter-active-class="transition duration-normal ease-out" enter-from-class="opacity-0" enter-to-class="opacity-100" leave-active-class="transition duration-[var(--duration-fast)] ease-in" leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="showInstallModal" class="fixed inset-0 z-[var(--z-modal)] flex justify-center items-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm" @mousedown.self="showInstallModal = false">
+                <div class="bg-bg-base w-full max-w-2xl rounded-lg shadow-2xl flex flex-col overflow-hidden border border-border-default transform transition-all">
+                    <div class="px-6 py-5 border-b border-border-default flex justify-between items-center bg-bg-surface shrink-0">
+                        <h2 class="text-base font-semibold text-text-h">Install HoneyWire Wizard</h2>
+                        <button @click="showInstallModal = false" class="p-2 -mr-2 text-text-m hover:text-text-h transition-colors duration-[var(--duration-fast)] rounded-full hover:bg-secondary-hover focus:outline-none">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <div class="p-6 md:p-8 space-y-4">
+                        <p class="text-sm text-text-h">Run the following command on your server to install the HoneyWire Wizard.</p>
+                        <div class="bg-bg-inset/50 border border-border-default rounded-md p-4 relative group flex flex-col gap-3">
+                            <code class="text-success-text text-sm font-mono whitespace-pre-wrap break-all leading-relaxed">curl -fsSL https://get.honeywire.dev | bash</code>
+                            <button @click="handleCopy('install-cmd', 'curl -fsSL https://get.honeywire.dev | bash')" class="self-end px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 focus:outline-none border" :class="copiedStates['install-cmd'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-bg-surface text-text-h border-border-default hover:bg-secondary-hover'">
+                                {{ copiedStates['install-cmd'] ? 'Copied!' : 'Copy' }}
+                            </button>
+                        </div>
+                        <p class="text-sm text-text-m mt-2">This installs the binary to <code class="px-1 py-0.5 bg-bg-inset border border-border-default rounded text-xs font-mono">/usr/local/bin/honeywire</code> using the official HoneyWire installation script.</p>
+                    </div>
+                </div>
+            </div>
+        </transition>
+    </Teleport>
 </template>
