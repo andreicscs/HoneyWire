@@ -59,6 +59,7 @@ const handleMarkAllRead = async () => {
 
             <button @click="appStore.toggleArmed()" 
                     type="button"
+                    title="Disable / Enable push notifications"
                     :aria-label="isArmed ? 'Disarm system' : 'Arm system'"
                     class="px-3 py-1.5 rounded-md text-xs  transition-colors border shadow-sm focus:outline-none"
                     :class="isArmed ? 'bg-success-bg text-success-text border-success-border hover:bg-success-selected' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h'">
