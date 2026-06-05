@@ -1,72 +1,35 @@
-.PHONY: build test test-gateway test-backend test-chaos
-.PHONY: all build build-linux deploy test clean
+.PHONY: all build clean deploy test
 
 -include .env
-BINARY_NAME=wizard
+
+BINARY_NAME=honeywire
 BUILD_DIR=build
 
-GATEWAY_IP ?= 127.0.0.1
-BACKEND_IP ?= 127.0.0.1
-CHAOS_IP   ?= 127.0.0.1
-# Remote deployment defaults (override via `make deploy TARGET_IP=192.168.1.X`)
-TARGET_USER?=root
-TARGET_IP?=192.168.1.11
-TARGET_PATH?=/root/wizard
+ENV_IP ?= 127.0.0.1
+ENV_PATH ?= /root
 
-# URL remote nodes use
-HUB_URL ?= http://localhost:8080
 all: clean build
 
-# Local API URL
-LOCAL_HUB_URL ?= http://127.0.0.1:8080
 build:
-	@echo "[*] Compiling Wizard locally..."
+	@echo "[*] Compiling HoneyWire for Linux (amd64 and arm64)..."
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) cmd/wizard/main.go
+	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-amd64 cmd/wizard/main.go
+	GOOS=linux GOARCH=arm64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-arm64 cmd/wizard/main.go
+	@echo "[*] Generating checksums..."
+	cd $(BUILD_DIR) && sha256sum $(BINARY_NAME)-* > checksums.txt
 
-# Dashboard password for provisioning
-HUB_PASSWORD ?= defaultpass
-build-linux:
-	@echo "[*] Compiling Wizard for Linux (amd64)..."
-	@mkdir -p $(BUILD_DIR)
-	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)_linux cmd/wizard/main.go
+deploy: build
+	@echo "[*] Deploying to root@$(ENV_IP):$(ENV_PATH)..."
+	scp $(BUILD_DIR)/$(BINARY_NAME)-amd64 root@$(ENV_IP):$(ENV_PATH)
+	scp $(BUILD_DIR)/$(BINARY_NAME)-arm64 root@$(ENV_IP):$(ENV_PATH)
+	scp $(BUILD_DIR)/checksums.txt root@$(ENV_IP):$(ENV_PATH)
 
-ENV ?= dev
-deploy: build-linux
-	@echo "[*] Pushing Wizard to $(TARGET_USER)@$(TARGET_IP)..."
-	scp $(BUILD_DIR)/$(BINARY_NAME)_linux $(TARGET_USER)@$(TARGET_IP):$(TARGET_PATH)
-	@echo "✅ Deployment complete! You can now run $(TARGET_PATH) on the remote node."
-
-build:
-	mkdir -p build
-	GOOS=linux GOARCH=amd64 go build -o build/wizard ./cmd/wizard
+	@echo "✅ Deployment complete!"
 
 test:
-	go test ./...
 	@echo "[*] Running tests..."
 	go test ./... -v
 
-define deploy_target
-	@echo "[*] TARGETING $(1) ($(ENV))"
-
-	scp build/wizard root@$($(2)):/root/wizard
-
-	ssh root@$($(2)) '\
-		chmod +x /root/wizard
-	'
-endef
-
-.ONESHELL:
-test-gateway: build
-	$(call deploy_target,gateway,GATEWAY_IP)
-
-.ONESHELL:
-test-backend: build
-	$(call deploy_target,backend,BACKEND_IP)
-
-.ONESHELL:
-test-chaos: build
-	$(call deploy_target,chaos,CHAOS_IP)
 clean:
 	@echo "[*] Cleaning build directory..."
 	rm -rf $(BUILD_DIR)
