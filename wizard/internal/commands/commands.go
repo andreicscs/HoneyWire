@@ -29,12 +29,10 @@ func warnIfHTTP(hubURL string, force bool) error {
 			"Use HTTPS in production. HTTP is only for local testing.\n\n",
 			cli.Yellow, cli.Reset,
 		)
-		if !force {
-			if !cli.ConfirmAction("Continue with HTTP anyway") {
-				return fmt.Errorf("aborted: HTTPS required for security")
-			}
-			fmt.Println()
+		if !cli.ConfirmAction("Continue with HTTP anyway", force) {
+			return fmt.Errorf("aborted: HTTPS required for security")
 		}
+		fmt.Println()
 	}
 	return nil
 }

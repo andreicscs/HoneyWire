@@ -13,7 +13,7 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 	}
 
 	if apiKey != "" {
-		if err := linkExistingNode(hubURL, apiKey); err != nil {
+		if err := linkExistingNode(hubURL, apiKey, force); err != nil {
 			return err
 		}
 	} else {
@@ -23,7 +23,7 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 				return fmt.Errorf("dashboard authentication required: %w", authErr)
 			}
 		}
-		if err := provisionNewNode(hubURL, alias, tags); err != nil {
+		if err := provisionNewNode(hubURL, alias, tags, force); err != nil {
 			return err
 		}
 	}
@@ -33,7 +33,7 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 		return nil
 	}
 
-	if cli.ConfirmAction("Run host discovery now") {
+	if cli.ConfirmAction("Run host discovery now", force) {
 		return HandleDiscover(force)
 	}
 
@@ -92,7 +92,7 @@ func HandleInteractiveMenu(force bool) error {
 	case "4":
 		return HandleFiredrill()
 	case "5":
-		return HandleRelink(nil)
+		return HandleRelink(nil, force)
 	case "6":
 		err := HandleTeardown(force)
 		if err == nil {

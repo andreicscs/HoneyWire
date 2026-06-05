@@ -41,7 +41,11 @@ func ResolveDashboardPassword() (string, error) {
 	return ReadPasswordMasked("Enter dashboard password: ")
 }
 
-func ConfirmAction(prompt string) bool {
+func ConfirmAction(prompt string, force bool) bool {
+	if force {
+		fmt.Printf("    %s? [y/N]: y (forced)\n", prompt)
+		return true
+	}
 	fmt.Printf("    %s? [y/N]: ", prompt)
 	input, err := PromptInput("")
 	if err != nil {

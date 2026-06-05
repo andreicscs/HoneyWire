@@ -11,7 +11,7 @@ import (
 	"github.com/honeywire/wizard/internal/cli"
 )
 
-func HandleRelink(args []string) error {
+func HandleRelink(args []string, force bool) error {
 	cli.PrintSectionHeader("HoneyWire Relink", cli.Yellow)
 
 	var backupPath string
@@ -26,7 +26,7 @@ func HandleRelink(args []string) error {
 		fmt.Printf("    %sWarning: This will replace the existing node identity.%s\n", cli.Yellow, cli.Reset)
 		fmt.Printf("    The old node entry remains in the Hub. Delete it from the Dashboard if needed.\n\n")
 
-		if !cli.ConfirmAction("Continue?") {
+		if !cli.ConfirmAction("Continue?", force) {
 			fmt.Printf("\n    %sRelink aborted.%s\n\n", cli.Dim, cli.Reset)
 			return nil
 		}
@@ -41,7 +41,7 @@ func HandleRelink(args []string) error {
 		}
 	}
 
-	err := executeRelink(args, defaultHubURL)
+	err := executeRelink(args, defaultHubURL, force)
 
 	if err != nil {
 		if hasBackup {
@@ -67,7 +67,7 @@ func HandleRelink(args []string) error {
 	return nil
 }
 
-func executeRelink(args []string, defaultHubURL string) error {
+func executeRelink(args []string, defaultHubURL string, force bool) error {
 	var hubURL, apiKey string
 	if len(args) > 0 {
 		hubURL = args[0]
@@ -93,12 +93,12 @@ func executeRelink(args []string, defaultHubURL string) error {
 		return fmt.Errorf("Hub URL is required")
 	}
 
-	if err := warnIfHTTP(hubURL, false); err != nil {
+	if err := warnIfHTTP(hubURL, force); err != nil {
 		return err
 	}
 
 	if apiKey != "" {
-		return linkExistingNode(hubURL, apiKey)
+		return linkExistingNode(hubURL, apiKey, force)
 	}
 
 	if !cli.IsTerminal() {
@@ -117,7 +117,7 @@ func executeRelink(args []string, defaultHubURL string) error {
 	case "1":
 		alias, _ := cli.PromptInput("    Custom Alias (leave blank for hostname): ")
 		tags, _ := cli.PromptInput("    Tags (comma-separated, leave blank for none): ")
-		return provisionNewNode(hubURL, alias, tags)
+		return provisionNewNode(hubURL, alias, tags, force)
 	case "2":
 		apiKey, err = cli.ReadPasswordMasked("    API Key: ")
 		if err != nil {
@@ -126,13 +126,13 @@ func executeRelink(args []string, defaultHubURL string) error {
 		if apiKey == "" {
 			return fmt.Errorf("API key is required")
 		}
-		return linkExistingNode(hubURL, apiKey)
+		return linkExistingNode(hubURL, apiKey, force)
 	default:
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
 }
 
-func linkExistingNode(hubURL, apiKey string) error {
+func linkExistingNode(hubURL, apiKey string, force bool) error {
 	cli.PrintSectionHeader("HoneyWire Node Link", cli.Cyan)
 	fmt.Printf("%s[*] Verifying API key with Hub at %s...%s\n", cli.Bold, hubURL, cli.Reset)
 
@@ -165,9 +165,9 @@ func linkExistingNode(hubURL, apiKey string) error {
 	fmt.Printf("\n%s✅ Linked to Hub as '%s'.%s\n", cli.Green, nodeInfo.Alias, cli.Reset)
 
 	if cli.IsTerminal() {
-		if cli.ConfirmAction("Apply Hub's desired state now") {
+		if cli.ConfirmAction("Apply Hub's desired state now", force) {
 			if applied, err := ApplyDesiredState(); err == nil {
-				if applied && cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+				if applied && cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
 					return HandleFiredrill()
 				}
 				if applied {
@@ -181,7 +181,7 @@ func linkExistingNode(hubURL, apiKey string) error {
 	return nil
 }
 
-func provisionNewNode(hubURL, customAlias, tagsStr string) error {
+func provisionNewNode(hubURL, customAlias, tagsStr string, force bool) error {
 	cli.PrintSectionHeader("HoneyWire Provisioning", cli.Cyan)
 	fmt.Printf("%s[*] Connecting to Hub at %s...%s\n", cli.Bold, hubURL, cli.Reset)
 
@@ -248,8 +248,8 @@ func provisionNewNode(hubURL, customAlias, tagsStr string) error {
 	fmt.Printf("\n%s✅ Node provisioned and identity saved.%s\n", cli.Green, cli.Reset)
 
 	if cli.IsTerminal() {
-		if cli.ConfirmAction("Run host discovery now") {
-			return HandleDiscover(false)
+		if cli.ConfirmAction("Run host discovery now", force) {
+			return HandleDiscover(force)
 		}
 	}
 	fmt.Printf("    %sRun 'wizard discover' to audit the host and add new sensors.%s\n\n", cli.Dim, cli.Reset)

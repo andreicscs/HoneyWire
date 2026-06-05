@@ -85,9 +85,16 @@ promptLoop:
 			return nil
 		}
 
-		choice, err := cli.PromptInput(fmt.Sprintf("    Apply all %s%d%s sensor suggestions? (or 'e' Edit) [y/N/e]: ", cli.Green, len(recommendations), cli.Reset))
-		if err != nil {
-			return err
+		var choice string
+		if force {
+			fmt.Printf("    Apply all %s%d%s sensor suggestions? (or 'e' Edit) [y/N/e]: y (forced)\n", cli.Green, len(recommendations), cli.Reset)
+			choice = "y"
+		} else {
+			var err error
+			choice, err = cli.PromptInput(fmt.Sprintf("    Apply all %s%d%s sensor suggestions? (or 'e' Edit) [y/N/e]: ", cli.Green, len(recommendations), cli.Reset))
+			if err != nil {
+				return err
+			}
 		}
 
 		choice = strings.ToLower(strings.TrimSpace(choice))
@@ -166,10 +173,10 @@ promptLoop:
 		}
 	}
 
-	return applySuggestions(app, recommendations)
+	return applySuggestions(app, recommendations, force)
 }
 
-func applySuggestions(app *app.App, recs []*discovery.Recommendation) error {
+func applySuggestions(app *app.App, recs []*discovery.Recommendation, force bool) error {
 	fmt.Printf("\n    %s[*] Dashboard auth required to register sensors.%s\n", cli.Cyan, cli.Reset)
 
 	if err := app.RequireDashboardAuth(); err != nil {
@@ -213,7 +220,7 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation) error {
 	fmt.Printf("    %s✅ Node reconciled. Run 'docker compose -f %s -p %s ps' to view sensors.%s\n\n", cli.Green, filepath.Join(deploy.DeployDir, deploy.ComposeFile), deploy.ProjectName, cli.Reset)
 
 	if cli.IsTerminal() {
-		if cli.ConfirmAction("Trigger a firedrill to test deployed sensors") {
+		if cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
 			return HandleFiredrill()
 		}
 		fmt.Printf("\n    %sRun 'wizard firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
@@ -234,9 +241,9 @@ func runPreFlightChecks(force bool) error {
 		}
 	}
 
-	if hasWarnings && !force {
+	if hasWarnings {
 		fmt.Printf("\n%s⚠️  Host environment is severely degraded. Proceeding may cause instability.%s\n", cli.Red, cli.Reset)
-		if !cli.ConfirmAction("Continue anyway") {
+		if !cli.ConfirmAction("Continue anyway", force) {
 			return fmt.Errorf("aborted due to failing health checks")
 		}
 		fmt.Println()

@@ -18,11 +18,9 @@ func HandleTeardown(force bool) error {
 	fmt.Printf("  %s-%s Delete the node identity file: %s\n", cli.Red, cli.Reset, app.ConfigPath)
 	fmt.Printf("  %s-%s Note: The node entry remains in the Hub. Delete it from the Dashboard if needed.%s\n\n", cli.Dim, cli.Reset, cli.Reset)
 
-	if !force {
-		if !cli.ConfirmAction("Are you absolutely sure you want to permanently remove HoneyWire from this host?") {
-			fmt.Printf("\n%sTeardown aborted.%s\n\n", cli.Dim, cli.Reset)
-			return nil
-		}
+	if !cli.ConfirmAction("Are you absolutely sure you want to permanently remove HoneyWire from this host?", force) {
+		fmt.Printf("\n%sTeardown aborted.%s\n\n", cli.Dim, cli.Reset)
+		return nil
 	}
 
 	fmt.Printf("\n%s[*] Tearing down isolated Docker environment...%s\n", cli.Dim, cli.Reset)

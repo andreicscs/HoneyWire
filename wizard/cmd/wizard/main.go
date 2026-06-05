@@ -54,7 +54,7 @@ func run() error {
 	case "status":
 		return commands.HandleStatus()
 	case "relink":
-		return commands.HandleRelink(args[1:])
+		return commands.HandleRelink(args[1:], *forcePtr)
 	case "uninstall":
 		err := commands.HandleTeardown(*forcePtr)
 		if err == nil {
