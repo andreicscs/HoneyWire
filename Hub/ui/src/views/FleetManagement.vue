@@ -79,7 +79,7 @@ const handleForgetNode = async (nodeId: string) => {
 
 const handleOpenNodeDetail = (nodeId: string) => {
     fleetStore.selectTarget(nodeId, null, false)
-    router.push({ name: 'node-detail', params: { id: nodeId } })
+    router.push({ name: 'node-details', params: { id: nodeId } })
 }
 
 </script>

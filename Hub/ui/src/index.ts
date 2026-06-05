@@ -17,7 +17,7 @@ const routes = [
   },
   {
     path: '/fleet/node/:id',
-    name: 'node-detail',
+    name: 'node-details',
     component: () => import('./views/NodeDetails.vue')
   },
   {

@@ -27,7 +27,7 @@ Ephemeral state owned entirely by the client. Fully synchronous and never requir
 const state = ref<AppState>({
   viewingArchive: false,
   sidebarOpen: true,
-  currentView: 'dashboard', // 'dashboard' | 'fleet' | 'settings' | 'node-detail'
+  currentView: 'dashboard', // 'dashboard' | 'fleet' | 'settings' | 'node-details'
   // ...
 })
 
