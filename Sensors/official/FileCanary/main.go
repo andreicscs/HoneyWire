@@ -214,13 +214,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start sensor
-	if err := hw.Start(); err != nil {
-		log.Fatalf("FATAL: Failed to sync with Hub: %v", err)
-	}
-
-	defer hw.Stop()
-
 	alertOnOpen := os.Getenv("HW_ALERT_ON_OPEN") == "true"
 
 	decoyFilesStr := os.Getenv("HW_DECOY_FILES")
@@ -308,9 +301,6 @@ func main() {
 	if len(watchMap) == 0 {
 		log.Fatalf("FATAL: No valid canary files mounted.")
 	}
-
-	log.Println("")
-	log.Println("File Canary active. Listening for events...")
 
 	// Graceful shutdown handling
 	sigChan := make(chan os.Signal, 1)
@@ -438,6 +428,16 @@ func main() {
 			}
 		}
 	}()
+
+	// Start sensor
+	if err := hw.Start(); err != nil {
+		log.Fatalf("FATAL: Failed to sync with Hub: %v", err)
+	}
+
+	defer hw.Stop()
+
+	log.Println("")
+	log.Println("File Canary active. Listening for events...")
 
 	<-sigChan
 

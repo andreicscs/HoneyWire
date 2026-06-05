@@ -13,6 +13,12 @@ class MyCustomSensor(HoneyWireSensor):
         
         # Custom config overrides
         self.target = os.getenv("HW_CUSTOM_TARGET", "/tmp/honey")
+        
+        # IMPORTANT LIFECYCLE NOTE:
+        # If your sensor binds to a port or requires an exclusive system resource,
+        # you should attempt to acquire it here (or before starting the main loop).
+        # This ensures the sensor crashes cleanly on failure BEFORE reporting
+        # a false-positive "online" heartbeat to the HoneyWire Hub.
 
     async def monitor(self):
         """

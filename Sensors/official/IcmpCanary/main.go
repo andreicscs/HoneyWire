@@ -41,11 +41,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: Failed to sync with Hub: %v", err)
-	}
-	defer hw.Stop() // Clean up goroutines!
-
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to listen for ICMP: %v\n(Ensure container has CAP_NET_RAW capability)", err)
@@ -58,6 +53,11 @@ func main() {
 	defer stop()
 
 	go listenICMP(conn, hw)
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: Failed to sync with Hub: %v", err)
+	}
+	defer hw.Stop() // Clean up goroutines!
 
 	// Block until shutdown signal
 	<-ctx.Done()

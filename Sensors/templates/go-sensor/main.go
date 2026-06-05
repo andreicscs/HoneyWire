@@ -41,20 +41,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 3. Start the SDK (Syncs Hub version, starts heartbeats)
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
-	}
-	defer hw.Stop() // Cleans up the background heartbeat goroutine
-
 	log.Printf("[*] Starting Custom Go Sensor | Target: %s", target)
 
-	// 4. Setup graceful shutdown via OS signals
+	// 3. Setup graceful shutdown and acquire resources (e.g., net.Listen)
+	// IMPORTANT: Always acquire resources and start your background listeners BEFORE calling hw.Start().
+	// This prevents the sensor from reporting a false "online" state to the Hub if it crashes immediately (e.g., port already in use).
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Spin off your sensor logic into a non-blocking goroutine
 	go runSensor(ctx, hw)
+
+	// 4. Start the SDK (Syncs Hub version, starts heartbeats)
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop() // Cleans up the background heartbeat goroutine
 
 	// Block main thread until Ctrl+C is pressed
 	<-ctx.Done()

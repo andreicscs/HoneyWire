@@ -58,18 +58,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
-	}
-	defer hw.Stop()
-
-	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
-
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to open raw socket (requires root/CAP_NET_RAW): %v", err)
 	}
 	defer syscall.Close(fd)
+
+	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -109,6 +104,11 @@ func main() {
 			}
 		}
 	}()
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
 
 	<-ctx.Done()
 }

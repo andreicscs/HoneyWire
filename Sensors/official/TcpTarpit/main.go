@@ -50,10 +50,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
+	var listeners []net.Listener
+	var lc net.ListenConfig
+	for _, port := range decoyPorts {
+		addr := fmt.Sprintf("0.0.0.0:%d", port)
+		l, err := lc.Listen(context.Background(), "tcp", addr)
+		if err != nil {
+			log.Fatalf("[!] FATAL: Failed to bind to port %d: %v", port, err)
+		}
+		listeners = append(listeners, l)
 	}
-	defer hw.Stop()
 
 	log.Printf("[*] HoneyWire Tarpit | Mode: %s", strings.ToUpper(tarpitMode))
 
@@ -61,23 +67,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	for _, port := range decoyPorts {
-		go startListener(ctx, hw, port, semaphore)
+	for i, listener := range listeners {
+		go startListener(ctx, hw, decoyPorts[i], listener, semaphore)
 	}
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
 
 	<-ctx.Done()
 	log.Println("[*] Tarpit shutting down.")
 }
 
-func startListener(ctx context.Context, hw *sdk.Sensor, port int, semaphore chan struct{}) {
-	addr := fmt.Sprintf("0.0.0.0:%d", port)
-
-	var lc net.ListenConfig
-	listener, err := lc.Listen(ctx, "tcp", addr)
-	if err != nil {
-		log.Printf("[!] Failed to bind to port %d: %v", port, err)
-		return
-	}
+func startListener(ctx context.Context, hw *sdk.Sensor, port int, listener net.Listener, semaphore chan struct{}) {
 	defer listener.Close()
 
 	log.Printf("[+] Tarpit listening on port %d", port)
