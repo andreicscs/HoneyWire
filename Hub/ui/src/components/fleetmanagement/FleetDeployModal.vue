@@ -76,7 +76,7 @@ const close = () => {
                         </span>
                     </BaseButton>
                 </div>
-                <code class="block w-full p-4 bg-bg-inset border border-border-default rounded-md text-sm font-mono text-text-h whitespace-pre-wrap break-all leading-normal select-all">curl -fsSL https://get.honeywire.dev | bash -s -- --link {{ hubUrl }} --api-key {{ nodeKey }}</code>
+                <code class="block w-full p-4 bg-bg-inset/50 border border-border-default rounded-md text-sm font-mono text-text-h whitespace-pre-wrap break-all leading-normal select-all">curl -fsSL https://get.honeywire.dev | bash -s -- --link {{ hubUrl }} --api-key {{ nodeKey }}</code>
             </div>
 
             <div>
@@ -91,7 +91,7 @@ const close = () => {
                     </BaseButton>
                 </div>
                 <div class="flex items-center gap-2">
-                    <code class="flex-1 block px-3 py-2.5 bg-bg-inset border border-border-default rounded-md text-sm font-mono text-text-m truncate select-all">{{ nodeKey }}</code>
+                    <code class="flex-1 block px-3 py-2.5 bg-bg-inset/50 border border-border-default rounded-md text-sm font-mono text-text-m truncate select-all">{{ nodeKey }}</code>
                 </div>
                 <p class="text-sm text-success-main font-medium mt-2">You can view this key again in the node details.</p>
             </div>

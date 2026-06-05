@@ -55,9 +55,9 @@ const syncCommand = computed(() => {
     if (!node.value) return ''
     const hubUrl = configStore.config.hubEndpoint || window.location.origin
     if (!node.value.lastHeartbeat) {
-        return `./wizard --link ${hubUrl} ${node.value.apiKey}\n./wizard apply`
+        return `curl -fsSL https://get.honeywire.dev | bash -s -- --link ${hubUrl} --api-key ${node.value.apiKey}`
     }
-    return `./wizard apply`
+    return `honeywire apply`
 })
 
 // --- ENV VAR HELPERS ---
