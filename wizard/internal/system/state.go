@@ -27,7 +27,7 @@ type SystemState struct {
 
 func CheckRoot() (string, error) {
 	if os.Geteuid() != 0 {
-		return "⚠️ Wizard is not running as root (UID 0). Must be run as root to continue.", nil
+		return "⚠️ HoneyWire wizard is not running as root (UID 0). Must be run as root to continue.", nil
 	}
 	return "", nil
 }

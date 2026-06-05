@@ -13,7 +13,7 @@ import (
 func HandleApply() error {
 	applied, err := ApplyDesiredState()
 	if err == nil && applied {
-		fmt.Printf("    %sRun 'wizard firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
+		fmt.Printf("    %sRun 'honeywire firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
 	}
 	return err
 }
@@ -53,7 +53,7 @@ func ApplyDesiredState() (bool, error) {
 	// If the compose file is empty or has no services, there's nothing to do.
 	if err := yaml.Unmarshal(composeData, &compose); err != nil || len(compose.Services) == 0 {
 		fmt.Printf("\n    %sNothing to reconcile. No sensors are configured for this node.%s\n", cli.Yellow, cli.Reset)
-		fmt.Printf("    %sUse 'wizard discover' or the Hub Dashboard to add sensors first.%s\n\n", cli.Dim, cli.Reset)
+		fmt.Printf("    %sUse 'honeywire discover' or the Hub Dashboard to add sensors first.%s\n\n", cli.Dim, cli.Reset)
 		return false, nil
 	}
 

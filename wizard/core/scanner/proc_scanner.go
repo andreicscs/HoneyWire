@@ -29,7 +29,7 @@ func NewProcScanner() *ProcScanner {
 		"file-canary":     true,
 		"icmp-canary":     true,
 		"scan-detector":   true,
-		"wizard":          true,
+		"honeywire":       true,
 		"bash":            true,
 		"systemd":         true,
 		"init":            true,

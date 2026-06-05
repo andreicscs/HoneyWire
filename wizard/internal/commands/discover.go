@@ -168,7 +168,7 @@ promptLoop:
 				}
 			}
 		case "", "n", "no":
-			fmt.Printf("\n    %sSuggestions not applied. Run 'wizard apply' when ready.%s\n\n", cli.Dim, cli.Reset)
+			fmt.Printf("\n    %sSuggestions not applied. Run 'honeywire apply' when ready.%s\n\n", cli.Dim, cli.Reset)
 			return nil
 		}
 	}
@@ -213,7 +213,7 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, force bool
 
 	if err := deploy.Apply(reconcileCtx, composeData); err != nil {
 		fmt.Printf("\n    %s[!] The Hub saved your sensor config, but local deployment failed.%s\n", cli.Red, cli.Reset)
-		fmt.Printf("    %sThe node is now in a 'Pending Sync' state. Check Docker logs, resolve the issue, and run 'wizard apply' to retry.%s\n\n", cli.Yellow, cli.Reset)
+		fmt.Printf("    %sThe node is now in a 'Pending Sync' state. Check Docker logs, resolve the issue, and run 'honeywire apply' to retry.%s\n\n", cli.Yellow, cli.Reset)
 		return fmt.Errorf("local reconciliation failed: %w", err)
 	}
 
@@ -223,9 +223,9 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, force bool
 		if cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
 			return HandleFiredrill()
 		}
-		fmt.Printf("\n    %sRun 'wizard firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
+		fmt.Printf("\n    %sRun 'honeywire firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
 	} else {
-		fmt.Printf("    %sRun 'wizard firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
+		fmt.Printf("    %sRun 'honeywire firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
 	}
 
 	return nil

@@ -36,7 +36,7 @@ func NewApp(cfg *NodeConfig) *App {
 func LoadApp() (*App, error) {
 	cfg, err := LoadConfig(ConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("node not provisioned. Run 'wizard --link <hub_url>' first")
+		return nil, fmt.Errorf("node not provisioned. Run 'honeywire --link <hub_url>' first")
 	}
 	return NewApp(cfg), nil
 }

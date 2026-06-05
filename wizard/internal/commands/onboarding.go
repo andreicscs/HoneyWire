@@ -28,16 +28,6 @@ func HandleLink(hubURL, apiKey, alias, tags string, force bool) error {
 		}
 	}
 
-	if !cli.IsTerminal() {
-		fmt.Printf("\n    %sRun 'wizard discover' to audit the host.%s\n\n", cli.Dim, cli.Reset)
-		return nil
-	}
-
-	if cli.ConfirmAction("Run host discovery now", force) {
-		return HandleDiscover(force)
-	}
-
-	fmt.Printf("\n    %sRun 'wizard discover' when ready.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
 

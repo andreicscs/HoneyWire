@@ -83,7 +83,7 @@ func HandleFiredrill() error {
 
 	if foundSensors == 0 {
 		fmt.Printf("\n    %s[!] No running containers found for the installed sensors.%s\n", cli.Yellow, cli.Reset)
-		fmt.Printf("    %sRun 'wizard apply' to ensure deployments are up to date.%s\n\n", cli.Dim, cli.Reset)
+		fmt.Printf("    %sRun 'honeywire apply' to ensure deployments are up to date.%s\n\n", cli.Dim, cli.Reset)
 	} else {
 		fmt.Printf("\n    %s✅ Firedrill complete. Check your Hub dashboard for the test events!%s\n\n", cli.Green, cli.Reset)
 	}

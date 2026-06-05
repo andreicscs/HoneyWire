@@ -55,7 +55,7 @@ Build and run the Wizard on the host:
 
 ```bash
 make build
-./build/wizard
+./build/honeywire
 ```
 
 Run the module test suite:
@@ -69,7 +69,7 @@ make test
 To tear down managed deception infrastructure:
 
 ```bash
-./build/wizard uninstall
+./build/honeywire uninstall
 ```
 
 This safely removes the managed compose deployment and leaves the host in a clean state.

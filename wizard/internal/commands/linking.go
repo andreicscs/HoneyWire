@@ -76,10 +76,13 @@ func executeRelink(args []string, defaultHubURL string, force bool) error {
 		apiKey = args[1]
 	}
 
-	if hubURL == "" {
-		if !cli.IsTerminal() {
-			return fmt.Errorf("Hub URL required but stdin is not a terminal. Provide as argument: wizard relink <hub_url>")
+	if !cli.IsTerminal() {
+		if hubURL == "" || apiKey == "" {
+			return fmt.Errorf("Hub URL and API key are required in non-interactive mode. Provide as arguments: honeywire relink <hub_url> <api_key>")
 		}
+	}
+
+	if hubURL == "" {
 		if defaultHubURL != "" {
 			hubURL, _ = cli.PromptInput(fmt.Sprintf("    Hub URL [%s]: ", defaultHubURL))
 			if strings.TrimSpace(hubURL) == "" {
@@ -99,10 +102,6 @@ func executeRelink(args []string, defaultHubURL string, force bool) error {
 
 	if apiKey != "" {
 		return linkExistingNode(hubURL, apiKey, force)
-	}
-
-	if !cli.IsTerminal() {
-		return fmt.Errorf("API key required but stdin is not a terminal. Provide as argument: wizard relink <hub_url> <api_key>")
 	}
 
 	fmt.Printf("\n    Link method:\n")
@@ -165,19 +164,29 @@ func linkExistingNode(hubURL, apiKey string, force bool) error {
 	fmt.Printf("\n%s✅ Linked to Hub as '%s'.%s\n", cli.Green, nodeInfo.Alias, cli.Reset)
 
 	if cli.IsTerminal() {
-		if cli.ConfirmAction("Apply Hub's desired state now", force) {
-			if applied, err := ApplyDesiredState(); err == nil {
-				if applied && cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
-					return HandleFiredrill()
+		if nodeInfo.PendingConfig {
+			if cli.ConfirmAction("Apply Hub's desired state now", force) {
+				applied, err := ApplyDesiredState()
+				if err == nil && applied {
+					if cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
+						return HandleFiredrill()
+					}
+					fmt.Printf("\n    %sRun 'honeywire firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
 				}
-				if applied {
-					fmt.Printf("\n    %sRun 'wizard firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
-				}
+				return err
 			}
+			fmt.Printf("    %sRun 'honeywire apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
 			return nil
 		}
+		if cli.ConfirmAction("Run host discovery now", force) {
+			return HandleDiscover(force)
+		}
+	} else if nodeInfo.PendingConfig {
+		fmt.Printf("    %sRun 'honeywire apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
+		return nil
 	}
-	fmt.Printf("    %sRun 'wizard apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
+
+	fmt.Printf("    %sRun 'honeywire discover' to audit the host and add new sensors.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
 
@@ -252,6 +261,6 @@ func provisionNewNode(hubURL, customAlias, tagsStr string, force bool) error {
 			return HandleDiscover(force)
 		}
 	}
-	fmt.Printf("    %sRun 'wizard discover' to audit the host and add new sensors.%s\n\n", cli.Dim, cli.Reset)
+	fmt.Printf("    %sRun 'honeywire discover' to audit the host and add new sensors.%s\n\n", cli.Dim, cli.Reset)
 	return nil
 }
