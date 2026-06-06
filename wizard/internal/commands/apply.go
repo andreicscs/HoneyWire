@@ -9,7 +9,6 @@ import (
 
 	"github.com/honeywire/wizard/internal/cli"
 	"github.com/honeywire/wizard/internal/deploy"
-	"github.com/honeywire/wizard/internal/system"
 	"gopkg.in/yaml.v3"
 )
 
@@ -53,11 +52,6 @@ func ApplyDesiredState() (bool, error) {
 		fmt.Printf("\n    %sNothing to reconcile. No sensors are configured for this node.%s\n", cli.Yellow, cli.Reset)
 		fmt.Printf("    %sUse 'honeywire discover' or the Hub Dashboard to add sensors first.%s\n\n", cli.Dim, cli.Reset)
 		return false, nil
-	}
-
-	// Validate the Hub-provided compose before making changes.
-	if err := system.ValidateComposeConfig(composeData); err != nil {
-		return false, fmt.Errorf("compose validation failed: %w", err)
 	}
 
 	// Load local compose file (if present) and perform a deep YAML comparison

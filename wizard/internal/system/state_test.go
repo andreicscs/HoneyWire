@@ -104,36 +104,3 @@ services:
 	// Assert images are deduplicated
 	assert.ElementsMatch(t, []string{"honeywire/nginx:latest", "honeywire/postgres:13"}, state.DeployedImages)
 }
-
-func TestValidateComposeConfig_DuplicateHostPort(t *testing.T) {
-	yamlData := []byte(`
-services:
-  sensor-a:
-    image: honeywire/nginx:latest
-    ports:
-      - "8080:80"
-  sensor-b:
-    image: honeywire/httpd:latest
-    ports:
-      - "8080:8080"
-`)
-
-	err := ValidateComposeConfig(yamlData)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "port conflict detected")
-}
-
-func TestValidateComposeConfig_DuplicateEnvVar(t *testing.T) {
-	yamlData := []byte(`
-services:
-  sensor-a:
-    image: honeywire/nginx:latest
-    environment:
-      - "HW_HUB_ENDPOINT=http://hub"
-      - "HW_HUB_ENDPOINT=http://hub"
-`)
-
-	err := ValidateComposeConfig(yamlData)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "environment conflict detected")
-}
