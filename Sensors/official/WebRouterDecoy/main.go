@@ -271,13 +271,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
-	}
-	defer hw.Stop()
-
-	log.Printf("[*] HoneyWire Web Router Decoy | Brand: %s | Port: %s", routerBrand, port)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("/login", handleLogin)
@@ -293,9 +286,17 @@ func main() {
 			log.Fatalf("[!] FATAL: Web server failed: %v", err)
 		}
 	}()
-
+    log.Printf("[*] HoneyWire Web Router Decoy | Brand: %s | Port: %s", routerBrand, port)
+    
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+
+    if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
+
 	<-ctx.Done()
 
 	log.Println("[*] Shutting down web decoy...")
