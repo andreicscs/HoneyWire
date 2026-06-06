@@ -267,6 +267,10 @@ export const useEventsStore = defineStore('events', () => {
       state.value.events = state.value.events.filter(e => e.id !== eventId)
       state.value.activeEvent = null
       await refreshUnreadCount()
+      // Refetch analytics projections so the charts zero out
+      fetchSeverityProjection('alltime', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      fetchSummaryProjection('24H', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      invalidateThreatVelocityProjection()
       return { success: true }
     } catch (err) {
       console.error('Failed to archive event:', err)
@@ -279,6 +283,10 @@ export const useEventsStore = defineStore('events', () => {
     try {
       await api.patch('/api/v1/events/archive-all')
       await fetchEvents(false, fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      // Refetch analytics projections so the charts zero out
+      fetchSeverityProjection('alltime', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      fetchSummaryProjection('24H', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
+      invalidateThreatVelocityProjection()
       return { success: true }
     } catch (err) {
       console.error('Failed to archive all events:', err)
