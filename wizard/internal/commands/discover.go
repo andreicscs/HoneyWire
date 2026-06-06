@@ -211,6 +211,10 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, force bool
 		return fmt.Errorf("failed to fetch deployment bundle: %w", err)
 	}
 
+	if err := system.ValidateComposeConfig(composeData); err != nil {
+		return fmt.Errorf("compose validation failed: %w", err)
+	}
+
 	if err := deploy.Apply(reconcileCtx, composeData); err != nil {
 		fmt.Printf("\n    %s[!] The Hub saved your sensor config, but local deployment failed.%s\n", cli.Red, cli.Reset)
 		fmt.Printf("    %sThe node is now in a 'Pending Sync' state. Check Docker logs, resolve the issue, and run 'honeywire apply' to retry.%s\n\n", cli.Yellow, cli.Reset)
