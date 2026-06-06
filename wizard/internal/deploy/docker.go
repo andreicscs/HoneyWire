@@ -29,7 +29,7 @@ type composeInfo struct {
 func GetDockerCommand() ([]string, error) {
 	// ValidateDockerState now performs the full check:
 	// 1. Docker binary check
-	// 2. Daemon responsiveness
+	// 2. Daemon responsiveness (now handled by checkDaemon)
 	// 3. Compose version verification
 	cmd, err := ValidateDockerState()
 	if err != nil {
@@ -43,7 +43,7 @@ func GetDockerCommand() ([]string, error) {
 
 func ValidateDockerState() ([]string, error) {
 	if _, err := exec.LookPath("docker"); err != nil {
-		return nil, generateRemediationError("Docker Engine is not installed.", err)
+		return nil, generateRemediationError("Docker Engine is not installed.", "", err)
 	}
 
 	if err := checkDaemon(); err != nil {
@@ -70,9 +70,10 @@ func checkDaemon() error {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		reason := fmt.Sprintf("Docker daemon is unresponsive. Ensure it is running.\n    Details: %s", strings.TrimSpace(stderr.String()))
+		mainReason := "Docker daemon is unresponsive. Ensure it is running."
+		details := strings.TrimSpace(stderr.String())
 		// We pass the actual system error to generateRemediationError now
-		return generateRemediationError(reason, err)
+		return generateRemediationError(mainReason, details, err)
 	}
 	return nil
 }
@@ -90,8 +91,9 @@ func validateComposeVersion() ([]string, error) {
 	cmd.Stderr = &errb
 
 	if err := cmd.Run(); err != nil {
-		reason := fmt.Sprintf("Docker Compose plugin is missing or malfunctioning.\n    Details: %s", strings.TrimSpace(errb.String()))
-		return nil, generateRemediationError(reason, err)
+		mainReason := "Docker Compose plugin is missing or malfunctioning."
+		details := strings.TrimSpace(errb.String())
+		return nil, generateRemediationError(mainReason, details, err)
 	}
 
 	var info composeInfo
@@ -102,25 +104,29 @@ func validateComposeVersion() ([]string, error) {
 	cleanVer := strings.TrimPrefix(info.Version, "v")
 
 	if !isVersionSufficient(cleanVer, ComposeMinVer) {
-		reason := fmt.Sprintf("Docker Compose is outdated (v%s). v%s+ is strictly required.", cleanVer, ComposeMinVer)
-		return nil, generateRemediationError(reason, nil)
+		mainReason := fmt.Sprintf("Docker Compose is outdated (v%s). v%s+ is strictly required.", cleanVer, ComposeMinVer)
+		return nil, generateRemediationError(mainReason, "", nil)
 	}
 
 	return []string{"docker", "compose"}, nil
 }
 
 // generateRemediationError formats an actionable error message.
-func generateRemediationError(reason string, originalErr error) error {
+func generateRemediationError(mainReason string, details string, originalErr error) error {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("\n    %s❌ Deployment Aborted: %s%s\n", cli.Red, reason, cli.Reset))
+	sb.WriteString(fmt.Sprintf("\n    %s❌ Deployment Aborted: %s%s\n", cli.Red, mainReason, cli.Reset))
+
+	if details != "" {
+		sb.WriteString(fmt.Sprintf("    %sDetails: %s%s\n", cli.Dim, details, cli.Reset))
+	}
 
 	// Inject the real system error (e.g., "permission denied") so you don't lose debugging context
 	if originalErr != nil {
 		sb.WriteString(fmt.Sprintf("    %sSystem Error: %v%s\n", cli.Dim, originalErr, cli.Reset))
 	}
 
-	sb.WriteString(fmt.Sprintf("    %sHoneyWire requires Docker Compose v%s+ to securely orchestrate honeypot lifecycles.%s\n\n", cli.Dim, ComposeMinVer, cli.Reset))
+	sb.WriteString(fmt.Sprintf("    %sHoneyWire requires Docker Compose v%s+ to securely orchestrate honeypot lifecycles.%s\n\n", cli.Red, ComposeMinVer, cli.Reset))
 
 	sb.WriteString(fmt.Sprintf("    %sPlease run the official upgrade command for your OS:%s\n", cli.Cyan, cli.Reset))
 	sb.WriteString("      Ubuntu/Debian:  sudo apt-get update && sudo apt-get install docker-compose-plugin\n")
@@ -128,8 +134,9 @@ func generateRemediationError(reason string, originalErr error) error {
 	sb.WriteString("      Arch:           sudo pacman -Syu docker-compose\n\n")
 
 	sb.WriteString(fmt.Sprintf("    %sIf you installed Docker manually, update the binary:%s\n", cli.Cyan, cli.Reset))
-	sb.WriteString(fmt.Sprintf("      curl -SL https://github.com/docker/compose/releases/download/v%s/docker-compose-linux-$(uname -m) -o /usr/local/lib/docker/cli-plugins/docker-compose\n", ComposeMinVer))
-	sb.WriteString("      chmod +x /usr/local/lib/docker/cli-plugins/docker-compose\n")
+	sb.WriteString("      mkdir -p ~/.docker/cli-plugins && \\ \n")
+	sb.WriteString(fmt.Sprintf("      curl -SL https://github.com/docker/compose/releases/download/%s/docker-compose-linux-$(uname -m) \\ -o ~/.docker/cli-plugins/docker-compose && \\ \n", ComposeMinVer))
+	sb.WriteString("      chmod +x ~/.docker/cli-plugins/docker-compose\n")
 
 	return errors.New(sb.String())
 }
