@@ -37,7 +37,7 @@ type SiemService interface {
 }
 
 type NotifyService interface {
-	Dispatch(title, message, severity string)
+	Dispatch(event models.Event)
 }
 
 type Service struct {
@@ -90,9 +90,7 @@ func (s *Service) ProcessEvent(e *models.Event, nodeID string) error {
 	}
 
 	if !isSilenced {
-		title := fmt.Sprintf("Intrusion Alert: %s", e.SensorID)
-		message := fmt.Sprintf("Trigger: %s\nSource: %s\nTarget: %s", e.EventTrigger, e.Source, e.Target)
-		s.notifyService.Dispatch(title, message, e.Severity)
+		s.notifyService.Dispatch(*e)
 	}
 
 	s.siemService.QueueEvent(*e)

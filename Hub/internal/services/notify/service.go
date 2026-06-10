@@ -11,6 +11,7 @@ import (
 	// codeql[go/insecure-randomness] Non-cryptographic use case.
 	// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 	"math/rand"
+	"github.com/honeywire/hub/internal/models"
 	"net/http"
 	"strconv"
 	"strings"
@@ -88,6 +89,10 @@ type WebhookPayload struct {
 	QueuedAt time.Time
 }
 
+type NodeService interface {
+	GetNodeDetails(nodeID string) (*models.Node, error)
+}
+
 type Service struct {
 	isArmed        bool
 	webhookType    string
@@ -97,13 +102,14 @@ type Service struct {
 	mu           sync.RWMutex
 	webhookQueue chan WebhookPayload
 
-	client     *http.Client
-	wg         sync.WaitGroup
-	isDraining atomic.Bool
-	rng        *rand.Rand
+	client      *http.Client
+	wg          sync.WaitGroup
+	isDraining  atomic.Bool
+	rng         *rand.Rand
+	nodeService NodeService
 }
 
-func NewService() *Service {
+func NewService(nodeService NodeService) *Service {
 	return &Service{
 		webhookQueue:   make(chan WebhookPayload, 1000),
 		severityFilter: make(map[string]struct{}),
@@ -112,7 +118,8 @@ func NewService() *Service {
 		},
 		// codeql[go/insecure-randomness] Non-cryptographic use case.
 		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
+		nodeService: nodeService,
 	}
 }
 
@@ -141,7 +148,7 @@ func (s *Service) UpdateIsArmed(isArmed bool) {
 	s.isArmed = isArmed
 }
 
-func (s *Service) Dispatch(title, message, severity string) {
+func (s *Service) Dispatch(e models.Event) {
 	if s.isDraining.Load() {
 		return
 	}
@@ -150,19 +157,44 @@ func (s *Service) Dispatch(title, message, severity string) {
 	isArmed := s.isArmed
 	webhookURL := s.webhookURL
 	webhookType := s.webhookType
-	_, allowed := s.severityFilter[strings.ToLower(severity)]
+	_, allowed := s.severityFilter[strings.ToLower(e.Severity)]
 	s.mu.RUnlock()
 
 	if !isArmed || webhookURL == "" || !allowed {
 		return
 	}
 
+	nodeAlias := e.NodeID
+	if s.nodeService != nil {
+		if nodeDetails, err := s.nodeService.GetNodeDetails(e.NodeID); err == nil && nodeDetails != nil {
+			if nodeDetails.Alias != "" {
+				nodeAlias = nodeDetails.Alias
+			}
+		}
+	}
+
+	// Unified title: "Threat detected on <node>"
+	title := fmt.Sprintf("Threat detected on %s", nodeAlias)
+
+	// Structured fields for embed-aware clients (Discord, Slack, Gotify, ntfy).
+	// Keep it terse — one fact per line, no emoji noise.
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("**Trigger:** %s\n", e.EventTrigger))
+	b.WriteString(fmt.Sprintf("**Sensor:** %s\n", e.SensorID))
+	if e.Source != "" {
+		b.WriteString(fmt.Sprintf("**Source:** %s\n", e.Source))
+	}
+	if e.Target != "" {
+		b.WriteString(fmt.Sprintf("**Target:** %s\n", e.Target))
+	}
+	b.WriteString(fmt.Sprintf("**Time:** %s", time.Now().UTC().Format("2006-01-02 15:04:05 UTC")))
+
 	payload := WebhookPayload{
 		Type:     webhookType,
 		URL:      webhookURL,
 		Title:    title,
-		Message:  message,
-		Severity: severity,
+		Message:  b.String(),
+		Severity: e.Severity,
 		QueuedAt: time.Now(),
 	}
 
@@ -281,14 +313,16 @@ func (s *Service) executeSend(payload WebhookPayload) (*http.Response, error) {
 }
 
 func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http.Response, error) {
-	priorities := map[string]int{"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10}
-	priority, exists := priorities[severity]
-	if !exists {
+	priorities := map[string]int{
+		"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10,
+	}
+	priority, ok := priorities[strings.ToLower(severity)]
+	if !ok {
 		priority = 5
 	}
 
 	payload := map[string]interface{}{
-		"title":    title,
+		"title":    title,   // now "Threat detected on <node>"
 		"message":  message,
 		"priority": priority,
 	}
@@ -296,40 +330,75 @@ func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http
 
 	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-
 	return s.client.Do(req)
 }
 
 func (s *Service) sendNtfy(webhookURL, title, message, severity string) (*http.Response, error) {
-	priorities := map[string]string{"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5"}
-	priority, exists := priorities[severity]
-	if !exists {
+	priorities := map[string]string{
+		"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5",
+	}
+	priority, ok := priorities[strings.ToLower(severity)]
+	if !ok {
 		priority = "3"
 	}
 
 	req, _ := http.NewRequest("POST", webhookURL, strings.NewReader(message))
 	req.Header.Set("Title", title)
 	req.Header.Set("Priority", priority)
-	req.Header.Set("Tags", "rotating_light")
-
+	req.Header.Set("Tags", ntfyTags(severity))
 	return s.client.Do(req)
 }
 
 func (s *Service) sendDiscordSlack(webhookURL, title, message, severity string) (*http.Response, error) {
-	icon := "⚠️"
-	if severity == "critical" || severity == "high" {
-		icon = "🚨"
-	}
-
 	payload := map[string]interface{}{
-		"content": fmt.Sprintf("%s **%s**\n%s", icon, title, message),
+		"username":   "HoneyWire",
+		"embeds": []map[string]interface{}{
+			{
+				"title":       title,
+				"description": message,
+				"color":       severityColor(severity),
+				"footer": map[string]string{
+					"text": fmt.Sprintf("Severity: %s", strings.ToUpper(severity)),
+				},
+			},
+		},
 	}
 	body, _ := json.Marshal(payload)
 
 	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
-
 	return s.client.Do(req)
+}
+
+// ============================================================================
+// FORMATTING HELPERS
+// ============================================================================
+
+// severityColor returns a decimal embed color for Discord/Slack per severity.
+func severityColor(severity string) int {
+	switch strings.ToLower(severity) {
+	case "critical":
+		return 0xE24B4A // red
+	case "high":
+		return 0xD85A30 // coral
+	case "medium":
+		return 0xBA7517 // amber
+	case "low":
+		return 0x378ADD // blue
+	default:
+		return 0x888780 // gray
+	}
+}
+
+// ntfyTags returns a comma-separated tag string for ntfy per severity.
+func ntfyTags(severity string) string {
+	base := "rotating_light,honeywire"
+	switch strings.ToLower(severity) {
+	case "critical", "high":
+		return base + ",warning"
+	default:
+		return base
+	}
 }
 
 func (s *Service) Wait() {

@@ -54,7 +54,7 @@ func main() {
 	nodeSvc := node.NewService(dbStore, wsService)
 	sensorSvc := sensor.NewService(dbStore, wsService)
 	siemService := siem.NewService(nodeSvc)
-	notifyService := notify.NewService()
+	notifyService := notify.NewService(nodeSvc)
 	eventSvc := event.NewService(dbStore, wsService, siemService, notifyService, cfg.Version)
 	configService := config.NewService(dbStore, authService, siemService, notifyService, cfg.DashboardPassword, cfg.Version)
 	composeService := composesvc.NewService(dbStore)
