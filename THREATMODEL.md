@@ -1,5 +1,3 @@
-TODO
-
 # THREAT MODEL — HoneyWire
 
 ## 1. System Overview
@@ -63,6 +61,9 @@ Hub must validate both:
 - raw registry manifests
 - Wizard-generated deployment intents (modified manifests)
 
+**Scope limitation:**
+Hub validation governs the *content it generates and returns*. It has no enforcement over what the Wizard does with that output after delivery. Post-delivery integrity (writing to disk, executing `docker compose up`) is outside the Hub's control and is instead bounded by host-level trust (see §7.2).
+
 ---
 
 ### 2.2 Wizard Trust Boundary (UNTRUSTED LOCAL COMPONENT)
@@ -74,14 +75,20 @@ It:
 - observes local system state (processes, ports, services)
 - generates sensor recommendations
 - submits deployment requests to the Hub
+- **receives Hub-generated compose output and writes it to `honeywire-compose.yml`**
+- **executes `docker compose up` against that file**
 
 The Wizard:
 - may be compromised locally
 - may leak environment metadata
 - may be manipulated to produce misleading recommendations
+- **may discard, modify, or replace Hub-generated compose output before execution**
 
 However:
 > Wizard output affects deployment inputs (configuration, sensor selection, environment values), but all outputs are re-validated by the Hub before final compose generation.
+
+**Important limitation:**
+> Hub validation protects the integrity of what the Hub *generates*. It does not protect against a compromised Wizard tampering with Hub output *after delivery* discarding it, modifying it, replaying a stale compose, or substituting an attacker-controlled file entirely. This post-delivery gap is explicitly acknowledged and accepted: the precondition for exploiting it (filesystem write access + Docker socket access on the host) is equivalent to full host compromise, which is addressed as a separate threat boundary (§7.2, Threat 3).
 
 ---
 
@@ -203,7 +210,7 @@ Mitigations:
 - compromise affects *generation*, not immediate runtime execution, meaning older deployments will not be compromised, but it can generate malicious deployment artifacts that will be executed when applied by the operator.
 
 **Mitigations (PARTIAL / FUTURE HARDENING):**
-- sandboxing the hub runs in a Pinciple of Least Privilege docker container, using distroless image, same as sensors do.
+- sandboxing the hub runs in a Principle of Least Privilege docker container, using distroless image, same as sensors do.
 - signed deployment artifacts (planned enforcement expansion)
 
 ---
@@ -214,7 +221,10 @@ Mitigations:
 - reads local environment state
 - modifies sensor recommendation logic
 - submits altered deployment requests
-- access to root executable if command execution cve were to be found
+- access to root executable if command execution CVE were to be found
+- **discards or modifies Hub-generated compose output after Hub validation**
+- **writes and executes an attacker-controlled `honeywire-compose.yml`**
+- **replays a previously valid but stale compose file**
 
 **Impact:**
 - leakage of local infrastructure metadata
@@ -222,13 +232,29 @@ Mitigations:
 - operational misconfiguration
 - if the Wizard is exploited, it may expose the local host system
 - compromise of node identity api key (this is an accepted trust boundary compromise)
+- **deployment of attacker-controlled containers regardless of Hub validation result**
+
+**Important scope clarification, post-delivery compose tampering:**
+A compromised Wizard can bypass Hub validation entirely by ignoring the Hub's compose output and executing an attacker-controlled file. Hub validation has no post-delivery enforcement capability.
+
+However, this attack is **explicitly accepted as subsumed by host compromise**. The preconditions required, write access to `honeywire-compose.yml` and access to the Docker socket, are equivalent to full root-level host access. An attacker with those capabilities has no need to abuse HoneyWire's deployment pipeline; they already own the host. The relevant threat boundary at that point is host security, not HoneyWire-specific controls.
+
+Hub validation therefore protects against:
+- malicious manifests reaching the compile stage
+- cross-node compromise (a Wizard on Node A cannot craft input that causes the Hub to generate a dangerous compose for Node B)
+- supply chain attacks where the attacker controls manifests but not a host
+
+Hub validation does NOT protect against:
+- a locally compromised Wizard choosing not to use Hub output
 
 **Mitigations (IMPLEMENTED):**
 - Wizard is fully untrusted by Hub
 - Hub re-validates all inputs independently
-- Wizard cannot override Hub-generated output
 - no deployment policy logic resides in Wizard
 - port range validation prevents local DoS from malformed `/proc` state
+
+**Accepted Risk:**
+Post-delivery compose tampering by a compromised Wizard is accepted as out of scope for HoneyWire-specific controls. It is bounded by host-level compromise, which is a prerequisite for the attack and represents a more severe, pre-existing failure condition.
 
 ---
 
@@ -242,6 +268,7 @@ Mitigations:
   - unsafe mount paths
   - injection via volume/template fields
   - modifies Wizard-generated deployment intent before Hub validation
+  - modifies Hub-generated compose output after Hub validation (see Threat 3 subsumed by host compromise)
 
 **Impact:**
 - host compromise via container escape paths
@@ -261,6 +288,7 @@ Mitigations:
 
 **Gaps:**
 - no strict command checking for init-provisioner containers
+- post-delivery compose tampering is not mitigated at the HoneyWire layer (accepted, see Threat 3)
 
 ---
 
@@ -354,8 +382,11 @@ This trade-off (Medium Risk - UX Issue) is formally accepted because:
 
 - Manifest → untrusted declarative DSL
 - Wizard → untrusted local orchestration + transformation layer
-- Hub → trusted policy enforcement + compilation engine (defensive against untrusted inputs)Hub → trusted compiler + policy enforcement
+- Hub → trusted policy enforcement + compilation engine (defensive against untrusted inputs)
 - Sensors → isolated containers in potentially hostile environments
+
+**What Hub validation does and does not guarantee:**
+Hub validation ensures the integrity of compose artifacts *as generated*. It does not provide post-delivery enforcement. A compromised Wizard may ignore Hub output entirely. This is accepted: the precondition for doing so is full host compromise, which is a separate and more severe failure condition outside HoneyWire's control plane.
 
 ---
 
@@ -386,8 +417,11 @@ Security relies on:
 - Wizard is untrusted
 - Wizard may be compromised
 - Wizard may leak environment metadata
+- **Wizard has full control over what gets written to `honeywire-compose.yml` and executed on the host — Hub validation does not constrain this**
 
-Wizard compromise does not bypass Hub validation, but it may still influence operational decisions and cause unsafe deployments if operators approve or automate its output.
+Wizard compromise does not bypass Hub validation *at the Hub*, but a compromised Wizard can choose to ignore Hub-generated output entirely after delivery. At this point the threat is equivalent to general host compromise: the attacker already has filesystem write access and Docker socket access, which implies full root-level control of the host. HoneyWire-specific controls are no longer the relevant security boundary.
+
+Wizard compromise may still influence operational decisions and cause unsafe deployments if operators approve or automate its output.
 
 ---
 
@@ -422,7 +456,7 @@ Therefore:
 - basic mount path escape attempts
 - interpolation-based injection attempts
 - dynamic volume path expansion via environment variables
-- untrusted Wizard influence on policy
+- untrusted Wizard influence on policy *at the Hub*
 - schema ambiguity (strict typing enforced)
 - port number parsing validation
 - Node apikey rate limiting
@@ -438,6 +472,10 @@ Therefore:
 - per-role execution sandbox model
 - image supply chain trust
 - manifest supply chain trust
+
+### Accepted / Out of Scope:
+- **post-delivery compose tampering by compromised Wizard** — requires full host compromise as a precondition; subsumed by host-level threat boundary (see Threat 3, §7.2)
+
 
 ---
 
