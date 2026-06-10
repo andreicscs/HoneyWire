@@ -315,7 +315,9 @@ const closeSensor = () => {
             :manifests="manifests" 
             :isLoading="isManifestLoading" 
             :fetchError="fetchError"
+            :installedSensors="node?.installedSensors || []"
             @open="openSensor"
+            @edit="editSensor"
         />
 
         <NodeKeyModal :show="showKeyModal" :apiKey="node?.apiKey || null" @close="showKeyModal = false" />
