@@ -11,7 +11,7 @@ import (
 	"github.com/honeywire/hub/internal/models"
 )
 
-func TestSyslogForwardingRFC3164(t *testing.T) {
+func TestSyslogForwardingRFC5424(t *testing.T) {
 	// Start a local TCP listener to act as the SIEM server
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -65,18 +65,16 @@ func TestSyslogForwardingRFC3164(t *testing.T) {
 	// Output the received message
 	t.Logf("Received syslog message: %s", msg)
 
-	// RFC3164 Regex Check
-	// <PRIVAL>TIMESTAMP HOSTNAME TAG[PID]: MSG
-	// TIMESTAMP is Mmm _d hh:mm:ss (where _ is space if day < 10)
-	// TAG is alphanumeric
-	rfc3164Regex := `^<(\d+)>([A-Z][a-z]{2}\s+[ \d]\d \d{2}:\d{2}:\d{2})\s+(\S+)\s+([a-zA-Z0-9]+)\[(\d+)\]:\s+(.*)\n$`
-	re := regexp.MustCompile(rfc3164Regex)
+	// RFC5424 Regex Check
+	// <PRIVAL>VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID STRUCTURED-DATA MSG
+	rfc5424Regex := `^<(\d+)>([1-9]\d{0,2})\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\[.*?\]|-)(?:\s+(.*))?\n$`
+	re := regexp.MustCompile(rfc5424Regex)
 	
 	if !re.MatchString(msg) {
-		t.Errorf("Message does not strictly match RFC3164.\nMessage: %q\nRegex: %s", msg, rfc3164Regex)
+		t.Errorf("Message does not strictly match RFC5424.\nMessage: %q\nRegex: %s", msg, rfc5424Regex)
 	} else {
 		matches := re.FindStringSubmatch(msg)
-		t.Logf("Matches: PRI=%s, TS=%q, HOST=%s, TAG=%s, PID=%s, MSG=%s", 
-			matches[1], matches[2], matches[3], matches[4], matches[5], matches[6])
+		t.Logf("Matches: PRI=%s, VER=%s, TS=%q, HOST=%s, APP=%s, PROC=%s, MSGID=%s, SD=%s, MSG=%s", 
+			matches[1], matches[2], matches[3], matches[4], matches[5], matches[6], matches[7], matches[8], matches[9])
 	}
 }

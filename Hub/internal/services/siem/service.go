@@ -109,7 +109,7 @@ type Service struct {
 
 func NewService(nodeService NodeService) *Service {
 	return &Service{
-		eventQueue:  make(chan models.Event, 5000),
+		eventQueue: make(chan models.Event, 5000),
 		// codeql[go/insecure-randomness] Non-cryptographic use case.
 		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -315,10 +315,7 @@ func (s *Service) formatSyslog(event models.Event) string {
 		}
 	}
 
-	timestamp := t.Format(time.Stamp)
-
-	hostname := "honeywire"
-	tag := "honeywireSensor"
+	timestamp := t.UTC().Format(time.RFC3339Nano)
 
 	detailsJSON, err := json.Marshal(event.Details)
 	if err != nil {
@@ -334,9 +331,14 @@ func (s *Service) formatSyslog(event models.Event) string {
 		}
 	}
 
-	return fmt.Sprintf("<%d>%s %s %s[%d]: [%s] Trigger: %s | Source: %s | Target: %s | Node: %s | Sensor: %s | Details: %s",
-		priority, timestamp, hostname, tag, event.ID, event.Severity,
-		event.EventTrigger, event.Source, event.Target, nodeAlias, event.SensorID, string(detailsJSON))
+	sd := fmt.Sprintf(
+		`[honeywire trigger="%s" source="%s" target="%s" node="%s" sensor="%s" severity="%s" details=%s]`,
+		event.EventTrigger, event.Source, event.Target,
+		nodeAlias, event.SensorID, event.Severity, string(detailsJSON),
+	)
+
+	return fmt.Sprintf("<%d>1 %s honeywire honeywireSensor - - %s %s",
+		priority, timestamp, sd, event.EventTrigger)
 }
 
 func syslogPriority(severity string) int {

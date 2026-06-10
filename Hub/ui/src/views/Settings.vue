@@ -285,7 +285,7 @@ const submitFactoryReset = async () => {
                             v-model="settings.siemProtocol" 
                             label="Protocol" 
                             :options="['tcp', 'udp']" 
-                            description="Events are sent in RFC3164 syslog format. Leave blank to disable SIEM forwarding."
+                            description="Events are sent in RFC5424 syslog format. Leave blank to disable SIEM forwarding."
                         />
                     </BaseCard>
                 </div>

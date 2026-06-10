@@ -231,7 +231,7 @@ Returns runtime configuration loaded from SQLite.
 | `webhookType` | `string` | The active push notification provider (`ntfy`, `gotify`, `discord`, `slack`, `none`). |
 | `webhookUrl` | `string` | The target URL for the selected webhook provider. |
 | `webhookEvents` | `string[]` | Array of severity levels that trigger a notification (e.g., `["critical", "high"]`). |
-| `siemAddress` | `string` | Address for RFC3164 syslog forwarding (e.g., `10.0.0.50:514`). Empty if disabled. |
+| `siemAddress` | `string` | Address for RFC5424 syslog forwarding (e.g., `10.0.0.50:514`). Empty if disabled. |
 | `siemProtocol` | `string` | Protocol for SIEM forwarding (`tcp`, `udp`). |
 
 **Response:**
