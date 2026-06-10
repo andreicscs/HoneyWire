@@ -92,22 +92,28 @@ func (s *Service) siemPolicy(fact NetworkFact, attempt int) (SiemAction, time.Du
 // SERVICE CORE & CONFIGURATION
 // ============================================================================
 
-type Service struct {
-	eventQueue chan models.Event
-	address    string
-	protocol   string
-	rng        *rand.Rand
-	mu         sync.RWMutex
-	wg         sync.WaitGroup
-	isDraining atomic.Bool
+type NodeService interface {
+	GetNodeDetails(nodeID string) (*models.Node, error)
 }
 
-func NewService() *Service {
+type Service struct {
+	eventQueue  chan models.Event
+	address     string
+	protocol    string
+	rng         *rand.Rand
+	mu          sync.RWMutex
+	wg          sync.WaitGroup
+	isDraining  atomic.Bool
+	nodeService NodeService
+}
+
+func NewService(nodeService NodeService) *Service {
 	return &Service{
-		eventQueue: make(chan models.Event, 5000),
+		eventQueue:  make(chan models.Event, 5000),
 		// codeql[go/insecure-randomness] Non-cryptographic use case.
 		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
+		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
+		nodeService: nodeService,
 	}
 }
 
@@ -309,19 +315,28 @@ func (s *Service) formatSyslog(event models.Event) string {
 		}
 	}
 
-	timestamp := t.Format("Jan 02 15:04:05")
+	timestamp := t.Format(time.Stamp)
 
 	hostname := "honeywire"
-	tag := "honeywire-sensor"
+	tag := "honeywireSensor"
 
 	detailsJSON, err := json.Marshal(event.Details)
 	if err != nil {
 		detailsJSON = []byte("{}")
 	}
 
-	return fmt.Sprintf("<%d>%s %s %s[%d]: [%s] Trigger: %s | Source: %s | Target: %s | Sensor: %s | Details: %s",
+	nodeAlias := event.NodeID
+	if s.nodeService != nil {
+		if nodeDetails, err := s.nodeService.GetNodeDetails(event.NodeID); err == nil && nodeDetails != nil {
+			if nodeDetails.Alias != "" {
+				nodeAlias = nodeDetails.Alias
+			}
+		}
+	}
+
+	return fmt.Sprintf("<%d>%s %s %s[%d]: [%s] Trigger: %s | Source: %s | Target: %s | Node: %s | Sensor: %s | Details: %s",
 		priority, timestamp, hostname, tag, event.ID, event.Severity,
-		event.EventTrigger, event.Source, event.Target, event.SensorID, string(detailsJSON))
+		event.EventTrigger, event.Source, event.Target, nodeAlias, event.SensorID, string(detailsJSON))
 }
 
 func syslogPriority(severity string) int {
