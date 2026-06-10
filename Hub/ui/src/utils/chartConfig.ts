@@ -1,7 +1,7 @@
 // src/utils/chartConfig.js
 import { getComputedRgb, injectAlpha } from './theme'
 
-export const baseTooltipConfig = {
+export const baseTooltipConfig: Record<string, any> = {
     borderWidth: 1, 
     padding: 10, 
     boxPadding: 6, 
@@ -12,7 +12,7 @@ export const baseTooltipConfig = {
     bodyFont: { size: 12, family: 'Inter, sans-serif', weight: 'bold' }
 }
 
-export const applyChartTheme = (chartInstance) => {
+export const applyChartTheme = (chartInstance: any): void => {
     if (!chartInstance) return;
     
     // Dynamically pull colors from the DOM

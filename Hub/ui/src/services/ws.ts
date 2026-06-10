@@ -4,7 +4,23 @@
  * Decoupled from Vue reactivity - uses an Event-Emitter pattern to pass data to stores.
  */
 export class HoneyWireWS {
-  constructor(baseUrl = window.location.origin) {
+  baseUrl: string;
+  ws: WebSocket | null;
+  isDestroyed: boolean;
+  retryCount: number;
+  maxRetries: number;
+  baseRetryDelay: number;
+  maxRetryDelay: number;
+  reconnectTimeoutId: ReturnType<typeof setTimeout> | null;
+  pingIntervalMs: number;
+  pongTimeoutMs: number;
+  pingIntervalId: ReturnType<typeof setInterval> | null;
+  pongTimeoutId: ReturnType<typeof setTimeout> | null;
+  sendQueue: string[];
+  eventMapping: Record<string, string>;
+  callbacks: Record<string, ((...args: any[]) => void) | null>;
+
+  constructor(baseUrl: string = window.location.origin) {
     this.baseUrl = baseUrl;
     this.ws = null;
     this.isDestroyed = false;
@@ -44,14 +60,14 @@ export class HoneyWireWS {
       onReconnect: null,
       onDisconnect: null,
       onError: null,
-      ...Object.values(this.eventMapping).reduce((acc, curr) => ({ ...acc, [curr]: null }), {})
+      ...Object.values(this.eventMapping).reduce((acc: Record<string, any>, curr: string) => ({ ...acc, [curr]: null }), {})
     };
   }
 
   /**
    * Register a callback for a specific message or lifecycle event
    */
-  on(eventType, callback) {
+  on(eventType: string, callback: (...args: any[]) => void): void {
     if (Object.prototype.hasOwnProperty.call(this.callbacks, eventType)) {
       this.callbacks[eventType] = callback;
     } else {
@@ -63,7 +79,7 @@ export class HoneyWireWS {
   /**
    * Establish WebSocket connection with automatic handling
    */
-  connect() {
+  connect(): void {
     if (this.isDestroyed) return;
 
     // Clean up any stray timeouts/existing connections safely first
@@ -106,15 +122,15 @@ export class HoneyWireWS {
       }
     };
 
-    this.ws.onmessage = (event) => {
+    this.ws.onmessage = (event: MessageEvent) => {
       this._handleMessage(event);
     };
 
-    this.ws.onerror = (error) => {
+    this.ws.onerror = (error: Event) => {
       if (this.callbacks.onError) this.callbacks.onError(error);
     };
 
-    this.ws.onclose = (event) => {
+    this.ws.onclose = (event: CloseEvent) => {
       this._stopHeartbeat();
       
       if (this.callbacks.onDisconnect) {
@@ -130,11 +146,11 @@ export class HoneyWireWS {
   /**
    * Send data out to the server safely, queuing if offline
    */
-  send(type, payload = {}) {
+  send(type: string, payload: any = {}): void {
     const messageStr = JSON.stringify({ type, payload });
 
     if (this.isConnected()) {
-      this.ws.send(messageStr);
+      this.ws?.send(messageStr);
     } else if (!this.isDestroyed) {
       this.sendQueue.push(messageStr);
     }
@@ -143,14 +159,14 @@ export class HoneyWireWS {
   /**
    * Check connection status safely
    */
-  isConnected() {
-    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
   /**
    * Total Teardown
    */
-  disconnect() {
+  disconnect(): void {
     this.isDestroyed = true;
     this._clearReconnection();
     this._stopHeartbeat();
@@ -166,7 +182,7 @@ export class HoneyWireWS {
    * Private Engine Methods
    */
 
-  _handleMessage(event) {
+  _handleMessage(event: MessageEvent): void {
     // Any message received (including your SYNC_CHARTS broadcast) resets our sanity timer
     this._startHeartbeat(); 
 
@@ -181,7 +197,7 @@ export class HoneyWireWS {
     }
   }
 
-  _scheduleReconnect() {
+  _scheduleReconnect(): void {
     if (this.reconnectTimeoutId) return; // Block stacked racing timeouts
 
     this.retryCount++;
@@ -200,14 +216,14 @@ export class HoneyWireWS {
     }, finalDelay);
   }
 
-  _clearReconnection() {
+  _clearReconnection(): void {
     if (this.reconnectTimeoutId) {
       clearTimeout(this.reconnectTimeoutId);
       this.reconnectTimeoutId = null;
     }
   }
 
-_startHeartbeat() {
+  _startHeartbeat(): void {
   this._stopHeartbeat();
 
   // If we don't hear a single word from the server for 35 seconds, 
@@ -218,23 +234,23 @@ _startHeartbeat() {
   }, 35000); 
 }
 
-  _resetPongTimeout() {
+  _resetPongTimeout(): void {
     if (this.pongTimeoutId) {
       clearTimeout(this.pongTimeoutId);
       this.pongTimeoutId = null;
     }
   }
 
-  _stopHeartbeat() {
+  _stopHeartbeat(): void {
     if (this.pingIntervalId) clearInterval(this.pingIntervalId);
     this._resetPongTimeout();
     this.pingIntervalId = null;
   }
 
-  _flushQueue() {
+  _flushQueue(): void {
     while (this.sendQueue.length > 0 && this.isConnected()) {
       const msg = this.sendQueue.shift();
-      this.ws.send(msg);
+      if (msg && this.ws) this.ws.send(msg);
     }
   }
 }

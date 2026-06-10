@@ -1,19 +1,19 @@
-export function getCssVariable(variableName) {
+export function getCssVariable(variableName: string): string {
     if (typeof window === 'undefined') return '';
     return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
 }
 
-export function hexToRgb(hex) {
+export function hexToRgb(hex: string): string {
     if (!hex) return '0, 0, 0';
     hex = hex.replace(/^#/, '');
     if (hex.length === 3) {
-        hex = hex.split('').map(c => c + c).join('');
+        hex = hex.split('').map((c: string) => c + c).join('');
     }
     const num = parseInt(hex, 16);
     return `${num >> 16}, ${(num >> 8) & 255}, ${num & 255}`;
 }
 
-export function getComputedRgb(variableName) {
+export function getComputedRgb(variableName: string): string {
     if (typeof window === 'undefined') return 'rgb(0, 0, 0)';
     
     // 1. Let the browser resolve the CSS variable
@@ -32,6 +32,7 @@ export function getComputedRgb(variableName) {
     canvas.width = 1;
     canvas.height = 1;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return 'rgb(0, 0, 0)';
     
     // The canvas engine natively translates OKLCH to visual pixels
     ctx.fillStyle = cssColor;
@@ -43,7 +44,7 @@ export function getComputedRgb(variableName) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-export function injectAlpha(rgbString, alpha) {
+export function injectAlpha(rgbString: string, alpha: number | string): string {
     if (!rgbString || !rgbString.includes('rgb')) return `rgba(0,0,0,${alpha})`;
     
     // Safely convert rgb(r, g, b) to rgba(r, g, b, alpha)

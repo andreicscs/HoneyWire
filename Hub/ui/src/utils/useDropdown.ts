@@ -2,15 +2,16 @@
 import { ref } from 'vue'
 
 // This exists exactly ONCE in the entire application's memory
-export const globalActiveMenuId = ref(null)
+export const globalActiveMenuId = ref<string | null>(null)
 
-let listenersAttached = false
+let listenersAttached: boolean = false
 
-export const initGlobalDropdownListeners = () => {
+export const initGlobalDropdownListeners = (): void => {
     if (listenersAttached || typeof window === 'undefined') return
     
-    window.addEventListener('click', (e) => {
-        if (!e.target.closest('.meatball-trigger') && !e.target.closest('.meatball-dropdown')) {
+    window.addEventListener('click', (e: Event) => {
+        const target = e.target as Element | null;
+        if (target && !target.closest('.meatball-trigger') && !target.closest('.meatball-dropdown')) {
             globalActiveMenuId.value = null
         }
     }, true)

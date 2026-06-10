@@ -1,9 +1,9 @@
 import { ref } from 'vue'
 
 export function useClipboard() {
-    const copiedStates = ref({})
+    const copiedStates = ref<Record<string, boolean>>({})
 
-    const handleCopy = async (id, text) => {
+    const handleCopy = async (id: string, text: string): Promise<void> => {
         if (!text) return
         try {
             if (navigator.clipboard && window.isSecureContext) {

@@ -5,7 +5,7 @@
  * @param {string} sensorId
  * @returns {string}
  */
-export const formatSensorId = (sensorId) => {
-    if (!sensorId) return sensorId
+export const formatSensorId = (sensorId: string | null | undefined): string => {
+    if (!sensorId) return sensorId || '';
     return sensorId.replace(/^hw-sensor-/, '')
 }
