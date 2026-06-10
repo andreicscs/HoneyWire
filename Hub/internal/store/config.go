@@ -117,17 +117,18 @@ func (s *SQLiteStore) FactoryReset() error {
 	if err != nil {
 		return err
 	}
-	// Defers are safe here; tx.Rollback() is a no-op if tx.Commit() succeeds.
-	defer tx.Rollback()
+	defer tx.Rollback() // Rollback on any error.
 
-	// Wipe all tables (Order matters if foreign keys aren't set to CASCADE,
-	// though ours are, it is best practice to be explicit).
+	// Wipe all tables. The order is important for manual deletion without cascades.
+	// It is best practice to be explicit, even though ON DELETE CASCADE is enabled.
 	queries := []string{
 		"DELETE FROM events",
 		"DELETE FROM sensor_heartbeats",
 		"DELETE FROM node_sensors",
 		"DELETE FROM nodes",
 		"DELETE FROM config",
+		// Reset the autoincrement counter for the events table.
+		"DELETE FROM sqlite_sequence WHERE name = 'events'",
 	}
 
 	for _, q := range queries {
@@ -136,9 +137,10 @@ func (s *SQLiteStore) FactoryReset() error {
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
+	// Re-initialize default config within the same transaction.
+	if err := initializeDefaultConfigTx(tx); err != nil {
 		return err
 	}
 
-	return InitializeDefaultConfig(s.DB)
+	return tx.Commit()
 }

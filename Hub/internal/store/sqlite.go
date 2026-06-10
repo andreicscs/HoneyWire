@@ -113,6 +113,19 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 }
 
 func InitializeDefaultConfig(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := initializeDefaultConfigTx(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func initializeDefaultConfigTx(tx *sql.Tx) error {
 	defaults := map[string]string{
 		"is_armed":          "true",
 		"webhook_type":      "ntfy",
@@ -124,11 +137,6 @@ func InitializeDefaultConfig(db *sql.DB) error {
 		"siem_protocol":     "tcp",
 	}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
 	stmt, err := tx.Prepare("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)")
 	if err != nil {
 		return err
@@ -137,10 +145,9 @@ func InitializeDefaultConfig(db *sql.DB) error {
 
 	for k, v := range defaults {
 		if _, err := stmt.Exec(k, v); err != nil {
-			tx.Rollback()
 			return err
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
