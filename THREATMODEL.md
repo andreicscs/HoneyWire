@@ -27,7 +27,7 @@ External sensor definitions dictate container images, capabilities, and mounts.
 
 ### 2.4 Execution Boundary (Docker Runtime)
 Sensors execute as isolated containers.
-* **Assumption:** Docker isolation is not absolute security. Host systems may be compromised, and containers are treated as potentially hostile execution units requiring least-privilege configurations.
+* **Assumption:** Docker isolation is not absolute security. Host systems may be compromised, and containers are treated as potentially hostile execution units requiring least-privilege configurations. To minimize post-compromise attacker capabilities, official components and sensors use minimal, shell-less "Distroless" base images.
 
 ---
 
@@ -67,6 +67,7 @@ Sensors execute as isolated containers.
   * Forbidden mount path denylist validation.
   * Read-only root filesystem enforcement for main sensor containers.
   * Security-opt enforcement (`no-new-privileges`).
+  * Distroless execution environments (no shell, package manager, or standard utilities) for all official Hub and Sensor images.
   * Dynamic volume path validation during Compose generation.
   * Explicit sandboxing role separation (e.g., heavily hardened `sensor-runtime` vs. scoped `init-provisioner`).
 
@@ -117,4 +118,4 @@ HoneyWire security is not based on trust. It is predicated on strict verificatio
 2. **All Inputs are Untrusted:** External manifests, local Wizard requests and deployed sensors telemetry are treated as hostile input.
 3. **Compile-Time Security:** Security policies (capabilities, mounts, read-only constraints) are structurally enforced during Compose generation, before runtime execution begins.
 4. **Deterministic Generation:** The compiler must produce predictable, auditable artifacts.
-5. **Least Privilege:** Containers are assumed to be potentially hostile units, defaulting to read-only environments with explicitly allowed capabilities.
+5. **Least Privilege:** Containers are assumed to be potentially hostile units, defaulting to read-only environments with explicitly allowed capabilities, and executed via Distroless base images to eliminate secondary payload tooling.
