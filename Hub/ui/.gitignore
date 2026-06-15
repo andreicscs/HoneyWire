@@ -19,6 +19,8 @@ node_modules/
 ui/dist/
 npm-debug.log*
 
+.vite
+
 # =========================
 # Go & Binaries
 # =========================
