@@ -60,6 +60,7 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 	SendJSON(w, http.StatusOK, map[string]interface{}{
 		"hubEndpoint":     cfg.HubEndpoint,
+		"registryUrl":     cfg.RegistryURL,
 		"autoArchiveDays": cfg.AutoArchiveDays,
 		"autoPurgeDays":   cfg.AutoPurgeDays,
 		"webhookType":     cfg.WebhookType,
