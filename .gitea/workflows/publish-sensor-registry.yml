@@ -116,10 +116,14 @@ jobs:
           echo "✅ Versioned manifest built successfully"
 
       # -------------------------------------------------
-      # 5. SWITCH TO REGISTRY-PAGES BRANCH
+      # 5. COPY SCRIPT & SWITCH TO REGISTRY-PAGES BRANCH
       # -------------------------------------------------
       - name: Checkout registry-pages branch
         run: |
+          # Copy the index builder script so it survives the branch switch
+          cp scripts/build-registry-index.sh /tmp/build-registry-index.sh
+          chmod +x /tmp/build-registry-index.sh
+
           git config user.name "HoneyWire CI"
           git config user.email "ci@honeywire.dev"
 
@@ -155,9 +159,7 @@ jobs:
       # -------------------------------------------------
       - name: Rebuild index.json
         run: |
-          # The build script lives on main, copy it from the fetched ref
-          git show origin/main:scripts/build-registry-index.sh > /tmp/build-registry-index.sh
-          chmod +x /tmp/build-registry-index.sh
+          # Run the script we copied earlier
           /tmp/build-registry-index.sh
 
           echo "✅ index.json regenerated"
