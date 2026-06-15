@@ -117,7 +117,7 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 				if HubAPIVersion > wizardMinHubAPI {
 					log.Printf("[!] Warning: Wizard on node %s is out of date (MinHubAPI: %d, HubAPIVersion: %d). Please update the Wizard.", nodeID, wizardMinHubAPI, HubAPIVersion)
 				}
-			} else {
+			} else if strings.Contains(strings.ToLower(r.Header.Get("User-Agent")), "wizard") {
 				log.Printf("[!] Warning: Wizard on node %s did not provide version headers.", nodeID)
 			}
 

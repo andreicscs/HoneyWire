@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 // Represents the exact JSON schema returned by GET /api/v1/config
 export interface ConfigApiResponse {
   hubEndpoint: string
+  registryUrl: string
   autoArchiveDays: number
   autoPurgeDays: number
   webhookType: string
@@ -18,6 +19,7 @@ export interface ConfigApiResponse {
 export interface ConfigState {
   isLoaded: boolean
   hubEndpoint: string
+  registryUrl: string
   autoArchiveDays: number
   autoPurgeDays: number
   webhookType: string
@@ -31,6 +33,7 @@ export const useConfigStore = defineStore('config', () => {
   const state = ref<ConfigState>({
     isLoaded: false,
     hubEndpoint: '',
+    registryUrl: '',
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     webhookType: 'ntfy',
@@ -46,6 +49,7 @@ export const useConfigStore = defineStore('config', () => {
       const data = (await res.json()) as ConfigApiResponse
       
       state.value.hubEndpoint = data.hubEndpoint || window.location.origin
+      state.value.registryUrl = data.registryUrl || ''
       state.value.autoArchiveDays = data.autoArchiveDays != null ? data.autoArchiveDays : 0
       state.value.autoPurgeDays = data.autoPurgeDays != null ? data.autoPurgeDays : 0
       state.value.webhookType = data.webhookType || 'ntfy'

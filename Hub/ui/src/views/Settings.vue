@@ -27,6 +27,7 @@ const settingTabs = [
 
 const settings = ref({
     hubEndpoint: window.location.origin,
+    registryUrl: '',
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     webhookType: 'ntfy',
@@ -42,6 +43,7 @@ watch(() => configStore.config.isLoaded, (loaded) => {
     if (loaded) {
         const loadedSettings = {
             hubEndpoint: configStore.config.hubEndpoint || window.location.origin,
+            registryUrl: configStore.config.registryUrl || '',
             autoArchiveDays: configStore.config.autoArchiveDays !== undefined ? configStore.config.autoArchiveDays : 0,
             autoPurgeDays: configStore.config.autoPurgeDays !== undefined ? configStore.config.autoPurgeDays : 0,
             webhookType: configStore.config.webhookType || 'ntfy',
@@ -193,11 +195,16 @@ const submitFactoryReset = async () => {
                 
                 <div v-show="activeTab === 'general'">
                     <BaseCard title="Network Configuration">
-                        <div class="max-w-md">
+                        <div class="max-w-md space-y-4">
                             <BaseInput 
                                 v-model="settings.hubEndpoint" 
                                 label="Hub Endpoint URL" 
                                 description="The publicly accessible URL or IP where sensors will send their telemetry." 
+                            />
+                            <BaseInput 
+                                v-model="settings.registryUrl" 
+                                label="Sensor Registry URL" 
+                                description="The public registry URL from which to download sensor updates." 
                             />
                         </div>
                         
