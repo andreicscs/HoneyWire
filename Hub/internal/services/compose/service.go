@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
 	"sync"
 
 
@@ -23,10 +24,22 @@ type Store interface {
 	SetNodeDesiredRevision(nodeID, rev string) error
 }
 
+type RegistryIndex struct {
+	Sensors []struct {
+		ID       string `json:"id"`
+		Latest   string `json:"latest"`
+		Versions []struct {
+			V         string `json:"v"`
+			MinHubAPI string `json:"min_hub_api"`
+		} `json:"versions"`
+	} `json:"sensors"`
+}
+
 type Service struct {
-	store Store
-	cache map[string]models.SensorManifest
-	mu    sync.RWMutex
+	store      Store
+	cache      map[string]models.SensorManifest
+	indexCache *RegistryIndex
+	mu         sync.RWMutex
 }
 
 func NewService(store Store) *Service {
@@ -54,45 +67,67 @@ type PreviewRequest struct {
 
 // --- MANIFEST FETCHING ---
 
-func (s *Service) FetchManifestBytes() ([]byte, error) {
-	manifests, err := s.fetchStrictCatalogManifests()
+func (s *Service) FetchManifestBytes(currentHubAPI int) ([]byte, error) {
+	manifests, err := s.fetchStrictCatalogManifests(currentHubAPI)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(manifests)
 }
 
-func (s *Service) fetchStrictCatalogManifests() ([]models.SensorManifest, error) {
+func (s *Service) fetchStrictCatalogManifests(currentHubAPI int) ([]models.SensorManifest, error) {
 	registryURL, err := s.store.GetConfigValue("registry_url")
 	if err != nil || registryURL == "" {
-		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages"
+		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages" // TODO implement the default in the store level. and check that url actually works...
 	}
 
 	indexURL := strings.TrimRight(registryURL, "/") + "/index.json"
+	var idx RegistryIndex
+	
 	resp, err := http.Get(indexURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("registry returned status %d", resp.StatusCode)
-	}
-
-	var idx struct {
-		Sensors []struct {
-			ID     string `json:"id"`
-			Latest string `json:"latest"`
-		} `json:"sensors"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&idx); err != nil {
-		return nil, err
+	if err != nil || resp.StatusCode != http.StatusOK {
+		log.Printf("[WARNING] Registry fetch failed (err: %v), falling back to index cache.", err)
+		s.mu.RLock()
+		cachedIdx := s.indexCache
+		s.mu.RUnlock()
+		if cachedIdx == nil {
+			return nil, fmt.Errorf("registry unreachable and no local index cache available")
+		}
+		idx = *cachedIdx
+	} else {
+		defer resp.Body.Close()
+		if err := json.NewDecoder(resp.Body).Decode(&idx); err != nil {
+			return nil, err
+		}
+		
+		// Update index cache
+		s.mu.Lock()
+		s.indexCache = &idx
+		s.mu.Unlock()
 	}
 
 	var result []models.SensorManifest
 
 	for _, sensor := range idx.Sensors {
-		cacheKey := sensor.ID + "-v" + sensor.Latest
+		targetVersion := ""
+		
+		// Find the highest version where min_hub_api <= currentHubAPI
+		// Assuming versions are ordered [lowest -> highest] by the build script
+		for i := len(sensor.Versions) - 1; i >= 0; i-- {
+			if reqAPI, err := strconv.Atoi(strings.TrimSpace(sensor.Versions[i].MinHubAPI)); err == nil {
+				if currentHubAPI >= reqAPI {
+					targetVersion = sensor.Versions[i].V
+					break
+				}
+			}
+		}
+
+		if targetVersion == "" {
+			log.Printf("[WARNING] No compatible version found for sensor %s", sensor.ID)
+			continue
+		}
+
+		cacheKey := sensor.ID + "-v" + targetVersion
 		s.mu.RLock()
 		cached, ok := s.cache[cacheKey]
 		s.mu.RUnlock()
@@ -103,7 +138,7 @@ func (s *Service) fetchStrictCatalogManifests() ([]models.SensorManifest, error)
 		}
 
 		sensorName := strings.TrimPrefix(sensor.ID, "hw-sensor-")
-		manifestURL := fmt.Sprintf("%s/%s-v%s.json", strings.TrimRight(registryURL, "/"), sensorName, sensor.Latest)
+		manifestURL := fmt.Sprintf("%s/%s-v%s.json", strings.TrimRight(registryURL, "/"), sensorName, targetVersion)
 
 		mResp, fetchErr := http.Get(manifestURL)
 		if fetchErr != nil {
@@ -135,7 +170,7 @@ func (s *Service) fetchStrictCatalogManifests() ([]models.SensorManifest, error)
 
 // --- GENERATION LOGIC ---
 
-func (s *Service) GetNodeCompose(token, hostFallback string) ([]byte, error) {
+func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) ([]byte, error) {
 	nodeID, err := s.store.GetNodeByKey(token)
 	if err != nil || nodeID == "" {
 		return nil, fmt.Errorf("unauthorized")
@@ -165,7 +200,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string) ([]byte, error) {
 		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors)
 	}
 
-	manifests, fetchErr := s.fetchStrictCatalogManifests()
+	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubAPI)
 	if fetchErr != nil {
 		log.Printf("[ERROR] fetchStrictCatalogManifests failed: %v", fetchErr)
 		return nil, fmt.Errorf("failed_to_fetch")
@@ -187,6 +222,15 @@ func (s *Service) GetNodeCompose(token, hostFallback string) ([]byte, error) {
 
 		if valErr := security.ValidateManifest(manifest); valErr != nil {
 			return nil, fmt.Errorf("invalid_manifest: %w", valErr)
+		}
+
+		if manifest.MinHubAPI != "" {
+			if minAPI, err := strconv.Atoi(strings.TrimSpace(manifest.MinHubAPI)); err == nil {
+				if currentHubAPI < minAPI {
+					log.Printf("[ERROR] Sensor %s requires Hub API %d, but Hub is running API %d", sensor.ID, minAPI, currentHubAPI)
+					return nil, fmt.Errorf("incompatible_sensor: %s requires Hub API %d", sensor.ID, minAPI)
+				}
+			}
 		}
 
 		userVars := make(map[string]string)

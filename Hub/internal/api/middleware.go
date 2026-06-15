@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"strconv"
 	"sync"
 
 	"golang.org/x/time/rate"
@@ -108,8 +108,11 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 			// Version handshake
 			wizardMinHubAPIStr := r.Header.Get("X-Wizard-Min-Hub-Api")
 			if wizardMinHubAPIStr != "" {
-				var wizardMinHubAPI int
-				fmt.Sscanf(wizardMinHubAPIStr, "%d", &wizardMinHubAPI)
+				wizardMinHubAPI, err := strconv.Atoi(strings.TrimSpace(wizardMinHubAPIStr))
+				if err != nil {
+					http.Error(w, "Invalid X-Wizard-Min-Hub-Api format", http.StatusBadRequest)
+					return
+				}
 				if HubAPIVersion < wizardMinHubAPI {
 					http.Error(w, "This Wizard requires Hub v"+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
 					return

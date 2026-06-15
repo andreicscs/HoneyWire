@@ -121,6 +121,17 @@ func TestAgentAuthMiddleware(t *testing.T) {
 		freshHandler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 	})
+
+	t.Run("Wizard Version Mismatch", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.Header.Set("X-Api-Key", "agent-key")
+		// Simulate a Wizard requesting a highly futuristic Hub API version
+		req.Header.Set("X-Wizard-Min-Hub-Api", "99")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		// Should return HTTP 426 Upgrade Required
+		assert.Equal(t, http.StatusUpgradeRequired, rec.Code)
+	})
 }
 
 func TestDualAuthMiddleware(t *testing.T) {

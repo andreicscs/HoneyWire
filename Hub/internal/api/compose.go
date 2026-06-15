@@ -26,7 +26,7 @@ func (h *ComposeHandler) GetNodeCompose(w http.ResponseWriter, r *http.Request) 
 	}
 
 	hostFallback := "https://" + r.Host
-	yamlData, err := h.service.GetNodeCompose(token, hostFallback)
+	yamlData, err := h.service.GetNodeCompose(token, hostFallback, HubAPIVersion)
 	if err != nil {
 		if err.Error() == "unauthorized" {
 			RespondError(w, "Unauthorized", http.StatusUnauthorized)
