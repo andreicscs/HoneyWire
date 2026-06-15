@@ -14,6 +14,7 @@ import (
 )
 
 const wizardUserAgent = "HoneyWire-Wizard/2.0"
+const WizardMinHubAPI = 1
 
 type HubClient struct {
 	baseURL string

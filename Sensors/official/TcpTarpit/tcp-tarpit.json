@@ -1,0 +1,117 @@
+{
+  "id": "hw-sensor-tcp-tarpit",
+  "version": "1.0.0",
+  "schema_version": "1.0",
+  "min_hub_api": "1",
+  "min_wizard_version": "1.0.0",
+  "name": "TCP Tarpit (Credential Trap)",
+  "category": "network",
+  "osi_layer": "Network Layer",
+  "icon_svg": "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  "description": "Slows credential brute-force attacks by holding connections open indefinitely.",
+  "documentation": {
+    "summary": "The TCP Tarpit acts as a credential trap for internal network sweeps and compromised devices attempting to pivot. It responds to connection attempts on decoy ports with slow, hanging responses that consume the attacker's resources.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Connection Exhaustion: Holds malicious lateral connections open for extended periods.",
+          "Banner Spoofing: Mimics legitimate internal services to attract rogue scanning.",
+          "Resource Denial: Consumes attacker threads and bandwidth silently."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Host Network Mode: Direct access to host networking for port binding.",
+          "Isolated Execution: No persistent data or external dependencies."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {
+      "processes": [
+        "mysqld",
+        "postgres",
+        "redis-server",
+        "mongod",
+        "mariadb",
+        "sshd",
+        "docker-proxy",
+        "memcached",
+        "rabbitmq",
+        "etcd"
+      ],
+      "ports": [
+        3306,
+        5432,
+        6379,
+        27017,
+        22,
+        11211,
+        5672,
+        2379
+      ]
+    },
+    "recommendation_reason": "Database or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-tcp-tarpit",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_DECOY_PORTS",
+        "description": "Comma-separated list of internal ports to tarpit.",
+        "default": "2222,3306",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_TARPIT_MODE",
+        "description": "Tarpit behavior mode.",
+        "default": "hold",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_TARPIT_BANNER",
+        "description": "Service banner to spoof.",
+        "default": "SSH-2.0-OpenSSH_8.2p1\\r\\n",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-tcptarpit",
+    "image_tag": "latest",
+    "image_digest": ""
+  }
+}

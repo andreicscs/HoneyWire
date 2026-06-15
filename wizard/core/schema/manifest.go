@@ -4,6 +4,7 @@ type SensorManifest struct {
 	ID               string        `json:"id"`
 	Version          string        `json:"version"`
 	SchemaVersion    string        `json:"schema_version"`
+	MinHubAPI        string        `json:"min_hub_api"`
 	MinWizardVersion string        `json:"min_wizard_version"`
 	Name             string        `json:"name"`
 	Category         string        `json:"category"`
@@ -39,7 +40,9 @@ type Triggers struct {
 }
 
 type Deployment struct {
-	Image           string           `json:"image"`
+	ImageRepository string           `json:"image_repository"`
+	ImageTag        string           `json:"image_tag"`
+	ImageDigest     string           `json:"image_digest,omitempty"`
 	NetworkMode     string           `json:"network_mode"`
 	User            string           `json:"user,omitempty"`
 	CapAdd          []string         `json:"cap_add,omitempty"`
@@ -50,10 +53,12 @@ type Deployment struct {
 }
 
 type InitContainer struct {
-	Name         string        `json:"name"`
-	Image        string        `json:"image"`
-	Command      string        `json:"command"`
-	VolumeMounts []VolumeMount `json:"volume_mounts,omitempty"`
+	Name            string        `json:"name"`
+	ImageRepository string        `json:"image_repository"`
+	ImageTag        string        `json:"image_tag"`
+	ImageDigest     string        `json:"image_digest,omitempty"`
+	Command         string        `json:"command"`
+	VolumeMounts    []VolumeMount `json:"volume_mounts,omitempty"`
 }
 
 type VolumeMount struct {

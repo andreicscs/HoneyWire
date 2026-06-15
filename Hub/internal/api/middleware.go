@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,7 +21,10 @@ type NodeAuthenticator interface {
 
 type contextKey string
 
-const NodeIDKey contextKey = "nodeID"
+const (
+	NodeIDKey     contextKey = "nodeID"
+	HubAPIVersion            = 2
+)
 
 // RateLimiter controls the frequency of requests on a per-node basis.
 type RateLimiter struct {
@@ -98,6 +103,22 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 			if !rateLimiter.Allow(nodeID) {
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return
+			}
+
+			// Version handshake
+			wizardMinHubAPIStr := r.Header.Get("X-Wizard-Min-Hub-Api")
+			if wizardMinHubAPIStr != "" {
+				var wizardMinHubAPI int
+				fmt.Sscanf(wizardMinHubAPIStr, "%d", &wizardMinHubAPI)
+				if HubAPIVersion < wizardMinHubAPI {
+					http.Error(w, "This Wizard requires Hub v"+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
+					return
+				}
+				if HubAPIVersion > wizardMinHubAPI {
+					log.Printf("[!] Warning: Wizard on node %s is out of date (MinHubAPI: %d, HubAPIVersion: %d). Please update the Wizard.", nodeID, wizardMinHubAPI, HubAPIVersion)
+				}
+			} else {
+				log.Printf("[!] Warning: Wizard on node %s did not provide version headers.", nodeID)
 			}
 
 			ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)

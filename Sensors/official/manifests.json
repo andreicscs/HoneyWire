@@ -3,6 +3,7 @@
     "id": "hw-sensor-tcp-tarpit",
     "version": "1.0.0",
     "schema_version": "1.0",
+    "min_hub_api": "1",
     "min_wizard_version": "1.0.0",
     "name": "TCP Tarpit (Credential Trap)",
     "category": "network",
@@ -33,13 +34,32 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["mysqld", "postgres", "redis-server", "mongod", "mariadb", "sshd", "docker-proxy", "memcached", "rabbitmq", "etcd"],
-        "ports": [3306, 5432, 6379, 27017, 22, 11211, 5672, 2379]
+        "processes": [
+          "mysqld",
+          "postgres",
+          "redis-server",
+          "mongod",
+          "mariadb",
+          "sshd",
+          "docker-proxy",
+          "memcached",
+          "rabbitmq",
+          "etcd"
+        ],
+        "ports": [
+          3306,
+          5432,
+          6379,
+          27017,
+          22,
+          11211,
+          5672,
+          2379
+        ]
       },
       "recommendation_reason": "Database or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-tcptarpit:latest",
       "network_mode": "host",
       "env_vars": [
         {
@@ -90,13 +110,17 @@
           "required": false,
           "hidden": false
         }
-      ]
+      ],
+      "image_repository": "ghcr.io/andreicscs/honeywire-tcptarpit",
+      "image_tag": "latest",
+      "image_digest": ""
     }
   },
   {
     "id": "hw-sensor-web-router-decoy",
     "version": "1.0.0",
     "schema_version": "1.0",
+    "min_hub_api": "1",
     "min_wizard_version": "1.0.0",
     "name": "Web Router Decoy",
     "category": "web",
@@ -127,13 +151,28 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["nginx", "apache2", "httpd", "lighttpd", "docker-proxy", "traefik", "caddy", "envoy", "haproxy"],
-        "ports": [80, 443, 8080, 8443, 9000]
+        "processes": [
+          "nginx",
+          "apache2",
+          "httpd",
+          "lighttpd",
+          "docker-proxy",
+          "traefik",
+          "caddy",
+          "envoy",
+          "haproxy"
+        ],
+        "ports": [
+          80,
+          443,
+          8080,
+          8443,
+          9000
+        ]
       },
       "recommendation_reason": "Web server detected. Deploy fake admin panel to catch internal network snooping."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-webdecoy:latest",
       "network_mode": "bridge",
       "env_vars": [
         {
@@ -176,13 +215,17 @@
           "required": false,
           "hidden": false
         }
-      ]
+      ],
+      "image_repository": "ghcr.io/andreicscs/honeywire-webdecoy",
+      "image_tag": "latest",
+      "image_digest": ""
     }
   },
   {
     "id": "hw-sensor-file-canary",
     "version": "1.0.0",
     "schema_version": "1.0",
+    "min_hub_api": "1",
     "min_wizard_version": "1.0.0",
     "name": "File Canary (FIM)",
     "category": "file",
@@ -215,18 +258,28 @@
     },
     "heuristics": {
       "triggers": {
-        "processes": ["python3", "node", "java", "nginx", "apache2", "httpd", "php-fpm", "docker-proxy", "ruby", "perl", "go"]
+        "processes": [
+          "python3",
+          "node",
+          "java",
+          "nginx",
+          "apache2",
+          "httpd",
+          "php-fpm",
+          "docker-proxy",
+          "ruby",
+          "perl",
+          "go"
+        ]
       },
       "recommendation_reason": "Runtime/app service detected. Deploy to catch malicious file scraping."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-filecanary:latest",
       "network_mode": "host",
       "user": "65532:65532",
       "init_containers": [
         {
           "name": "decoy-provisioner",
-          "image": "ghcr.io/andreicscs/honeywire-filecanary:latest",
           "command": "/app/file-canary init",
           "user": "0:0",
           "cap_drop": [
@@ -245,7 +298,10 @@
               "target_prefix": "/host",
               "read_only": false
             }
-          ]
+          ],
+          "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+          "image_tag": "latest",
+          "image_digest": ""
         }
       ],
       "volume_mounts": [
@@ -297,13 +353,17 @@
           "required": false,
           "hidden": false
         }
-      ]
+      ],
+      "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+      "image_tag": "latest",
+      "image_digest": ""
     }
   },
   {
     "id": "hw-sensor-icmp-canary",
     "version": "1.0.0",
     "schema_version": "1.0",
+    "min_hub_api": "1",
     "min_wizard_version": "1.0.0",
     "name": "ICMP Canary",
     "category": "network",
@@ -338,9 +398,10 @@
       "recommendation_reason": "Core Network Sensor. Generates 'Info' severity events to track subnet mapping without triggering alert fatigue from legitimate uptime monitors."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-icmpcanary:latest",
       "network_mode": "host",
-      "cap_add": ["NET_RAW"],
+      "cap_add": [
+        "NET_RAW"
+      ],
       "env_vars": [
         {
           "name": "HW_HUB_ENDPOINT",
@@ -366,13 +427,17 @@
           "required": true,
           "hidden": true
         }
-      ]
+      ],
+      "image_repository": "ghcr.io/andreicscs/honeywire-icmpcanary",
+      "image_tag": "latest",
+      "image_digest": ""
     }
   },
   {
     "id": "hw-sensor-network-scan-detector",
     "version": "1.0.0",
     "schema_version": "1.0",
+    "min_hub_api": "1",
     "min_wizard_version": "1.0.0",
     "name": "Network Scan Detector",
     "category": "network",
@@ -408,9 +473,10 @@
       "recommendation_reason": "Core Network Sensor. Highly recommended to silently detect lateral Nmap sweeps and horizontal port scanning across the network interface."
     },
     "deployment": {
-      "image": "ghcr.io/andreicscs/honeywire-networkscandetector:latest",
       "network_mode": "host",
-      "cap_add": ["NET_RAW"],
+      "cap_add": [
+        "NET_RAW"
+      ],
       "env_vars": [
         {
           "name": "HW_HUB_ENDPOINT",
@@ -460,7 +526,10 @@
           "required": false,
           "hidden": false
         }
-      ]
+      ],
+      "image_repository": "ghcr.io/andreicscs/honeywire-networkscandetector",
+      "image_tag": "latest",
+      "image_digest": ""
     }
   }
 ]

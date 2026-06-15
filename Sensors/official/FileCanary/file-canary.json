@@ -1,0 +1,138 @@
+{
+  "id": "hw-sensor-file-canary",
+  "version": "1.0.0",
+  "schema_version": "1.0",
+  "min_hub_api": "1",
+  "min_wizard_version": "1.0.0",
+  "name": "File Canary (FIM)",
+  "category": "file",
+  "osi_layer": "Host Level",
+  "icon_svg": "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  "description": "Honeypot and File Integrity Monitor. Watches files/directories for unauthorized modifications.",
+  "documentation": {
+    "summary": "The File Canary acts as both a Honeypot and a File Integrity Monitor (FIM). It watches a specified directory or file on the host machine for unauthorized access, modifications, or encryption attempts (e.g., Ransomware spreading across the LAN).",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Zero-Dependency Execution: Runs as a statically compiled binary without requiring external interpreters or libraries.",
+          "Safe Permissions Handling: Uses Access Control Lists (ACLs) to securely read target directories without altering host ownership.",
+          "Context-Aware Lures: Automatically generates realistic trap files based on detected services (database backups, config files, etc.).",
+          "Real-time Monitoring: Instant alerts on file access, modification, or deletion."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Unprivileged Execution: Runs entirely as a non-root user (UID 65532).",
+          "Kernel Capability Stripping: Drops ALL Linux kernel capabilities.",
+          "Read-Only Access: Monitors files without write permissions to prevent accidental data corruption."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {
+      "processes": [
+        "python3",
+        "node",
+        "java",
+        "nginx",
+        "apache2",
+        "httpd",
+        "php-fpm",
+        "docker-proxy",
+        "ruby",
+        "perl",
+        "go"
+      ]
+    },
+    "recommendation_reason": "Runtime/app service detected. Deploy to catch malicious file scraping."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "65532:65532",
+    "init_containers": [
+      {
+        "name": "decoy-provisioner",
+        "command": "/app/file-canary init",
+        "user": "0:0",
+        "cap_drop": [
+          "ALL"
+        ],
+        "cap_add": [
+          "DAC_OVERRIDE"
+        ],
+        "security_opt": [
+          "no-new-privileges:true"
+        ],
+        "volume_mounts": [
+          {
+            "type": "dynamic_dir_bind",
+            "source_env": "HW_DECOY_FILES",
+            "target_prefix": "/host",
+            "read_only": false
+          }
+        ],
+        "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+        "image_tag": "latest",
+        "image_digest": ""
+      }
+    ],
+    "volume_mounts": [
+      {
+        "type": "dynamic_file_bind",
+        "source_env": "HW_DECOY_FILES",
+        "target_prefix": "/canaries",
+        "read_only": true
+      }
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-file-canary",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_ALERT_ON_OPEN",
+        "description": "Generate alerts when a file is simply read or opened (noisier).",
+        "default": "false",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_DECOY_FILES",
+        "description": "Comma-separated list of absolute file paths to deploy and monitor.",
+        "default": "{{ if .HasWeb }}/var/www/html/.backup-config.php{{ else if .HasDB }}/var/lib/db/dump.sql.bak{{ else }}/opt/.env.backup{{ end }}{{ if gt (len .MatchedServices) 1 }},/home/admin/vpn_keys.txt{{ end }}",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+    "image_tag": "latest",
+    "image_digest": ""
+  }
+}

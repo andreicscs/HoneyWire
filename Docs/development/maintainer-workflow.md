@@ -91,3 +91,38 @@ You do not need to compile the Wizard to test it. You can run it directly via Go
    ```bash
    go run wizard/cmd/wizard/main.go apply
    ```
+
+---
+
+## 4. Releasing a Sensor Version
+
+Sensor releases are automated via the registry pipeline. **You never create versioned manifest files manually.**
+
+### Step 1: Edit the Source Manifest
+The authoring surface is a single JSON file per sensor in its respective directory under `Sensors/official/`:
+- `TcpTarpit/tcp-tarpit.json`
+- `FileCanary/file-canary.json`
+- `WebRouterDecoy/web-router-decoy.json`
+- `IcmpCanary/icmp-canary.json`
+- `NetworkScanDetector/network-scan-detector.json`
+
+Edit the file, update documentation, env vars, heuristics, etc. Commit to `main`.
+
+### Step 2: Push a Namespaced Git Tag
+```bash
+git tag sensor/file-canary/v1.2.0
+git push origin sensor/file-canary/v1.2.0
+```
+
+### Step 3: CI Handles the Rest
+The `publish-sensor-registry` Gitea Action will:
+1. Read `Sensors/official/FileCanary/file-canary.json` at the tagged commit
+2. Inject `"version": "1.2.0"` and update the Docker `image_tag` to `"1.2.0"`
+3. Write `file-canary-v1.2.0.json` to the `registry-pages` branch
+4. Regenerate `index.json`
+
+### Step 4: Verify
+Check the `registry-pages` branch to confirm:
+- The versioned JSON file exists
+- `index.json` lists the new version
+- The `latest` field points to the new version

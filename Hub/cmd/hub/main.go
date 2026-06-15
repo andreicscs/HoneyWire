@@ -24,6 +24,7 @@ import (
 )
 
 const Version = "2.0.0"
+const HubAPIVersion = 1
 
 // loadConfigSafe is a helper to fetch DB configs without panicking on empty/missing rows
 func loadConfigSafe(s *store.SQLiteStore, key string, fallback string) string {

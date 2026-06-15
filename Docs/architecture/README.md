@@ -174,6 +174,29 @@ The Wizard performs discovery using point-in-time host inspection. No resident d
 
 ---
 
+## Versioning & Registry
+
+HoneyWire uses a **git-tag-driven static registry** for sensor versioning, enabling sensor updates independent of Hub releases.
+
+### Tagging Convention
+- **Hub releases:** `hub/v{semver}` (e.g., `hub/v2.0.0`)
+- **Wizard releases:** `wizard/v{semver}` (e.g., `wizard/v1.1.0`)
+- **Sensor releases:** `sensor/{sensor-name}/v{semver}` (e.g., `sensor/file-canary/v1.2.0`)
+
+### Compatibility Mechanism
+Each Hub binary embeds a `HubAPIVersion` constant (integer). Each sensor manifest declares a `min_hub_api` field. The Hub only presents sensor versions where `min_hub_api <= HubAPIVersion`. This ~15 lines of Go code is the entire backward compatibility mechanism.
+
+### Registry Pipeline
+When a `sensor/**` tag is pushed, a Gitea Action:
+1. Reads the sensor's source JSON from `Sensors/official/`
+2. Injects the version and Docker image tag
+3. Writes a versioned manifest to the `registry-pages` branch
+4. Regenerates `index.json` with all sensor metadata and version/compat tables
+
+The `registry-pages` branch is served as a static file host (Gitea Pages, GitHub Pages, nginx, or S3).
+
+---
+
 ## Repository Structure
 
 The monorepo structure reflects the major components and clear ownership boundaries:
