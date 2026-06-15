@@ -46,7 +46,7 @@ func TestValidateManifest(t *testing.T) {
 		return models.SensorManifest{
 			SchemaVersion: "1.0",
 			Deployment: models.Deployment{
-				Image: "safe-image:latest",
+				ImageRepository: "safe-image:latest",
 			},
 		}
 	}
@@ -100,7 +100,7 @@ func TestValidateManifest(t *testing.T) {
 		{
 			name: "Interpolation in Main Image",
 			modifier: func(m *models.SensorManifest) {
-				m.Deployment.Image = "image:${TAG}"
+				m.Deployment.ImageRepository = "image:${TAG}"
 			},
 			expectError: true,
 			errorMsg:    "interpolation not allowed in image",
@@ -168,7 +168,7 @@ func TestDecodeManifestStrict(t *testing.T) {
 	})
 
 	t.Run("Valid Decode", func(t *testing.T) {
-		goodJson := `{"schema_version": "1.0", "deployment": {"image": "test"}}`
+		goodJson := `{"schema_version": "1.0", "deployment": {"image_repository": "test"}}`
 		_, err := DecodeManifestStrict(strings.NewReader(goodJson))
 		assert.NoError(t, err)
 	})

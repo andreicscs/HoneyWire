@@ -54,8 +54,8 @@ func ValidateManifest(m models.SensorManifest) error {
 	}
 
 	// Interpolation Checks
-	if containsInterpolation(m.Deployment.Image) {
-		return fmt.Errorf("SECURITY REJECT: interpolation not allowed in image")
+	if containsInterpolation(m.Deployment.ImageRepository) || containsInterpolation(m.Deployment.ImageTag) || containsInterpolation(m.Deployment.ImageDigest) {
+		return fmt.Errorf("SECURITY REJECT: interpolation not allowed in image fields")
 	}
 	if containsInterpolation(m.Deployment.NetworkMode) {
 		return fmt.Errorf("SECURITY REJECT: interpolation not allowed in network_mode")
@@ -66,8 +66,8 @@ func ValidateManifest(m models.SensorManifest) error {
 		}
 	}
 	for _, ic := range m.Deployment.InitContainers {
-		if containsInterpolation(ic.Image) {
-			return fmt.Errorf("SECURITY REJECT: interpolation not allowed in init container image")
+		if containsInterpolation(ic.ImageRepository) || containsInterpolation(ic.ImageTag) || containsInterpolation(ic.ImageDigest) {
+			return fmt.Errorf("SECURITY REJECT: interpolation not allowed in init container image fields")
 		}
 		if containsInterpolation(ic.Command) {
 			return fmt.Errorf("SECURITY REJECT: interpolation not allowed in init container command")

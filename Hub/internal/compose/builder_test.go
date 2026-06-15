@@ -11,7 +11,7 @@ import (
 func TestBuildService_SecurityDefaults(t *testing.T) {
 	manifest := models.SensorManifest{
 		Deployment: models.Deployment{
-			Image: "test-image",
+			ImageRepository: "test-image",
 		},
 	}
 	compose, err := BuildService("test-sensor", manifest, map[string]string{})
@@ -28,7 +28,7 @@ func TestBuildService_SecurityDefaults(t *testing.T) {
 func TestBuildService_CapabilityFiltering(t *testing.T) {
 	manifest := models.SensorManifest{
 		Deployment: models.Deployment{
-			Image:  "test-image",
+			ImageRepository:  "test-image",
 			CapAdd: []string{"NET_RAW", "SYS_ADMIN"}, // SYS_ADMIN is not allowed
 		},
 	}
@@ -44,7 +44,7 @@ func TestBuildService_DynamicVolumeExpansion(t *testing.T) {
 	t.Run("Dynamic File Bind", func(t *testing.T) {
 		manifest := models.SensorManifest{
 			Deployment: models.Deployment{
-				Image: "test-image",
+				ImageRepository: "test-image",
 				VolumeMounts: []models.VolumeMount{
 					{Type: models.DynamicFileBind, SourceEnv: "HW_FILES", TargetPrefix: "/watch/"},
 				},
@@ -102,10 +102,10 @@ func TestBuildService_DynamicVolumeExpansion(t *testing.T) {
 func TestBuildService_InitContainers(t *testing.T) {
 	manifest := models.SensorManifest{
 		Deployment: models.Deployment{
-			Image: "main-image",
+			ImageRepository: "main-image",
 			InitContainers: []models.InitContainer{
-				{Name: "z-init", Image: "init-z"},
-				{Name: "a-init", Image: "init-a"},
+				{Name: "z-init", ImageRepository: "init-z"},
+				{Name: "a-init", ImageRepository: "init-a"},
 			},
 		},
 	}

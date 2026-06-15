@@ -67,7 +67,7 @@ Run `docker compose -f docker-compose.test-infra.yml up -d`.
 Start the Hub in development mode. Leave this running in a dedicated terminal pane so you can monitor the logs for HTTP requests and compilation errors.
 ```bash
 cd Hub
-HW_ENV=development HW_PORT=8080 HW_MANIFEST_URL=http://localhost:3000/your/path/to/the/gitea/hosted/manifest.dev.json go run cmd/hub/main.go
+HW_ENV=development HW_PORT=8080 go run cmd/hub/main.go
 ```
 *(Ensure the UI is also running via `npm run dev` in `Hub/ui` if you are working on the ui, you can also use the hub's embedded ui at `http://localhost:8080`if you need to use the dashboard to provision API keys).*
 

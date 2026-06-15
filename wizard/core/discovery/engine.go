@@ -50,8 +50,18 @@ func (e *Engine) GetRecommendations(hostState *scanner.HostState, systemState *s
 
 	// Iterate through manifests and find correlated matches
 	for _, manifest := range e.manifests {
+		imageStr := manifest.Deployment.ImageRepository
+		if manifest.Deployment.ImageTag != "" {
+			imageStr += ":" + manifest.Deployment.ImageTag
+		} else {
+			imageStr += ":latest"
+		}
+		if manifest.Deployment.ImageDigest != "" {
+			imageStr += "@" + manifest.Deployment.ImageDigest
+		}
+
 		// Idempotency check: skip if this sensor is already deployed
-		if deployedImageSet[manifest.Deployment.Image] {
+		if deployedImageSet[imageStr] {
 			continue
 		}
 

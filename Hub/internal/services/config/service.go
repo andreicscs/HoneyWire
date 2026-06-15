@@ -127,6 +127,7 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 
 	return models.ConfigPayload{
 		HubEndpoint:     kv["hub_endpoint"],
+		RegistryURL:     kv["registry_url"],
 		AutoArchiveDays: archiveDays,
 		AutoPurgeDays:   purgeDays,
 		WebhookURL:      kv["webhook_url"],
@@ -142,6 +143,7 @@ func (s *Service) UpdateConfig(req map[string]interface{}) error {
 	dbUpdates := make(map[string]interface{})
 	mapping := map[string]string{
 		"hubEndpoint":     "hub_endpoint",
+		"registryUrl":     "registry_url",
 		"autoArchiveDays": "auto_archive_days",
 		"autoPurgeDays":   "auto_purge_days",
 		"webhookType":     "webhook_type",

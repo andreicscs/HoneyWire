@@ -102,7 +102,7 @@ Common message types:
 
 ### GET /api/v1/manifests
 
-Fetches the sensor manifest catalog from `HW_MANIFEST_URL` or the default public manifest registry.
+Fetches the sensor manifest catalog from `RegistryURL` or the default public manifest registry.
 
 ### POST /api/v1/compose/generate
 

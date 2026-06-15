@@ -19,6 +19,19 @@ var CoreEnvVars = []string{
 	"HW_SEVERITY",
 }
 
+func buildImageString(repo, tag, digest string) string {
+	img := repo
+	if tag != "" {
+		img += ":" + tag
+	} else {
+		img += ":latest"
+	}
+	if digest != "" {
+		img += "@" + digest
+	}
+	return img
+}
+
 func BuildService(sensorID string, m models.SensorManifest, envMap map[string]string) (*ComposeFile, error) {
 	var compose ComposeFile
 
@@ -34,7 +47,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 
 	for _, ic := range initContainers {
 		initSvc := &ComposeService{
-			Image:   ic.Image,
+			Image:   buildImageString(ic.ImageRepository, ic.ImageTag, ic.ImageDigest),
 			Command: ic.Command,
 		}
 
@@ -155,7 +168,7 @@ func BuildService(sensorID string, m models.SensorManifest, envMap map[string]st
 	}
 
 	svc := &ComposeService{
-		Image:         m.Deployment.Image,
+		Image:         buildImageString(m.Deployment.ImageRepository, m.Deployment.ImageTag, m.Deployment.ImageDigest),
 		ContainerName: containerName,
 		Restart:       "unless-stopped",
 

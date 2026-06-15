@@ -10,6 +10,7 @@ type SetupPayload struct {
 // ConfigPayload represents the runtime configuration of the Hub
 type ConfigPayload struct {
 	HubEndpoint     string   `json:"hubEndpoint"`
+	RegistryURL     string   `json:"registryUrl"`
 	AutoArchiveDays int      `json:"autoArchiveDays"`
 	AutoPurgeDays   int      `json:"autoPurgeDays"`
 	WebhookURL      string   `json:"webhookUrl"`

@@ -50,6 +50,7 @@ func (c *HubClient) doRequest(ctx context.Context, method, path string, body io.
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", wizardUserAgent)
+	req.Header.Set("X-Wizard-Min-Hub-Api", fmt.Sprintf("%d", WizardMinHubAPI))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

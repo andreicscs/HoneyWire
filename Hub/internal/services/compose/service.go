@@ -1,13 +1,13 @@
 package composesvc
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
+	"strings"
+	"sync"
+
 
 	composeEngine "github.com/honeywire/hub/internal/compose"
 	"github.com/honeywire/hub/internal/compose/security"
@@ -25,10 +25,15 @@ type Store interface {
 
 type Service struct {
 	store Store
+	cache map[string]models.SensorManifest
+	mu    sync.RWMutex
 }
 
 func NewService(store Store) *Service {
-	return &Service{store: store}
+	return &Service{
+		store: store,
+		cache: make(map[string]models.SensorManifest),
+	}
 }
 
 // --- DTOs ---
@@ -47,46 +52,85 @@ type PreviewRequest struct {
 
 // --- MANIFEST FETCHING ---
 
-func (s *Service) FetchManifestBytes() ([]byte, error) {
-	manifestURL := os.Getenv("HW_MANIFEST_URL")
+// --- MANIFEST FETCHING ---
 
-	if manifestURL == "" {
-		manifestURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/main/Sensors/official/manifests.json"
+func (s *Service) FetchManifestBytes() ([]byte, error) {
+	manifests, err := s.fetchStrictCatalogManifests()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(manifests)
+}
+
+func (s *Service) fetchStrictCatalogManifests() ([]models.SensorManifest, error) {
+	registryURL, err := s.store.GetConfigValue("registry_url")
+	if err != nil || registryURL == "" {
+		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages"
 	}
 
-	resp, err := http.Get(manifestURL)
+	indexURL := strings.TrimRight(registryURL, "/") + "/index.json"
+	resp, err := http.Get(indexURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("manifest registry returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("registry returned status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
-}
-
-func (s *Service) fetchStrictCatalogManifests() ([]models.SensorManifest, error) {
-	body, err := s.FetchManifestBytes()
-	if err != nil {
+	var idx struct {
+		Sensors []struct {
+			ID     string `json:"id"`
+			Latest string `json:"latest"`
+		} `json:"sensors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&idx); err != nil {
 		return nil, err
 	}
 
-	var rawManifests []json.RawMessage
-	if err := json.Unmarshal(body, &rawManifests); err != nil {
-		return nil, err
-	}
+	var result []models.SensorManifest
 
-	var manifests []models.SensorManifest
-	for _, raw := range rawManifests {
-		manifest, err := security.DecodeManifestStrict(bytes.NewReader(raw))
-		if err != nil {
-			return nil, err
+	for _, sensor := range idx.Sensors {
+		cacheKey := sensor.ID + "-v" + sensor.Latest
+		s.mu.RLock()
+		cached, ok := s.cache[cacheKey]
+		s.mu.RUnlock()
+
+		if ok {
+			result = append(result, cached)
+			continue
 		}
-		manifests = append(manifests, manifest)
+
+		sensorName := strings.TrimPrefix(sensor.ID, "hw-sensor-")
+		manifestURL := fmt.Sprintf("%s/%s-v%s.json", strings.TrimRight(registryURL, "/"), sensorName, sensor.Latest)
+
+		mResp, fetchErr := http.Get(manifestURL)
+		if fetchErr != nil {
+			log.Printf("[WARNING] Failed to fetch %s: %v", manifestURL, fetchErr)
+			continue
+		}
+
+		if mResp.StatusCode != http.StatusOK {
+			mResp.Body.Close()
+			continue
+		}
+
+		manifest, decodeErr := security.DecodeManifestStrict(mResp.Body)
+		mResp.Body.Close()
+		if decodeErr != nil {
+			log.Printf("[WARNING] Failed to decode %s: %v", manifestURL, decodeErr)
+			continue
+		}
+
+		s.mu.Lock()
+		s.cache[cacheKey] = manifest
+		s.mu.Unlock()
+
+		result = append(result, manifest)
 	}
-	return manifests, nil
+
+	return result, nil
 }
 
 // --- GENERATION LOGIC ---

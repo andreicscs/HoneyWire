@@ -27,7 +27,17 @@ func PrintDeploymentPlan(recommendations []*discovery.Recommendation) {
 	for _, rec := range recommendations {
 		fmt.Printf("    %s+%s %s%s%s %s(%s)%s\n", Green, Reset, Bold, rec.SensorName, Reset, Gray, rec.SensorID, Reset)
 		fmt.Printf("        %sReason:%s %s\n", Cyan, Reset, rec.Reason)
-		fmt.Printf("        %sImage:%s  %s\n", Cyan, Reset, rec.DeploymentTemplate.Image)
+		imageStr := rec.DeploymentTemplate.ImageRepository
+		if rec.DeploymentTemplate.ImageTag != "" {
+			imageStr += ":" + rec.DeploymentTemplate.ImageTag
+		} else {
+			imageStr += ":latest"
+		}
+		if rec.DeploymentTemplate.ImageDigest != "" {
+			imageStr += "@" + rec.DeploymentTemplate.ImageDigest
+		}
+
+		fmt.Printf("        %sImage:%s  %s\n", Cyan, Reset, imageStr)
 
 		if len(rec.DeploymentTemplate.VolumeMounts) > 0 {
 			fmt.Printf("        %sVolume Mounts:%s\n", Cyan, Reset)
