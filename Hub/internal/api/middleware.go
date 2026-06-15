@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -117,11 +116,6 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 					http.Error(w, "This Wizard requires Hub v"+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
 					return
 				}
-				if models.HubAPIVersion > wizardMinHubAPI {
-					log.Printf("[!] Warning: Wizard on node %s is out of date (MinHubAPI: %d, models.HubAPIVersion: %d). Please update the Wizard.", nodeID, wizardMinHubAPI, models.HubAPIVersion)
-				}
-			} else if strings.Contains(strings.ToLower(r.Header.Get("User-Agent")), "wizard") {
-				log.Printf("[!] Warning: Wizard on node %s did not provide version headers.", nodeID)
 			}
 
 			ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)
