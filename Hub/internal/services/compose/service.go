@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync"
 
-
+	"github.com/honeywire/hub/internal/catalog"
 	composeEngine "github.com/honeywire/hub/internal/compose"
 	"github.com/honeywire/hub/internal/compose/security"
 	"github.com/honeywire/hub/internal/models"
@@ -22,30 +22,21 @@ type Store interface {
 	GetNodeDetails(nodeID string) (*models.Node, error)
 	GetConfigValue(key string) (string, error)
 	SetNodeDesiredRevision(nodeID, rev string) error
-}
-
-type RegistryIndex struct {
-	Sensors []struct {
-		ID       string `json:"id"`
-		Latest   string `json:"latest"`
-		Versions []struct {
-			V         string `json:"v"`
-			MinHubAPI string `json:"min_hub_api"`
-		} `json:"versions"`
-	} `json:"sensors"`
+	SetNodeSensorDeployedVersion(nodeID, sensorID, version string) error
 }
 
 type Service struct {
-	store      Store
-	cache      map[string]models.SensorManifest
-	indexCache *RegistryIndex
-	mu         sync.RWMutex
+	store   Store
+	catalog *catalog.Service
+	cache   map[string]models.SensorManifest
+	mu      sync.RWMutex
 }
 
-func NewService(store Store) *Service {
+func NewService(store Store, catalogSvc *catalog.Service) *Service {
 	return &Service{
-		store: store,
-		cache: make(map[string]models.SensorManifest),
+		store:   store,
+		catalog: catalogSvc,
+		cache:   make(map[string]models.SensorManifest),
 	}
 }
 
@@ -65,8 +56,6 @@ type PreviewRequest struct {
 
 // --- MANIFEST FETCHING ---
 
-// --- MANIFEST FETCHING ---
-
 func (s *Service) FetchManifestBytes(currentHubAPI int) ([]byte, error) {
 	manifests, err := s.fetchStrictCatalogManifests(currentHubAPI)
 	if err != nil {
@@ -78,51 +67,23 @@ func (s *Service) FetchManifestBytes(currentHubAPI int) ([]byte, error) {
 func (s *Service) fetchStrictCatalogManifests(currentHubAPI int) ([]models.SensorManifest, error) {
 	registryURL, err := s.store.GetConfigValue("registry_url")
 	if err != nil || registryURL == "" {
-		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages" // TODO implement the default in the store level. and check that url actually works...
+		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages"
 	}
 
-	indexURL := strings.TrimRight(registryURL, "/") + "/index.json"
-	var idx RegistryIndex
-	
-	resp, err := http.Get(indexURL)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		log.Printf("[WARNING] Registry fetch failed (err: %v), falling back to index cache.", err)
-		s.mu.RLock()
-		cachedIdx := s.indexCache
-		s.mu.RUnlock()
-		if cachedIdx == nil {
-			return nil, fmt.Errorf("registry unreachable and no local index cache available")
-		}
-		idx = *cachedIdx
-	} else {
-		defer resp.Body.Close()
-		if err := json.NewDecoder(resp.Body).Decode(&idx); err != nil {
-			return nil, err
-		}
-		
-		// Update index cache
-		s.mu.Lock()
-		s.indexCache = &idx
-		s.mu.Unlock()
+	if err := s.catalog.RefreshIndex(); err != nil {
+		log.Printf("[WARNING] fetchStrictCatalogManifests catalog refresh failed: %v", err)
+	}
+
+	index := s.catalog.GetIndex()
+	if index == nil {
+		return nil, fmt.Errorf("registry unreachable and no local index cache available")
 	}
 
 	var result []models.SensorManifest
 
-	for _, sensor := range idx.Sensors {
-		targetVersion := ""
-		
-		// Find the highest version where min_hub_api <= currentHubAPI
-		// Assuming versions are ordered [lowest -> highest] by the build script
-		for i := len(sensor.Versions) - 1; i >= 0; i-- {
-			if reqAPI, err := strconv.Atoi(strings.TrimSpace(sensor.Versions[i].MinHubAPI)); err == nil {
-				if currentHubAPI >= reqAPI {
-					targetVersion = sensor.Versions[i].V
-					break
-				}
-			}
-		}
-
-		if targetVersion == "" {
+	for _, sensor := range index.Sensors {
+		targetVersion, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, currentHubAPI)
+		if err != nil || targetVersion == "" {
 			log.Printf("[WARNING] No compatible version found for sensor %s", sensor.ID)
 			continue
 		}
@@ -188,7 +149,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 
 	effectiveRevision := nodeDetails.DesiredRevision
 	if effectiveRevision == "" && nodeDetails.HasPendingConfig {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubAPI)
 		if err := s.store.SetNodeDesiredRevision(nodeID, effectiveRevision); err != nil {
 			return nil, fmt.Errorf("failed_to_allocate")
 		}
@@ -197,7 +158,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 		effectiveRevision = nodeDetails.ActiveRevision
 	}
 	if effectiveRevision == "" {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubAPI)
 	}
 
 	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubAPI)
@@ -220,6 +181,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 			continue
 		}
 
+		// The Hub will strictly wait for evaluateNodeSyncState to verify the new hash before considering this version deployed!
 		if valErr := security.ValidateManifest(manifest); valErr != nil {
 			return nil, fmt.Errorf("invalid_manifest: %w", valErr)
 		}

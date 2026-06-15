@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/honeywire/hub/internal/catalog"
 	"github.com/honeywire/hub/internal/models"
 	composesvc "github.com/honeywire/hub/internal/services/compose"
 )
@@ -39,6 +40,10 @@ func (m *MockStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 }
 
 func (m *MockStore) SetNodeDesiredRevision(nodeID, rev string) error {
+	return nil
+}
+
+func (m *MockStore) SetNodeSensorDeployedVersion(nodeID, sensorID, version string) error {
 	return nil
 }
 
@@ -78,8 +83,14 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	defer ts.Close()
 
 	store := &MockStore{RegistryURL: ts.URL}
-	svc := composesvc.NewService(store)
+	catSvc := catalog.NewService(store)
+	svc := composesvc.NewService(store, catSvc)
 
+	// VERSIONING ARCHITECTURE EXPLANATION (SENSOR REGISTRY):
+	// The Compose service automatically parses the registry's index.json and steps backwards 
+	// through the versions array to find the absolute highest sensor image tag that is compatible
+	// with the currently executing Hub. If the Hub's API is too old for the absolute latest 
+	// sensor release, it gracefully injects the previous compatible tag into the docker-compose YAML.
 	t.Run("Perfect Match Resolution (Hub API 2)", func(t *testing.T) {
 		// Hub API 2 should select v1.5.0, ignoring v2.0.0
 		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 2)

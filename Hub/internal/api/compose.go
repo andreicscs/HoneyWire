@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/honeywire/hub/internal/models"
 	composesvc "github.com/honeywire/hub/internal/services/compose"
 )
 
@@ -26,7 +27,7 @@ func (h *ComposeHandler) GetNodeCompose(w http.ResponseWriter, r *http.Request) 
 	}
 
 	hostFallback := "https://" + r.Host
-	yamlData, err := h.service.GetNodeCompose(token, hostFallback, HubAPIVersion)
+	yamlData, err := h.service.GetNodeCompose(token, hostFallback, models.HubAPIVersion)
 	if err != nil {
 		if err.Error() == "unauthorized" {
 			RespondError(w, "Unauthorized", http.StatusUnauthorized)

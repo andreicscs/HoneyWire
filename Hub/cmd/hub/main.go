@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/honeywire/hub/internal/api"
+	"github.com/honeywire/hub/internal/catalog"
 	"github.com/honeywire/hub/internal/services/auth"
 	composesvc "github.com/honeywire/hub/internal/services/compose"
 	"github.com/honeywire/hub/internal/services/config"
@@ -52,13 +53,17 @@ func main() {
 
 	wsService := websocket.NewService()
 	authService := auth.NewService(dbStore, cfg.DashboardPassword)
-	nodeSvc := node.NewService(dbStore, wsService)
+
+	catalogService := catalog.NewService(dbStore)
+
+	nodeSvc := node.NewService(dbStore, wsService, catalogService)
+	nodeSvc.StartAutoEvaluator()
 	sensorSvc := sensor.NewService(dbStore, wsService)
 	siemService := siem.NewService(nodeSvc)
 	notifyService := notify.NewService(nodeSvc)
 	eventSvc := event.NewService(dbStore, wsService, siemService, notifyService, cfg.Version)
 	configService := config.NewService(dbStore, authService, siemService, notifyService, cfg.DashboardPassword, cfg.Version)
-	composeService := composesvc.NewService(dbStore)
+	composeService := composesvc.NewService(dbStore, catalogService)
 
 	authHandler := api.NewAuthHandler(authService, cfg)
 	nodeHandler := api.NewNodeHandler(nodeSvc)

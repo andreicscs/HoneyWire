@@ -4,10 +4,11 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/honeywire/hub/internal/models"
 	"golang.org/x/time/rate"
 )
 
@@ -23,7 +24,6 @@ type contextKey string
 
 const (
 	NodeIDKey     contextKey = "nodeID"
-	HubAPIVersion            = 2
 )
 
 // RateLimiter controls the frequency of requests on a per-node basis.
@@ -113,12 +113,12 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 					http.Error(w, "Invalid X-Wizard-Min-Hub-Api format", http.StatusBadRequest)
 					return
 				}
-				if HubAPIVersion < wizardMinHubAPI {
+				if models.HubAPIVersion < wizardMinHubAPI {
 					http.Error(w, "This Wizard requires Hub v"+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
 					return
 				}
-				if HubAPIVersion > wizardMinHubAPI {
-					log.Printf("[!] Warning: Wizard on node %s is out of date (MinHubAPI: %d, HubAPIVersion: %d). Please update the Wizard.", nodeID, wizardMinHubAPI, HubAPIVersion)
+				if models.HubAPIVersion > wizardMinHubAPI {
+					log.Printf("[!] Warning: Wizard on node %s is out of date (MinHubAPI: %d, models.HubAPIVersion: %d). Please update the Wizard.", nodeID, wizardMinHubAPI, models.HubAPIVersion)
 				}
 			} else if strings.Contains(strings.ToLower(r.Header.Get("User-Agent")), "wizard") {
 				log.Printf("[!] Warning: Wizard on node %s did not provide version headers.", nodeID)

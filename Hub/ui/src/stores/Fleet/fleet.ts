@@ -10,6 +10,7 @@ export interface RawSensorPayload {
   isSilenced?: boolean
   envVars?: Record<string, any>
   metadata?: Record<string, any>
+  updateAvailable?: boolean
   lastHeartbeat?: string | null
 }
 
@@ -21,6 +22,7 @@ export interface RawNodePayload {
   lastHeartbeat?: string | null
   publicIp?: string | null
   privateIp?: string | null
+  hasUpdateAvailable?: boolean
   tags?: string[]
   apiKey?: string | null
   activeRevision?: string
@@ -60,6 +62,7 @@ export interface InstalledSensor {
   isSilenced: boolean
   envVars: Record<string, any>
   metadata: Record<string, any>
+  updateAvailable?: boolean
   lastHeartbeat: string | null
 }
 
@@ -80,8 +83,8 @@ export interface FleetNode {
   totalSensors?: number
   onlineSensors?: number
   isSilenced?: boolean
+  hasUpdateAvailable?: boolean
   sensorSummary?: { type: string; count: number; sensors: any[] }[]
-  hasUpdate?: boolean
   isAwaitingCheckIn?: boolean
 }
 
@@ -234,7 +237,6 @@ export const useFleetStore = defineStore('fleet', () => {
         ...node, 
         installedSensors: enrichedSensors,
         totalSensors, onlineSensors, isSilenced, sensorSummary,
-        hasUpdate: false,
         isAwaitingCheckIn: node.status === 'pending' || (!node.lastHeartbeat && totalSensors === 0)
       }
     })
@@ -349,6 +351,7 @@ export const useFleetStore = defineStore('fleet', () => {
       apiKey: raw.apiKey || null,
       activeRevision: raw.activeRevision || '',
       desiredRevision: raw.desiredRevision || '',
+      hasUpdateAvailable: raw.hasUpdateAvailable || false,
       lastEvent: raw.lastEvent || 'Never',
     }
   }
@@ -365,6 +368,7 @@ export const useFleetStore = defineStore('fleet', () => {
       display: raw.customName || rawId,
       status: raw.status || 'down',
       isSilenced: raw.isSilenced ?? false,
+      updateAvailable: raw.updateAvailable || false,
       envVars: raw.envVars || {},
       metadata: raw.metadata || {},
       lastHeartbeat: raw.lastHeartbeat || null,

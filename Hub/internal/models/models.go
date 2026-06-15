@@ -1,5 +1,8 @@
 package models
 
+// HubAPIVersion defines the backend protocol version for resolving compatible sensors and authenticating Agents.
+const HubAPIVersion = 2
+
 // SetupPayload represents the initial setup POST request
 type SetupPayload struct {
 	Password    string `json:"password"`
@@ -44,18 +47,19 @@ type Heartbeat struct {
 
 // Node represents a physical server managing sensors
 type Node struct {
-	ID               string       `json:"nodeId"`
-	Alias            string       `json:"alias"`
-	APIKey           string       `json:"apiKey"`
-	ActiveRevision   string       `json:"activeRevision,omitempty"`
-	DesiredRevision  string       `json:"desiredRevision,omitempty"`
-	PublicIP         *string      `json:"publicIp"`
-	PrivateIP        *string      `json:"privateIp"`
-	Tags             []string     `json:"tags"`
-	HasPendingConfig bool         `json:"hasPendingConfig"`
-	LastHeartbeat    *string      `json:"lastHeartbeat"`
-	Status           string       `json:"status"` // Derived status (up, down, pending)
-	InstalledSensors []NodeSensor `json:"installedSensors"`
+	ID                 string       `json:"nodeId"`
+	Alias              string       `json:"alias"`
+	APIKey             string       `json:"apiKey"`
+	ActiveRevision     string       `json:"activeRevision,omitempty"`
+	DesiredRevision    string       `json:"desiredRevision,omitempty"`
+	PublicIP           *string      `json:"publicIp"`
+	PrivateIP          *string      `json:"privateIp"`
+	Tags               []string     `json:"tags"`
+	HasPendingConfig   bool         `json:"hasPendingConfig"`
+	HasUpdateAvailable bool         `json:"hasUpdateAvailable"`
+	LastHeartbeat      *string      `json:"lastHeartbeat"`
+	Status             string       `json:"status"`
+	InstalledSensors   []NodeSensor `json:"installedSensors"`
 }
 
 // NodeSensor represents a deployed sensor on a node
@@ -67,9 +71,11 @@ type NodeSensor struct {
 	Status        string                 `json:"status"`
 	LastHeartbeat *string                `json:"lastHeartbeat"`
 	IsSilenced    bool                   `json:"isSilenced"`
-	Events24h     int                    `json:"events24h"`
-	EnvVars       map[string]interface{} `json:"envVars"`
-	Metadata      map[string]interface{} `json:"metadata"`
+	Events24h       int                    `json:"events24h"`
+	EnvVars         map[string]interface{} `json:"envVars"`
+	Metadata        map[string]interface{} `json:"metadata"`
+	DeployedVersion string                 `json:"deployedVersion"`
+	UpdateAvailable bool                   `json:"updateAvailable"`
 }
 
 

@@ -2,6 +2,7 @@
   "id": "hw-sensor-custom-template",
   "version": "1.0.0",
   "schema_version": "1.0",
+  "min_hub_api": "1",
   "min_wizard_version": "1.0.0",
   "name": "Custom Go Sensor",
   "category": "custom",
@@ -36,7 +37,8 @@
     "recommendation_reason": "Custom user-defined sensor blueprint."
   },
   "deployment": {
-    "image": "ghcr.io/yourusername/honeywire-mysensor:latest",
+    "image_repository": "ghcr.io/yourusername/honeywire-mysensor",
+    "image_tag": "latest",
     "network_mode": "bridge",
     "user": "65532:65532",
     "env_vars": [

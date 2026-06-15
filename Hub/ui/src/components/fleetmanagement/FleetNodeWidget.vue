@@ -100,7 +100,7 @@ const removeTag = (index: number | string) => {
                             <span v-if="node.hasPendingConfig" class="shrink-0 text-high" title="Pending sync — open node details to apply changes">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                             </span>
-                            <span v-if="node.hasUpdate" class="px-1.5 py-0.5 rounded text-sm bg-low/20 border border-low/40 text-highlight-text" title="Sensor Updates Available">Update</span>
+                            <span v-if="node.hasUpdateAvailable" class="w-2 h-2 rounded-full bg-low/70 shrink-0" title="Sensor Updates Available"></span>
                             <svg v-if="node.isSilenced" class="w-4 h-4 text-medium shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Node Silenced"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/></svg>
                         </div>
                     </div>

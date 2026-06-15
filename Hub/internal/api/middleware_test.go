@@ -122,7 +122,12 @@ func TestAgentAuthMiddleware(t *testing.T) {
 		assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 	})
 
-	t.Run("Wizard Version Mismatch", func(t *testing.T) {
+	// VERSIONING ARCHITECTURE EXPLANATION:
+	// The Hub guarantees backwards compatibility for Wizards, but strongly rejects future Wizards.
+	// This ensures that an outdated Hub cannot accidentally corrupt a newer Wizard's state,
+	// while allowing older Wizards to safely continue operating on an upgraded Hub.
+
+	t.Run("Futuristic Wizard Mismatch (v99)", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", nil)
 		req.Header.Set("X-Api-Key", "agent-key")
 		// Simulate a Wizard requesting a highly futuristic Hub API version
@@ -131,6 +136,26 @@ func TestAgentAuthMiddleware(t *testing.T) {
 		handler.ServeHTTP(rec, req)
 		// Should return HTTP 426 Upgrade Required
 		assert.Equal(t, http.StatusUpgradeRequired, rec.Code)
+	})
+
+	t.Run("Legacy Backward Compat (Wizard v1, Hub v2)", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.Header.Set("X-Api-Key", "agent-key")
+		// Simulate a legacy Wizard
+		req.Header.Set("X-Wizard-Min-Hub-Api", "1")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		// Should pass completely natively
+		assert.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("Malformed Wizard Header", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.Header.Set("X-Api-Key", "agent-key")
+		req.Header.Set("X-Wizard-Min-Hub-Api", "   garbage   ")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 }
 

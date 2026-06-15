@@ -29,7 +29,10 @@ defineEmits<{ (e: 'edit', sensor: any): void, (e: 'toggleSilence', sensor: any):
                     </BaseMeatballMenu>
                 </div>
                 <div class="mt-3 pt-3 border-t border-border-default flex justify-between items-center">
-                    <span class="px-1.5 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ sensor.osi }}</span>
+                    <div class="flex items-center gap-2">
+                        <span v-if="sensor.updateAvailable" class="w-2 h-2 rounded-full bg-low/70 shadow-[0_0_8px_rgba(var(--color-low),0.5)]" title="Sensor Update Available"></span>
+                        <span class="px-1.5 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ sensor.osi }}</span>
+                    </div>
                     <svg v-if="sensor.isSilenced" class="w-3.5 h-3.5 text-medium shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Alerts Silenced"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/></svg>
                 </div>
             </div>

@@ -122,23 +122,27 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 		n.HasPendingConfig = pendingInt == 1
 		n.Status = deriveStatus(n.LastHeartbeat)
 		n.InstalledSensors = []models.NodeSensor{}
+		nodes = append(nodes, n)
+	}
 
-		// Subquery to fetch sensors for this specific node
-		sensorRows, err := s.DB.Query(`
-			SELECT sensor_id, custom_name, config_values, is_silenced, last_heartbeat 
-			FROM node_sensors WHERE node_id = ?`, n.ID)
+	// Fetch sensors
+	for i := range nodes {
+		rows, err := s.DB.Query(`
+			SELECT sensor_id, custom_name, config_values, metadata, deployed_version, is_silenced, last_heartbeat 
+			FROM node_sensors WHERE node_id = ?`, nodes[i].ID)
 		if err != nil {
 			return nil, err
 		}
 
-		for sensorRows.Next() {
+		for rows.Next() {
 			var ns models.NodeSensor
 			var configStr string
+			var metaStr string
 			var silencedInt int
 			var lastHb sql.NullString
 
-			if err := sensorRows.Scan(&ns.Name, &ns.Display, &configStr, &silencedInt, &lastHb); err != nil {
-				sensorRows.Close()
+			if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &metaStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
+				rows.Close()
 				return nil, err
 			}
 
@@ -149,12 +153,11 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 			}
 			ns.Status = deriveStatus(ns.LastHeartbeat)
 			json.Unmarshal([]byte(configStr), &ns.EnvVars)
-			n.InstalledSensors = append(n.InstalledSensors, ns)
+			nodes[i].InstalledSensors = append(nodes[i].InstalledSensors, ns)
 		}
-		sensorRows.Close()
+		rows.Close()
 
-		n.Status = deriveCompositeNodeStatus(n.Status, n.InstalledSensors)
-		nodes = append(nodes, n)
+		nodes[i].Status = deriveCompositeNodeStatus(nodes[i].Status, nodes[i].InstalledSensors)
 	}
 
 	if nodes == nil {
@@ -194,7 +197,7 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 
 	// Fetch Installed Sensors (Added metadata and last_heartbeat)
 	rows, err := s.DB.Query(`
-		SELECT sensor_id, custom_name, config_values, metadata, is_silenced, last_heartbeat 
+		SELECT sensor_id, custom_name, config_values, metadata, deployed_version, is_silenced, last_heartbeat 
 		FROM node_sensors WHERE node_id = ?`, nodeID)
 	if err != nil {
 		return nil, err
@@ -208,7 +211,7 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 		var silencedInt int
 		var lastHb sql.NullString
 
-		if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &metaStr, &silencedInt, &lastHb); err != nil {
+		if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &metaStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
 			return nil, err
 		}
 
@@ -245,21 +248,17 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 
 // AddSensorToNode securely inserts a configured sensor and flags the node as pending sync.
 func (s *SQLiteStore) AddSensorToNode(nodeID, sensorID, customName string, configValues map[string]interface{}) error {
-	configJSON, err := json.Marshal(configValues)
-	if err != nil {
-		return err
-	}
-
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().UTC().Format(time.RFC3339)
+	configStr, _ := json.Marshal(configValues)
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.Exec(`
-		INSERT INTO node_sensors (node_id, sensor_id, custom_name, config_values, is_silenced, created_at, updated_at) 
-		VALUES (?, ?, ?, ?, 0, ?, ?)`,
-		nodeID, sensorID, customName, string(configJSON), now, now,
+		INSERT INTO node_sensors (node_id, sensor_id, custom_name, config_values, deployed_version, created_at, updated_at) 
+		VALUES (?, ?, ?, ?, '', ?, ?)`,
+		nodeID, sensorID, customName, string(configStr), now, now,
 	)
 	if err != nil {
 		tx.Rollback()
@@ -370,3 +369,17 @@ func (s *SQLiteStore) ApplyNodeRevision(nodeID, revision string) error {
 	)
 	return err
 }
+
+// SetNodeSensorDeployedVersion updates the version metadata string safely without triggering pending syncs
+func (s *SQLiteStore) SetNodeSensorDeployedVersion(nodeID, sensorID, version string) error {
+	_, err := s.DB.Exec("UPDATE node_sensors SET deployed_version = ? WHERE node_id = ? AND sensor_id = ?", version, nodeID, sensorID)
+	return err
+}
+
+// SetNodePendingConfig flags a node as having unapplied changes
+func (s *SQLiteStore) SetNodePendingConfig(nodeID string) error {
+	_, err := s.DB.Exec("UPDATE nodes SET pending_config = 1 WHERE id = ?", nodeID)
+	return err
+}
+
+

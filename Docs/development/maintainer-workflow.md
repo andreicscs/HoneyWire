@@ -99,14 +99,12 @@ You do not need to compile the Wizard to test it. You can run it directly via Go
 Sensor releases are automated via the registry pipeline. **You never create versioned manifest files manually.**
 
 ### Step 1: Edit the Source Manifest
-The authoring surface is a single JSON file per sensor in its respective directory under `Sensors/official/`:
-- `TcpTarpit/tcp-tarpit.json`
-- `FileCanary/file-canary.json`
-- `WebRouterDecoy/web-router-decoy.json`
-- `IcmpCanary/icmp-canary.json`
-- `NetworkScanDetector/network-scan-detector.json`
+The authoring surface requires you to add the `manifest.json` file directly inside the individual sensor's root directory:
+- `Sensors/official/tcp-tarpit/manifest.json`
+- `Sensors/official/file-canary/manifest.json`
+- `Sensors/official/web-router-decoy/manifest.json`
 
-Edit the file, update documentation, env vars, heuristics, etc. Commit to `main`.
+This decoupled architecture allows the Hub to dynamically index sensors without monolithic configuration files. Edit the file, update documentation, env vars, heuristics, etc. Commit to `main`.
 
 ### Step 2: Push a Namespaced Git Tag
 ```bash

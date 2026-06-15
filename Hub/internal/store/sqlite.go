@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS node_sensors (
     custom_name     TEXT NOT NULL, 
     config_values   TEXT NOT NULL DEFAULT '{}',
     metadata        TEXT NOT NULL DEFAULT '{}',
+	deployed_version TEXT NOT NULL DEFAULT '',
 	last_heartbeat  TEXT,
     is_silenced     INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL,
@@ -148,6 +149,9 @@ func initializeDefaultConfigTx(tx *sql.Tx) error {
 			return err
 		}
 	}
+
+	// Safe schema migrations
+	tx.Exec("ALTER TABLE node_sensors ADD COLUMN deployed_version TEXT NOT NULL DEFAULT ''")
 
 	return nil
 }

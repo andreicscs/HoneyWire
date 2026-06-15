@@ -111,6 +111,10 @@ func PrintNodeStatus(nodeInfo *api.NodeInfo, hubURL string) {
 	fmt.Printf("    %sActive Rev:%s  %s\n", Cyan, Reset, nodeInfo.ActiveRevision)
 	fmt.Printf("    %sDesired Rev:%s %s\n", Cyan, Reset, nodeInfo.DesiredRevision)
 
+	if nodeInfo.HasUpdateAvailable {
+		fmt.Printf("    %sUpdates:%s     %s[AVAILABLE]%s\n", Cyan, Reset, Cyan, Reset)
+	}
+
 	syncState := "Synced"
 	syncColor := Green
 	if nodeInfo.PendingConfig {
@@ -128,6 +132,9 @@ func PrintNodeStatus(nodeInfo *api.NodeInfo, hubURL string) {
 			}
 			if s.IsSilenced {
 				fmt.Printf(" %s[silenced]%s", Yellow, Reset)
+			}
+			if s.UpdateAvailable {
+				fmt.Printf(" %s[update available]%s", Cyan, Reset)
 			}
 			fmt.Println()
 		}

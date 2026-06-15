@@ -107,7 +107,7 @@ func (h *SensorHandler) ToggleSilence(w http.ResponseWriter, r *http.Request) {
 
 // GetManifests fetches the sensor manifest JSON.
 func (h *SensorHandler) GetManifests(w http.ResponseWriter, r *http.Request) {
-	body, err := h.composeService.FetchManifestBytes(HubAPIVersion)
+	body, err := h.composeService.FetchManifestBytes(models.HubAPIVersion)
 	if err != nil {
 		RespondError(w, "Failed to reach manifest registry", http.StatusBadGateway)
 		return

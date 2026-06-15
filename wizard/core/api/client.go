@@ -249,16 +249,18 @@ type NodeInfo struct {
 	Alias            string       `json:"alias"`
 	Tags             []string     `json:"tags"`
 	Status           string       `json:"status"`
-	PendingConfig    bool         `json:"hasPendingConfig"`
-	ActiveRevision   string       `json:"activeRevision"`
-	DesiredRevision  string       `json:"desiredRevision"`
-	InstalledSensors []SensorInfo `json:"installedSensors"`
+	PendingConfig      bool         `json:"hasPendingConfig"`
+	HasUpdateAvailable bool         `json:"hasUpdateAvailable"`
+	ActiveRevision     string       `json:"activeRevision"`
+	DesiredRevision    string       `json:"desiredRevision"`
+	InstalledSensors   []SensorInfo `json:"installedSensors"`
 }
 
 type SensorInfo struct {
-	SensorID   string `json:"sensorId"`
-	CustomName string `json:"display"`
-	IsSilenced bool   `json:"isSilenced"`
+	SensorID        string `json:"sensorId"`
+	CustomName      string `json:"display"`
+	IsSilenced      bool   `json:"isSilenced"`
+	UpdateAvailable bool   `json:"updateAvailable"`
 }
 
 type addSensorRequest struct {
