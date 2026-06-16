@@ -97,7 +97,7 @@ func Apply(ctx context.Context, composeData []byte) error {
 	upCtx, upCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer upCancel()
 
-	upArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--pull", "always", "--remove-orphans")
+	upArgs := append(cmdBase, "-f", ComposeFile, "-p", ProjectName, "up", "-d", "--remove-orphans")
 	upCmd := exec.CommandContext(upCtx, upArgs[0], upArgs[1:]...)
 	upCmd.Dir = DeployDir
 	upCmd.Stdout = os.Stdout
