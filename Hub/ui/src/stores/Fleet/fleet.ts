@@ -457,6 +457,11 @@ export const useFleetStore = defineStore('fleet', () => {
       return
     }
 
+    if (type === 'CATALOG_UPDATED') {
+      fetchManifests()
+      return
+    }
+
     if (['NEW_SENSOR', 'UPDATE_SENSOR', 'DELETE_SENSOR', 'NODE_SYNCED', 'UPDATE_NODE'].includes(type)) {
       fetchNodeDetails(payload.nodeId)
       fetchManifests()

@@ -54,7 +54,7 @@ func main() {
 	wsService := websocket.NewService()
 	authService := auth.NewService(dbStore, cfg.DashboardPassword)
 
-	catalogService := catalog.NewService(dbStore)
+	catalogService := catalog.NewService(dbStore, wsService)
 
 	nodeSvc := node.NewService(dbStore, wsService, catalogService)
 	nodeSvc.StartAutoEvaluator()

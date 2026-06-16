@@ -87,7 +87,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	defer ts.Close()
 
 	store := &MockStore{RegistryURL: ts.URL}
-	catSvc := catalog.NewService(store)
+	catSvc := catalog.NewService(store, nil)
 	svc := composesvc.NewService(store, catSvc)
 
 	// VERSIONING ARCHITECTURE EXPLANATION (SENSOR REGISTRY):

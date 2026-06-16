@@ -26,14 +26,19 @@ type Store interface {
 	GetConfigValue(key string) (string, error)
 }
 
-type Service struct {
-	store      Store
-	indexCache *RegistryIndex
-	mu         sync.RWMutex
+type Broadcaster interface {
+	Broadcast(eventType string, payload interface{})
 }
 
-func NewService(store Store) *Service {
-	return &Service{store: store}
+type Service struct {
+	store       Store
+	broadcaster Broadcaster
+	indexCache  *RegistryIndex
+	mu          sync.RWMutex
+}
+
+func NewService(store Store, broadcaster Broadcaster) *Service {
+	return &Service{store: store, broadcaster: broadcaster}
 }
 
 func (s *Service) RefreshIndex() error {
@@ -58,6 +63,10 @@ func (s *Service) RefreshIndex() error {
 	s.mu.Lock()
 	s.indexCache = &idx
 	s.mu.Unlock()
+
+	if s.broadcaster != nil {
+		s.broadcaster.Broadcast("CATALOG_UPDATED", nil)
+	}
 
 	return nil
 }
