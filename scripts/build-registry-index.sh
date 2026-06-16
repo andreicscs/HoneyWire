@@ -50,6 +50,12 @@ for FILE in "${MANIFEST_FILES[@]}"; do
     continue
   fi
 
+  # Skip deprecated versions
+  if jq -e '.deprecated == true' "$FILE" >/dev/null 2>&1; then
+    echo "⏭️  Skipping deprecated version: $FILE"
+    continue
+  fi
+
   ENTRY=$(jq -c '{
     id: .id,
     name: .name,

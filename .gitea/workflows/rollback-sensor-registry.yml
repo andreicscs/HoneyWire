@@ -1,0 +1,97 @@
+name: Rollback Sensor Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      sensor_name:
+        description: 'Sensor name to rollback (e.g. file-canary) or "all" to rollback all sensors'
+        required: true
+        default: 'all'
+
+jobs:
+  rollback:
+    name: "🔄 Rollback Sensor Version"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare build script
+        run: |
+          cp scripts/build-registry-index.sh /tmp/build-registry-index.sh
+          chmod +x /tmp/build-registry-index.sh
+
+      - name: Checkout registry-pages branch
+        run: |
+          git config user.name "HoneyWire CI"
+          git config user.email "ci@honeywire.dev"
+          git fetch origin registry-pages
+          git checkout registry-pages
+
+      - name: Perform Rollback
+        id: rollback
+        run: |
+          SENSOR_TARGET="${{ inputs.sensor_name }}"
+          
+          if [ ! -f index.json ]; then
+            echo "❌ index.json not found in registry-pages branch!"
+            exit 1
+          fi
+
+          SENSORS=()
+          if [ "$SENSOR_TARGET" = "all" ]; then
+            # Extract sensor names from index.json (stripping the "hw-sensor-" prefix)
+            mapfile -t SENSORS < <(jq -r '.sensors[] | .id | sub("^hw-sensor-"; "")' index.json)
+          else
+            SENSORS=("$SENSOR_TARGET")
+          fi
+
+          echo "Rolling back sensors: ${SENSORS[*]}"
+          
+          ROLLBACK_COUNT=0
+
+          for SENSOR in "${SENSORS[@]}"; do
+             # Find the highest version currently in the index for this sensor
+             LATEST_VERSION=$(jq -r --arg id "hw-sensor-$SENSOR" '.sensors[] | select(.id == $id) | .versions | map(.v) | sort_by(split(".") | map(tonumber)) | last' index.json)
+             
+             if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+                echo "⚠️ No versions found for sensor $SENSOR, skipping."
+                continue
+             fi
+
+             FILE_TO_DELETE="${SENSOR}-v${LATEST_VERSION}.json"
+             if [ -f "$FILE_TO_DELETE" ]; then
+                # Mark as deprecated instead of deleting
+                jq '.deprecated = true' "$FILE_TO_DELETE" > "$FILE_TO_DELETE.tmp" && mv "$FILE_TO_DELETE.tmp" "$FILE_TO_DELETE"
+                echo "✅ Marked $FILE_TO_DELETE as deprecated"
+
+                ROLLBACK_COUNT=$((ROLLBACK_COUNT + 1))
+             else
+                echo "⚠️ File $FILE_TO_DELETE not found, skipping."
+             fi
+          done
+
+          if [ "$ROLLBACK_COUNT" -eq 0 ]; then
+             echo "⚠️ No rollbacks performed."
+          fi
+          
+          echo "count=$ROLLBACK_COUNT" >> $GITHUB_OUTPUT
+          
+      - name: Rebuild index.json
+        if: steps.rollback.outputs.count > 0
+        run: |
+          /tmp/build-registry-index.sh
+          echo "✅ index.json regenerated"
+
+      - name: Commit and push changes
+        if: steps.rollback.outputs.count > 0
+        run: |
+          git add *.json
+          git commit -m "registry: rollback ${{ inputs.sensor_name }}
+          
+          Automated rollback of the latest versions via deprecation."
+          
+          git push origin registry-pages
+          echo "🎉 Rollback complete!"
