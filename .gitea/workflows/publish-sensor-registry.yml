@@ -137,7 +137,19 @@ jobs:
           docker build -t "$IMAGE_TAG" -f "$SENSOR_DIR/Dockerfile" .
           
           echo "🐳 Pushing Docker Image: $IMAGE_TAG"
-          docker push "$IMAGE_TAG" 
+          docker push "$IMAGE_TAG" | tee push_out.log
+          
+          # Extract the final SHA256 cryptographic digest from Docker's response
+          DIGEST=$(grep -o 'sha256:[a-f0-9]\{64\}' push_out.log | tail -n 1)
+          if [ -n "$DIGEST" ]; then
+             echo "📦 Captured Digest: $DIGEST"
+             OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
+             jq --arg digest "$DIGEST" '.deployment.image_digest = $digest' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+             echo "✅ Injected digest into manifest"
+          else
+             echo "⚠️ Error: Could not extract digest from Docker push output!"
+             exit 1
+          fi
 
       # -------------------------------------------------
       # 5. COPY SCRIPT & SWITCH TO REGISTRY-PAGES BRANCH
