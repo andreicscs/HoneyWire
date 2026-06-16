@@ -137,7 +137,7 @@ jobs:
           docker build -t "$IMAGE_TAG" -f "$SENSOR_DIR/Dockerfile" .
           
           echo "🐳 Pushing Docker Image: $IMAGE_TAG"
-          docker push "$IMAGE_TAG" || echo "⚠️ Warning: Push failed! Ensure your CI runner is authenticated to the registry."
+          docker push "$IMAGE_TAG" 
 
       # -------------------------------------------------
       # 5. COPY SCRIPT & SWITCH TO REGISTRY-PAGES BRANCH
