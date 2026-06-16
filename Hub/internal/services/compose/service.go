@@ -161,6 +161,11 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubAPI)
 	}
 
+	// Auto-reconcile empty nodes since they have no sensors to report back via heartbeats
+	if len(nodeDetails.InstalledSensors) == 0 && nodeDetails.HasPendingConfig {
+		_ = s.store.ApplyNodeRevision(nodeID, effectiveRevision)
+	}
+
 	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubAPI)
 	if fetchErr != nil {
 		log.Printf("[ERROR] fetchStrictCatalogManifests failed: %v", fetchErr)
