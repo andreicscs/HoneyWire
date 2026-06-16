@@ -144,7 +144,7 @@ jobs:
           if [ -n "$DIGEST" ]; then
              echo "📦 Captured Digest: $DIGEST"
              OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
-             jq --arg digest "$DIGEST" '.deployment.image_digest = $digest | if .deployment.init_containers then .deployment.init_containers[].image_digest = $digest else . end' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+             jq --arg digest "$DIGEST" '.deployment.image_digest = $digest | if .deployment.init_containers then .deployment.init_containers[].image_digest = $digest else . end' "/tmp/$OUTPUT_FILE" > "/tmp/$OUTPUT_FILE.tmp" && mv "/tmp/$OUTPUT_FILE.tmp" "/tmp/$OUTPUT_FILE"
              echo "✅ Injected digest into manifest and init containers"
           else
              echo "⚠️ Error: Could not extract digest from Docker push output!"
