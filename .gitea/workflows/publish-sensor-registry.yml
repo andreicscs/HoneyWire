@@ -116,6 +116,30 @@ jobs:
           echo "✅ Versioned manifest built successfully"
 
       # -------------------------------------------------
+      # 4.5 BUILD AND PUSH DOCKER IMAGE
+      # -------------------------------------------------
+      - name: Build and Push Docker Image
+        run: |
+          SOURCE="${{ steps.validate.outputs.SOURCE }}"
+          SENSOR_DIR=$(dirname "$SOURCE")
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          
+          IMAGE_REPO=$(jq -r '.deployment.image_repository // empty' "$SOURCE")
+          
+          if [ -z "$IMAGE_REPO" ]; then
+             echo "⚠️ No image_repository found in manifest. Skipping Docker build."
+             exit 0
+          fi
+
+          IMAGE_TAG="$IMAGE_REPO:v$VERSION"
+          echo "🐳 Building Docker Image: $IMAGE_TAG in $SENSOR_DIR..."
+          
+          docker build -t "$IMAGE_TAG" "$SENSOR_DIR"
+          
+          echo "🐳 Pushing Docker Image: $IMAGE_TAG"
+          docker push "$IMAGE_TAG" || echo "⚠️ Warning: Push failed! Ensure your CI runner is authenticated to the registry."
+
+      # -------------------------------------------------
       # 5. COPY SCRIPT & SWITCH TO REGISTRY-PAGES BRANCH
       # -------------------------------------------------
       - name: Checkout registry-pages branch
