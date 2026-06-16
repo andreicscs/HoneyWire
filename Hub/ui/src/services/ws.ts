@@ -52,7 +52,8 @@ export class HoneyWireWS {
       'NEW_NODE': 'onNewNode',
       'UPDATE_NODE': 'onUpdateNode',
       'DELETE_NODE': 'onDeleteNode',
-      'NODE_SYNCED': 'onNodeSynced'
+      'NODE_SYNCED': 'onNodeSynced',
+      'CATALOG_UPDATED': 'onCatalogUpdated'
     };
 
     // Callback registry

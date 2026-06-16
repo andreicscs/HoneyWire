@@ -153,6 +153,28 @@ Creates a new node entry and returns the generated node credentials.
 
 Returns all registered nodes and their installed sensors. Each node includes current status, heartbeat metadata, and pending config state.
 
+**Response:**
+```json
+[
+  {
+    "nodeId": "node-alpha",
+    "alias": "Production Web Server",
+    "activeRevision": "rev_e4f2a1",
+    "desiredRevision": "rev_b7c9d0",
+    "hasPendingConfig": true,
+    "hasUpdateAvailable": true,
+    "status": "online",
+    "installedSensors": [
+      {
+        "sensorId": "hw-tcp-tarpit",
+        "customName": "SSH Decoy",
+        "updateAvailable": true
+      }
+    ]
+  }
+]
+```
+
 #### GET /api/v1/nodes/{nodeId}
 
 Returns details for a single node, including installed sensors and per-sensor event counts.

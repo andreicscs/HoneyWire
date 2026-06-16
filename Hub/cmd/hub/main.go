@@ -57,7 +57,6 @@ func main() {
 	catalogService := catalog.NewService(dbStore, wsService)
 
 	nodeSvc := node.NewService(dbStore, wsService, catalogService)
-	nodeSvc.StartAutoEvaluator()
 	sensorSvc := sensor.NewService(dbStore, wsService)
 	siemService := siem.NewService(nodeSvc)
 	notifyService := notify.NewService(nodeSvc)
@@ -95,6 +94,7 @@ func main() {
 	go authService.StartWorkers(rootCtx)
 	go siemService.StartWorker(rootCtx)
 	go notifyService.StartWorker(rootCtx)
+	go nodeSvc.StartWorker(rootCtx)
 
 	// 2. Load Runtime Configurations Safely
 	isArmed := loadConfigSafe(dbStore, "is_armed", "false") == "true"

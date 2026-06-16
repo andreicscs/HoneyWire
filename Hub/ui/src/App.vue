@@ -70,6 +70,7 @@ const loadAppData = async () => {
     wsService.on('onUpdateNode', (payload: any) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
     wsService.on('onDeleteNode', (payload: any) => fleetStore.handleWsUpdate('DELETE_NODE', payload))
     wsService.on('onNodeSynced', (payload: any) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
+    wsService.on('onCatalogUpdated', (payload: any) => fleetStore.handleWsUpdate('CATALOG_UPDATED', payload))
 
     wsService.on('onReconnect', async () => {
       console.log("WebSocket Reconnected: Syncing missed data...")

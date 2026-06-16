@@ -458,6 +458,7 @@ export const useFleetStore = defineStore('fleet', () => {
     }
 
     if (type === 'CATALOG_UPDATED') {
+      fetchFleet()
       fetchManifests()
       return
     }

@@ -149,18 +149,11 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion s
 		hubEndpoint = hostFallback
 	}
 
-	effectiveRevision := nodeDetails.DesiredRevision
-	if effectiveRevision == "" && nodeDetails.HasPendingConfig {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubVersion)
+	effectiveRevision := node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubVersion)
+	if effectiveRevision != nodeDetails.DesiredRevision {
 		if err := s.store.SetNodeDesiredRevision(nodeID, effectiveRevision); err != nil {
 			return nil, fmt.Errorf("failed_to_allocate")
 		}
-	}
-	if effectiveRevision == "" {
-		effectiveRevision = nodeDetails.ActiveRevision
-	}
-	if effectiveRevision == "" {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubVersion)
 	}
 
 	// Auto-reconcile empty nodes since they have no sensors to report back via heartbeats

@@ -35,10 +35,17 @@ type Service struct {
 	broadcaster Broadcaster
 	indexCache  *RegistryIndex
 	mu          sync.RWMutex
+	onChange    func()
 }
 
 func NewService(store Store, broadcaster Broadcaster) *Service {
 	return &Service{store: store, broadcaster: broadcaster}
+}
+
+func (s *Service) SetOnChangeHook(hook func()) {
+	s.mu.Lock()
+	s.onChange = hook
+	s.mu.Unlock()
 }
 
 func (s *Service) RefreshIndex() error {
@@ -61,11 +68,28 @@ func (s *Service) RefreshIndex() error {
 	}
 
 	s.mu.Lock()
+	var oldJSON, newJSON []byte
+	if s.indexCache != nil {
+		oldJSON, _ = json.Marshal(s.indexCache)
+	}
+	newJSON, _ = json.Marshal(&idx)
+	
+	changed := string(oldJSON) != string(newJSON)
 	s.indexCache = &idx
+	
+	var hook func()
+	if changed {
+		hook = s.onChange
+	}
 	s.mu.Unlock()
 
-	if s.broadcaster != nil {
-		s.broadcaster.Broadcast("CATALOG_UPDATED", nil)
+	if changed {
+		if s.broadcaster != nil {
+			s.broadcaster.Broadcast("CATALOG_UPDATED", nil)
+		}
+		if hook != nil {
+			go hook()
+		}
 	}
 
 	return nil

@@ -124,3 +124,6 @@ Check the `registry-pages` branch to confirm:
 - The versioned JSON file exists
 - `index.json` lists the new version
 - The `latest` field points to the new version
+
+### Step 5: Dashboard Sync
+Refresh your HoneyWire dashboard or wait for the automatic UI sync. The Hub's event-driven catalog hook will instantly detect the registry mutation, generate the new cryptographic hashes for your nodes, lock them into 'Pending Sync' state, and immediately broadcast the update to all active UI sessions without latency. You do not need to wait for a 5-minute background loop.

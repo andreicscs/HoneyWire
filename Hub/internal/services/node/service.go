@@ -1,9 +1,11 @@
 package node
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log"
 	"sort"
 	"time"
 
@@ -45,16 +47,34 @@ func NewService(store Store, broadcaster Broadcaster, cat *catalog.Service) *Ser
 	}
 }
 
-// StartAutoEvaluator runs a background thread that periodically refreshes the catalog
+// StartWorker runs a background thread that periodically refreshes the catalog
 // and recalculates the node sync states to instantly flag updates natively.
-func (s *Service) StartAutoEvaluator() {
-	if s.catalog == nil {
-		return
+func (s *Service) StartWorker(ctx context.Context) {
+	log.Println("[INFO] Starting node sync background worker...")
+
+	if s.catalog != nil {
+		s.catalog.SetOnChangeHook(func() {
+			nodes, err := s.store.GetNodes()
+			if err == nil {
+				for _, n := range nodes {
+					s.evaluateNodeSyncState(n.ID)
+				}
+			}
+		})
 	}
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			s.catalog.RefreshIndex()
+
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("[INFO] Node sync worker stopped")
+			return
+		case <-ticker.C:
+			if s.catalog != nil {
+				s.catalog.RefreshIndex()
+			}
 			nodes, err := s.store.GetNodes()
 			if err == nil {
 				for _, n := range nodes {
@@ -62,7 +82,7 @@ func (s *Service) StartAutoEvaluator() {
 				}
 			}
 		}
-	}()
+	}
 }
 
 func (s *Service) CreateNode(alias string, tags []string) (string, string, error) {
@@ -107,6 +127,11 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 				if err == nil && latest != "" {
 					deployedVer := sensor.DeployedVersion
 					if deployedVer != latest {
+						newHash := GenerateRevisionHash(nodes[i].InstalledSensors, s.catalog, models.HubVersion)
+						if nodes[i].ActiveRevision != "" && nodes[i].ActiveRevision == newHash {
+							_ = s.store.SetNodeSensorDeployedVersion(nodes[i].ID, sensor.ID, latest)
+							continue
+						}
 						nodes[i].HasUpdateAvailable = true
 						break
 					}
@@ -131,6 +156,12 @@ func (s *Service) GetNodeDetails(nodeID string) (*models.Node, error) {
 			if err == nil && latest != "" {
 				deployedVer := sensor.DeployedVersion
 				if deployedVer != latest {
+					newHash := GenerateRevisionHash(node.InstalledSensors, s.catalog, models.HubVersion)
+					if node.ActiveRevision != "" && node.ActiveRevision == newHash {
+						_ = s.store.SetNodeSensorDeployedVersion(node.ID, sensor.ID, latest)
+						node.InstalledSensors[i].DeployedVersion = latest
+						continue
+					}
 					node.InstalledSensors[i].UpdateAvailable = true
 					node.HasUpdateAvailable = true
 				}

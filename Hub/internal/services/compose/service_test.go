@@ -2,6 +2,7 @@ package composesvc_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,8 @@ import (
 
 type MockStore struct {
 	RegistryURL string
+	AssignedRevision string
+	ShouldFailSetRevision bool
 }
 
 func (m *MockStore) GetConfigValue(key string) (string, error) {
@@ -36,10 +39,15 @@ func (m *MockStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 		InstalledSensors: []models.NodeSensor{
 			{ID: "hw-sensor-test"},
 		},
+		DesiredRevision: "old_revision",
 	}, nil
 }
 
 func (m *MockStore) SetNodeDesiredRevision(nodeID, rev string) error {
+	if m.ShouldFailSetRevision {
+		return fmt.Errorf("simulated database lock timeout")
+	}
+	m.AssignedRevision = rev
 	return nil
 }
 
@@ -164,4 +172,89 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 
 func contains(b []byte, s string) bool {
 	return strings.Contains(string(b), s)
+}
+
+func TestGetNodeComposeSynchronousSync(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/index.json" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"sensors": []map[string]interface{}{
+					{
+						"id":     "hw-sensor-test",
+						"version": "v1.0.0",
+					},
+				},
+			})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/hw-sensor-test-v1.0.0.json") {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":      "hw-sensor-test",
+				"version": "1.0.0",
+				"deployment": map[string]interface{}{
+					"image": "test-image",
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	store := &MockStore{RegistryURL: ts.URL}
+	catSvc := catalog.NewService(store, nil)
+	svc := composesvc.NewService(store, catSvc)
+
+	// Refresh index to simulate worker background state
+	catSvc.RefreshIndex()
+
+	_, err := svc.GetNodeCompose("node-1", "http://fallback.com", "v1.0.0")
+	if err != nil {
+		t.Fatalf("GetNodeCompose failed: %v", err)
+	}
+
+	// Verify that GetNodeCompose calculated a new hash and explicitly synchronized it!
+	if store.AssignedRevision == "" || store.AssignedRevision == "old_revision" {
+		t.Fatalf("Expected DesiredRevision to be dynamically assigned new hash, got: %v", store.AssignedRevision)
+	}
+}
+
+func TestComposeSetDesiredRevisionErrorHandling(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/index.json" {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"sensors": []map[string]interface{}{
+					{
+						"id":     "hw-sensor-test",
+						"latest": "v1.0.0",
+					},
+				},
+			})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/hw-sensor-test-v1.0.0.json") {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":      "hw-sensor-test",
+				"version": "1.0.0",
+				"deployment": map[string]interface{}{
+					"image": "test-image",
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	// Simulate database failure
+	store := &MockStore{RegistryURL: ts.URL, ShouldFailSetRevision: true}
+	catSvc := catalog.NewService(store, nil)
+	svc := composesvc.NewService(store, catSvc)
+
+	catSvc.RefreshIndex()
+
+	_, err := svc.GetNodeCompose("node-1", "http://fallback.com", "v1.0.0")
+	if err == nil || !strings.Contains(err.Error(), "failed_to_allocate") {
+		t.Fatalf("Expected failed_to_allocate error to cascade up, got: %v", err)
+	}
 }

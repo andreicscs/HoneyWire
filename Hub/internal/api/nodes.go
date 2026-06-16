@@ -107,12 +107,13 @@ func (h *NodeHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 		"activeRevision":   node.ActiveRevision,
 		"desiredRevision":  node.DesiredRevision,
 		"publicIp":         node.PublicIP,
-		"privateIp":        node.PrivateIP,
-		"tags":             node.Tags,
-		"hasPendingConfig": node.HasPendingConfig,
-		"lastHeartbeat":    node.LastHeartbeat,
-		"status":           node.Status,
-		"installedSensors": node.InstalledSensors,
+		"privateIp":          node.PrivateIP,
+		"tags":               node.Tags,
+		"hasPendingConfig":   node.HasPendingConfig,
+		"hasUpdateAvailable": node.HasUpdateAvailable,
+		"lastHeartbeat":      node.LastHeartbeat,
+		"status":             node.Status,
+		"installedSensors":   node.InstalledSensors,
 	})
 }
 
