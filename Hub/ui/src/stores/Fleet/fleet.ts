@@ -511,8 +511,10 @@ export const useFleetStore = defineStore('fleet', () => {
     try {
       const res = await api.get('/api/v1/manifests')
       const data = await res.json()
-      state.value.manifests = data
-      return data
+      // The API returns the raw index.json which has a top-level { sensors: [] } wrapper
+      const sensorsArray = Array.isArray(data) ? data : (data?.sensors || [])
+      state.value.manifests = sensorsArray
+      return sensorsArray
     } catch (err) {
       console.error('Failed to fetch manifests:', err)
       throw err

@@ -36,6 +36,11 @@ const handleSensorClick = (s: any) => {
             <h3 class="text-base font-medium text-text-h">Unable to reach Sensor Registry</h3>
             <p class="text-base text-text-m mt-2 max-w-md">Please ensure this Hub has connectivity access to pull the latest sensor manifests.</p>
         </div>
+        <div v-else-if="manifests.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
+            <svg class="w-12 h-12 text-text-m opacity-50 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"></path></svg>
+            <h3 class="text-base font-medium text-text-h">No Sensors Available</h3>
+            <p class="text-base text-text-m mt-2 max-w-md">There are currently no sensor manifests registered in the catalog.</p>
+        </div>
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div v-for="s in manifests" :key="s.id" @click="handleSensorClick(s)" class="bg-bg-surface border rounded-lg p-4 shadow-sm hover:shadow-md cursor-pointer transition-all duration-normal group flex flex-col relative overflow-hidden" :class="isInstalled(s) ? 'border-primary-main/50' : 'border-border-default hover:border-primary-main'">
                 <div class="flex justify-between items-start mb-3">
