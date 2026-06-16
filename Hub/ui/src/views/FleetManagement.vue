@@ -77,6 +77,10 @@ const handleForgetNode = async (nodeId: string) => {
     if (!res.success) alert(res.error)
 }
 
+const handleUpgradeNode = async (nodeId: string) => {
+    await fleetStore.upgradeNode(nodeId)
+}
+
 const handleOpenNodeDetail = (nodeId: string) => {
     fleetStore.selectTarget(nodeId, null, false)
     router.push({ name: 'node-details', params: { id: nodeId } })
@@ -125,6 +129,7 @@ const handleOpenNodeDetail = (nodeId: string) => {
                 @silence="handleSilenceNode(node.id)"
                 @delete="handleForgetNode(node.id)"
                 @openDetail="handleOpenNodeDetail(node.id)"
+                @upgradeAll="handleUpgradeNode(node.id)"
             />
         </div>
     </div>

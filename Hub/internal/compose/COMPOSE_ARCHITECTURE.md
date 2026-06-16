@@ -17,7 +17,11 @@ The architecture is driven by the principle of **Secure Defaults by Inversion**.
    - Blocks untrusted interpolation patterns in fields that are not executed through a safe templating engine.
 3. **Secure Environment Composition (`env.go`)**
    The `BuildEnv` pipeline ensures isolated priority overrides. Manifest defaults are loaded, overridden safely by user vars (dropping any attempting to modify forbidden environment fields), and ultimately superseded by statically defined, system-injected constants (e.g., `HW_HUB_KEY`, `HW_SENSOR_ID`).
-4. **The Builder (`builder.go`)**
+4. **Versioning and Dual-Manifest Resolution**
+   Because nodes now support manual rather than automatic upgrades, a node may run a deprecated legacy version of a sensor. To prevent breaking changes during compose regeneration, the compiler relies on dual-manifest resolution:
+   - **Latest Catalog:** Warmed into cache on startup via `index.json`.
+   - **Historical Schemas:** Lazy-loaded and permanently cached via `FetchSpecificManifest` (e.g. `hw-sensor-tarpit-v1.0.0.json`) when requested by a legacy node.
+5. **The Builder (`builder.go`)**
    The `BuildService` routine converts the strictly-validated models into `ComposeFile` structs.
    - **Immutable Sandboxing**: Unconditionally forces `ReadOnly: true`, `CapDrop: ["ALL"]`, and `SecurityOpt: ["no-new-privileges:true"]`.
    - Structural templating handles file-bind expansions inherently rather than executing string replacement interpolations on manifest strings.

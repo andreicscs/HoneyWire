@@ -112,6 +112,9 @@ git tag sensor/file-canary/v1.2.0
 git push origin sensor/file-canary/v1.2.0
 ```
 
+> [!WARNING]
+> **Immutability Rule:** In standard GitOps workflows, release tags are immutable. If you push `v1.2.0`, realize it's broken, and rollback your fleet, you **must not** overwrite the `v1.2.0` tag with a fix. Doing so causes cache poisoning in the Hub backend and Docker registries. Always bump the version (e.g. `v1.2.1`) and leave the rolled-back tag untouched.
+
 ### Step 3: CI Handles the Rest
 The `publish-sensor-registry` Gitea Action will:
 1. Read `Sensors/official/FileCanary/file-canary.json` at the tagged commit
@@ -125,5 +128,7 @@ Check the `registry-pages` branch to confirm:
 - `index.json` lists the new version
 - The `latest` field points to the new version
 
-### Step 5: Dashboard Sync
-Refresh your HoneyWire dashboard or wait for the automatic UI sync. The Hub's event-driven catalog hook will instantly detect the registry mutation, generate the new cryptographic hashes for your nodes, lock them into 'Pending Sync' state, and immediately broadcast the update to all active UI sessions without latency. You do not need to wait for a 5-minute background loop.
+### Step 5: Dashboard Sync & Manual Upgrades
+Refresh your HoneyWire dashboard or wait for the automatic UI sync. The Hub's event-driven catalog hook will instantly detect the registry mutation and compare it against deployed sensors.
+
+Instead of forcefully upgrading production edge nodes automatically, the Hub will flag nodes with an **"Update Available"** indicator. Users must manually trigger the `/api/v1/nodes/{id}/upgrade` endpoint (via the UI) to instruct the node to pull the new version schema and execute a compose restart.

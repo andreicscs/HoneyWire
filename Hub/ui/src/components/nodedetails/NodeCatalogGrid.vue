@@ -10,11 +10,6 @@ const getInstalled = (manifest: any) => {
     return props.installedSensors?.find((sensor: any) => sensor.id === manifest.id || sensor.sensorId === manifest.id || sensor.name === manifest.id)
 }
 
-const hasUpdate = (manifest: any) => {
-    const installed = getInstalled(manifest)
-    return installed?.updateAvailable || false
-}
-
 const handleSensorClick = (s: any) => {
     const installed = getInstalled(s)
     if (installed) {
@@ -46,7 +41,6 @@ const handleSensorClick = (s: any) => {
                 <div class="flex justify-between items-start mb-3">
                     <div class="w-10 h-10 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-normal"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg></div>
                     <div class="flex items-center gap-2">
-                        <span v-if="hasUpdate(s)" class="w-2 h-2 rounded-full bg-low/70 shadow-[0_0_8px_rgba(var(--color-low),0.5)]" title="Sensor Update Available"></span>
                         <span class="px-2 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ s.osi_layer }}</span>
                     </div>
                 </div>

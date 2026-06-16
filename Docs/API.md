@@ -104,6 +104,13 @@ Common message types:
 
 Fetches the sensor manifest catalog from `RegistryURL` or the default public manifest registry.
 
+### GET /api/v1/manifests/{sensorId}/versions
+
+Fetches a specific historical version schema of a sensor manifest from the registry.
+
+**Query parameters:**
+- `version` — The exact version string to fetch (e.g. `2.0.6`).
+
 ### POST /api/v1/compose/generate
 
 Generates a `docker-compose.yml` preview from the selected sensor manifests and UI-provided environment values.
@@ -193,6 +200,10 @@ Updates a node's alias, tags, public IP, or private IP.
 }
 ```
 
+#### POST /api/v1/nodes/{nodeId}/upgrade
+
+Triggers a fleet-wide sync command over WebSockets to force the node to pull the newest compose definitions and automatically pull the latest manifest versions for all of its installed sensors.
+
 #### DELETE /api/v1/nodes/{nodeId}
 
 Deletes a node and cascades to remove its sensors, event history, and heartbeat records.
@@ -219,6 +230,10 @@ Updates a sensor's custom name and config values and marks the parent node pendi
 #### DELETE /api/v1/nodes/{nodeId}/sensors/{sensorId}
 
 Removes a sensor from the node and marks the node pending sync.
+
+#### POST /api/v1/nodes/{nodeId}/sensors/{sensorId}/upgrade
+
+Upgrades a specific sensor to the latest available manifest version listed in the registry, and marks the node pending sync.
 
 #### PATCH /api/v1/nodes/{nodeId}/sensors/{sensorId}/silence
 

@@ -27,7 +27,7 @@ HoneyWire
 
 ### Hub
 The central orchestrator and data aggregator. 
-*For deep-dives into the Hub, see the [Backend Architecture](./hub/backend/overview.md) and [Frontend Architecture](./hub/frontend/overview.md).*
+*For deep-dives into the Hub, see the [Backend Architecture](./hub/backend/overview.md), and [Frontend Architecture](./hub/frontend/overview.md).*
 
 **Responsibilities:**
 - Stores events
@@ -219,6 +219,7 @@ A high-level view of internal subsystem boundaries:
 **Hub**
 
 ├── API Layer
+├── Compose Compiler
 ├── Services
 ├── Store
 ├── Projections

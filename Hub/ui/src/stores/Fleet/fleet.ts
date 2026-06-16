@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '../../api/client'
-
 // --- TYPES & INTERFACES ---
 export interface RawSensorPayload {
   sensorId: string
@@ -10,6 +9,7 @@ export interface RawSensorPayload {
   isSilenced?: boolean
   envVars?: Record<string, any>
   metadata?: Record<string, any>
+  deployedVersion?: string
   updateAvailable?: boolean
   lastHeartbeat?: string | null
 }
@@ -62,6 +62,7 @@ export interface InstalledSensor {
   isSilenced: boolean
   envVars: Record<string, any>
   metadata: Record<string, any>
+  deployedVersion?: string
   updateAvailable?: boolean
   lastHeartbeat: string | null
 }
@@ -368,6 +369,7 @@ export const useFleetStore = defineStore('fleet', () => {
       display: raw.customName || rawId,
       status: raw.status || 'down',
       isSilenced: raw.isSilenced ?? false,
+      deployedVersion: raw.deployedVersion || '',
       updateAvailable: raw.updateAvailable || false,
       envVars: raw.envVars || {},
       metadata: raw.metadata || {},
@@ -592,6 +594,16 @@ export const useFleetStore = defineStore('fleet', () => {
     }
   }
 
+  const upgradeNode = async (nodeId: string): Promise<void> => {
+    try {
+      await api.post(`/api/v1/nodes/${nodeId}/upgrade`)
+      fetchNodeDetails(nodeId)
+    } catch (err: any) {
+      console.error('Node Upgrade Failed:', err.message || 'Failed to upgrade node')
+      throw err
+    }
+  }
+
   const deleteNode = async (nodeId: string): Promise<{ success: boolean; error?: string }> => {
     markNodeAction(nodeId, 'deleting')
 
@@ -623,6 +635,18 @@ export const useFleetStore = defineStore('fleet', () => {
       fetchNodeDetails(nodeId)
     } catch (err) {
       console.error('Failed to add sensor:', err)
+      throw err
+    }
+  }
+
+  const upgradeSensor = async (nodeId: string, rawSensorId: string) => {
+    if (!nodeId || !rawSensorId) throw new Error('Missing required parameters')
+    
+    try {
+      await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/upgrade`)
+      fetchNodeDetails(nodeId)
+    } catch (err: any) {
+      console.error('Sensor Upgrade Failed:', err.message || 'Failed to upgrade sensor')
       throw err
     }
   }
@@ -715,8 +739,8 @@ export const useFleetStore = defineStore('fleet', () => {
     isNodeActionPending, isNodeSilenced,
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
     selectTarget, clearSelection, setActiveTimeframe,
-    createNode, deleteNode, updateNode,
-    addSensor, updateSensor, removeSensor, toggleSilence, silenceNode,
+    createNode, deleteNode, updateNode, upgradeNode,
+    addSensor, updateSensor, upgradeSensor, removeSensor, toggleSilence, silenceNode,
     fetchCompose, generateCompose, syncNode,
     handleWsUpdate,
   }

@@ -120,3 +120,22 @@ func (h *SensorHandler) GetManifests(w http.ResponseWriter, r *http.Request) {
 	// nosemgrep: go.lang.security.audit.xss.no-direct-write-to-responsewriter.no-direct-write-to-responsewriter
 	w.Write(body)
 }
+
+// GetSpecificManifest fetches the exact historical manifest for a specific version.
+func (h *SensorHandler) GetSpecificManifest(w http.ResponseWriter, r *http.Request) {
+	sensorID := chi.URLParam(r, "sensorId")
+	version := r.URL.Query().Get("version")
+
+	if sensorID == "" || version == "" {
+		RespondError(w, "sensorId and version are required", http.StatusBadRequest)
+		return
+	}
+
+	manifest, err := h.composeService.FetchSpecificManifest(sensorID, version)
+	if err != nil {
+		RespondError(w, "Failed to fetch manifest version: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, manifest)
+}

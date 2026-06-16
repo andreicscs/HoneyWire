@@ -168,6 +168,19 @@ func (h *NodeHandler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+// UpgradeNodeSensor handles POST /api/v1/nodes/{id}/sensors/{sensorId}/upgrade
+func (h *NodeHandler) UpgradeNodeSensor(w http.ResponseWriter, r *http.Request) {
+	nodeID := chi.URLParam(r, "nodeId")
+	sensorID := chi.URLParam(r, "sensorId")
+
+	if err := h.service.UpgradeSensor(nodeID, sensorID); err != nil {
+		RespondError(w, "Failed to upgrade sensor: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Sensor upgraded, node pending sync"})
+}
+
 // DeleteNodeSensor handles DELETE /api/v1/nodes/{id}/sensors/{sensorId}
 func (h *NodeHandler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
@@ -191,6 +204,18 @@ func (h *NodeHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// UpgradeNode handles POST /api/v1/nodes/{id}/upgrade
+func (h *NodeHandler) UpgradeNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := chi.URLParam(r, "nodeId")
+
+	if err := h.service.UpgradeNode(nodeID); err != nil {
+		RespondError(w, "Failed to upgrade node: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Node upgraded, pending sync"})
 }
 
 // GetCurrentNode handles GET /api/v1/nodes/me

@@ -15,7 +15,8 @@ const emit = defineEmits<{
     (e: 'update', updates: any): void,
     (e: 'silence'): void,
     (e: 'delete'): void,
-    (e: 'openDetail'): void
+    (e: 'openDetail'): void,
+    (e: 'upgradeAll'): void
 }>()
 
 const { copiedStates, handleCopy } = useClipboard() as any
@@ -113,6 +114,10 @@ const removeTag = (index: number | string) => {
                             <path v-if="node.isSilenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                         </svg>
                         {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
+                    </button>
+                    <button v-if="node.hasUpdateAvailable" @click="$emit('upgradeAll')" class="w-full text-left px-3 py-2 text-sm font-medium text-low flex items-center gap-2 hover:bg-low/10 transition-colors group">
+                        <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Update Node
                     </button>
                     <button @click="$emit('delete')" class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
                         <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" /><path class="origin-bottom-right transition-transform duration-normal group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>

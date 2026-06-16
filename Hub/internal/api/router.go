@@ -70,11 +70,13 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Get("/api/v1/nodes", cfg.Nodes.GetNodes)
 		r.Get("/api/v1/nodes/{nodeId}", cfg.Nodes.GetNodeDetails)
 		r.Patch("/api/v1/nodes/{nodeId}", cfg.Nodes.UpdateNode)
+		r.Post("/api/v1/nodes/{nodeId}/upgrade", cfg.Nodes.UpgradeNode)
 		r.Delete("/api/v1/nodes/{nodeId}", cfg.Nodes.DeleteNode)
 
 		// --- Sensor Management ---
 		r.Post("/api/v1/nodes/{nodeId}/sensors", cfg.Nodes.AddNodeSensor)
 		r.Put("/api/v1/nodes/{nodeId}/sensors/{sensorId}", cfg.Nodes.EditNodeSensor)
+		r.Post("/api/v1/nodes/{nodeId}/sensors/{sensorId}/upgrade", cfg.Nodes.UpgradeNodeSensor)
 		r.Delete("/api/v1/nodes/{nodeId}/sensors/{sensorId}", cfg.Nodes.DeleteNodeSensor)
 		r.Patch("/api/v1/nodes/{nodeId}/sensors/{sensorId}/silence", cfg.Sensors.ToggleSilence)
 
@@ -112,7 +114,10 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Post("/api/v1/event", cfg.Events.ReceiveEvent)
 	})
 
-	r.With(DualAuthMiddleware(cfg.SessionValidator, cfg.NodeAuthenticator, rateLimiter)).Get("/api/v1/manifests", cfg.Sensors.GetManifests)
+	r.With(DualAuthMiddleware(cfg.SessionValidator, cfg.NodeAuthenticator, rateLimiter)).Group(func(r chi.Router) {
+		r.Get("/api/v1/manifests", cfg.Sensors.GetManifests)
+		r.Get("/api/v1/manifests/{sensorId}/versions", cfg.Sensors.GetSpecificManifest)
+	})
 
 	// --- Serve the Vue Frontend ---
 	distFS, err := fs.Sub(ui.StaticFiles, "dist")

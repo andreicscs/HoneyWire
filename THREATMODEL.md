@@ -42,8 +42,9 @@ Sensors execute as isolated containers.
   * Strict typed schema enforcement (`DisallowUnknownFields` JSON decoding).
   * Hub-side normalization prior to compilation.
   * Interpolation rejection (blocks `${`, `{{`, and `$` patterns).
+  * Strict version pinning for historical manifests (prevents tag-overwriting and cache poisoning).
+  * Image digest pinning (ensures cryptographically verified, immutable container pulls).
 * **Gaps (NOT IMPLEMENTED):**
-  * Image digest pinning (currently relying on image tags).
   * Cryptographic manifest signature verification.
   * Provenance tracking.
 

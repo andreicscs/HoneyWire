@@ -16,7 +16,8 @@ const emit = defineEmits<{
     (e: 'silence'): void,
     (e: 'delete'): void,
     (e: 'sync'): void,
-    (e: 'manageKey'): void
+    (e: 'manageKey'): void,
+    (e: 'upgradeAll'): void
 }>()
 
 const { copiedStates, handleCopy } = useClipboard() as any
@@ -99,6 +100,7 @@ const removeTag = (index: number) => {
                     <span v-if="node.hasPendingConfig" class="shrink-0 text-high" title="Pending sync — click Sync Node below to apply changes">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </span>
+                    <span v-if="node.hasUpdateAvailable" class="w-2.5 h-2.5 rounded-full bg-low/70 shadow-[0_0_8px_rgba(var(--color-low),0.5)] shrink-0" title="Updates available for installed sensors"></span>
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-m">
@@ -147,6 +149,11 @@ const removeTag = (index: number) => {
                             <path v-if="node.isSilenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
                         </svg>
                         {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
+                    </button>
+                    
+                    <button v-if="node.hasUpdateAvailable" @click="$emit('upgradeAll')" class="w-full text-left px-3 py-2 text-sm font-medium text-low flex items-center gap-2 hover:bg-low/10 transition-colors group">
+                        <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                        Update Node
                     </button>
                     
                     <button @click="$emit('delete')" class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">

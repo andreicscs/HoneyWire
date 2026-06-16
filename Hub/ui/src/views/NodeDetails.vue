@@ -6,6 +6,7 @@ import { useEventsStore } from '../stores/Events/events.ts'
 import { useAppStore } from '../stores/System/app.ts'
 import { useConfigStore } from '../stores/Config/config.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
+import { api } from '../api/client.ts'
 
 import NodeDetailHeader from '../components/nodedetails/NodeDetailHeader.vue'
 import NodeStatWidgets from '../components/nodedetails/NodeStatWidgets.vue'
@@ -75,12 +76,22 @@ const getUIDefault = (def: any) => {
 // --- SENSOR ACTIONS (delegated to store) ---
 
 const handleToggleSensorSilence = async (sensor: any) => {
-  if (!node.value?.id || !sensor.sensorId) return
-  try {
-    await fleetStore.toggleSilence(node.value.id, sensor.sensorId, !sensor.isSilenced)
-  } catch (err) {
-    alert('Unable to change sensor silence state. Please try again.')
-  }
+    if (!node.value) return
+    try {
+        await fleetStore.toggleSilence(node.value.id, sensor.sensorId, !sensor.isSilenced)
+    } catch (e) {
+        // Error handled in store
+    }
+}
+
+const handleUpgradeSensor = async (sensor: any) => {
+    if (!node.value) return
+    await fleetStore.upgradeSensor(node.value.id, sensor.sensorId)
+}
+
+const handleUpgradeAll = async () => {
+    if (!node.value) return
+    await fleetStore.upgradeNode(node.value.id)
 }
 
 const handleRemoveSensor = async (sensor: any) => {
@@ -237,8 +248,18 @@ const openSensor = (sensor: any) => {
   showSensorModal.value = true
 }
 
-const editSensor = (installedSensor: any) => {
-  const manifest = manifests.value.find((m: any) => m.id === installedSensor.id || m.id === installedSensor.sensorId || m.id === installedSensor.name)
+const editSensor = async (installedSensor: any) => {
+  let manifest = manifests.value.find((m: any) => m.id === installedSensor.id || m.id === installedSensor.sensorId || m.id === installedSensor.name)
+  
+  if (installedSensor.deployedVersion) {
+      try {
+          const res = await api.get(`/api/v1/manifests/${encodeURIComponent(installedSensor.sensorId || installedSensor.id || installedSensor.name)}/versions?version=${encodeURIComponent(installedSensor.deployedVersion)}`)
+          manifest = await res.json()
+      } catch (err) {
+          console.error("Failed to fetch deployed manifest version schema:", err)
+      }
+  }
+
   if (!manifest) {
       alert('Sensor manifest not found')
       return
@@ -298,6 +319,7 @@ const closeSensor = () => {
                 @delete="handleDeleteNode"
                 @sync="triggerManualSync"
                 @manage-key="showKeyModal = true"
+                @upgradeAll="handleUpgradeAll"
             />
 
             <NodeStatWidgets :node="node" :recent-activity="recentActivity" @view-all-events="viewAllEvents" />
@@ -307,6 +329,7 @@ const closeSensor = () => {
                 @edit="editSensor"
                 @toggleSilence="handleToggleSensorSilence"
                 @remove="handleRemoveSensor"
+                @upgrade="handleUpgradeSensor"
             />
         </div>
 

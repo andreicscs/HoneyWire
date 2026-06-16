@@ -8,6 +8,7 @@ import (
 	"log"
 	"sort"
 	"time"
+	"fmt"
 
 	"github.com/honeywire/hub/internal/catalog"
 	"github.com/honeywire/hub/internal/models"
@@ -127,11 +128,6 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 				if err == nil && latest != "" {
 					deployedVer := sensor.DeployedVersion
 					if deployedVer != latest {
-						newHash := GenerateRevisionHash(nodes[i].InstalledSensors, s.catalog, models.HubVersion)
-						if nodes[i].ActiveRevision != "" && nodes[i].ActiveRevision == newHash {
-							_ = s.store.SetNodeSensorDeployedVersion(nodes[i].ID, sensor.ID, latest)
-							continue
-						}
 						nodes[i].HasUpdateAvailable = true
 						break
 					}
@@ -156,12 +152,6 @@ func (s *Service) GetNodeDetails(nodeID string) (*models.Node, error) {
 			if err == nil && latest != "" {
 				deployedVer := sensor.DeployedVersion
 				if deployedVer != latest {
-					newHash := GenerateRevisionHash(node.InstalledSensors, s.catalog, models.HubVersion)
-					if node.ActiveRevision != "" && node.ActiveRevision == newHash {
-						_ = s.store.SetNodeSensorDeployedVersion(node.ID, sensor.ID, latest)
-						node.InstalledSensors[i].DeployedVersion = latest
-						continue
-					}
 					node.InstalledSensors[i].UpdateAvailable = true
 					node.HasUpdateAvailable = true
 				}
@@ -185,6 +175,46 @@ func (s *Service) EditSensor(nodeID, sensorID, customName string, configValues m
 		return err
 	}
 	s.evaluateNodeSyncState(nodeID)
+	return nil
+}
+
+func (s *Service) UpgradeSensor(nodeID, sensorID string) error {
+	if s.catalog == nil {
+		return fmt.Errorf("catalog unavailable")
+	}
+	latest, err := s.catalog.GetLatestCompatibleVersion(sensorID, models.HubVersion)
+	if err != nil || latest == "" {
+		return fmt.Errorf("no update available")
+	}
+	if err := s.store.SetNodeSensorDeployedVersion(nodeID, sensorID, latest); err != nil {
+		return err
+	}
+	s.evaluateNodeSyncState(nodeID)
+	return nil
+}
+
+func (s *Service) UpgradeNode(nodeID string) error {
+	if s.catalog == nil {
+		return fmt.Errorf("catalog unavailable")
+	}
+	nodeDetails, err := s.store.GetNodeDetails(nodeID)
+	if err != nil {
+		return err
+	}
+
+	updatedAny := false
+	for _, sensor := range nodeDetails.InstalledSensors {
+		latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
+		if err == nil && latest != "" && sensor.DeployedVersion != latest {
+			_ = s.store.SetNodeSensorDeployedVersion(nodeID, sensor.ID, latest)
+			updatedAny = true
+		}
+	}
+
+	if updatedAny {
+		s.evaluateNodeSyncState(nodeID)
+	}
+
 	return nil
 }
 
@@ -213,9 +243,11 @@ func (s *Service) evaluateNodeSyncState(nodeID string) {
 
 			if s.catalog != nil {
 				for _, sensor := range nodeDetails.InstalledSensors {
-					latest, _ := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
-					if latest != "" && sensor.DeployedVersion != latest {
-						_ = s.store.SetNodeSensorDeployedVersion(nodeID, sensor.ID, latest)
+					if sensor.DeployedVersion == "" {
+						latest, _ := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
+						if latest != "" {
+							_ = s.store.SetNodeSensorDeployedVersion(nodeID, sensor.ID, latest)
+						}
 					}
 				}
 			}
@@ -236,11 +268,11 @@ func GenerateRevisionHash(sensors []models.NodeSensor, catSvc *catalog.Service, 
 	}
 	var configs []sensorConfig
 	for _, s := range sensors {
-		latestVersion := ""
-		if catSvc != nil {
-			latestVersion, _ = catSvc.GetLatestCompatibleVersion(s.ID, currentHubVersion)
+		targetVersion := s.DeployedVersion
+		if targetVersion == "" && catSvc != nil {
+			targetVersion, _ = catSvc.GetLatestCompatibleVersion(s.ID, currentHubVersion)
 		}
-		configs = append(configs, sensorConfig{ID: s.ID, Version: latestVersion, EnvVars: s.EnvVars})
+		configs = append(configs, sensorConfig{ID: s.ID, Version: targetVersion, EnvVars: s.EnvVars})
 	}
 	sort.Slice(configs, func(i, j int) bool { return configs[i].ID < configs[j].ID })
 	b, _ := json.Marshal(configs)

@@ -69,7 +69,7 @@ func (s *Service) FetchManifestBytes(currentHubVersion string) ([]byte, error) {
 func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]models.SensorManifest, error) {
 	registryURL, err := s.store.GetConfigValue("registry_url")
 	if err != nil || registryURL == "" {
-		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages"
+		return nil, fmt.Errorf("registry_url is not configured in database")
 	}
 
 	if err := s.catalog.RefreshIndex(); err != nil {
@@ -131,6 +131,51 @@ func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]model
 	return result, nil
 }
 
+func (s *Service) FetchSpecificManifest(sensorID, targetVersion string) (*models.SensorManifest, error) {
+	cleanVersion := strings.TrimPrefix(targetVersion, "v")
+
+	registryURL, err := s.store.GetConfigValue("registry_url")
+	if err != nil || registryURL == "" {
+		return nil, fmt.Errorf("registry_url is not configured in database")
+	}
+
+	sensorName := strings.TrimPrefix(sensorID, "hw-sensor-")
+	manifestURL := fmt.Sprintf("%s/%s-v%s.json", strings.TrimRight(registryURL, "/"), sensorName, cleanVersion)
+
+	cacheKey := sensorID + "-v" + cleanVersion
+	s.mu.RLock()
+	cached, ok := s.cache[cacheKey]
+	s.mu.RUnlock()
+
+	if ok {
+		return &cached, nil
+	}
+
+	mResp, fetchErr := http.Get(manifestURL)
+	if fetchErr != nil {
+		log.Printf("[ERROR] FetchSpecificManifest network error: %v", fetchErr)
+		return nil, fetchErr
+	}
+	defer mResp.Body.Close()
+
+	if mResp.StatusCode != 200 {
+		log.Printf("[ERROR] FetchSpecificManifest received HTTP %d from %s", mResp.StatusCode, manifestURL)
+		return nil, fmt.Errorf("unexpected status %d", mResp.StatusCode)
+	}
+
+	var specific models.SensorManifest
+	if dErr := json.NewDecoder(mResp.Body).Decode(&specific); dErr != nil {
+		log.Printf("[ERROR] FetchSpecificManifest failed to decode JSON: %v", dErr)
+		return nil, dErr
+	}
+	
+	s.mu.Lock()
+	s.cache[cacheKey] = specific
+	s.mu.Unlock()
+
+	return &specific, nil
+}
+
 // --- GENERATION LOGIC ---
 
 func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion string) ([]byte, error) {
@@ -161,25 +206,20 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion s
 		_ = s.store.ApplyNodeRevision(nodeID, effectiveRevision)
 	}
 
-	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubVersion)
-	if fetchErr != nil {
-		log.Printf("[ERROR] fetchStrictCatalogManifests failed: %v", fetchErr)
-		return nil, fmt.Errorf("failed_to_fetch")
-	}
-
-	manifestByID := make(map[string]models.SensorManifest)
-	for _, m := range manifests {
-		manifestByID[m.ID] = m
-	}
-
 	var finalCompose composeEngine.ComposeFile
 
 	for _, sensor := range nodeDetails.InstalledSensors {
-		manifest, ok := manifestByID[sensor.ID]
-		if !ok {
-			log.Printf("[WARNING] Manifest for sensor %s not found in catalog, skipping.", sensor.ID)
+		targetVersion := sensor.DeployedVersion
+		if targetVersion == "" {
+			targetVersion, _ = s.catalog.GetLatestCompatibleVersion(sensor.ID, currentHubVersion)
+		}
+
+		manifestPtr, err := s.FetchSpecificManifest(sensor.ID, targetVersion)
+		if err != nil || manifestPtr == nil {
+			log.Printf("[WARNING] Manifest for sensor %s (v%s) not found in catalog, skipping.", sensor.ID, targetVersion)
 			continue
 		}
+		manifest := *manifestPtr
 
 		// The Hub will strictly wait for evaluateNodeSyncState to verify the new hash before considering this version deployed!
 		if valErr := security.ValidateManifest(manifest); valErr != nil {

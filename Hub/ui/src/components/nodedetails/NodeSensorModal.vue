@@ -26,9 +26,11 @@ watch(() => props.show, (shown) => {
     if (shown && props.sensor) {
         activeTab.value = props.isEditing ? 'config' : 'readme'
         envVarValues.value = { ...props.initialEnvVars }
-        fetchYamlFromHub()
     } else {
-        envVarValues.value = {}; rawCompose.value = ''; highlightedCompose.value = ''; activeEnvVar.value = null
+        envVarValues.value = {}
+        rawCompose.value = ''
+        highlightedCompose.value = ''
+        activeEnvVar.value = null
     }
 }, { immediate: true })
 
