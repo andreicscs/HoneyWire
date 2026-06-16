@@ -134,7 +134,7 @@ jobs:
           IMAGE_TAG="$IMAGE_REPO:v$VERSION"
           echo "🐳 Building Docker Image: $IMAGE_TAG in $SENSOR_DIR..."
           
-          docker build -t "$IMAGE_TAG" "$SENSOR_DIR"
+          docker build -t "$IMAGE_TAG" -f "$SENSOR_DIR/Dockerfile" .
           
           echo "🐳 Pushing Docker Image: $IMAGE_TAG"
           docker push "$IMAGE_TAG" || echo "⚠️ Warning: Push failed! Ensure your CI runner is authenticated to the registry."
