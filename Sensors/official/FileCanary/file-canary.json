@@ -76,7 +76,7 @@
             "read_only": false
           }
         ],
-        "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+        "image_repository": "192.168.1.11:5000/honeywire-filecanary",
         "image_tag": "latest",
         "image_digest": ""
       }
