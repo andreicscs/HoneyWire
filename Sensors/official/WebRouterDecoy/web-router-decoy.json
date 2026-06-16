@@ -56,7 +56,6 @@
     "recommendation_reason": "Live web proxy or HTTP server detected. Deploy a fake administrative panel to catch internal network snooping and directory brute-forcing."
   },
   "deployment": {
-    "image": "192.168.1.11:5000/honeywire-webrouterdecoy:dev",
     "network_mode": "host",
     "user": "0:0",
     "env_vars": [
@@ -116,6 +115,9 @@
         "required": false,
         "hidden": false
       }
-    ]
+    ],
+    "image_repository": "192.168.1.11:5000/honeywire-webrouterdecoy",
+    "image_tag": "dev",
+    "image_digest": ""
   }
 }

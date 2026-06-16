@@ -51,13 +51,11 @@
     "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch suspicious canary file interactions or ransomware activity."
   },
   "deployment": {
-    "image": "192.168.1.11:5000/honeywire-filecanary:dev",
     "network_mode": "host",
     "user": "65532:65532",
     "init_containers": [
       {
         "name": "fim-decoy-provisioner",
-        "image": "192.168.1.11:5000/honeywire-filecanary:dev",
         "command": "/app/file-canary init",
         "user": "0:0",
         "cap_add": [
@@ -73,7 +71,10 @@
             "target_prefix": "/host",
             "read_only": false
           }
-        ]
+        ],
+        "image_repository": "192.168.1.11:5000/honeywire-filecanary",
+        "image_tag": "dev",
+        "image_digest": ""
       }
     ],
     "volume_mounts": [
@@ -141,6 +142,9 @@
         "required": false,
         "hidden": false
       }
-    ]
+    ],
+    "image_repository": "192.168.1.11:5000/honeywire-filecanary",
+    "image_tag": "dev",
+    "image_digest": ""
   }
 }

@@ -60,7 +60,6 @@
     "recommendation_reason": "Critical datastore or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement attempts targeting these specific services."
   },
   "deployment": {
-    "image": "192.168.1.11:5000/honeywire-tcptarpit:dev",
     "network_mode": "host",
     "user": "0:0",
     "cap_add": [
@@ -131,6 +130,9 @@
         "required": false,
         "hidden": false
       }
-    ]
+    ],
+    "image_repository": "192.168.1.11:5000/honeywire-tcptarpit",
+    "image_tag": "dev",
+    "image_digest": ""
   }
 }

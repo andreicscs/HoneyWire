@@ -37,7 +37,6 @@
     "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments."
   },
   "deployment": {
-    "image": "192.168.1.11:5000/honeywire-networkscandetector:dev",
     "network_mode": "host",
     "user": "0:0",
     "cap_add": [
@@ -108,6 +107,9 @@
         "required": false,
         "hidden": false
       }
-    ]
+    ],
+    "image_repository": "192.168.1.11:5000/honeywire-networkscandetector",
+    "image_tag": "dev",
+    "image_digest": ""
   }
 }
