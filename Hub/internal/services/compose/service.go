@@ -23,6 +23,7 @@ type Store interface {
 	GetConfigValue(key string) (string, error)
 	SetNodeDesiredRevision(nodeID, rev string) error
 	SetNodeSensorDeployedVersion(nodeID, sensorID, version string) error
+	ApplyNodeRevision(nodeID, revision string) error
 }
 
 type Service struct {

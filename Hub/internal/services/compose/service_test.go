@@ -47,6 +47,10 @@ func (m *MockStore) SetNodeSensorDeployedVersion(nodeID, sensorID, version strin
 	return nil
 }
 
+func (m *MockStore) ApplyNodeRevision(nodeID, revision string) error {
+	return nil
+}
+
 func TestComposeSmartVersionSelection(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/index.json" {
