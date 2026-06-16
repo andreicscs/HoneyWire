@@ -71,7 +71,8 @@ jobs:
 
                 ROLLBACK_COUNT=$((ROLLBACK_COUNT + 1))
              else
-                echo "⚠️ File $FILE_TO_DELETE not found, skipping."
+                echo "⚠️ File $FILE_TO_DELETE not found, treating as manual deletion."
+                ROLLBACK_COUNT=$((ROLLBACK_COUNT + 1))
              fi
           done
 
