@@ -459,6 +459,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
     if (['NEW_SENSOR', 'UPDATE_SENSOR', 'DELETE_SENSOR', 'NODE_SYNCED', 'UPDATE_NODE'].includes(type)) {
       fetchNodeDetails(payload.nodeId)
+      fetchManifests()
       return
     }
     
@@ -505,9 +506,6 @@ export const useFleetStore = defineStore('fleet', () => {
   }
 
   const fetchManifests = async (): Promise<any[]> => {
-    if (state.value.manifests.length > 0) {
-      return state.value.manifests
-    }
     try {
       const res = await api.get('/api/v1/manifests')
       const data = await res.json()
