@@ -67,7 +67,7 @@
         "hidden": true
       }
     ],
-    "image_repository": "ghcr.io/andreicscs/honeywire-icmpcanary",
+    "image_repository": "192.168.1.11:5000/honeywire-icmpcanary",
     "image_tag": "latest",
     "image_digest": ""
   }
