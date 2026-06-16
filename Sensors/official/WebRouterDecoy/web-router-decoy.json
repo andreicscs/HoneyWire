@@ -16,17 +16,18 @@
         "title": "Features",
         "type": "list",
         "content": [
-          "Router Simulation: Mimics popular router brands (Netgear, TP-Link, Cisco).",
-          "Credential Logging: Captures attempted login credentials from internal threats.",
-          "Browser Fingerprinting: Logs user-agent and request patterns."
+          "Router Simulation: Mimics popular router brands (Netgear, TP-Link, Cisco) to trick attackers.",
+          "Credential Logging: Captures and alerts on attempted login credentials from internal threats.",
+          "Browser Fingerprinting: Logs user-agent and request patterns for forensic analysis."
         ]
       },
       {
         "title": "Security Architecture",
         "type": "list",
         "content": [
-          "Bridge Network Mode: Isolated networking with port mapping.",
-          "Stateless Design: No persistent storage of sensitive data."
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) to allow bridging network modes.",
+          "Required Capabilities: None required. Relies purely on isolated internal container routing."
         ]
       }
     ]
@@ -52,10 +53,12 @@
         9000
       ]
     },
-    "recommendation_reason": "Web server detected. Deploy fake admin panel to catch internal network snooping."
+    "recommendation_reason": "Live web proxy or HTTP server detected. Deploy a fake administrative panel to catch internal network snooping and directory brute-forcing."
   },
   "deployment": {
-    "network_mode": "bridge",
+    "image": "192.168.1.11:5000/honeywire-webrouterdecoy:dev",
+    "network_mode": "host",
+    "user": "0:0",
     "env_vars": [
       {
         "name": "HW_HUB_ENDPOINT",
@@ -82,6 +85,22 @@
         "hidden": true
       },
       {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "critical",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
         "name": "HW_BIND_PORT",
         "description": "Port to bind the decoy web server.",
         "default": "{{ availablePort 8080 }}",
@@ -97,9 +116,6 @@
         "required": false,
         "hidden": false
       }
-    ],
-    "image_repository": "192.168.1.11:5000/honeywire-webrouterdecoy",
-    "image_tag": "latest",
-    "image_digest": ""
+    ]
   }
 }

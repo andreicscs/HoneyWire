@@ -16,28 +16,30 @@
         "title": "Features",
         "type": "list",
         "content": [
-          "Passive Monitoring: Listens for ICMP traffic without generating responses.",
+          "Passive Monitoring: Listens for ICMP traffic directly on the host interface without generating responses.",
           "Detailed Logging: Captures source IP, TTL, packet size, and timing information.",
-          "Network Discovery Detection: Identifies internal subnet scanning and host enumeration."
+          "Network Discovery Detection: Identifies internal subnet scanning and host enumeration instantly."
         ]
       },
       {
         "title": "Security Architecture",
         "type": "list",
         "content": [
-          "Raw Socket Access: Requires NET_RAW capability for packet inspection.",
-          "Host Network Mode: Direct access to host network interfaces.",
-          "Zero External Dependencies: Self-contained monitoring solution."
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to initialize the raw network socket.",
+          "Required Capabilities: Adds 'NET_RAW' to allow direct packet inspection bypassing traditional NIDS frameworks."
         ]
       }
     ]
   },
   "heuristics": {
     "triggers": {},
-    "recommendation_reason": "Core Network Sensor. Generates 'Info' severity events to track subnet mapping without triggering alert fatigue from legitimate uptime monitors."
+    "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments (e.g., Uptime Kuma)."
   },
   "deployment": {
+    "image": "192.168.1.11:5000/honeywire-icmpcanary:dev",
     "network_mode": "host",
+    "user": "0:0",
     "cap_add": [
       "NET_RAW"
     ],
@@ -65,10 +67,23 @@
         "type": "string",
         "required": true,
         "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "info",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
       }
-    ],
-    "image_repository": "192.168.1.11:5000/honeywire-icmpcanary",
-    "image_tag": "latest",
-    "image_digest": ""
+    ]
   }
 }

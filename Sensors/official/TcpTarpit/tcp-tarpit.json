@@ -16,17 +16,18 @@
         "title": "Features",
         "type": "list",
         "content": [
-          "Connection Exhaustion: Holds malicious lateral connections open for extended periods.",
-          "Banner Spoofing: Mimics legitimate internal services to attract rogue scanning.",
-          "Resource Denial: Consumes attacker threads and bandwidth silently."
+          "Connection Exhaustion: Holds malicious lateral connections open for extended periods to stall automated tools.",
+          "Banner Spoofing: Mimics legitimate internal services (like SSH or MySQL) to attract rogue scanning.",
+          "Resource Denial: Consumes attacker threads and bandwidth silently without risking host exhaustion."
         ]
       },
       {
         "title": "Security Architecture",
         "type": "list",
         "content": [
-          "Host Network Mode: Direct access to host networking for port binding.",
-          "Isolated Execution: No persistent data or external dependencies."
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to bind to low-numbered decoy ports.",
+          "Required Capabilities: Adds 'NET_BIND_SERVICE' to allow binding to ports below 1024 without needing full host network control."
         ]
       }
     ]
@@ -56,10 +57,15 @@
         2379
       ]
     },
-    "recommendation_reason": "Database or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement."
+    "recommendation_reason": "Critical datastore or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement attempts targeting these specific services."
   },
   "deployment": {
+    "image": "192.168.1.11:5000/honeywire-tcptarpit:dev",
     "network_mode": "host",
+    "user": "0:0",
+    "cap_add": [
+      "NET_BIND_SERVICE"
+    ],
     "env_vars": [
       {
         "name": "HW_HUB_ENDPOINT",
@@ -86,6 +92,22 @@
         "hidden": true
       },
       {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "high",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
         "name": "HW_DECOY_PORTS",
         "description": "Comma-separated list of internal ports to tarpit.",
         "default": "2222,3306",
@@ -95,7 +117,7 @@
       },
       {
         "name": "HW_TARPIT_MODE",
-        "description": "Tarpit behavior mode.",
+        "description": "Tarpit behavior mode (hold, echo, close).",
         "default": "hold",
         "type": "string",
         "required": false,
@@ -109,9 +131,6 @@
         "required": false,
         "hidden": false
       }
-    ],
-    "image_repository": "192.168.1.11:5000/honeywire-tcptarpit",
-    "image_tag": "latest",
-    "image_digest": ""
+    ]
   }
 }

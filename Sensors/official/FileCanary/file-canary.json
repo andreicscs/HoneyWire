@@ -4,7 +4,7 @@
   "schema_version": "1.0",
   "min_hub_version": "1.0.0",
   "min_wizard_version": "1.0.0",
-  "name": "File Canary (FIM) TEST",
+  "name": "File Canary (FIM)",
   "category": "file",
   "osi_layer": "Host Level",
   "icon_svg": "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
@@ -16,19 +16,18 @@
         "title": "Features",
         "type": "list",
         "content": [
-          "Zero-Dependency Execution: Runs as a statically compiled binary without requiring external interpreters or libraries.",
-          "Safe Permissions Handling: Uses Access Control Lists (ACLs) to securely read target directories without altering host ownership.",
-          "Context-Aware Lures: Automatically generates realistic trap files based on detected services (database backups, config files, etc.).",
-          "Real-time Monitoring: Instant alerts on file access, modification, or deletion."
+          "Context-Aware Lures: Automatically generates realistic trap files based on detected host services (database backups, web config files, etc.).",
+          "Safe Permissions Handling: Uses Access Control Lists (ACLs) to securely read target directories without altering original host ownership.",
+          "Real-time Alerting: Instant telemetry transmission on file access, modification, or deletion."
         ]
       },
       {
         "title": "Security Architecture",
         "type": "list",
         "content": [
-          "Unprivileged Execution: Runs entirely as a non-root user (UID 65532).",
-          "Kernel Capability Stripping: Drops ALL Linux kernel capabilities.",
-          "Read-Only Access: Monitors files without write permissions to prevent accidental data corruption."
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs completely unprivileged as UID 65532 to prevent system-level modifications even in the event of a breach.",
+          "Required Capabilities: DAC_OVERRIDE, operates purely through monitored Volume Mounts."
         ]
       }
     ]
@@ -49,19 +48,18 @@
         "go"
       ]
     },
-    "recommendation_reason": "Runtime/app service detected. Deploy to catch malicious file scraping."
+    "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch suspicious canary file interactions or ransomware activity."
   },
   "deployment": {
+    "image": "192.168.1.11:5000/honeywire-filecanary:dev",
     "network_mode": "host",
     "user": "65532:65532",
     "init_containers": [
       {
-        "name": "decoy-provisioner",
+        "name": "fim-decoy-provisioner",
+        "image": "192.168.1.11:5000/honeywire-filecanary:dev",
         "command": "/app/file-canary init",
         "user": "0:0",
-        "cap_drop": [
-          "ALL"
-        ],
         "cap_add": [
           "DAC_OVERRIDE"
         ],
@@ -75,10 +73,7 @@
             "target_prefix": "/host",
             "read_only": false
           }
-        ],
-        "image_repository": "192.168.1.11:5000/honeywire-filecanary",
-        "image_tag": "latest",
-        "image_digest": ""
+        ]
       }
     ],
     "volume_mounts": [
@@ -115,6 +110,22 @@
         "hidden": true
       },
       {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "critical",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
         "name": "HW_ALERT_ON_OPEN",
         "description": "Generate alerts when a file is simply read or opened (noisier).",
         "default": "false",
@@ -130,9 +141,6 @@
         "required": false,
         "hidden": false
       }
-    ],
-    "image_repository": "192.168.1.11:5000/honeywire-filecanary",
-    "image_tag": "latest",
-    "image_digest": ""
+    ]
   }
 }

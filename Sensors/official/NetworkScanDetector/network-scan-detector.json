@@ -16,29 +16,30 @@
         "title": "Features",
         "type": "list",
         "content": [
-          "Threshold-Based Detection: Configurable scan detection parameters.",
-          "Multiple Scan Types: Detects SYN scans, UDP sweeps, and banner grabbing.",
-          "Intelligent Filtering: Excludes legitimate internal services from scan detection.",
-          "Source Tracking: Logs internal attacker IP addresses and scan patterns."
+          "Threshold-Based Detection: Configurable scan detection parameters for noisy environments.",
+          "Intelligent Filtering: Automatically ignores legitimate internal services to prevent false positives.",
+          "Source Tracking: Logs internal attacker IP addresses and precise scan patterns."
         ]
       },
       {
         "title": "Security Architecture",
         "type": "list",
         "content": [
-          "Raw Socket Monitoring: Uses packet-level inspection for accuracy.",
-          "Host Network Access: Direct visibility into all network traffic.",
-          "Configurable Sensitivity: Adjustable detection thresholds."
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to initialize the raw network socket.",
+          "Required Capabilities: Adds 'NET_RAW' to allow deep packet-level inspection of TCP headers."
         ]
       }
     ]
   },
   "heuristics": {
     "triggers": {},
-    "recommendation_reason": "Core Network Sensor. Highly recommended to silently detect lateral Nmap sweeps and horizontal port scanning across the network interface."
+    "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments."
   },
   "deployment": {
+    "image": "192.168.1.11:5000/honeywire-networkscandetector:dev",
     "network_mode": "host",
+    "user": "0:0",
     "cap_add": [
       "NET_RAW"
     ],
@@ -68,6 +69,22 @@
         "hidden": true
       },
       {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "high",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
         "name": "HW_SCAN_THRESHOLD",
         "description": "Number of ports that must be scanned to trigger detection.",
         "default": "5",
@@ -91,9 +108,6 @@
         "required": false,
         "hidden": false
       }
-    ],
-    "image_repository": "192.168.1.11:5000/honeywire-networkscandetector",
-    "image_tag": "latest",
-    "image_digest": ""
+    ]
   }
 }
