@@ -95,12 +95,12 @@ jobs:
           echo "   Output:    $OUTPUT_FILE"
 
           # Inject version, update deployment.image_tag, and update init_containers tags
-          jq --arg ver "$VERSION" \
+          jq --arg ver "$VERSION" --arg tag "v$VERSION" \
              '.version = $ver |
-              .deployment.image_tag = $ver |
+              .deployment.image_tag = $tag |
               if .deployment.init_containers then
                 .deployment.init_containers = [
-                  .deployment.init_containers[] | .image_tag = $ver
+                  .deployment.init_containers[] | .image_tag = $tag
                 ]
               else . end' \
              "$SOURCE" > "/tmp/$OUTPUT_FILE"

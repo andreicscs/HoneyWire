@@ -4,7 +4,7 @@ type SensorManifest struct {
 	ID               string        `json:"id"`
 	Version          string        `json:"version"`
 	SchemaVersion    string        `json:"schema_version"`
-	MinHubAPI        string        `json:"min_hub_api"`
+	MinHubVersion    string        `json:"min_hub_version"`
 	MinWizardVersion string        `json:"min_wizard_version"`
 	Name             string        `json:"name"`
 	Category         string        `json:"category"`

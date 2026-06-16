@@ -1,7 +1,7 @@
 package models
 
-// HubAPIVersion defines the backend protocol version for resolving compatible sensors and authenticating Agents.
-const HubAPIVersion = 2
+// HubVersion defines the backend protocol version for resolving compatible sensors and authenticating Agents.
+const HubVersion = "2.0.0"
 
 // SetupPayload represents the initial setup POST request
 type SetupPayload struct {
@@ -85,7 +85,7 @@ type SensorManifest struct {
 	ID               string        `json:"id"`
 	Version          string        `json:"version"`
 	SchemaVersion    string        `json:"schema_version"`
-	MinHubAPI        string        `json:"min_hub_api"`
+	MinHubVersion    string        `json:"min_hub_version"`
 	MinWizardVersion string        `json:"min_wizard_version"`
 	Name             string        `json:"name"`
 	Category         string        `json:"category"`

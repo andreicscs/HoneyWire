@@ -2,7 +2,7 @@
   "id": "hw-sensor-tcp-tarpit",
   "version": "1.0.0",
   "schema_version": "1.0",
-  "min_hub_api": "1",
+  "min_hub_version": "1.0.0",
   "min_wizard_version": "1.0.0",
   "name": "TCP Tarpit (Credential Trap)",
   "category": "network",

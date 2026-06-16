@@ -103,7 +103,7 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 	if s.catalog != nil {
 		for i := range nodes {
 			for _, sensor := range nodes[i].InstalledSensors {
-				latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubAPIVersion) 
+				latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion) 
 				if err == nil && latest != "" {
 					deployedVer := sensor.DeployedVersion
 					if deployedVer != latest {
@@ -127,7 +127,7 @@ func (s *Service) GetNodeDetails(nodeID string) (*models.Node, error) {
 	// Compute UpdateAvailable for each sensor
 	if s.catalog != nil {
 		for i, sensor := range node.InstalledSensors {
-			latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubAPIVersion)
+			latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
 			if err == nil && latest != "" {
 				deployedVer := sensor.DeployedVersion
 				if deployedVer != latest {
@@ -176,13 +176,13 @@ func (s *Service) DeleteNode(nodeID string) error {
 func (s *Service) evaluateNodeSyncState(nodeID string) {
 	nodeDetails, err := s.store.GetNodeDetails(nodeID)
 	if err == nil {
-		newHash := GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, models.HubAPIVersion)
+		newHash := GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, models.HubVersion)
 		if newHash == nodeDetails.ActiveRevision {
 			s.store.ClearNodePendingConfig(nodeID)
 
 			if s.catalog != nil {
 				for _, sensor := range nodeDetails.InstalledSensors {
-					latest, _ := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubAPIVersion)
+					latest, _ := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
 					if latest != "" && sensor.DeployedVersion != latest {
 						_ = s.store.SetNodeSensorDeployedVersion(nodeID, sensor.ID, latest)
 					}
@@ -197,7 +197,7 @@ func (s *Service) evaluateNodeSyncState(nodeID string) {
 	}
 }
 
-func GenerateRevisionHash(sensors []models.NodeSensor, catSvc *catalog.Service, currentHubAPI int) string {
+func GenerateRevisionHash(sensors []models.NodeSensor, catSvc *catalog.Service, currentHubVersion string) string {
 	type sensorConfig struct {
 		ID      string
 		Version string
@@ -207,7 +207,7 @@ func GenerateRevisionHash(sensors []models.NodeSensor, catSvc *catalog.Service, 
 	for _, s := range sensors {
 		latestVersion := ""
 		if catSvc != nil {
-			latestVersion, _ = catSvc.GetLatestCompatibleVersion(s.ID, currentHubAPI)
+			latestVersion, _ = catSvc.GetLatestCompatibleVersion(s.ID, currentHubVersion)
 		}
 		configs = append(configs, sensorConfig{ID: s.ID, Version: latestVersion, EnvVars: s.EnvVars})
 	}

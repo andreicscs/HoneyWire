@@ -6,8 +6,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"strconv"
 	"sync"
+
+	"golang.org/x/mod/semver"
 
 	"github.com/honeywire/hub/internal/catalog"
 	composeEngine "github.com/honeywire/hub/internal/compose"
@@ -57,15 +58,15 @@ type PreviewRequest struct {
 
 // --- MANIFEST FETCHING ---
 
-func (s *Service) FetchManifestBytes(currentHubAPI int) ([]byte, error) {
-	manifests, err := s.fetchStrictCatalogManifests(currentHubAPI)
+func (s *Service) FetchManifestBytes(currentHubVersion string) ([]byte, error) {
+	manifests, err := s.fetchStrictCatalogManifests(currentHubVersion)
 	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(manifests)
 }
 
-func (s *Service) fetchStrictCatalogManifests(currentHubAPI int) ([]models.SensorManifest, error) {
+func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]models.SensorManifest, error) {
 	registryURL, err := s.store.GetConfigValue("registry_url")
 	if err != nil || registryURL == "" {
 		registryURL = "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages"
@@ -83,7 +84,7 @@ func (s *Service) fetchStrictCatalogManifests(currentHubAPI int) ([]models.Senso
 	var result []models.SensorManifest
 
 	for _, sensor := range index.Sensors {
-		targetVersion, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, currentHubAPI)
+		targetVersion, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, currentHubVersion)
 		if err != nil || targetVersion == "" {
 			log.Printf("[WARNING] No compatible version found for sensor %s", sensor.ID)
 			continue
@@ -132,7 +133,7 @@ func (s *Service) fetchStrictCatalogManifests(currentHubAPI int) ([]models.Senso
 
 // --- GENERATION LOGIC ---
 
-func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) ([]byte, error) {
+func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion string) ([]byte, error) {
 	nodeID, err := s.store.GetNodeByKey(token)
 	if err != nil || nodeID == "" {
 		return nil, fmt.Errorf("unauthorized")
@@ -150,7 +151,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 
 	effectiveRevision := nodeDetails.DesiredRevision
 	if effectiveRevision == "" && nodeDetails.HasPendingConfig {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubAPI)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubVersion)
 		if err := s.store.SetNodeDesiredRevision(nodeID, effectiveRevision); err != nil {
 			return nil, fmt.Errorf("failed_to_allocate")
 		}
@@ -159,7 +160,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 		effectiveRevision = nodeDetails.ActiveRevision
 	}
 	if effectiveRevision == "" {
-		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubAPI)
+		effectiveRevision = node.GenerateRevisionHash(nodeDetails.InstalledSensors, s.catalog, currentHubVersion)
 	}
 
 	// Auto-reconcile empty nodes since they have no sensors to report back via heartbeats
@@ -167,7 +168,7 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 		_ = s.store.ApplyNodeRevision(nodeID, effectiveRevision)
 	}
 
-	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubAPI)
+	manifests, fetchErr := s.fetchStrictCatalogManifests(currentHubVersion)
 	if fetchErr != nil {
 		log.Printf("[ERROR] fetchStrictCatalogManifests failed: %v", fetchErr)
 		return nil, fmt.Errorf("failed_to_fetch")
@@ -192,12 +193,15 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubAPI int) 
 			return nil, fmt.Errorf("invalid_manifest: %w", valErr)
 		}
 
-		if manifest.MinHubAPI != "" {
-			if minAPI, err := strconv.Atoi(strings.TrimSpace(manifest.MinHubAPI)); err == nil {
-				if currentHubAPI < minAPI {
-					log.Printf("[ERROR] Sensor %s requires Hub API %d, but Hub is running API %d", sensor.ID, minAPI, currentHubAPI)
-					return nil, fmt.Errorf("incompatible_sensor: %s requires Hub API %d", sensor.ID, minAPI)
-				}
+		if manifest.MinHubVersion != "" {
+			reqVer := strings.TrimSpace(manifest.MinHubVersion)
+			if !strings.HasPrefix(reqVer, "v") { reqVer = "v" + reqVer }
+			curVer := currentHubVersion
+			if !strings.HasPrefix(curVer, "v") { curVer = "v" + curVer }
+			
+			if !semver.IsValid(reqVer) || semver.Compare(curVer, reqVer) < 0 {
+				log.Printf("[ERROR] Sensor %s requires Hub Version %s, but Hub is running %s", sensor.ID, reqVer, curVer)
+				return nil, fmt.Errorf("incompatible_sensor: %s requires Hub Version %s", sensor.ID, reqVer)
 			}
 		}
 

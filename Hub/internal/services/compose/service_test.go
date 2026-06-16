@@ -60,9 +60,9 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 						"id":     "hw-sensor-test",
 						"latest": "2.0.0",
 						"versions": []map[string]string{
-							{"v": "1.0.0", "min_hub_api": "1"},
-							{"v": "1.5.0", "min_hub_api": " 2 "}, // Injecting malicious whitespace
-							{"v": "2.0.0", "min_hub_api": "  3"}, // Injecting malicious whitespace
+							{"v": "1.0.0", "min_hub_version": "1.0.0"},
+							{"v": "1.5.0", "min_hub_version": " 2.0.0 "}, // Injecting malicious whitespace
+							{"v": "2.0.0", "min_hub_version": "  3.0.0"}, // Injecting malicious whitespace
 						},
 					},
 				},
@@ -77,7 +77,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 			"id":             "hw-sensor-test",
 			"version":        version,
 			"schema_version": "1.0",
-			"min_hub_api":    "1", // Mock doesn't need to match perfectly, just needs to parse
+			"min_hub_version": "1.0.0", // Mock doesn't need to match perfectly, just needs to parse
 			"deployment": map[string]interface{}{
 				"image_repository": "test",
 				"image_tag":        version,
@@ -97,7 +97,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	// sensor release, it gracefully injects the previous compatible tag into the docker-compose YAML.
 	t.Run("Perfect Match Resolution (Hub API 2)", func(t *testing.T) {
 		// Hub API 2 should select v1.5.0, ignoring v2.0.0
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 2)
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 
 	t.Run("Legacy Backward Compat (Hub API 4)", func(t *testing.T) {
 		// Hub API 4 should select v2.0.0 because 4 >= 3
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 4)
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "4.0.0")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
@@ -121,7 +121,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	
 	t.Run("No Compatible Version Found", func(t *testing.T) {
 		// Hub API 0 is too old for everything (minimum is 1)
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 0)
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "0.0.0")
 		if err != nil {
 			t.Fatalf("Expected success (generates empty compose, logs warning), got err: %v", err)
 		}
@@ -132,12 +132,12 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	})
 
 	t.Run("Whitespace Robust Parsing", func(t *testing.T) {
-		// Even if min_hub_api has spaces like "  3  ", it should parse cleanly and fail on Hub API 2
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 2)
+		// Even if min_hub_version has spaces like "  3.0.0", it should parse cleanly and fail on Hub Version 2.0.0
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
-		// Because min_hub_api=" 3 " for v2.0.0 parses successfully, Hub API 2 will correctly reject it and fallback to v1.5.0
+		// Because min_hub_version=" 3.0.0 " for v2.0.0 parses successfully, Hub Version 2.0.0 will correctly reject it and fallback to v1.5.0
 		if !contains(yamlData, "image: test:1.5.0") {
 			t.Errorf("Expected fallback to v1.5.0, got yaml:\n%s", string(yamlData))
 		}
@@ -145,13 +145,13 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 
 	t.Run("Network Cache Fallback on 502", func(t *testing.T) {
 		// First, do a successful fetch to populate the cache
-		_, _ = svc.GetNodeCompose("dummy", "http://localhost", 2)
+		_, _ = svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
 
 		// Now break the registry URL so the next fetch fails completely
 		store.RegistryURL = "http://localhost:1" // guaranteed connection refused
 
 		// Attempt to fetch again. The network will fail, but the cache should save the day!
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", 2)
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
 		if err != nil {
 			t.Fatalf("Expected cache fallback success, got error: %v", err)
 		}

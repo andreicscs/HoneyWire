@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/mod/semver"
 )
 
 type RegistryIndex struct {
@@ -15,8 +16,8 @@ type RegistryIndex struct {
 		ID       string `json:"id"`
 		Latest   string `json:"latest"`
 		Versions []struct {
-			V         string `json:"v"`
-			MinHubAPI string `json:"min_hub_api"`
+			V             string `json:"v"`
+			MinHubVersion string `json:"min_hub_version"`
 		} `json:"versions"`
 	} `json:"sensors"`
 }
@@ -67,8 +68,8 @@ func (s *Service) GetIndex() *RegistryIndex {
 	return s.indexCache
 }
 
-// GetLatestCompatibleVersion safely calculates the highest image tag for the current Hub API
-func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubAPI int) (string, error) {
+// GetLatestCompatibleVersion safely calculates the highest image tag for the current Hub version
+func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubVersion string) (string, error) {
 	s.mu.RLock()
 	idx := s.indexCache
 	s.mu.RUnlock()
@@ -87,10 +88,18 @@ func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubAPI int)
 	for _, sensor := range idx.Sensors {
 		if sensor.ID == sensorID {
 			for i := len(sensor.Versions) - 1; i >= 0; i-- {
-				if reqAPI, err := strconv.Atoi(strings.TrimSpace(sensor.Versions[i].MinHubAPI)); err == nil {
-					if currentHubAPI >= reqAPI {
-						return sensor.Versions[i].V, nil
-					}
+				reqVer := strings.TrimSpace(sensor.Versions[i].MinHubVersion)
+				// Format semver standard 'vX.Y.Z' for comparison
+				if !strings.HasPrefix(reqVer, "v") {
+					reqVer = "v" + reqVer
+				}
+				curVer := currentHubVersion
+				if !strings.HasPrefix(curVer, "v") {
+					curVer = "v" + curVer
+				}
+
+				if semver.IsValid(reqVer) && semver.Compare(curVer, reqVer) >= 0 {
+					return sensor.Versions[i].V, nil
 				}
 			}
 			return "", fmt.Errorf("no compatible version found for sensor %s", sensorID)

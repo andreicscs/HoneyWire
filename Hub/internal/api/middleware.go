@@ -3,9 +3,10 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/mod/semver"
 
 	"github.com/honeywire/hub/internal/models"
 	"golang.org/x/time/rate"
@@ -107,13 +108,17 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 			// Version handshake
 			wizardMinHubAPIStr := r.Header.Get("X-Wizard-Min-Hub-Api")
 			if wizardMinHubAPIStr != "" {
-				wizardMinHubAPI, err := strconv.Atoi(strings.TrimSpace(wizardMinHubAPIStr))
-				if err != nil {
+				reqVer := strings.TrimSpace(wizardMinHubAPIStr)
+				if !strings.HasPrefix(reqVer, "v") { reqVer = "v" + reqVer }
+				curVer := models.HubVersion
+				if !strings.HasPrefix(curVer, "v") { curVer = "v" + curVer }
+
+				if !semver.IsValid(reqVer) {
 					http.Error(w, "Invalid X-Wizard-Min-Hub-Api format", http.StatusBadRequest)
 					return
 				}
-				if models.HubAPIVersion < wizardMinHubAPI {
-					http.Error(w, "This Wizard requires Hub v"+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
+				if semver.Compare(curVer, reqVer) < 0 {
+					http.Error(w, "This Wizard requires Hub "+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
 					return
 				}
 			}
