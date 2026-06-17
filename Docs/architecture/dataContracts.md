@@ -77,8 +77,6 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
   "id": "hw-tcp-tarpit",
   "version": "1.1.0",
   "schema_version": "1.0",
-  "min_hub_api": "1",
-  "min_wizard_version": "1.0.0",
   "name": "TCP Tarpit",
   "category": "network",
   "osi_layer": "L4",
@@ -128,7 +126,6 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
 ```
 
 ### Key Subsystems
-- `min_hub_api`: Integer string. The minimum Hub API version required to deploy this sensor. The Hub filters out sensor versions where `min_hub_api` exceeds its own `HubAPIVersion` constant.
 - `heuristics.triggers`: Used by the Wizard Discovery Engine. If the Wizard observes matching `processes`, `ports`, or `file_patterns` on the host, it will recommend this sensor.
 - `deployment`: Used by the Wizard Deployment Engine to generate the Intermediate Representation (IR) and final `docker-compose.yml`.
 - `deployment.env_vars`: Rendered in the Hub UI so users can configure the sensor dynamically.

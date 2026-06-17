@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
+	
 	"github.com/honeywire/wizard/core/schema"
 )
 
 const wizardUserAgent = "HoneyWire-Wizard/2.0"
-const WizardMinHubAPI = 1
+const WizardVersion = "2.0.0"
 
 type HubClient struct {
 	baseURL string
@@ -50,7 +50,7 @@ func (c *HubClient) doRequest(ctx context.Context, method, path string, body io.
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", wizardUserAgent)
-	req.Header.Set("X-Wizard-Min-Hub-Api", fmt.Sprintf("%d", WizardMinHubAPI))
+	req.Header.Set("X-Wizard-Version", WizardVersion)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -64,6 +64,20 @@ func readBody(resp *http.Response) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 	return data, nil
+}
+
+func checkStatus(resp *http.Response, expected ...int) error {
+	for _, e := range expected {
+		if resp.StatusCode == e {
+			return nil
+		}
+	}
+	
+	msg := readBodyTruncated(resp)
+	if resp.StatusCode == http.StatusUpgradeRequired {
+		return fmt.Errorf("[VERSION MISMATCH] %s\n    Please update your Hub or use a compatible Wizard version.", msg)
+	}
+	return fmt.Errorf("hub returned error (HTTP %d): %s", resp.StatusCode, msg)
 }
 
 func readBodyTruncated(resp *http.Response) string {
@@ -92,8 +106,8 @@ func (c *HubClient) AuthenticateDashboard(ctx context.Context, password string) 
 		return "", fmt.Errorf("network error: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("hub rejected credentials (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK); err != nil {
+		return "", err
 	}
 
 	var cookieValue string
@@ -128,8 +142,8 @@ func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string,
 		return "", fmt.Errorf("network error: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("hub rejected request (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK, http.StatusCreated); err != nil {
+		return "", err
 	}
 
 	data, err := readBody(resp)
@@ -166,8 +180,8 @@ func (c *HubClient) GetCurrentNode(ctx context.Context, apiKey string) (*NodeInf
 		return nil, fmt.Errorf("network error: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API key rejected (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK); err != nil {
+		return nil, err
 	}
 
 	data, err := readBody(resp)
@@ -203,8 +217,8 @@ func (c *HubClient) AddSensor(ctx context.Context, nodeID, cookie, sensorID, cus
 		return fmt.Errorf("network error adding sensor %s: %w", sensorID, err)
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		return fmt.Errorf("hub rejected sensor %s (HTTP %d): %s", sensorID, resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK, http.StatusCreated, http.StatusConflict); err != nil {
+		return err
 	}
 
 	return nil
@@ -218,8 +232,8 @@ func (c *HubClient) FetchCompose(ctx context.Context, apiKey string) ([]byte, er
 		return nil, fmt.Errorf("network error: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("hub returned error (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK); err != nil {
+		return nil, err
 	}
 
 	return readBody(resp)
@@ -277,8 +291,8 @@ func (c *HubClient) FetchManifests(ctx context.Context, apiKey string) ([]*schem
 		return nil, fmt.Errorf("network error: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("hub returned error (HTTP %d): %s", resp.StatusCode, readBodyTruncated(resp))
+	if err := checkStatus(resp, http.StatusOK); err != nil {
+		return nil, err
 	}
 
 	data, err := readBody(resp)

@@ -107,11 +107,6 @@ func main() {
 	siemProtocol := loadConfigSafe(dbStore, "siem_protocol", "tcp")
 	siemService.UpdateConfig(siemAddress, siemProtocol)
 
-	if siemAddress != "" {
-		log.Printf("[SIEM] Configured to forward to %s via %s\n", siemAddress, siemProtocol)
-	} else {
-		log.Println("[SIEM] Forwarding disabled (no address configured).")
-	}
 
 	go eventSvc.StartRetentionWorker(rootCtx)
 

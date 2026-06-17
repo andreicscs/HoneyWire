@@ -166,7 +166,7 @@ func (s *Service) StartWorker(ctx context.Context) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		log.Println("[SIEM] Worker started. Listening for telemetry streams...")
+		log.Println("[SIEM] Worker started.")
 
 		// Initialize the stateful session object
 		sess := &streamSession{

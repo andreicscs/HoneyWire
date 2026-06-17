@@ -131,7 +131,7 @@ func TestAgentAuthMiddleware(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", nil)
 		req.Header.Set("X-Api-Key", "agent-key")
 		// Simulate a Wizard requesting a highly futuristic Hub API version
-		req.Header.Set("X-Wizard-Min-Hub-Api", "99")
+		req.Header.Set("X-Wizard-Version", "99.0.0")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		// Should return HTTP 426 Upgrade Required
@@ -141,8 +141,8 @@ func TestAgentAuthMiddleware(t *testing.T) {
 	t.Run("Legacy Backward Compat (Wizard v1, Hub v2)", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", nil)
 		req.Header.Set("X-Api-Key", "agent-key")
-		// Simulate a legacy Wizard
-		req.Header.Set("X-Wizard-Min-Hub-Api", "1")
+		// Simulate a valid Wizard
+		req.Header.Set("X-Wizard-Version", "2.0.0")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		// Should pass completely natively
@@ -152,7 +152,7 @@ func TestAgentAuthMiddleware(t *testing.T) {
 	t.Run("Malformed Wizard Header", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", nil)
 		req.Header.Set("X-Api-Key", "agent-key")
-		req.Header.Set("X-Wizard-Min-Hub-Api", "   garbage   ")
+		req.Header.Set("X-Wizard-Version", "   garbage   ")
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)

@@ -18,6 +18,10 @@ func HandleStatus() error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
+	// Explicitly fetch manifests to force the Hub to refresh its catalog cache.
+	// This ensures the status command calculates the latest 'UpdateAvailable' flags accurately.
+	_, _ = app.Hub.FetchManifests(ctx, app.Config.APIKey)
+
 	nodeInfo, err := app.Hub.GetCurrentNode(ctx, app.Config.APIKey)
 	if err != nil {
 		return fmt.Errorf("failed to resolve node identity: %w", err)

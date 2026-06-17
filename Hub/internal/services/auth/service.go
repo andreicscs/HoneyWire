@@ -51,6 +51,7 @@ func NewService(store Store, dashboardPassword string) *Service {
 
 // StartWorkers starts background goroutines for cleaning up sessions and brute-force trackers.
 func (s *Service) StartWorkers(ctx context.Context) {
+	log.Println("[Auth] Worker started.")
 	go s.cleanupSessions(ctx)
 	go s.cleanupAuthTracker(ctx)
 }
@@ -63,6 +64,7 @@ func (s *Service) cleanupSessions(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Println("[Auth] Worker stopped.")
 			return
 		case <-ticker.C:
 			s.sessionMu.Lock()

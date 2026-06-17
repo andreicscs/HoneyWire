@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log"
 	"sort"
-	"time"
 	"fmt"
 
 	"github.com/honeywire/hub/internal/catalog"
@@ -51,7 +50,7 @@ func NewService(store Store, broadcaster Broadcaster, cat *catalog.Service) *Ser
 // StartWorker runs a background thread that periodically refreshes the catalog
 // and recalculates the node sync states to instantly flag updates natively.
 func (s *Service) StartWorker(ctx context.Context) {
-	log.Println("[INFO] Starting node sync background worker...")
+	log.Println("[Node] Worker started.")
 
 	if s.catalog != nil {
 		s.catalog.SetOnChangeHook(func() {
@@ -64,26 +63,8 @@ func (s *Service) StartWorker(ctx context.Context) {
 		})
 	}
 
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[INFO] Node sync worker stopped")
-			return
-		case <-ticker.C:
-			if s.catalog != nil {
-				s.catalog.RefreshIndex()
-			}
-			nodes, err := s.store.GetNodes()
-			if err == nil {
-				for _, n := range nodes {
-					s.evaluateNodeSyncState(n.ID)
-				}
-			}
-		}
-	}
+	<-ctx.Done()
+	log.Println("[Node] Worker stopped.")
 }
 
 func (s *Service) CreateNode(alias string, tags []string) (string, string, error) {

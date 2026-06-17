@@ -68,9 +68,10 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 						"id":     "hw-sensor-test",
 						"latest": "2.0.0",
 						"versions": []map[string]string{
-							{"v": "1.0.0", "min_hub_version": "1.0.0"},
-							{"v": "1.5.0", "min_hub_version": " 2.0.0 "}, // Injecting malicious whitespace
-							{"v": "2.0.0", "min_hub_version": "  3.0.0"}, // Injecting malicious whitespace
+							{"v": "1.0.0"},
+							{"v": "2.0.0"},
+							{"v": "2.5.0"},
+							{"v": "3.0.0"},
 						},
 					},
 				},
@@ -80,12 +81,15 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 
 		// Mock responses for the requested versions
 		version := r.URL.Path[len("/test-v") : len(r.URL.Path)-5] // Extract version from path
+		if version == "" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":             "hw-sensor-test",
 			"version":        version,
 			"schema_version": "1.0",
-			"min_hub_version": "1.0.0", // Mock doesn't need to match perfectly, just needs to parse
 			"deployment": map[string]interface{}{
 				"image_repository": "test",
 				"image_tag":        version,
@@ -96,6 +100,7 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 
 	store := &MockStore{RegistryURL: ts.URL}
 	catSvc := catalog.NewService(store, nil)
+	catSvc.RefreshIndex() // explicitly refresh
 	svc := composesvc.NewService(store, catSvc)
 
 	// VERSIONING ARCHITECTURE EXPLANATION (SENSOR REGISTRY):
@@ -104,26 +109,25 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	// with the currently executing Hub. If the Hub's API is too old for the absolute latest 
 	// sensor release, it gracefully injects the previous compatible tag into the docker-compose YAML.
 	t.Run("Perfect Match Resolution (Hub API 2)", func(t *testing.T) {
-		// Hub API 2 should select v1.5.0, ignoring v2.0.0
+		// Hub API 2 should select v2.5.0
 		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
 		
-		if !contains(yamlData, "image: test:1.5.0") {
-			t.Errorf("Expected to deploy v1.5.0, got yaml:\n%s", string(yamlData))
+		if !contains(yamlData, "image: test:2.5.0") {
+			t.Errorf("Expected to deploy v2.5.0, got yaml:\n%s", string(yamlData))
 		}
 	})
 
-	t.Run("Legacy Backward Compat (Hub API 4)", func(t *testing.T) {
-		// Hub API 4 should select v2.0.0 because 4 >= 3
+	t.Run("Incompatible Hub API 4", func(t *testing.T) {
+		// Hub API 4 should NOT select v3.0.0 because it's looking for v4.x.x
 		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "4.0.0")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
-		
-		if !contains(yamlData, "image: test:2.0.0") {
-			t.Errorf("Expected to deploy v2.0.0, got yaml:\n%s", string(yamlData))
+		if contains(yamlData, "image: test:") {
+			t.Errorf("Expected NO sensor to be deployed, got yaml:\n%s", string(yamlData))
 		}
 	})
 	
@@ -140,14 +144,12 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 	})
 
 	t.Run("Whitespace Robust Parsing", func(t *testing.T) {
-		// Even if min_hub_version has spaces like "  3.0.0", it should parse cleanly and fail on Hub Version 2.0.0
-		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "2.0.0")
+		yamlData, err := svc.GetNodeCompose("dummy", "http://localhost", "  2.0.0  ")
 		if err != nil {
 			t.Fatalf("Expected success, got error: %v", err)
 		}
-		// Because min_hub_version=" 3.0.0 " for v2.0.0 parses successfully, Hub Version 2.0.0 will correctly reject it and fallback to v1.5.0
-		if !contains(yamlData, "image: test:1.5.0") {
-			t.Errorf("Expected fallback to v1.5.0, got yaml:\n%s", string(yamlData))
+		if !contains(yamlData, "image: test:2.5.0") {
+			t.Errorf("Expected fallback to v2.5.0, got yaml:\n%s", string(yamlData))
 		}
 	})
 
@@ -164,8 +166,8 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 			t.Fatalf("Expected cache fallback success, got error: %v", err)
 		}
 		
-		if !contains(yamlData, "image: test:1.5.0") {
-			t.Errorf("Expected cached fallback to v1.5.0, got yaml:\n%s", string(yamlData))
+		if !contains(yamlData, "image: test:2.5.0") {
+			t.Errorf("Expected cached fallback to v2.5.0, got yaml:\n%s", string(yamlData))
 		}
 	})
 }

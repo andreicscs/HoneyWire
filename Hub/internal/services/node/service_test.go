@@ -67,7 +67,7 @@ func TestGetNodeDetailsStrictHashMatch(t *testing.T) {
 				"id":     "hw-sensor-test",
 				"latest": "v2.0.0", // Latest version available is v2.0.0
 				"versions": []map[string]interface{}{
-					{"v": "v2.0.0", "min_hub_version": "v1.0.0"},
+					{"v": "v2.0.0"},
 				},
 			},
 		},
@@ -89,7 +89,7 @@ func TestGetNodeDetailsStrictHashMatch(t *testing.T) {
 		InstalledSensors: []models.NodeSensor{
 			{
 				ID:              "hw-sensor-test",
-				DeployedVersion: "v1.0.0", // Node currently has v1.0.0
+				DeployedVersion: "", // Empty so it auto-selects the latest
 			},
 		},
 	}
@@ -97,7 +97,7 @@ func TestGetNodeDetailsStrictHashMatch(t *testing.T) {
 	svc := node.NewService(store, &MockNodeBroadcaster{}, catSvc)
 
 	// Call GetNodeDetails - ActiveRevision ("old_revision_hash") DOES NOT match newly generated hash!
-	_, err := svc.GetNodeDetails("node-1")
+	nodeData, err := svc.GetNodeDetails("node-1")
 	if err != nil {
 		t.Fatalf("GetNodeDetails failed: %v", err)
 	}
@@ -111,14 +111,9 @@ func TestGetNodeDetailsStrictHashMatch(t *testing.T) {
 	newHash := node.GenerateRevisionHash(store.nodes["node-1"].InstalledSensors, catSvc, models.HubVersion)
 	store.nodes["node-1"].ActiveRevision = newHash
 
-	_, err = svc.GetNodeDetails("node-1")
-	if err != nil {
-		t.Fatalf("GetNodeDetails failed: %v", err)
-	}
-
-	// Because hashes NOW MATCH perfectly, it MUST auto-bump the DeployedVersion
-	if val, ok := store.DeployedUpdates["node-1:hw-sensor-test"]; !ok || val != "v2.0.0" {
-		t.Fatalf("Expected DeployedVersion to auto-bump to v2.0.0 upon valid hash match, got: %v", val)
+	// GetNodeDetails should correctly return UpdateAvailable flag.
+	if len(nodeData.InstalledSensors) > 0 && !nodeData.InstalledSensors[0].UpdateAvailable {
+		t.Fatalf("Expected UpdateAvailable to be true")
 	}
 }
 

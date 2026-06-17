@@ -61,8 +61,7 @@ for FILE in "${MANIFEST_FILES[@]}"; do
     name: .name,
     category: .category,
     icon_svg: .icon_svg,
-    version: .version,
-    min_hub_version: (.min_hub_version // "1.0.0")
+    version: .version
   }' "$FILE")
 
   if [ -n "$ENTRY" ]; then
@@ -92,7 +91,7 @@ echo -e "$ENTRIES" | jq -s '
       category: .[0].category,
       icon_svg: .[0].icon_svg,
       latest: .[-1].version,
-      versions: [.[] | { v: .version, min_hub_version: .min_hub_version }]
+      versions: [.[] | { v: .version }]
     }
   ) |
   sort_by(.id)

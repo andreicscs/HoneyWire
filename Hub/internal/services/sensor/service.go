@@ -81,7 +81,7 @@ func (s *Service) ProcessHeartbeat(nodeID, sensorID string, metadata map[string]
 }
 
 func (s *Service) StartHealthMonitor(ctx context.Context) {
-	log.Println("[INFO] Starting background health monitor...")
+	log.Println("[Sensor] Worker started.")
 
 	tickerPeriod := 30 * time.Second
 	ticker := time.NewTicker(tickerPeriod)
@@ -93,7 +93,7 @@ func (s *Service) StartHealthMonitor(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("[INFO] Health monitor stopped")
+			log.Println("[Sensor] Worker stopped.")
 			return
 		case t := <-ticker.C:
 			offlineThreshold := 60 * time.Second

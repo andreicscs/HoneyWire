@@ -106,19 +106,19 @@ func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(
 			}
 
 			// Version handshake
-			wizardMinHubAPIStr := r.Header.Get("X-Wizard-Min-Hub-Api")
-			if wizardMinHubAPIStr != "" {
-				reqVer := strings.TrimSpace(wizardMinHubAPIStr)
+			wizardVersionStr := r.Header.Get("X-Wizard-Version")
+			if wizardVersionStr != "" {
+				reqVer := strings.TrimSpace(wizardVersionStr)
 				if !strings.HasPrefix(reqVer, "v") { reqVer = "v" + reqVer }
 				curVer := models.HubVersion
 				if !strings.HasPrefix(curVer, "v") { curVer = "v" + curVer }
 
 				if !semver.IsValid(reqVer) {
-					http.Error(w, "Invalid X-Wizard-Min-Hub-Api format", http.StatusBadRequest)
+					http.Error(w, "Invalid X-Wizard-Version format", http.StatusBadRequest)
 					return
 				}
-				if semver.Compare(curVer, reqVer) < 0 {
-					http.Error(w, "This Wizard requires Hub "+wizardMinHubAPIStr+" or later. Please update your Hub.", http.StatusUpgradeRequired)
+				if semver.Major(curVer) != semver.Major(reqVer) {
+					http.Error(w, "This Wizard version ("+wizardVersionStr+") is incompatible with this Hub. Please update.", http.StatusUpgradeRequired)
 					return
 				}
 			}

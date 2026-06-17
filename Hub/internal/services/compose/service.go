@@ -73,7 +73,7 @@ func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]model
 	}
 
 	if err := s.catalog.RefreshIndex(); err != nil {
-		log.Printf("[WARNING] fetchStrictCatalogManifests catalog refresh failed: %v", err)
+		// Suppressed log spam when registry is down
 	}
 
 	index := s.catalog.GetIndex()
@@ -226,15 +226,15 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion s
 			return nil, fmt.Errorf("invalid_manifest: %w", valErr)
 		}
 
-		if manifest.MinHubVersion != "" {
-			reqVer := strings.TrimSpace(manifest.MinHubVersion)
+		if manifest.Version != "" {
+			reqVer := strings.TrimSpace(manifest.Version)
 			if !strings.HasPrefix(reqVer, "v") { reqVer = "v" + reqVer }
-			curVer := currentHubVersion
+			curVer := strings.TrimSpace(currentHubVersion)
 			if !strings.HasPrefix(curVer, "v") { curVer = "v" + curVer }
 			
-			if !semver.IsValid(reqVer) || semver.Compare(curVer, reqVer) < 0 {
-				log.Printf("[ERROR] Sensor %s requires Hub Version %s, but Hub is running %s", sensor.ID, reqVer, curVer)
-				return nil, fmt.Errorf("incompatible_sensor: %s requires Hub Version %s", sensor.ID, reqVer)
+			if semver.IsValid(reqVer) && semver.Major(curVer) != semver.Major(reqVer) {
+				log.Printf("[ERROR] Sensor %s (v%s) is incompatible with Hub (v%s) - Major versions must match", sensor.ID, reqVer, curVer)
+				return nil, fmt.Errorf("incompatible_sensor: %s (v%s) requires a matching Hub Major version", sensor.ID, reqVer)
 			}
 		}
 

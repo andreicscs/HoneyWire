@@ -140,7 +140,8 @@ export const useFleetStore = defineStore('fleet', () => {
   const selectedSensorId = computed(() => state.value.selectedSensorId)
   const activeTimeframe = computed(() => state.value.activeTimeframe)
   const uptimeData = computed(() => state.value.uptimeData)
-  const manifests = computed(() => state.value.manifests)
+  const DEFAULT_SENSOR_ICON = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01L20.73 6.96 M12 22.08V12'
+  const manifests = computed(() => state.value.manifests.map(m => ({ ...m, icon_svg: m.icon_svg || DEFAULT_SENSOR_ICON })))
   const pendingNodeActions = computed(() => state.value.pendingNodeActions)
   const pendingSensorActions = computed(() => state.value.pendingSensorActions)
 
@@ -191,7 +192,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const enrichedNodes = computed(() => {
     const manifestMap = new Map()
-    for (const s of state.value.manifests) {
+    for (const s of manifests.value) {
       manifestMap.set(s.id, s)
       manifestMap.set(s.sensorId, s)
       manifestMap.set(s.name, s)
@@ -205,7 +206,7 @@ export const useFleetStore = defineStore('fleet', () => {
         return {
           ...sensor,
           display: manifest?.name || sensor.display || sensor.name || '',
-          icon: manifest?.icon_svg || sensor.metadata?.icon || '',
+          icon: manifest?.icon_svg || sensor.metadata?.icon || DEFAULT_SENSOR_ICON,
           osi: manifest?.osi_layer || sensor.metadata?.osi || 'Other',
           status: (node.status === 'down' && sensor.status === 'pending') ? 'down' : sensor.status
         }

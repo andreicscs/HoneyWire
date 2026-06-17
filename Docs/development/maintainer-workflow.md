@@ -129,6 +129,10 @@ Check the `registry-pages` branch to confirm:
 - The `latest` field points to the new version
 
 ### Step 5: Dashboard Sync & Manual Upgrades
-Refresh your HoneyWire dashboard or wait for the automatic UI sync. The Hub's event-driven catalog hook will instantly detect the registry mutation and compare it against deployed sensors.
+Because HoneyWire explicitly avoids background network polling for security and network hygiene, the Hub will not automatically discover this new version in the background.
 
-Instead of forcefully upgrading production edge nodes automatically, the Hub will flag nodes with an **"Update Available"** indicator. Users must manually trigger the `/api/v1/nodes/{id}/upgrade` endpoint (via the UI) to instruct the node to pull the new version schema and execute a compose restart.
+To sync the catalog:
+1. Run `honeywire status` via the edge node CLI, OR
+2. go into Fleet Management or Node Details view in the Hub Dashboard.
+
+This triggers an on-demand registry fetch. The Hub will compare the latest compatible versions against deployed sensors and flag nodes with an **"Update Available"** indicator. Users must manually trigger the `/api/v1/nodes/{id}/upgrade` endpoint (via the UI) or run `honeywire apply` to instruct the node to pull the new version schema and execute a compose restart.

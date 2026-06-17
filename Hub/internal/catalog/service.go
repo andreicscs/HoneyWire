@@ -3,7 +3,6 @@ package catalog
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,8 +15,7 @@ type RegistryIndex struct {
 		ID       string `json:"id"`
 		Latest   string `json:"latest"`
 		Versions []struct {
-			V             string `json:"v"`
-			MinHubVersion string `json:"min_hub_version"`
+			V string `json:"v"`
 		} `json:"versions"`
 	} `json:"sensors"`
 }
@@ -107,10 +105,8 @@ func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubVersion 
 	idx := s.indexCache
 	s.mu.RUnlock()
 
-	// If cache is empty, try to refresh it synchronously
 	if idx == nil {
 		if err := s.RefreshIndex(); err != nil {
-			log.Printf("[WARNING] Registry fetch failed (err: %v), no cache available.", err)
 			return "", err
 		}
 		s.mu.RLock()
@@ -118,20 +114,24 @@ func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubVersion 
 		s.mu.RUnlock()
 	}
 
+	if idx == nil {
+		return "", fmt.Errorf("registry index not available")
+	}
+
 	for _, sensor := range idx.Sensors {
 		if sensor.ID == sensorID {
 			for i := len(sensor.Versions) - 1; i >= 0; i-- {
-				reqVer := strings.TrimSpace(sensor.Versions[i].MinHubVersion)
+				reqVer := strings.TrimSpace(sensor.Versions[i].V)
 				// Format semver standard 'vX.Y.Z' for comparison
 				if !strings.HasPrefix(reqVer, "v") {
 					reqVer = "v" + reqVer
 				}
-				curVer := currentHubVersion
+				curVer := strings.TrimSpace(currentHubVersion)
 				if !strings.HasPrefix(curVer, "v") {
 					curVer = "v" + curVer
 				}
 
-				if semver.IsValid(reqVer) && semver.Compare(curVer, reqVer) >= 0 {
+				if semver.IsValid(reqVer) && semver.Major(curVer) == semver.Major(reqVer) {
 					return sensor.Versions[i].V, nil
 				}
 			}

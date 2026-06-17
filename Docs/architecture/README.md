@@ -178,13 +178,22 @@ The Wizard performs discovery using point-in-time host inspection. No resident d
 
 HoneyWire uses a **git-tag-driven static registry** for sensor versioning, enabling sensor updates independent of Hub releases.
 
+### Split Architecture Philosophy
+HoneyWire intentionally decouples component distribution to match their structural requirements:
+- **Sensors (Custom Registry):** Sensors require a dynamic JSON schema (`index.json` + versioned manifests) so the Hub can instantly render dynamic configuration UI forms and support isolated offline air-gapping.
+- **Wizard (GitHub Releases):** The Wizard is a compiled CLI binary with no dynamic UI configuration schema. It is distributed natively via GitHub/Gitea releases to keep the `get.honeywire.dev` install scripts dead-simple.
+
 ### Tagging Convention
 - **Hub releases:** `hub/v{semver}` (e.g., `hub/v2.0.0`)
 - **Wizard releases:** `wizard/v{semver}` (e.g., `wizard/v1.1.0`)
 - **Sensor releases:** `sensor/{sensor-name}/v{semver}` (e.g., `sensor/file-canary/v1.2.0`)
 
 ### Compatibility Mechanism
-Each Hub binary embeds a `HubAPIVersion` constant (integer). Each sensor manifest declares a `min_hub_api` field. The Hub only presents sensor versions where `min_hub_api <= HubAPIVersion`. This ~15 lines of Go code is the entire backward compatibility mechanism.
+HoneyWire strictly uses Semantic Versioning (`vMAJOR.MINOR.PATCH`). 
+- **Sensors vs Hub:** The Hub natively checks if the sensor's major version exactly matches its own major version. If they match, they are compatible.
+- **Wizard vs Hub:** The Hub enforces a rigid `X-Wizard-Version` header check. If the Wizard's major version differs from the Hub, the Hub explicitly blocks the connection (`HTTP 426 Upgrade Required`).
+
+This relies entirely on the inherent stability guarantees of Semantic Versioning rather than manual configuration metadata.
 
 ### Registry Pipeline
 When a `sensor/**` tag is pushed, a Gitea Action:
