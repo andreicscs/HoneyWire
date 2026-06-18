@@ -9,79 +9,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const v2Schema = `
--- Nodes: Physical servers/agents managing sensors
-CREATE TABLE IF NOT EXISTS nodes (
-    id              TEXT PRIMARY KEY,
-    alias           TEXT NOT NULL,
-    api_key         TEXT UNIQUE NOT NULL,
-    public_ip       TEXT,
-    private_ip      TEXT,
-    tags            TEXT NOT NULL DEFAULT '[]',
-    pending_config    INTEGER NOT NULL DEFAULT 0,
-    active_revision   TEXT,
-    desired_revision  TEXT,
-    last_heartbeat    TEXT,
-    created_at        TEXT NOT NULL,
-    updated_at        TEXT NOT NULL
-);
-
--- NodeSensors: Installed instances of catalog sensors
-CREATE TABLE IF NOT EXISTS node_sensors (
-    node_id         TEXT NOT NULL,
-    sensor_id       TEXT NOT NULL, 
-    custom_name     TEXT NOT NULL, 
-    config_values   TEXT NOT NULL DEFAULT '{}',
-    metadata        TEXT NOT NULL DEFAULT '{}',
-	deployed_version TEXT NOT NULL DEFAULT '',
-	last_heartbeat  TEXT,
-    is_silenced     INTEGER NOT NULL DEFAULT 0,
-    created_at      TEXT NOT NULL,
-    updated_at      TEXT NOT NULL,
-    PRIMARY KEY (node_id, sensor_id),
-    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
-);
-
--- Events: Security alerts from sensors
-CREATE TABLE IF NOT EXISTS events (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id          TEXT NOT NULL,
-    sensor_id        TEXT NOT NULL, 
-    timestamp        TEXT NOT NULL,
-    contract_version TEXT NOT NULL DEFAULT '1.0.0',
-    event_trigger    TEXT NOT NULL DEFAULT 'alert',
-    severity         TEXT NOT NULL DEFAULT 'medium',
-    source           TEXT NOT NULL DEFAULT 'Unknown',
-    target           TEXT NOT NULL DEFAULT 'Unknown',
-    details          TEXT NOT NULL DEFAULT '{}',
-    is_read          INTEGER NOT NULL DEFAULT 0,
-    is_archived      INTEGER NOT NULL DEFAULT 0,
-    count            INTEGER NOT NULL DEFAULT 1,
-    FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
-);
-
--- Sensor Heartbeats: Routine health pings from sensors
-CREATE TABLE IF NOT EXISTS sensor_heartbeats (
-    node_id     TEXT NOT NULL,
-    sensor_id   TEXT NOT NULL,
-    time_bucket TEXT NOT NULL,
-    PRIMARY KEY (node_id, sensor_id, time_bucket),
-    FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
-);
-
--- System Configuration
-CREATE TABLE IF NOT EXISTS config (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
-
--- High-performance indexes
-CREATE INDEX IF NOT EXISTS idx_events_archived ON events(is_archived, id DESC);
-CREATE INDEX IF NOT EXISTS idx_events_node_sensor ON events(node_id, sensor_id);
-CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
-CREATE INDEX IF NOT EXISTS idx_sensors_node ON node_sensors(node_id);
-CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
-`
 
 type SQLiteStore struct {
 	DB *sql.DB
@@ -101,8 +28,8 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	if _, err := db.Exec(v2Schema); err != nil {
-		return nil, err
+	if err := RunMigrations(db); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	if err := InitializeDefaultConfig(db); err != nil {
@@ -150,9 +77,6 @@ func initializeDefaultConfigTx(tx *sql.Tx) error {
 			return err
 		}
 	}
-
-	// Safe schema migrations
-	tx.Exec("ALTER TABLE node_sensors ADD COLUMN deployed_version TEXT NOT NULL DEFAULT ''")
 
 	return nil
 }
