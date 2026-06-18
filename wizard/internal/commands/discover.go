@@ -233,7 +233,13 @@ func applySuggestions(app *app.App, recs []*discovery.Recommendation, force bool
 
 func runPreFlightChecks(force bool) error {
 	var hasWarnings bool
-	checks := []func() (string, error){system.CheckMemory, system.CheckLoad, system.CheckDiskSpace}
+	checkDocker := func() (string, error) {
+		if _, err := deploy.ValidateDockerState(); err != nil {
+			return err.Error(), nil
+		}
+		return "", nil
+	}
+	checks := []func() (string, error){system.CheckMemory, system.CheckLoad, system.CheckDiskSpace, checkDocker}
 	for _, check := range checks {
 		if warning, err := check(); err == nil && warning != "" {
 			fmt.Printf("%s%s%s\n", cli.Yellow, warning, cli.Reset)

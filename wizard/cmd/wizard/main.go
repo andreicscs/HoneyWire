@@ -46,7 +46,7 @@ func run() error {
 
 	switch args[0] {
 	case "apply":
-		return commands.HandleApply()
+		return commands.HandleApply(*forcePtr)
 	case "discover":
 		return commands.HandleDiscover(*forcePtr)
 	case "firedrill":

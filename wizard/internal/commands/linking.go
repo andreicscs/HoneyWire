@@ -166,7 +166,7 @@ func linkExistingNode(hubURL, apiKey string, force bool) error {
 	if cli.IsTerminal() {
 		if nodeInfo.PendingConfig {
 			if cli.ConfirmAction("Apply Hub's desired state now", force) {
-				applied, err := ApplyDesiredState()
+				applied, err := ApplyDesiredState(force)
 				if err == nil && applied {
 					if cli.ConfirmAction("Trigger a firedrill to test deployed sensors", force) {
 						return HandleFiredrill()

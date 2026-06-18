@@ -74,7 +74,7 @@ func HandleInteractiveMenu(force bool) error {
 
 	switch choice {
 	case "1":
-		return HandleApply()
+		return HandleApply(force)
 	case "2":
 		return HandleDiscover(force)
 	case "3":

@@ -62,11 +62,12 @@ func checkDaemon() error {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 
-	var stderr bytes.Buffer
+	var stdout, stderr bytes.Buffer
 
 	// codeql[go/command-injection] Hardcoded/trusted CLI arguments.
 	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	cmd := exec.CommandContext(ctx, "docker", "info", "--format", "{{json .}}")
+	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
@@ -75,6 +76,22 @@ func checkDaemon() error {
 		// We pass the actual system error to generateRemediationError now
 		return generateRemediationError(mainReason, details, err)
 	}
+
+	var info struct {
+		SecurityOptions []string `json:"SecurityOptions"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &info); err == nil {
+		for _, opt := range info.SecurityOptions {
+			if strings.Contains(strings.ToLower(opt), "rootless") {
+				return generateRemediationError(
+					"Docker is running in Rootless mode.",
+					"HoneyWire sensors require raw network access and iptables manipulation, which cannot be done in Rootless mode. Please install a standard Rootful Docker daemon.",
+					nil,
+				)
+			}
+		}
+	}
+
 	return nil
 }
 

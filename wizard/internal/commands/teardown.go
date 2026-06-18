@@ -33,6 +33,13 @@ func HandleTeardown(force bool) error {
 		fmt.Printf("%s[!] Failed to remove config file: %v%s\n", cli.Yellow, err, cli.Reset)
 	}
 
-	fmt.Printf("\n%s✅ All HoneyWire sensors and configurations have been successfully removed.%s\n\n", cli.Green, cli.Reset)
+	fmt.Printf("\n%s[*] Removing HoneyWire CLI binary...%s\n", cli.Dim, cli.Reset)
+	if execPath, err := os.Executable(); err == nil {
+		if err := os.Remove(execPath); err != nil && !os.IsNotExist(err) {
+			fmt.Printf("%s[!] Failed to remove CLI binary (%s): %v%s\n", cli.Yellow, execPath, err, cli.Reset)
+		}
+	}
+
+	fmt.Printf("\n%s✅ All HoneyWire sensors, configurations, and the CLI tool have been successfully removed.%s\n\n", cli.Green, cli.Reset)
 	return nil
 }

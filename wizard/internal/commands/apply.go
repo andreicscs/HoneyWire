@@ -12,8 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func HandleApply() error {
-	applied, err := ApplyDesiredState()
+func HandleApply(force bool) error {
+	applied, err := ApplyDesiredState(force)
 	if err == nil && applied {
 		fmt.Printf("    %sRun 'honeywire firedrill' to test deployed sensors.%s\n\n", cli.Dim, cli.Reset)
 	}
@@ -22,7 +22,7 @@ func HandleApply() error {
 
 // ApplyDesiredState reconciles the node against the Hub's desired state
 // and returns true if sensors were actually deployed.
-func ApplyDesiredState() (bool, error) {
+func ApplyDesiredState(force bool) (bool, error) {
 	app, err := loadApp()
 	if err != nil {
 		return false, err
@@ -86,6 +86,10 @@ func ApplyDesiredState() (bool, error) {
 	if identical {
 		fmt.Printf("    %s✅ Node is already up to date with Hub's desired state.%s\n\n", cli.Green, cli.Reset)
 		return false, nil
+	}
+
+	if err := runPreFlightChecks(force); err != nil {
+		return false, err
 	}
 
 	if err := deploy.Apply(ctx, composeData); err != nil {
