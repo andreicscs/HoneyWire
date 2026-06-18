@@ -136,6 +136,7 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 		WebhookEvents:   events,
 		SiemAddress:     kv["siem_address"],
 		SiemProtocol:    kv["siem_protocol"],
+		WhitelistedSources: kv["whitelisted_sources"],
 	}, nil
 }
 
@@ -152,6 +153,7 @@ func (s *Service) UpdateConfig(req map[string]interface{}) error {
 		"webhookEvents":   "webhook_events",
 		"siemAddress":     "siem_address",
 		"siemProtocol":    "siem_protocol",
+		"whitelistedSources": "whitelisted_sources",
 	}
 	for camelKey, snakeKey := range mapping {
 		if val, exists := req[camelKey]; exists {

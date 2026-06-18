@@ -68,6 +68,7 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		"webhookEvents":   cfg.WebhookEvents,
 		"siemAddress":     cfg.SiemAddress,
 		"siemProtocol":    cfg.SiemProtocol,
+		"whitelistedSources": cfg.WhitelistedSources,
 	})
 }
 

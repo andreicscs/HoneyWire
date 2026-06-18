@@ -21,6 +21,7 @@ type ConfigPayload struct {
 	WebhookEvents   []string `json:"webhookEvents"`
 	SiemAddress     string   `json:"siemAddress"`
 	SiemProtocol    string   `json:"siemProtocol"`
+	WhitelistedSources string `json:"whitelistedSources"`
 }
 
 type Event struct {

@@ -13,6 +13,7 @@ export interface ConfigApiResponse {
   webhookEvents: string[]
   siemAddress: string
   siemProtocol: 'tcp' | 'udp' | ''
+  whitelistedSources: string
 }
 
 // Represents the internal reactive state used by Vue components
@@ -27,6 +28,7 @@ export interface ConfigState {
   webhookEvents: string[]
   siemAddress: string
   siemProtocol: 'tcp' | 'udp' | ''
+  whitelistedSources: string
 }
 
 export const useConfigStore = defineStore('config', () => {
@@ -40,7 +42,8 @@ export const useConfigStore = defineStore('config', () => {
     webhookUrl: '',
     webhookEvents: [],
     siemAddress: '',
-    siemProtocol: 'tcp'
+    siemProtocol: 'tcp',
+    whitelistedSources: ''
   })
 
   const fetchConfig = async (): Promise<void> => {
@@ -60,9 +63,9 @@ export const useConfigStore = defineStore('config', () => {
       } else {
         state.value.webhookEvents = ['critical', 'high', 'medium', 'low', 'info']
       }
-      
       state.value.siemAddress = data.siemAddress || ''
       state.value.siemProtocol = data.siemProtocol || 'tcp'
+      state.value.whitelistedSources = data.whitelistedSources || ''
       
       state.value.isLoaded = true
     } catch (error) {

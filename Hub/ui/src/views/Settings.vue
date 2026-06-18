@@ -52,7 +52,8 @@ watch(() => configStore.config.isLoaded, (loaded) => {
                 ? [...configStore.config.webhookEvents] 
                 : ['critical', 'high', 'medium', 'low', 'info'],
             siemAddress: configStore.config.siemAddress || '',
-            siemProtocol: configStore.config.siemProtocol || 'tcp'
+            siemProtocol: configStore.config.siemProtocol || 'tcp',
+            whitelistedSources: configStore.config.whitelistedSources || ''
         }
         settings.value = JSON.parse(JSON.stringify(loadedSettings))
         initialSettings.value = JSON.parse(JSON.stringify(loadedSettings))
@@ -232,7 +233,17 @@ const submitFactoryReset = async () => {
                                 </div>
                             </div>
                         </div>
-                        
+                    </BaseCard>
+
+                    <BaseCard title="Event Filtering" class="mt-6">
+                        <div class="max-w-md">
+                            <BaseInput 
+                                v-model="settings.whitelistedSources" 
+                                label="Whitelisted Event Sources" 
+                                description="Comma-separated list of IPs or source names to ignore. Events originating from these sources will be completely dropped and not logged." 
+                                placeholder="e.g. 192.168.1.1, vulnerability_scanner"
+                            />
+                        </div>
                     </BaseCard>
                 </div>
 

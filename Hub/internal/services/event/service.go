@@ -67,6 +67,18 @@ func (s *Service) ProcessEvent(e *models.Event, nodeID string) error {
 	}
 
 	nowStr := time.Now().UTC().Format(time.RFC3339)
+
+	whitelistedSources, err := s.store.GetConfigValue("whitelisted_sources")
+	if err == nil && whitelistedSources != "" {
+		sources := strings.Split(whitelistedSources, ",")
+		for _, source := range sources {
+			if strings.TrimSpace(source) == e.Source {
+				// Whitelisted source, ignore entirely
+				return nil
+			}
+		}
+	}
+
 	detailsJSON, _ := json.Marshal(e.Details)
 	e.NodeID = nodeID
 
