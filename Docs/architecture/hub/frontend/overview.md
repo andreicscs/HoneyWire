@@ -111,3 +111,41 @@ This decision was explicitly chosen to prioritize initial simplicity and speed o
 
 **Future Migration Path:**
 This is considered technical debt. If frontend performance bottlenecks arise due to memory overhead (e.g., traversing thousands of events in the browser), or if HoneyWire adopters request it for scale, the event pagination logic will be migrated to the backend to match the architecture of our dashboard projections.
+# Bootstrap & Lifecycle
+
+## Cold Boot Sequence
+
+User loads the app (`onMounted` in App.vue):
+
+1. Check if setup is required (`checkRequiresSetup`).
+2. Check if authenticated (`checkSystemState`).
+3. Load application data in parallel (`fetchFleet`, `fetchEvents`, etc.).
+4. Connect WebSocket and register handlers.
+5. **Critical Invariant:** `isAuthenticated = true` is set **last**, after all data has been fetched. This prevents the authenticated shell from rendering before stores are populated.
+
+---
+
+# Debugging Guide
+
+## Blank Dashboard After Login
+- Check: `loadAppData()` actually completed and all `await Promise.all([...])` calls resolved.
+- Fix: Ensure `isAuthenticated = true` is set AFTER data loads.
+
+## UI Not Updating
+- Check: Array reassignment broke reactivity (`nodes.value = newArray`). Fix by using `splice()`, `push()`, `Object.assign()`.
+- Check: Watched property is accessed with `.value` in `<script setup>`.
+
+## WebSocket Not Receiving Updates
+- Check: WebSocket not connected (check Network tab for "101 Switching Protocols").
+- Check: Handler not registered before `wsService.connect()`.
+- Check: Event filtered out inside `handleWsEvent()` due to `selectedNode` / `selectedSensor`.
+
+## Composite Key Bugs (Sensors)
+- Symptom: Wrong sensor updated, cross-node collisions.
+- Fix: Always pass both `nodeId` and `sensorId` to get a sensor, as `sensorId` alone is not unique.
+
+## Optimistic Update Didn't Rollback
+- Check: Saved state before optimistic update was not captured or was applied to the wrong object reference.
+
+---
+

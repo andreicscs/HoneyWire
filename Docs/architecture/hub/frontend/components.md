@@ -34,3 +34,46 @@ Views act as orchestrators for pages (e.g., `Dashboard.vue`, `NodeDetails.vue`).
 | Own ephemeral UI state (e.g., "is the modal open?") | Perform backend mutations directly |
 | Delegate heavy logic to Pinia stores | Duplicate error rollback logic |
 | Orchestrate layout and pass down props | Normalize API responses |
+
+---
+
+## Design System
+
+The Hub frontend uses a centralized token system based on the OKLCH color space (located in `src/assets/style.css`).
+
+### Principles
+
+- Semantic tokens only — no hardcoded colors in components.
+- Accessibility-first contrast.
+- Dark/light parity.
+- Theme switching swaps root variables only.
+
+### Token Categories
+
+| Category | Examples | Usage |
+|---|---|---|
+| Structural | `--bg`, `--bg-surface`, `--border-default` | Layout hierarchy |
+| Interactive | `--primary-main`, `--secondary-main`, `--danger-main` | Actions & states |
+| Severity | `--sev-critical` through `--sev-info` | Charts, alerts, tables, status |
+| Typography | `--text-h1`, `--text-base`, `--text-sm` | All text sizing |
+| Spacing | `--space-card-p`, `--space-flow` | Layout rhythm |
+| Elevation | `--radius-sm`, `--shadow-md` | Cards, modals, widgets |
+| Z-index | `--z-dropdown` → `--z-toast` | Stacking hierarchy |
+
+**No arbitrary values.** Use tokens.
+
+### Tailwind Integration
+
+Tokens exposed via `@theme`:
+
+```css
+bg-bg-surface    →  --bg-surface
+text-text-h      →  --text-h
+border-border-default  →  --border-default
+```
+
+### Dark Mode
+
+```css
+.dark { /* overrides root variables */ }
+```
