@@ -390,12 +390,10 @@ func (s *Sensor) heartbeatLoop() {
 
 func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 	payload := map[string]any{
-		"sensorId": s.SensorID,
-		"metadata": map[string]string{
-			"agent_version":    s.AgentVersion,
-			"contract_version": s.hubContractVersion,
-			"HW_CONFIG_REV":    s.ConfigRev,
-		},
+		"sensorId":        s.SensorID,
+		"agentVersion":    s.AgentVersion,
+		"contractVersion": s.hubContractVersion,
+		"configRev":       s.ConfigRev,
 	}
 	return s.postToHub("/api/v1/heartbeat", payload)
 }

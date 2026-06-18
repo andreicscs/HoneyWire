@@ -12,16 +12,16 @@ type SetupPayload struct {
 
 // ConfigPayload represents the runtime configuration of the Hub
 type ConfigPayload struct {
-	HubEndpoint     string   `json:"hubEndpoint"`
-	RegistryURL     string   `json:"registryUrl"`
-	AutoArchiveDays int      `json:"autoArchiveDays"`
-	AutoPurgeDays   int      `json:"autoPurgeDays"`
-	WebhookURL      string   `json:"webhookUrl"`
-	WebhookType     string   `json:"webhookType"`
-	WebhookEvents   []string `json:"webhookEvents"`
-	SiemAddress     string   `json:"siemAddress"`
-	SiemProtocol    string   `json:"siemProtocol"`
-	WhitelistedSources string `json:"whitelistedSources"`
+	HubEndpoint        string   `json:"hubEndpoint"`
+	RegistryURL        string   `json:"registryUrl"`
+	AutoArchiveDays    int      `json:"autoArchiveDays"`
+	AutoPurgeDays      int      `json:"autoPurgeDays"`
+	WebhookURL         string   `json:"webhookUrl"`
+	WebhookType        string   `json:"webhookType"`
+	WebhookEvents      []string `json:"webhookEvents"`
+	SiemAddress        string   `json:"siemAddress"`
+	SiemProtocol       string   `json:"siemProtocol"`
+	WhitelistedSources string   `json:"whitelistedSources"`
 }
 
 type Event struct {
@@ -42,8 +42,10 @@ type Event struct {
 
 // Heartbeat represents a routine ping from a sensor
 type Heartbeat struct {
-	SensorID string                 `json:"sensorId"`
-	Metadata map[string]interface{} `json:"metadata"` // Contains HW_CONFIG_REV
+	SensorID        string `json:"sensorId"`
+	AgentVersion    string `json:"agentVersion"`
+	ContractVersion string `json:"contractVersion"`
+	ConfigRev       string `json:"configRev"`
 }
 
 // Node represents a physical server managing sensors
@@ -74,7 +76,6 @@ type NodeSensor struct {
 	IsSilenced    bool                   `json:"isSilenced"`
 	Events24h       int                    `json:"events24h"`
 	EnvVars         map[string]interface{} `json:"envVars"`
-	Metadata        map[string]interface{} `json:"metadata"`
 	DeployedVersion string                 `json:"deployedVersion"`
 	UpdateAvailable bool                   `json:"updateAvailable"`
 }

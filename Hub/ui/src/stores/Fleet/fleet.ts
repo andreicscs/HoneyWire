@@ -8,7 +8,6 @@ export interface RawSensorPayload {
   status?: string
   isSilenced?: boolean
   envVars?: Record<string, any>
-  metadata?: Record<string, any>
   deployedVersion?: string
   updateAvailable?: boolean
   lastHeartbeat?: string | null
@@ -61,7 +60,6 @@ export interface InstalledSensor {
   status: string
   isSilenced: boolean
   envVars: Record<string, any>
-  metadata: Record<string, any>
   deployedVersion?: string
   updateAvailable?: boolean
   lastHeartbeat: string | null
@@ -206,8 +204,8 @@ export const useFleetStore = defineStore('fleet', () => {
         return {
           ...sensor,
           display: manifest?.name || sensor.display || sensor.name || '',
-          icon: manifest?.icon_svg || sensor.metadata?.icon || DEFAULT_SENSOR_ICON,
-          osi: manifest?.osi_layer || sensor.metadata?.osi || 'Other',
+          icon: manifest?.icon_svg || DEFAULT_SENSOR_ICON,
+          osi: manifest?.osi_layer || 'Other',
           status: (node.status === 'down' && sensor.status === 'pending') ? 'down' : sensor.status
         }
       })
@@ -373,7 +371,6 @@ export const useFleetStore = defineStore('fleet', () => {
       deployedVersion: raw.deployedVersion || '',
       updateAvailable: raw.updateAvailable || false,
       envVars: raw.envVars || {},
-      metadata: raw.metadata || {},
       lastHeartbeat: raw.lastHeartbeat || null,
     }
   }

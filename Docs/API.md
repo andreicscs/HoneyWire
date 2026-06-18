@@ -158,7 +158,7 @@ Creates a new node entry and returns the generated node credentials.
 
 #### GET /api/v1/nodes
 
-Returns all registered nodes and their installed sensors. Each node includes current status, heartbeat metadata, and pending config state.
+Returns all registered nodes and their installed sensors. Each node includes current status and pending config state.
 
 **Response:**
 ```json
@@ -546,18 +546,15 @@ These endpoints are used by sensor agents and require the node API key bearer to
 
 ### POST /api/v1/heartbeat
 
-Reports a sensor heartbeat and updates runtime metadata.
+Reports a sensor heartbeat and updates its versioning state.
 
 **Request:**
 ```json
 {
   "sensorId": "alpha-node-01",
-  "metadata": {
-    "agent_version": "1.0.0",
-    "contract_version": "1.0",
-    "sensor_type": "tarpit",
-    "HW_CONFIG_REV": "rev_abc123"
-  }
+  "agentVersion": "1.0.0",
+  "contractVersion": "1.0",
+  "configRev": "rev_abc123"
 }
 ```
 

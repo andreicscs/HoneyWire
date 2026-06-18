@@ -317,11 +317,9 @@ class HoneyWireSensor(ABC):
 
             payload = {
                 "sensorId": self.sensor_id,
-                "metadata": {
-                    "agent_version": self.agent_version,
-                    "contract_version": self._hub_contract_version,
-                    "HW_CONFIG_REV": self.config_rev
-                }
+                "agentVersion": self.agent_version,
+                "contractVersion": self._hub_contract_version,
+                "configRev": self.config_rev
             }
 
             resp, exc = None, None

@@ -58,18 +58,7 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SendJSON(w, http.StatusOK, map[string]interface{}{
-		"hubEndpoint":     cfg.HubEndpoint,
-		"registryUrl":     cfg.RegistryURL,
-		"autoArchiveDays": cfg.AutoArchiveDays,
-		"autoPurgeDays":   cfg.AutoPurgeDays,
-		"webhookType":     cfg.WebhookType,
-		"webhookUrl":      cfg.WebhookURL,
-		"webhookEvents":   cfg.WebhookEvents,
-		"siemAddress":     cfg.SiemAddress,
-		"siemProtocol":    cfg.SiemProtocol,
-		"whitelistedSources": cfg.WhitelistedSources,
-	})
+	SendJSON(w, http.StatusOK, cfg)
 }
 
 func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {

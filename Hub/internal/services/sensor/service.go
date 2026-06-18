@@ -2,7 +2,6 @@ package sensor
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"strings"
@@ -11,7 +10,7 @@ import (
 
 // Store defines exactly what the Sensor service needs from internal/store
 type Store interface {
-	ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, metadataJSON string) (bool, error)
+	ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr string) (bool, error)
 	InsertHeartbeat(nodeID, sensorID, minuteBucket string) error
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
@@ -38,24 +37,16 @@ func NewService(store Store, broadcaster Broadcaster) *Service {
 }
 
 // ProcessHeartbeat handles the core logic of a sensor checking in
-func (s *Service) ProcessHeartbeat(nodeID, sensorID string, metadata map[string]interface{}) error {
-	now := time.Now().UTC()
-	nowStr := now.Format(time.RFC3339)
-	minuteBucket := now.Truncate(time.Minute).Format(time.RFC3339)
+func (s *Service) ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev string) error {
+	nowStr := time.Now().UTC().Format(time.RFC3339)
 
-	agentRevision := ""
-	if rev, ok := metadata["HW_CONFIG_REV"].(string); ok {
-		agentRevision = rev
-	}
-
-	metadataJSON, _ := json.Marshal(metadata)
-
-	justSynced, err := s.store.ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, string(metadataJSON))
+	justSynced, err := s.store.ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr)
 	if err != nil {
 		log.Printf("[ERROR] Heartbeat DB update failed for node %s: %v", nodeID, err)
 		return err
 	}
 
+	minuteBucket := time.Now().UTC().Truncate(time.Minute).Format(time.RFC3339)
 	if err := s.store.InsertHeartbeat(nodeID, sensorID, minuteBucket); err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY") {
 			return ErrSensorNotRegistered

@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"encoding/json"
 	"time"
 )
 
@@ -20,7 +19,7 @@ type HeartbeatData struct {
 }
 
 // ProcessHeartbeat safely handles node updates and config reconciliation
-func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, metadataStr string) (bool, error) {
+func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr string) (bool, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return false, err
@@ -35,9 +34,9 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, 
 	// Update the specific Sensor's heartbeat AND metadata
 	if _, err := tx.Exec(`
 		UPDATE node_sensors 
-		SET metadata = ?, last_heartbeat = ?, updated_at = ? 
+		SET agent_version = ?, contract_version = ?, config_rev = ?, last_heartbeat = ?, updated_at = ? 
 		WHERE node_id = ? AND sensor_id = ?`,
-		metadataStr, nowStr, nowStr, nodeID, sensorID); err != nil {
+		agentVersion, contractVersion, configRev, nowStr, nowStr, nodeID, sensorID); err != nil {
 		return false, err
 	}
 
@@ -54,22 +53,17 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentRevision, nowStr, 
 			targetRevision = desiredRevision.String
 		}
 
-		if targetRevision != "" && targetRevision == agentRevision {
-			rows, err := tx.Query("SELECT metadata FROM node_sensors WHERE node_id = ?", nodeID)
+		if targetRevision != "" && targetRevision == configRev {
+			rows, err := tx.Query("SELECT config_rev FROM node_sensors WHERE node_id = ?", nodeID)
 			if err == nil {
 				allMatched := true
 				for rows.Next() {
-					var metaStr string
-					if err := rows.Scan(&metaStr); err != nil {
+					var rev string
+					if err := rows.Scan(&rev); err != nil {
 						allMatched = false
 						break
 					}
-					var meta map[string]interface{}
-					if err := json.Unmarshal([]byte(metaStr), &meta); err != nil {
-						allMatched = false
-						break
-					}
-					if rev, ok := meta["HW_CONFIG_REV"].(string); !ok || rev != targetRevision {
+					if rev != targetRevision {
 						allMatched = false
 						break
 					}

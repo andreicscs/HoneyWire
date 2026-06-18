@@ -36,7 +36,9 @@ CREATE TABLE IF NOT EXISTS node_sensors (
     sensor_id       TEXT NOT NULL, 
     custom_name     TEXT NOT NULL, 
     config_values   TEXT NOT NULL DEFAULT '{}',
-    metadata        TEXT NOT NULL DEFAULT '{}',
+    agent_version   TEXT NOT NULL DEFAULT '',
+    contract_version TEXT NOT NULL DEFAULT '',
+    config_rev      TEXT NOT NULL DEFAULT '',
 	deployed_version TEXT NOT NULL DEFAULT '',
 	last_heartbeat  TEXT,
     is_silenced     INTEGER NOT NULL DEFAULT 0,
@@ -86,6 +88,18 @@ CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
 CREATE INDEX IF NOT EXISTS idx_sensors_node ON node_sensors(node_id);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
 `
+
+// WARNING: Schema Migrations & Foreign Keys
+//
+// HoneyWire uses ON DELETE CASCADE for critical tables (e.g., deleting a node_sensor 
+// automatically deletes all its events).
+// 
+// When altering schemas, NEVER use the legacy SQLite workaround of creating a new table,
+// copying data, and dropping the old table. If foreign keys are enabled, dropping the 
+// old table will instantly trigger the cascade and permanently delete all dependent rows.
+//
+// ALWAYS use native SQLite 3.35.0+ ALTER TABLE statements (e.g., ADD COLUMN or DROP COLUMN)
+// to mutate schemas safely without destroying dependent data.
 
 var migrations = []Migration{
 	{

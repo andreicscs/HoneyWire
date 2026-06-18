@@ -128,7 +128,7 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 	// Fetch sensors
 	for i := range nodes {
 		rows, err := s.DB.Query(`
-			SELECT sensor_id, custom_name, config_values, metadata, deployed_version, is_silenced, last_heartbeat 
+			SELECT sensor_id, custom_name, config_values, deployed_version, is_silenced, last_heartbeat 
 			FROM node_sensors WHERE node_id = ?`, nodes[i].ID)
 		if err != nil {
 			return nil, err
@@ -137,11 +137,10 @@ func (s *SQLiteStore) GetNodes() ([]models.Node, error) {
 		for rows.Next() {
 			var ns models.NodeSensor
 			var configStr string
-			var metaStr string
 			var silencedInt int
 			var lastHb sql.NullString
 
-			if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &metaStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
+			if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -197,7 +196,7 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 
 	// Fetch Installed Sensors (Added metadata and last_heartbeat)
 	rows, err := s.DB.Query(`
-		SELECT sensor_id, custom_name, config_values, metadata, deployed_version, is_silenced, last_heartbeat 
+		SELECT sensor_id, custom_name, config_values, deployed_version, is_silenced, last_heartbeat 
 		FROM node_sensors WHERE node_id = ?`, nodeID)
 	if err != nil {
 		return nil, err
@@ -207,11 +206,10 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 	for rows.Next() {
 		var ns models.NodeSensor
 		var configStr string
-		var metaStr string
 		var silencedInt int
 		var lastHb sql.NullString
 
-		if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &metaStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
+		if err := rows.Scan(&ns.Name, &ns.Display, &configStr, &ns.DeployedVersion, &silencedInt, &lastHb); err != nil {
 			return nil, err
 		}
 
@@ -227,7 +225,6 @@ func (s *SQLiteStore) GetNodeDetails(nodeID string) (*models.Node, error) {
 		ns.Status = deriveStatus(ns.LastHeartbeat)
 
 		json.Unmarshal([]byte(configStr), &ns.EnvVars)
-		json.Unmarshal([]byte(metaStr), &ns.Metadata)
 
 		// Count events in the last 24h for this specific sensor
 		yesterday := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)

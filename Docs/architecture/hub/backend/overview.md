@@ -65,6 +65,11 @@ The data access layer.
 - Operates in Write-Ahead Log (WAL) mode with connection pooling.
 - Contains **no** business logic.
 
+#### Schema Migrations & Constraints
+- The Hub uses an embedded, automated migration system. 
+- **CRITICAL:** Do NOT use the legacy `CREATE new_table -> DROP old_table -> RENAME` workaround for altering schemas if the table is referenced by foreign keys with `ON DELETE CASCADE`. Doing so while foreign keys are enforced will instantly trigger the cascade and wipe out dependent data (e.g., dropping `node_sensors` deletes all `events`).
+- **Solution:** HoneyWire uses a modern SQLite driver (3.35.0+) that natively supports `ALTER TABLE ... DROP COLUMN`. Always use native `ALTER TABLE` operations to guarantee schema mutations are non-destructive and isolated.
+
 ### 5. Read/Analytics Layer (`internal/projections`)
 A specialized CQRS (Command Query Responsibility Segregation) pattern used for heavy dashboard analytics.
 - Used for high-volume aggregations like Threat Velocity and Threat Severity Distributions.

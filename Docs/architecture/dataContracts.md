@@ -51,20 +51,17 @@ This payload is emitted continuously (typically every 30 seconds) by sensors to 
 ```json
 {
   "sensorId": "alpha-node-01",
-  "metadata": {
-    "agent_version": "1.0.0",
-    "contract_version": "1.0",
-    "HW_CONFIG_REV": "rev_abc123"
-  }
+  "agentVersion": "1.0.0",
+  "contractVersion": "1.0",
+  "configRev": "rev_abc123"
 }
 ```
 
 ### Field Definitions
 - `sensorId` (string, required): The unique identifier of the sensor.
-- `metadata` (object, required):
-  - `agent_version` (string): The version of the language SDK or agent.
-  - `contract_version` (string): The API contract version in use.
-  - `HW_CONFIG_REV` (string): The current configuration revision the sensor is running. Used by the Hub to determine if the node has synchronized its desired state.
+- `agentVersion` (string, required): The version of the language SDK or agent.
+- `contractVersion` (string, required): The API contract version in use.
+- `configRev` (string, required): The current configuration revision the sensor is running. Used by the Hub to determine if the node has synchronized its desired state.
 
 ---
 
