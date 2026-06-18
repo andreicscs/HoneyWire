@@ -148,7 +148,7 @@ type Sensor struct {
 	testTrigger string
 	testSource  string
 	testTarget  string
-	testDetails map[string]any
+	testDetails EventDetails
 }
 
 func NewSensor() (*Sensor, error) {
@@ -176,7 +176,7 @@ func NewSensor() (*Sensor, error) {
 }
 
 // SetTestPayload allows community sensors to define a realistic, protocol-specific mock payload
-func (s *Sensor) SetTestPayload(trigger, source, target string, details map[string]any) {
+func (s *Sensor) SetTestPayload(trigger, source, target string, details EventDetails) {
 	s.testPayload = map[string]any{
 		"eventTrigger": trigger,
 		"source":       source,
@@ -214,7 +214,7 @@ func (s *Sensor) listenForSignals() {
 			trigger := "test_mode_synthetic_alert"
 			source := "Wizard Live Test"
 			target := "Mock Hub"
-			details := map[string]any{"test_message": "Wizard triggered a live test event firedrill."}
+			details := EventDetails{{"test_message", "Wizard triggered a live test event firedrill."}}
 
 			if s.testTrigger != "" {
 				trigger = s.testTrigger
@@ -241,7 +241,7 @@ func (s *Sensor) RunTestMode() bool {
 	trigger := "test_mode_synthetic_alert"
 	source := "CI/CD Runner"
 	target := "Mock Hub"
-	details := map[string]any{"test_message": "Automated CI/CD check."}
+	details := EventDetails{{"test_message", "Automated CI/CD check."}}
 
 	if s.testTrigger != "" {
 		trigger = s.testTrigger
@@ -275,7 +275,33 @@ func (s *Sensor) RunTestMode() bool {
 // PIPELINE A: EVENT WORKER
 // ==========================================
 
-func (s *Sensor) ReportEvent(trigger, source, target string, details map[string]any) bool {
+// EventDetail represents an ordered key-value pair for event details
+type EventDetail struct {
+	Key   string
+	Value any
+}
+
+// EventDetails is an ordered slice of event details that marshals to a JSON object
+type EventDetails []EventDetail
+
+func (ed EventDetails) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString("{")
+	for i, d := range ed {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		key, _ := json.Marshal(d.Key)
+		val, _ := json.Marshal(d.Value)
+		buf.Write(key)
+		buf.WriteString(":")
+		buf.Write(val)
+	}
+	buf.WriteString("}")
+	return buf.Bytes(), nil
+}
+
+func (s *Sensor) ReportEvent(trigger, source, target string, details EventDetails) bool {
 	payload := map[string]any{
 		"contractVersion": s.hubContractVersion,
 		"sensorId":        s.SensorID,

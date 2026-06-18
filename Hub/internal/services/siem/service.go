@@ -2,7 +2,6 @@ package siem
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -317,8 +316,8 @@ func (s *Service) formatSyslog(event models.Event) string {
 
 	timestamp := t.UTC().Format(time.RFC3339Nano)
 
-	detailsJSON, err := json.Marshal(event.Details)
-	if err != nil {
+	detailsJSON := event.Details
+	if len(detailsJSON) == 0 {
 		detailsJSON = []byte("{}")
 	}
 

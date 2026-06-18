@@ -27,9 +27,9 @@ func main() {
 		"custom_anomaly_detected",
 		"Wizard Firedrill",
 		"Mock Custom Target",
-		map[string]any{
-			"test_message": "Wizard triggered a synthetic event firedrill.",
-			"action_taken": "logged",
+		sdk.EventDetails{
+			{"test_message", "Wizard triggered a synthetic event firedrill."},
+			{"action_taken", "logged"},
 		},
 	)
 
@@ -84,10 +84,10 @@ func runSensor(ctx context.Context, hw *sdk.Sensor) {
 				"custom_anomaly_detected", // 1. Event Trigger
 				sourceIP,                  // 2. Source
 				target,                    // 3. Target
-				map[string]any{            // 4. Details
-					"attack_type":  "example_probe",
-					"raw_payload":  "GET /etc/passwd HTTP/1.1",
-					"action_taken": "logged",
+				sdk.EventDetails{ // 4. Details
+					{"attack_type", "example_probe"},
+					{"raw_payload", "GET /etc/passwd HTTP/1.1"},
+					{"action_taken", "logged"},
 				},
 			)
 		}

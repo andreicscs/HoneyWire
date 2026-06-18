@@ -3,6 +3,7 @@ package siem
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"net"
 	"regexp"
 	"testing"
@@ -41,7 +42,7 @@ func TestSyslogForwardingRFC5424(t *testing.T) {
 		Source:       "192.168.1.100",
 		Target:       "10.0.0.5",
 		SensorID:     "sensor-01",
-		Details:      map[string]interface{}{"file": "/etc/shadow"},
+		Details:      json.RawMessage(`{"file": "/etc/shadow"}`),
 	}
 
 	// Send the event

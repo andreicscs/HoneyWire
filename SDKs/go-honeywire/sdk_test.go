@@ -264,7 +264,7 @@ func TestReportEvent_Serialization(t *testing.T) {
 	trigger := "test_serialization"
 	source := "192.168.1.10"
 	target := "8.8.8.8:53"
-	details := map[string]any{"protocol": "dns"}
+	details := EventDetails{{"protocol", "dns"}}
 
 	// Report the event, which places it on the channel
 	if !s.ReportEvent(trigger, source, target, details) {
@@ -287,8 +287,9 @@ func TestReportEvent_Serialization(t *testing.T) {
 		if got, want := receivedPayload["target"], target; got != want {
 			t.Errorf("target mismatch: got %v, want %v", got, want)
 		}
-		if !reflect.DeepEqual(receivedPayload["details"], details) {
-			t.Errorf("details mismatch: got %v, want %v", receivedPayload["details"], details)
+		expectedDetails := map[string]any{"protocol": "dns"}
+		if !reflect.DeepEqual(receivedPayload["details"], expectedDetails) {
+			t.Errorf("details mismatch: got %v, want %v", receivedPayload["details"], expectedDetails)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timed out waiting for server to receive event payload")

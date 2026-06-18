@@ -1,5 +1,7 @@
 package models
 
+import "encoding/json"
+
 // HubVersion defines the backend protocol version for resolving compatible sensors and authenticating Agents.
 const HubVersion = "2.0.0"
 
@@ -34,7 +36,7 @@ type Event struct {
 	Severity        string                 `json:"severity"`
 	Source          string                 `json:"source"`
 	Target          string                 `json:"target"`
-	Details         map[string]interface{} `json:"details"`
+	Details         json.RawMessage        `json:"details"`
 	IsRead          bool                   `json:"isRead"`
 	IsArchived      bool                   `json:"isArchived"`
 	Count           int                    `json:"count"`

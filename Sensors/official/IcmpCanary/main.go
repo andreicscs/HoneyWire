@@ -23,12 +23,12 @@ func main() {
 		"icmp_ping_received",
 		"Wizard Firedrill",
 		"ICMP Listener",
-		map[string]any{
-			"test_message": "Wizard triggered a synthetic event firedrill.",
-			"packet_size":  64,
-			"icmp_id":      1337,
-			"icmp_seq":     1,
-			"action_taken": "logged",
+		sdk.EventDetails{
+			{"test_message", "Wizard triggered a synthetic event firedrill."},
+			{"packet_size", 64},
+			{"icmp_id", 1337},
+			{"icmp_seq", 1},
+			{"action_taken", "logged"},
 		},
 	)
 
@@ -99,11 +99,11 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 			"icmp_ping_received",
 			sourceIP,
 			"ICMP Listener",
-			map[string]any{
-				"packet_size":  n,
-				"icmp_id":      echo.ID,
-				"icmp_seq":     echo.Seq,
-				"action_taken": "logged",
+			sdk.EventDetails{
+				{"packet_size", n},
+				{"icmp_id", echo.ID},
+				{"icmp_seq", echo.Seq},
+				{"action_taken", "logged"},
 			},
 		)
 	}

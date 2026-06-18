@@ -77,7 +77,11 @@ func (s *SQLiteStore) GetEvents(isArchived int, nodeID string, sensorID string) 
 
 		e.IsRead = isReadInt == 1
 		e.IsArchived = isArchivedInt == 1
-		json.Unmarshal([]byte(detailsStr), &e.Details)
+		if detailsStr != "" {
+			e.Details = json.RawMessage(detailsStr)
+		} else {
+			e.Details = json.RawMessage("{}")
+		}
 		events = append(events, e)
 	}
 

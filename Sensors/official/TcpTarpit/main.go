@@ -35,11 +35,11 @@ func main() {
 		"tcp_connection",
 		"Wizard Firedrill",
 		"Mock Tarpit Port",
-		map[string]any{
-			"test_message": "Wizard triggered a synthetic event firedrill.",
-			"payload":      []string{"SSH-2.0-Firedrill-Test\r\n"},
-			"duration_sec": 5.2,
-			"action_taken": "hold",
+		sdk.EventDetails{
+			{"test_message", "Wizard triggered a synthetic event firedrill."},
+			{"payload", []string{"SSH-2.0-Firedrill-Test\r\n"}},
+			{"duration_sec", 5.2},
+			{"action_taken", "hold"},
 		},
 	)
 
@@ -165,10 +165,10 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 		"tcp_connection",
 		srcIP,
 		fmt.Sprintf("Port %d", port),
-		map[string]any{
-			"duration_sec": duration,
-			"payload":      payload,
-			"action_taken": tarpitMode,
+		sdk.EventDetails{
+			{"duration_sec", duration},
+			{"payload", payload},
+			{"action_taken", tarpitMode},
 		},
 	)
 }

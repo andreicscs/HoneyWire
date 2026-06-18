@@ -251,12 +251,12 @@ func main() {
 		"web_login_attempt",
 		"Wizard Firedrill",
 		"Web Interface",
-		map[string]any{
-			"test_message":       "Wizard triggered a synthetic event firedrill.",
-			"user_agent":         "HoneyWire-Firedrill/1.0",
-			"attempted_username": "admin",
-			"attempted_password": "password123",
-			"action_taken":       "logged",
+		sdk.EventDetails{
+			{"test_message", "Wizard triggered a synthetic event firedrill."},
+			{"user_agent", "HoneyWire-Firedrill/1.0"},
+			{"attempted_username", "admin"},
+			{"attempted_password", "password123"},
+			{"action_taken", "logged"},
 		},
 	)
 
@@ -350,11 +350,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		"web_login_attempt",
 		srcIP,
 		"Web Interface",
-		map[string]any{
-			"user_agent":         userAgent,
-			"attempted_username": username,
-			"attempted_password": password,
-			"action_taken":       "logged",
+		sdk.EventDetails{
+			{"user_agent", userAgent},
+			{"attempted_username", username},
+			{"attempted_password", password},
+			{"action_taken", "logged"},
 		},
 	)
 

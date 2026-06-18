@@ -2,7 +2,6 @@ package event
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -79,10 +78,13 @@ func (s *Service) ProcessEvent(e *models.Event, nodeID string) error {
 		}
 	}
 
-	detailsJSON, _ := json.Marshal(e.Details)
+	detailsStr := "{}"
+	if len(e.Details) > 0 {
+		detailsStr = string(e.Details)
+	}
 	e.NodeID = nodeID
 
-	lastInsertID, err := s.store.InsertEvent(e, nowStr, string(detailsJSON))
+	lastInsertID, err := s.store.InsertEvent(e, nowStr, detailsStr)
 	if err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY") {
 			return fmt.Errorf("sensor_not_registered")
