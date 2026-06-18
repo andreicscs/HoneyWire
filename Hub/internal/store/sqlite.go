@@ -63,7 +63,7 @@ func initializeDefaultConfigTx(tx *sql.Tx) error {
 		"auto_purge_days":   "0",
 		"siem_address":      "",
 		"siem_protocol":     "tcp",
-		// TODO: Add "registry_url": "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages" default
+		"registry_url": "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages",
 	}
 
 	stmt, err := tx.Prepare("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)")

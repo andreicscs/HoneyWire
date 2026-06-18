@@ -1,6 +1,6 @@
 .PHONY: tag-sensors
 
-# Usage: make tag-sensors VERSION=v2.1.0
+# Release all sensors at once by running: make tag-sensors VERSION=v2.1.0
 tag-sensors:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "❌ Error: VERSION is not set. Usage: make tag-sensors VERSION=v2.1.0"; \

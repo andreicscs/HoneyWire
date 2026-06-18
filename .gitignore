@@ -14,8 +14,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # hub binary
-hub
-hub.exe
+/hub
+/Hub/hub
+/hub.exe
+/Hub/hub.exe
 
 # =========================
 # OS & IDE Clutter
