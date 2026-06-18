@@ -50,6 +50,7 @@ type Store interface {
 	UpdateConfigBatch(updates map[string]interface{}) error
 	UpdateConfigValue(key, value string) error
 	FactoryReset() error
+	FactoryResetDryRun() (map[string]int, error)
 }
 
 type SessionManager interface {
@@ -230,6 +231,19 @@ func (s *Service) FactoryReset(password, ip string) error {
 
 	s.sessionManager.ClearAllSessions()
 	return nil
+}
+
+func (s *Service) FactoryResetDryRun(password string) (map[string]int, error) {
+	dbHash, err := s.store.GetConfigValue("admin_hash")
+	if err != nil {
+		return nil, errors.New("database_error")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(dbHash), []byte(password)); err != nil {
+		return nil, errors.New("incorrect_password")
+	}
+
+	return s.store.FactoryResetDryRun()
 }
 
 func (s *Service) GetSystemState() (bool, error) {

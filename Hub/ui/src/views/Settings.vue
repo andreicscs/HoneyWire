@@ -153,13 +153,29 @@ const submitFactoryReset = async () => {
     resetLoading.value = true
     resetError.value = ''
 
-    const result = await appStore.factoryReset(resetPassword.value)
+    // Step 1: Dry run
+    const dryRunResult = await appStore.factoryReset(resetPassword.value, true)
+    
+    if (!dryRunResult.success) {
+        resetLoading.value = false
+        resetError.value = dryRunResult.error || "Dry run failed."
+        return
+    }
 
     resetLoading.value = false
-    if (result.success) {
-        window.location.reload()
-    } else {
-        resetError.value = result.error
+    const stats = dryRunResult.stats
+
+    if (confirm(`Confirm Factory Reset?\n\nThis will permanently delete:\n- ${stats.events} Security Events\n- ${stats.sensor_heartbeats} Sensor Heartbeats\n- ${stats.node_sensors} Deployed Sensors\n- ${stats.nodes} Nodes\n\nThis action cannot be undone.`)) {
+        resetLoading.value = true
+        const result = await appStore.factoryReset(resetPassword.value, false)
+        resetLoading.value = false
+        
+        if (result.success) {
+            alert("Factory reset complete. The database has been wiped.")
+            window.location.reload()
+        } else {
+            resetError.value = result.error || "Reset failed."
+        }
     }
 }
 </script>
@@ -201,11 +217,20 @@ const submitFactoryReset = async () => {
                                 label="Hub Endpoint URL" 
                                 description="The publicly accessible URL or IP where sensors will send their telemetry." 
                             />
+                            
                             <BaseInput 
                                 v-model="settings.registryUrl" 
                                 label="Sensor Registry URL" 
                                 description="The public registry URL from which to download sensor updates." 
                             />
+                            
+                            <div v-if="(settings.hubEndpoint && settings.hubEndpoint.startsWith('http://')) || (settings.registryUrl && settings.registryUrl.startsWith('http://'))" class="flex items-start gap-2 text-danger-text bg-danger-bg p-3 rounded-md border border-danger-border mt-4">
+                                <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <div class="text-sm">
+                                    <p class="font-medium">Unsafe Protocol Detected</p>
+                                    <p class="mt-0.5 opacity-90">Using HTTP allows unencrypted man-in-the-middle attacks. It is highly recommended to use HTTPS for all URLs to protect sensor telemetry and manifests.</p>
+                                </div>
+                            </div>
                         </div>
                         
                     </BaseCard>
@@ -366,9 +391,9 @@ const submitFactoryReset = async () => {
                 <div v-if="resetError" class="text-xs  text-danger-text bg-danger-bg p-2.5 rounded-md border border-danger-border text-center">{{ resetError }}</div>
                 
                 <div class="pt-4 flex justify-end gap-3">
-                    <BaseButton variant="ghost" @click="showResetModal = false">Cancel</BaseButton>
+                    <BaseButton variant="ghost" @click="showResetModal = false; resetPassword = ''; resetError = ''">Cancel</BaseButton>
                     <BaseButton variant="danger" type="submit" :disabled="resetLoading">
-                        {{ resetLoading ? 'Wiping...' : 'Destroy Data' }}
+                        {{ resetLoading ? 'Processing...' : 'Destroy Data' }}
                     </BaseButton>
                 </div>
             </form>

@@ -146,10 +146,18 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  const factoryReset = async (password: string): Promise<{ success: boolean; error?: string }> => {
+  const factoryReset = async (password: string, dryrun: boolean = false): Promise<{ success: boolean; error?: string; stats?: any }> => {
     try {
-      await api.post('/api/v1/system/reset', { password })
-      return { success: true }
+      const url = dryrun ? '/api/v1/system/reset?dryrun=true' : '/api/v1/system/reset'
+      const response = await api.post(url, { password })
+      
+      let stats = undefined
+      if (dryrun) {
+          const data = await response.json()
+          stats = data.stats
+      }
+      
+      return { success: true, stats }
     } catch (err: any) {
       if (err.status === 401) {
         return { success: false, error: 'Incorrect password.' }

@@ -132,6 +132,25 @@ func (h *ConfigHandler) FactoryReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := GetRealIP(r, h.Cfg.TrustProxy)
+	dryrun := r.URL.Query().Get("dryrun") == "true"
+
+	if dryrun {
+		stats, err := h.service.FactoryResetDryRun(req.Password)
+		if err != nil {
+			if err.Error() == "incorrect_password" {
+				RespondError(w, "Incorrect password", http.StatusUnauthorized)
+				return
+			}
+			RespondError(w, "Failed to calculate dry run", http.StatusInternalServerError)
+			return
+		}
+		SendJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "success",
+			"dryrun": true,
+			"stats":  stats,
+		})
+		return
+	}
 
 	if err := h.service.FactoryReset(req.Password, ip); err != nil {
 		if err.Error() == "incorrect_password" {

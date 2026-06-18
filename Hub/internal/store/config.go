@@ -144,3 +144,26 @@ func (s *SQLiteStore) FactoryReset() error {
 
 	return tx.Commit()
 }
+
+// FactoryResetDryRun calculates the number of rows that would be deleted
+func (s *SQLiteStore) FactoryResetDryRun() (map[string]int, error) {
+	stats := make(map[string]int)
+
+	queries := map[string]string{
+		"events":            "SELECT COUNT(*) FROM events",
+		"sensor_heartbeats": "SELECT COUNT(*) FROM sensor_heartbeats",
+		"node_sensors":      "SELECT COUNT(*) FROM node_sensors",
+		"nodes":             "SELECT COUNT(*) FROM nodes",
+	}
+
+	for key, query := range queries {
+		var count int
+		if err := s.DB.QueryRow(query).Scan(&count); err != nil {
+			return nil, err
+		}
+		stats[key] = count
+	}
+
+	return stats, nil
+}
+
