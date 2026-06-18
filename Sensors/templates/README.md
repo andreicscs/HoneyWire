@@ -25,3 +25,7 @@ HoneyWire provides two distinct ways to test your sensor's payload delivery safe
    python3 scripts/mock_hub.py &
    docker run --rm -e HW_HUB_ENDPOINT=http://<LOCAL_IP>:8080 -e HW_HUB_KEY=test_key -e HW_SENSOR_ID=test_sensor -e HW_TEST_MODE=true your-sensor-image:latest
    ```
+
+2. **Testing Against a Real Hub**: Deploy the sensor using `wizard apply`, then run the `wizard firedrill` command to safely verify telemetry transmission to your live Hub.
+
+> **Note**: For an actual trip check, you can manually trigger the specific sensor's tripwire on your own to verify the event appears in the Hub UI.
