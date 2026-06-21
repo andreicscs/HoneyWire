@@ -110,8 +110,17 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 			for _, sensor := range nodes[i].InstalledSensors {
 				latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion) 
 				if err == nil && latest != "" {
-					deployedVer := sensor.DeployedVersion
-					if deployedVer != latest {
+					deployedVer := strings.TrimSpace(sensor.DeployedVersion)
+					if !strings.HasPrefix(deployedVer, "v") && deployedVer != "" {
+						deployedVer = "v" + deployedVer
+					}
+					
+					latestVer := strings.TrimSpace(latest)
+					if !strings.HasPrefix(latestVer, "v") && latestVer != "" {
+						latestVer = "v" + latestVer
+					}
+
+					if deployedVer != "" && semver.Compare(deployedVer, latestVer) < 0 {
 						nodes[i].HasUpdateAvailable = true
 						break
 					}
