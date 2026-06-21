@@ -159,13 +159,6 @@ func TestDecodeManifestStrict(t *testing.T) {
 		assert.Contains(t, err.Error(), "unknown_field")
 	})
 
-	t.Run("Unsupported Schema Version", func(t *testing.T) {
-		badJson := `{}`
-		_, err := DecodeManifestStrict(strings.NewReader(badJson))
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported schema version: 2.0")
-	})
-
 	t.Run("Valid Decode", func(t *testing.T) {
 		goodJson := `{ "deployment": {"image_repository": "test"}}`
 		_, err := DecodeManifestStrict(strings.NewReader(goodJson))

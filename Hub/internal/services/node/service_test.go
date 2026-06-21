@@ -89,7 +89,7 @@ func TestGetNodeDetailsStrictHashMatch(t *testing.T) {
 		InstalledSensors: []models.NodeSensor{
 			{
 				ID:              "hw-sensor-test",
-				DeployedVersion: "", // Empty so it auto-selects the latest
+				DeployedVersion: "v1.0.0", // Older version so it triggers UpdateAvailable
 			},
 		},
 	}

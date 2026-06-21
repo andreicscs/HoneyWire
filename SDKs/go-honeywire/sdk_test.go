@@ -22,16 +22,16 @@ func TestClassify(t *testing.T) {
 		wantTrans    bool
 		wantRetryDur time.Duration
 	}{
-		{Key: "Network Error", Value: errors.New("timeout"), 0, "", true, true, 0},
-		{Key: "Success OK", Value: nil, 200, "", false, false, 0},
-		{Key: "Success Created", Value: nil, 201, "", false, false, 0},
-		{Key: "Bad Request (Terminal)", Value: nil, 400, "", true, false, 0},
-		{Key: "Unauthorized (Terminal)", Value: nil, 401, "", true, false, 0},
-		{Key: "Not Found (Terminal)", Value: nil, 404, "", true, false, 0},
-		{Key: "Rate Limit (Transient)", Value: nil, 429, "10", true, true, 10 * time.Second},
-		{Key: "Malformed Retry-After", Value: nil, 429, "potato", true, true, 0},
-		{Key: "Server Error (Transient)", Value: nil, 500, "", true, true, 0},
-		{Key: "Bad Gateway (Transient)", Value: nil, 502, "30", true, true, 30 * time.Second},
+		{"Network Error", errors.New("timeout"), 0, "", true, true, 0},
+		{"Success OK", nil, 200, "", false, false, 0},
+		{"Success Created", nil, 201, "", false, false, 0},
+		{"Bad Request (Terminal)", nil, 400, "", true, false, 0},
+		{"Unauthorized (Terminal)", nil, 401, "", true, false, 0},
+		{"Not Found (Terminal)", nil, 404, "", true, false, 0},
+		{"Rate Limit (Transient)", nil, 429, "10", true, true, 10 * time.Second},
+		{"Malformed Retry-After", nil, 429, "potato", true, true, 0},
+		{"Server Error (Transient)", nil, 500, "", true, true, 0},
+		{"Bad Gateway (Transient)", nil, 502, "30", true, true, 30 * time.Second},
 	}
 
 	for _, tt := range tests {

@@ -273,10 +273,10 @@ type EventDetails []EventDetail
 
 func (ed EventDetails) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
-	buf.WriteString("{Key: ")
+	buf.WriteString("{")
 	for i, d := range ed {
 		if i > 0 {
-			buf.WriteString(", Value: ")
+			buf.WriteString(",")
 		}
 		key, _ := json.Marshal(d.Key)
 		val, _ := json.Marshal(d.Value)
