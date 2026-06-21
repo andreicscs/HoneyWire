@@ -79,6 +79,7 @@ HoneyWire is split into four independent microservices:
 4. `/wizard`: Setup wizard cli tool to automate operator tasks such as discovery, deployment and testing of HoneyWires.
 
 > **[Check out the full architecture docs](./Docs/architecture/README.md)**
+> **[Read the User Operations Guide](./Docs/operations.md)**
 
 ## 🚀 Quick Start Guide
 
@@ -143,6 +144,8 @@ Navigate to `http://<your-server-ip>:HW_PORT` in your browser. You will be greet
 
 Once your containers are up, the Tarpit sensor should appear as `ONLINE` within 30 seconds.
 Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to test connectivity.
+
+> **Note:** For a deeper dive into managing nodes, updating sensors, and handling rollbacks, see the **[User Operations Guide](./Docs/operations.md)**.
 
 ---
 
