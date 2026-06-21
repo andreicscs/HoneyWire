@@ -50,7 +50,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     AuthCookieName,
 		Value:    token,
-		MaxAge:   2592000,
+		MaxAge:   2592000, // 30 days in seconds
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
 		HttpOnly: true,
 		Secure:   isProd,
 		SameSite: http.SameSiteStrictMode,
