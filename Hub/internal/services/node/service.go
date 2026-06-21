@@ -242,6 +242,9 @@ func (s *Service) evaluateNodeSyncState(nodeID string) {
 }
 
 func GenerateRevisionHash(sensors []models.NodeSensor, catSvc *catalog.Service, currentHubVersion string) string {
+	if len(sensors) == 0 {
+		return ""
+	}
 	type sensorConfig struct {
 		ID      string
 		Version string
