@@ -45,5 +45,11 @@ func Uninstall() error {
 		os.Remove(DeployDir)
 	}
 
+	if execPath, err := os.Executable(); err == nil {
+		if err := os.Remove(execPath); err != nil {
+			fmt.Printf("⚠️  Could not remove HoneyWire binary at %s. You may need to delete it manually.\n", execPath)
+		}
+	}
+
 	return nil
 }
