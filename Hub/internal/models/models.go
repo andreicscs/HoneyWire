@@ -31,7 +31,6 @@ type Event struct {
 	NodeID          string                 `json:"nodeId,omitempty"`
 	SensorID        string                 `json:"sensorId"`
 	Timestamp       string                 `json:"timestamp"`
-	ContractVersion string                 `json:"contractVersion"`
 	EventTrigger    string                 `json:"eventTrigger"`
 	Severity        string                 `json:"severity"`
 	Source          string                 `json:"source"`
@@ -45,8 +44,6 @@ type Event struct {
 // Heartbeat represents a routine ping from a sensor
 type Heartbeat struct {
 	SensorID        string `json:"sensorId"`
-	AgentVersion    string `json:"agentVersion"`
-	ContractVersion string `json:"contractVersion"`
 	ConfigRev       string `json:"configRev"`
 }
 
@@ -88,7 +85,6 @@ type NodeSensor struct {
 type SensorManifest struct {
 	ID               string        `json:"id"`
 	Version          string        `json:"version"`
-	SchemaVersion    string        `json:"schema_version"`
 	Name             string        `json:"name"`
 	Category         string        `json:"category"`
 	OSILayer         string        `json:"osi_layer"`

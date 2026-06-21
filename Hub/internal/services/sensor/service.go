@@ -10,7 +10,7 @@ import (
 
 // Store defines exactly what the Sensor service needs from internal/store
 type Store interface {
-	ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr string) (bool, error)
+	ProcessHeartbeat(nodeID, sensorID, configRev, nowStr string) (bool, error)
 	InsertHeartbeat(nodeID, sensorID, minuteBucket string) error
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
@@ -37,10 +37,10 @@ func NewService(store Store, broadcaster Broadcaster) *Service {
 }
 
 // ProcessHeartbeat handles the core logic of a sensor checking in
-func (s *Service) ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev string) error {
+func (s *Service) ProcessHeartbeat(nodeID, sensorID, configRev string) error {
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 
-	justSynced, err := s.store.ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr)
+	justSynced, err := s.store.ProcessHeartbeat(nodeID, sensorID, configRev, nowStr)
 	if err != nil {
 		log.Printf("[ERROR] Heartbeat DB update failed for node %s: %v", nodeID, err)
 		return err

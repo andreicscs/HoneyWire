@@ -28,8 +28,8 @@ func main() {
 		"Wizard Firedrill",
 		"Mock Custom Target",
 		sdk.EventDetails{
-			{"test_message", "Wizard triggered a synthetic event firedrill."},
-			{"action_taken", "logged"},
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -85,9 +85,9 @@ func runSensor(ctx context.Context, hw *sdk.Sensor) {
 				sourceIP,                  // 2. Source
 				target,                    // 3. Target
 				sdk.EventDetails{ // 4. Details
-					{"attack_type", "example_probe"},
-					{"raw_payload", "GET /etc/passwd HTTP/1.1"},
-					{"action_taken", "logged"},
+					{Key: "attack_type", Value: "example_probe"},
+					{Key: "raw_payload", Value: "GET /etc/passwd HTTP/1.1"},
+					{Key: "action_taken", Value: "logged"},
 				},
 			)
 		}

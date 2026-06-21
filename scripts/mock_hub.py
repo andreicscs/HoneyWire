@@ -30,7 +30,6 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
             if self.path == '/api/v1/event':
                 # 1. Enforce the updated V1.0 Contract
                 required_keys = [
-                    "contractVersion", "sensorId", "severity", 
                     "eventTrigger", "source", "target", "details"
                 ]
                 

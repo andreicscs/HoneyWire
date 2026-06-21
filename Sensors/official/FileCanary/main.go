@@ -168,9 +168,9 @@ func reportFileEvent(
 		"Local OS",
 		filepath.Base(path),
 		sdk.EventDetails{
-			{"category", category},
-			{"action", action},
-			{"path", path},
+			{Key: "category", Value: category},
+			{Key: "action", Value: action},
+			{Key: "path", Value: path},
 		},
 	)
 
@@ -196,10 +196,10 @@ func main() {
 		"Wizard Firedrill",
 		"Mock Canary File",
 		sdk.EventDetails{
-			{"test_message", "Wizard triggered a synthetic event firedrill."},
-			{"category", "tamper"},
-			{"action", "Decoy file modified"},
-			{"path", "/canaries/mock_passwords.txt"},
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "category", Value: "tamper"},
+			{Key: "action", Value: "Decoy file modified"},
+			{Key: "path", Value: "/canaries/mock_passwords.txt"},
 		},
 	)
 

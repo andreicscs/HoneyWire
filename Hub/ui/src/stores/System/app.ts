@@ -31,7 +31,7 @@ export const useAppStore = defineStore('app', () => {
   // SINGLE STATE TREE
   const state = ref<AppState>({
     isArmed: true,
-    version: '1.0.0',
+    version: '2.0.0',
     viewingArchive: false,
     sidebarOpen: true,
     activeTimeframe: '24H',

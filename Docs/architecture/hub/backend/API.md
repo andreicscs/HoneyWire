@@ -552,8 +552,6 @@ Reports a sensor heartbeat and updates its versioning state.
 ```json
 {
   "sensorId": "alpha-node-01",
-  "agentVersion": "1.0.0",
-  "contractVersion": "1.0",
   "configRev": "rev_abc123"
 }
 ```

@@ -9,15 +9,15 @@ import (
 )
 
 func (s *SQLiteStore) InsertEvent(e *models.Event, nowStr string, detailsStr string) (int, error) {
-	result, err := s.DB.Exec(`
-		INSERT INTO events (node_id, sensor_id, timestamp, contract_version, event_trigger, severity, source, target, details, is_read, is_archived)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		e.NodeID, e.SensorID, nowStr, e.ContractVersion, e.EventTrigger, e.Severity, e.Source, e.Target, detailsStr,
-	)
+	res, err := s.DB.Exec(`
+		INSERT INTO events (node_id, sensor_id, timestamp, event_trigger, severity, source, target, details, is_read, is_archived)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		e.NodeID, e.SensorID, nowStr, e.EventTrigger, e.Severity, e.Source, e.Target, detailsStr,
+		0, 0)
 	if err != nil {
 		return 0, err
 	}
-	lastInsertID, err := result.LastInsertId()
+	lastInsertID, err := res.LastInsertId()
 	if err != nil {
 		return 0, err
 	}
@@ -41,7 +41,7 @@ func (s *SQLiteStore) IsSensorSilenced(nodeID, sensorID string) (bool, error) {
 }
 
 func (s *SQLiteStore) GetEvents(isArchived int, nodeID string, sensorID string) ([]models.Event, error) {
-	query := "SELECT id, timestamp, contract_version, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
+	query := "SELECT id, timestamp, sensor_id, node_id, event_trigger, severity, source, target, details, is_read, is_archived FROM events WHERE is_archived = ?"
 	args := []interface{}{isArchived}
 
 	if nodeID != "" {
@@ -68,9 +68,9 @@ func (s *SQLiteStore) GetEvents(isArchived int, nodeID string, sensorID string) 
 		var isReadInt, isArchivedInt int
 
 		if err := rows.Scan(
-			&e.ID, &e.Timestamp, &e.ContractVersion, &e.SensorID, &e.NodeID,
-			&e.EventTrigger, &e.Severity, &e.Source, &e.Target,
-			&detailsStr, &isReadInt, &isArchivedInt,
+			&e.ID, &e.Timestamp, &e.SensorID, &e.NodeID,
+			&e.EventTrigger, &e.Severity, &e.Source, &e.Target, &detailsStr,
+			&isReadInt, &isArchivedInt,
 		); err != nil {
 			return nil, err
 		}

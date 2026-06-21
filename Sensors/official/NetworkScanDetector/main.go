@@ -43,11 +43,11 @@ func main() {
 		"Wizard Firedrill",
 		"Multiple Ports",
 		sdk.EventDetails{
-			{"test_message", "Wizard triggered a synthetic event firedrill."},
-			{"ports_hit", []uint16{22, 80, 443, 3306, 8080}},
-			{"count", 5},
-			{"window_sec", 5.0},
-			{"action_taken", "logged"},
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "ports_hit", Value: []uint16{22, 80, 443, 3306, 8080}},
+			{Key: "count", Value: 5},
+			{Key: "window_sec", Value: 5.0},
+			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -150,10 +150,10 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 				srcIP,
 				"Multiple Ports",
 				sdk.EventDetails{
-					{"ports_hit", uniquePortsList},
-					{"count", len(uniquePortsList)},
-					{"window_sec", window.Seconds()},
-					{"action_taken", "logged"},
+					{Key: "ports_hit", Value: uniquePortsList},
+					{Key: "count", Value: len(uniquePortsList)},
+					{Key: "window_sec", Value: window.Seconds()},
+					{Key: "action_taken", Value: "logged"},
 				},
 			)
 			state.history = nil

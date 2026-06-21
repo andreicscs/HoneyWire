@@ -24,11 +24,11 @@ func main() {
 		"Wizard Firedrill",
 		"ICMP Listener",
 		sdk.EventDetails{
-			{"test_message", "Wizard triggered a synthetic event firedrill."},
-			{"packet_size", 64},
-			{"icmp_id", 1337},
-			{"icmp_seq", 1},
-			{"action_taken", "logged"},
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "packet_size", Value: 64},
+			{Key: "icmp_id", Value: 1337},
+			{Key: "icmp_seq", Value: 1},
+			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -100,10 +100,10 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 			sourceIP,
 			"ICMP Listener",
 			sdk.EventDetails{
-				{"packet_size", n},
-				{"icmp_id", echo.ID},
-				{"icmp_seq", echo.Seq},
-				{"action_taken", "logged"},
+				{Key: "packet_size", Value: n},
+				{Key: "icmp_id", Value: echo.ID},
+				{Key: "icmp_seq", Value: echo.Seq},
+				{Key: "action_taken", Value: "logged"},
 			},
 		)
 	}

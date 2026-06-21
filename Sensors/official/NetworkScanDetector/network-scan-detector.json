@@ -1,7 +1,6 @@
 {
   "id": "hw-sensor-network-scan-detector",
   "version": "2.0.0",
-  "schema_version": "1.0",
   "name": "Network Scan Detector",
   "category": "network",
   "osi_layer": "Network Layer",

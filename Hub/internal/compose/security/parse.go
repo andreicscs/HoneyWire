@@ -16,9 +16,7 @@ func DecodeManifestStrict(r io.Reader) (models.SensorManifest, error) {
 		return manifest, fmt.Errorf("strict decode failed: %w", err)
 	}
 
-	if manifest.SchemaVersion != "1.0" {
-		return manifest, fmt.Errorf("unsupported schema version: %s", manifest.SchemaVersion)
-	}
+
 
 	return manifest, nil
 }

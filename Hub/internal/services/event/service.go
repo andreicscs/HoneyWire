@@ -44,26 +44,19 @@ type Service struct {
 	broadcaster   Broadcaster
 	siemService   SiemService
 	notifyService NotifyService
-	hubVersion    string
 }
 
-func NewService(store Store, broadcaster Broadcaster, siemService SiemService, notifyService NotifyService, hubVersion string) *Service {
+func NewService(store Store, broadcaster Broadcaster, siemService SiemService, notifyService NotifyService) *Service {
 	return &Service{
 		store:         store,
 		broadcaster:   broadcaster,
 		siemService:   siemService,
 		notifyService: notifyService,
-		hubVersion:    hubVersion,
 	}
 }
 
 // ProcessEvent handles incoming events from sensors, pushes them to the SIEM, and triggers notifications.
 func (s *Service) ProcessEvent(e *models.Event, nodeID string) error {
-	hubMajor := strings.Split(s.hubVersion, ".")[0]
-	agentMajor := strings.Split(e.ContractVersion, ".")[0]
-	if agentMajor == "" || hubMajor != agentMajor {
-		return fmt.Errorf("upgrade required")
-	}
 
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 

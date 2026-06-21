@@ -3,7 +3,6 @@ package schema
 type SensorManifest struct {
 	ID               string        `json:"id"`
 	Version          string        `json:"version"`
-	SchemaVersion    string        `json:"schema_version"`
 	Name             string        `json:"name"`
 	Category         string        `json:"category"`
 	OSILayer         string        `json:"osi_layer"`

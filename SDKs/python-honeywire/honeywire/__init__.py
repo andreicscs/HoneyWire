@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from dataclasses import dataclass
 
-SDK_DEFAULT_AGENT_VERSION = "1.0.0"
+
 
 # ============================================================================
 # 1. SHARED CLASSIFIER (Pure Truth Layer)
@@ -109,7 +109,6 @@ class HoneyWireSensor(ABC):
         self.sensor_id = os.getenv("HW_SENSOR_ID")
         self.config_rev = os.getenv("HW_CONFIG_REV", "")
         self.test_mode = os.getenv("HW_TEST_MODE", "false").lower() == "true"
-        self.agent_version = os.getenv("HONEYWIRE_VERSION", SDK_DEFAULT_AGENT_VERSION)
         
         self.severity = os.getenv("HW_SEVERITY", "medium") 
 
@@ -122,7 +121,6 @@ class HoneyWireSensor(ABC):
             "Content-Type": "application/json"
         })
 
-        self._hub_contract_version = "unknown"
         self._stop_event = threading.Event()
         self._event_queue = queue.Queue(maxsize=1000)
         
@@ -151,8 +149,6 @@ class HoneyWireSensor(ABC):
         self.test_details = details
 
     async def start(self):
-        self._sync_hub_version()
-        
         threading.Thread(target=self._event_loop, daemon=True).start()
         threading.Thread(target=self._heartbeat_loop, daemon=True).start()
         
@@ -186,13 +182,6 @@ class HoneyWireSensor(ABC):
     def run_test_mode(self) -> bool:
         print("[*] Test mode: sending synthetic payload...")
 
-        # 1. Establish handshake to fetch the contract version
-        try:
-            self._sync_hub_version()
-        except Exception as e:
-            print(f"[-] Test mode sync failed: {e}")
-            return False
-
         # 2. Synchronously send the payload to guarantee delivery before the program exits
         normalized_severity = self._normalize_severity(self.severity)
         
@@ -208,7 +197,6 @@ class HoneyWireSensor(ABC):
             details = self.test_details
 
         payload = {
-            "contractVersion": self._hub_contract_version,
             "sensorId": self.sensor_id,
             "severity": normalized_severity,
             "eventTrigger": trigger,
@@ -238,7 +226,6 @@ class HoneyWireSensor(ABC):
         normalized_severity = self._normalize_severity(self.severity)
         
         payload = {
-            "contractVersion": self._hub_contract_version,
             "sensorId": self.sensor_id,
             "severity": normalized_severity,
             "eventTrigger": event_trigger,
@@ -317,8 +304,6 @@ class HoneyWireSensor(ABC):
 
             payload = {
                 "sensorId": self.sensor_id,
-                "agentVersion": self.agent_version,
-                "contractVersion": self._hub_contract_version,
                 "configRev": self.config_rev
             }
 
@@ -337,39 +322,6 @@ class HoneyWireSensor(ABC):
     # ==========================================
     # UTILITIES
     # ==========================================
-
-    def _sync_hub_version(self) -> None:
-        for i in range(3):
-            resp, exc = None, None
-            try:
-                resp = self.client.get(f"{self.hub_endpoint}/api/v1/version", timeout=5)
-            except Exception as e:
-                exc = e
-
-            fact = classify(exc, resp)
-
-            if not fact.is_error:
-                try:
-                    data = resp.json()
-                    self._hub_contract_version = data.get("version", "unknown")
-                    
-                    hub_major = str(self._hub_contract_version).split('.')[0]
-                    agent_major = str(self.agent_version).split('.')[0]
-                    if hub_major != agent_major and hub_major != "unknown":
-                        raise RuntimeError(f"Version mismatch. Hub (v{self._hub_contract_version}) vs Agent (v{self.agent_version})")
-                    
-                    return
-                except Exception as e:
-                    print(f"[!] Sync decode failed: {e}")
-                    fact.is_transient = True 
-
-            if not fact.is_transient:
-                raise ConnectionError(f"Fatal synchronization failure (HTTP {fact.status_code})")
-
-            wait = PolicyEngine.calculate_backoff(i)
-            time.sleep(wait) # Safe blocking sleep during startup
-
-        raise ConnectionError("Failed to synchronize with Hub after backoff limits.")
 
     def go_offline(self, reason: str):
         payload = {

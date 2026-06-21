@@ -13,7 +13,6 @@ This is the standard telemetry payload that all sensors (official or community) 
 
 ```json
 {
-  "contractVersion": "1.0",
   "sensorId": "core-dpi-engine",
   "eventTrigger": "malformed_jwt_detected",
   "severity": "critical",
@@ -31,7 +30,6 @@ This is the standard telemetry payload that all sensors (official or community) 
 ```
 
 ### Field Definitions
-- `contractVersion` (string, required): Must match the Hub's supported major version.
 - `sensorId` (string, required): The unique identifier of the sensor emitting the event.
 - `eventTrigger` (string, required): A brief, machine-readable reason for the event.
 - `severity` (string, required): Must be one of `info`, `low`, `medium`, `high`, `critical`.
@@ -51,16 +49,12 @@ This payload is emitted continuously (typically every 30 seconds) by sensors to 
 ```json
 {
   "sensorId": "alpha-node-01",
-  "agentVersion": "1.0.0",
-  "contractVersion": "1.0",
   "configRev": "rev_abc123"
 }
 ```
 
 ### Field Definitions
 - `sensorId` (string, required): The unique identifier of the sensor.
-- `agentVersion` (string, required): The version of the language SDK or agent.
-- `contractVersion` (string, required): The API contract version in use.
 - `configRev` (string, required): The current configuration revision the sensor is running. Used by the Hub to determine if the node has synchronized its desired state.
 
 ---
@@ -73,7 +67,6 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
 {
   "id": "hw-tcp-tarpit",
   "version": "1.1.0",
-  "schema_version": "1.0",
   "name": "TCP Tarpit",
   "category": "network",
   "osi_layer": "L4",

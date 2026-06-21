@@ -19,7 +19,7 @@ type HeartbeatData struct {
 }
 
 // ProcessHeartbeat safely handles node updates and config reconciliation
-func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentVersion, contractVersion, configRev, nowStr string) (bool, error) {
+func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, configRev, nowStr string) (bool, error) {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return false, err
@@ -32,11 +32,12 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, agentVersion, contractV
 	}
 
 	// Update the specific Sensor's heartbeat AND metadata
-	if _, err := tx.Exec(`
+	query := `
 		UPDATE node_sensors 
-		SET agent_version = ?, contract_version = ?, config_rev = ?, last_heartbeat = ?, updated_at = ? 
-		WHERE node_id = ? AND sensor_id = ?`,
-		agentVersion, contractVersion, configRev, nowStr, nowStr, nodeID, sensorID); err != nil {
+		SET config_rev = ?, last_heartbeat = ?, updated_at = ? 
+		WHERE node_id = ? AND sensor_id = ?
+	`
+	if _, err := tx.Exec(query, configRev, nowStr, nowStr, nodeID, sensorID); err != nil {
 		return false, err
 	}
 

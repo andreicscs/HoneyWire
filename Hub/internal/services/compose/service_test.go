@@ -89,7 +89,6 @@ func TestComposeSmartVersionSelection(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":             "hw-sensor-test",
 			"version":        version,
-			"schema_version": "1.0",
 			"deployment": map[string]interface{}{
 				"image_repository": "test",
 				"image_tag":        version,

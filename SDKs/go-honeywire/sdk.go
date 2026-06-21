@@ -131,15 +131,13 @@ func (s *Sensor) calculateBackoff(attempt int) time.Duration {
 // ============================================================================
 
 type Sensor struct {
-	SensorID           string
-	Severity           string
-	AgentVersion       string
-	hubContractVersion string
-	HubEndpoint        string
-	HubKey             string
-	ConfigRev          string
-	TestMode           bool
-	client             *http.Client
+	SensorID    string
+	Severity    string
+	HubEndpoint string
+	HubKey      string
+	ConfigRev   string
+	TestMode    bool
+	client      *http.Client
 
 	eventCh     chan map[string]any
 	stopCh      chan struct{}
@@ -153,16 +151,15 @@ type Sensor struct {
 
 func NewSensor() (*Sensor, error) {
 	s := &Sensor{
-		SensorID:     getEnv("HW_SENSOR_ID", ""),
-		Severity:     getEnv("HW_SEVERITY", "medium"),
-		AgentVersion: "1.0.0",
-		HubEndpoint:  getEnv("HW_HUB_ENDPOINT", ""),
-		HubKey:       getEnv("HW_HUB_KEY", ""),
-		ConfigRev:    getEnv("HW_CONFIG_REV", ""),
-		TestMode:     getEnv("HW_TEST_MODE", "false") == "true",
-		client:       &http.Client{Timeout: 10 * time.Second},
-		eventCh:      make(chan map[string]any, 1000),
-		stopCh:       make(chan struct{}),
+		SensorID:    getEnv("HW_SENSOR_ID", ""),
+		Severity:    getEnv("HW_SEVERITY", "medium"),
+		HubEndpoint: getEnv("HW_HUB_ENDPOINT", ""),
+		HubKey:      getEnv("HW_HUB_KEY", ""),
+		ConfigRev:   getEnv("HW_CONFIG_REV", ""),
+		TestMode:    getEnv("HW_TEST_MODE", "false") == "true",
+		client:      &http.Client{Timeout: 10 * time.Second},
+		eventCh:     make(chan map[string]any, 1000),
+		stopCh:      make(chan struct{}),
 		// codeql[go/insecure-randomness] Non-cryptographic use case.
 		// nosemgrep: go.lang.security.audit.crypto.math_random.math-random-used
 		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -190,9 +187,6 @@ func (s *Sensor) SetTestPayload(trigger, source, target string, details EventDet
 }
 
 func (s *Sensor) Start() error {
-	if err := s.syncHubVersion(); err != nil {
-		return err
-	}
 	go s.eventLoop()
 	go s.heartbeatLoop()
 	go s.listenForSignals()
@@ -214,7 +208,7 @@ func (s *Sensor) listenForSignals() {
 			trigger := "test_mode_synthetic_alert"
 			source := "Wizard Live Test"
 			target := "Mock Hub"
-			details := EventDetails{{"test_message", "Wizard triggered a live test event firedrill."}}
+			details := EventDetails{{Key: "test_message", Value: "Wizard triggered a live test event firedrill."}}
 
 			if s.testTrigger != "" {
 				trigger = s.testTrigger
@@ -232,16 +226,10 @@ func (s *Sensor) listenForSignals() {
 func (s *Sensor) RunTestMode() bool {
 	log.Println("[*] Test mode: sending synthetic payload...")
 
-	// 1. Establish handshake to fetch the contract version
-	if err := s.syncHubVersion(); err != nil {
-		log.Printf("[-] Test mode sync failed: %v", err)
-		return false
-	}
-
 	trigger := "test_mode_synthetic_alert"
 	source := "CI/CD Runner"
 	target := "Mock Hub"
-	details := EventDetails{{"test_message", "Automated CI/CD check."}}
+	details := EventDetails{{Key: "test_message", Value: "Automated CI/CD check."}}
 
 	if s.testTrigger != "" {
 		trigger = s.testTrigger
@@ -252,7 +240,6 @@ func (s *Sensor) RunTestMode() bool {
 
 	// 2. Synchronously send the payload to guarantee delivery before the program exits
 	payload := map[string]any{
-		"contractVersion": s.hubContractVersion,
 		"sensorId":        s.SensorID,
 		"severity":        s.Severity,
 		"eventTrigger":    trigger,
@@ -286,10 +273,10 @@ type EventDetails []EventDetail
 
 func (ed EventDetails) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
-	buf.WriteString("{")
+	buf.WriteString("{Key: ")
 	for i, d := range ed {
 		if i > 0 {
-			buf.WriteString(",")
+			buf.WriteString(", Value: ")
 		}
 		key, _ := json.Marshal(d.Key)
 		val, _ := json.Marshal(d.Value)
@@ -303,7 +290,6 @@ func (ed EventDetails) MarshalJSON() ([]byte, error) {
 
 func (s *Sensor) ReportEvent(trigger, source, target string, details EventDetails) bool {
 	payload := map[string]any{
-		"contractVersion": s.hubContractVersion,
 		"sensorId":        s.SensorID,
 		"severity":        s.Severity,
 		"eventTrigger":    trigger,
@@ -417,8 +403,6 @@ func (s *Sensor) heartbeatLoop() {
 func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 	payload := map[string]any{
 		"sensorId":        s.SensorID,
-		"agentVersion":    s.AgentVersion,
-		"contractVersion": s.hubContractVersion,
 		"configRev":       s.ConfigRev,
 	}
 	return s.postToHub("/api/v1/heartbeat", payload)
@@ -428,42 +412,7 @@ func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 // UTILITIES
 // ==========================================
 
-func (s *Sensor) syncHubVersion() error {
-	if s.hubContractVersion != "" {
-		return nil // Short-circuit if already synced
-	}
 
-	for i := 0; i < 3; i++ {
-		req, err := http.NewRequest("GET", s.HubEndpoint+"/api/v1/version", nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+s.HubKey)
-
-		resp, err := s.client.Do(req)
-		fact := classify(err, resp)
-
-		if !fact.IsError {
-			var result map[string]string
-			decodeErr := json.NewDecoder(resp.Body).Decode(&result)
-			resp.Body.Close()
-
-			if decodeErr == nil {
-				s.hubContractVersion = result["version"]
-				return nil
-			}
-		} else if resp != nil {
-			resp.Body.Close()
-		}
-
-		if !fact.IsTransient {
-			return fmt.Errorf("fatal synchronization failure (HTTP %d)", fact.StatusCode)
-		}
-
-		time.Sleep(s.calculateBackoff(i))
-	}
-	return fmt.Errorf("failed to sync with Hub after backoff limits")
-}
 
 func (s *Sensor) GoOffline(reason string) {
 	fastClient := &http.Client{Timeout: 2 * time.Second}

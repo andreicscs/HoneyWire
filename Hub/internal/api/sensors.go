@@ -39,7 +39,7 @@ func (h *SensorHandler) ReceiveHeartbeat(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Hand off to the Service layer
-	if err := h.service.ProcessHeartbeat(nodeID, hb.SensorID, hb.AgentVersion, hb.ContractVersion, hb.ConfigRev); err != nil {
+	if err := h.service.ProcessHeartbeat(nodeID, hb.SensorID, hb.ConfigRev); err != nil {
 		if errors.Is(err, sensor.ErrSensorNotRegistered) {
 			RespondError(w, "Sensor not registered on this node", http.StatusNotFound)
 			return

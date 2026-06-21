@@ -1,7 +1,6 @@
 {
   "id": "hw-sensor-python-template",
   "version": "2.0.0",
-  "schema_version": "1.0",
   "name": "Custom Python Sensor",
   "category": "custom",
   "osi_layer": "Application Layer",

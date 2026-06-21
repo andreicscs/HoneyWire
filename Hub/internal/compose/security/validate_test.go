@@ -44,7 +44,6 @@ func TestValidateMountPath(t *testing.T) {
 func TestValidateManifest(t *testing.T) {
 	baseManifest := func() models.SensorManifest {
 		return models.SensorManifest{
-			SchemaVersion: "1.0",
 			Deployment: models.Deployment{
 				ImageRepository: "safe-image:latest",
 			},
@@ -154,21 +153,21 @@ func TestValidateManifest(t *testing.T) {
 
 func TestDecodeManifestStrict(t *testing.T) {
 	t.Run("Disallow Unknown Fields", func(t *testing.T) {
-		badJson := `{"schema_version": "1.0", "deployment": {}, "unknown_field": "should_fail"}`
+		badJson := `{ "deployment": {}, "unknown_field": "should_fail"}`
 		_, err := DecodeManifestStrict(strings.NewReader(badJson))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown_field")
 	})
 
 	t.Run("Unsupported Schema Version", func(t *testing.T) {
-		badJson := `{"schema_version": "2.0"}`
+		badJson := `{}`
 		_, err := DecodeManifestStrict(strings.NewReader(badJson))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported schema version: 2.0")
 	})
 
 	t.Run("Valid Decode", func(t *testing.T) {
-		goodJson := `{"schema_version": "1.0", "deployment": {"image_repository": "test"}}`
+		goodJson := `{ "deployment": {"image_repository": "test"}}`
 		_, err := DecodeManifestStrict(strings.NewReader(goodJson))
 		assert.NoError(t, err)
 	})
