@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/mod/semver"
 )
@@ -55,7 +56,8 @@ func (s *Service) RefreshIndex() error {
 	indexURL := strings.TrimRight(registryURL, "/") + "/index.json"
 	var idx RegistryIndex
 	
-	resp, err := http.Get(indexURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(indexURL)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to fetch registry index")
 	}

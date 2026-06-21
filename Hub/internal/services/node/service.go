@@ -8,6 +8,9 @@ import (
 	"log"
 	"sort"
 	"fmt"
+	"strings"
+
+	"golang.org/x/mod/semver"
 
 	"github.com/honeywire/hub/internal/catalog"
 	"github.com/honeywire/hub/internal/models"
@@ -131,8 +134,17 @@ func (s *Service) GetNodeDetails(nodeID string) (*models.Node, error) {
 		for i, sensor := range node.InstalledSensors {
 			latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion)
 			if err == nil && latest != "" {
-				deployedVer := sensor.DeployedVersion
-				if deployedVer != latest {
+				deployedVer := strings.TrimSpace(sensor.DeployedVersion)
+				if !strings.HasPrefix(deployedVer, "v") && deployedVer != "" {
+					deployedVer = "v" + deployedVer
+				}
+				
+				latestVer := strings.TrimSpace(latest)
+				if !strings.HasPrefix(latestVer, "v") && latestVer != "" {
+					latestVer = "v" + latestVer
+				}
+
+				if deployedVer != "" && semver.Compare(deployedVer, latestVer) < 0 {
 					node.InstalledSensors[i].UpdateAvailable = true
 					node.HasUpdateAvailable = true
 				}

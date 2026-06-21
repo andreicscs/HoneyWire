@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/mod/semver"
 
@@ -103,7 +104,8 @@ func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]model
 		sensorName := strings.TrimPrefix(sensor.ID, "hw-sensor-")
 		manifestURL := fmt.Sprintf("%s/%s-v%s.json", strings.TrimRight(registryURL, "/"), sensorName, targetVersion)
 
-		mResp, fetchErr := http.Get(manifestURL)
+		client := &http.Client{Timeout: 10 * time.Second}
+		mResp, fetchErr := client.Get(manifestURL)
 		if fetchErr != nil {
 			log.Printf("[WARNING] Failed to fetch %s: %v", manifestURL, fetchErr)
 			continue
@@ -151,7 +153,8 @@ func (s *Service) FetchSpecificManifest(sensorID, targetVersion string) (*models
 		return &cached, nil
 	}
 
-	mResp, fetchErr := http.Get(manifestURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+	mResp, fetchErr := client.Get(manifestURL)
 	if fetchErr != nil {
 		log.Printf("[ERROR] FetchSpecificManifest network error: %v", fetchErr)
 		return nil, fetchErr
