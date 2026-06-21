@@ -36,7 +36,7 @@ const showManualSync = ref(false)
                                 <svg class="w-4 h-4 text-text-m transition-transform duration-normal" :class="showManualSync ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             </button>
                             <div v-show="showManualSync" class="mt-4 space-y-4">
-                                <p class="text-sm text-danger-main">Docker Compose v5.0.0+ is strictly required.</p>
+                                <p class="text-sm text-danger-main">Docker Compose v5.0.0+ and Rootful Docker are strictly required.</p>
                                 <p class="text-sm text-text-m">Save the following configuration to <code class="px-1.5 py-0.5 bg-bg-inset border border-border-default rounded text-xs font-mono">/opt/honeywire/sensors/honeywire-compose.yml</code>.</p>
                                 <div class="relative bg-bg-surface border border-border-default rounded-lg p-4 text-sm text-text-h overflow-auto max-h-[30vh] custom-scroll">
                                     <button @click="handleCopy('sync-yaml', syncComposeYaml)" class="absolute top-3 right-3 px-3 py-1.5 rounded-md text-sm font-medium font-sans transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 z-10 focus:outline-none border" :class="copiedStates['sync-yaml'] ? 'bg-success-bg text-success-text border-success-border' : 'bg-secondary-main text-text-h border-secondary-border hover:bg-secondary-hover'">{{ copiedStates['sync-yaml'] ? 'Copied!' : 'Copy' }}</button>
@@ -50,7 +50,7 @@ const showManualSync = ref(false)
                             </div>
                         </div>
                     </div>
-                    <div class="px-6 py-4 border-t border-border-default bg-bg-surface flex justify-end shrink-0"><BaseButton variant="secondary" @click="$emit('close')">Done</BaseButton></div>
+                    <div class="px-6 py-4 border-t border-border-default bg-bg-surface flex justify-end shrink-0"><BaseButton variant="primary" @click="$emit('close')">Done</BaseButton></div>
                 </div>
             </div>
         </transition>
