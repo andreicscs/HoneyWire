@@ -58,8 +58,14 @@ dist/
 # =========================
 # Go & Builds
 # =========================
+# Logs
+*.log
+*.log.*
+
+# Build artifacts
 build/
 wizard/build/
+Hub/cmd/hub/hub
 *.exe
 *.test
 
