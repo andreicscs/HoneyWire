@@ -172,7 +172,6 @@ const submitFactoryReset = async () => {
         resetLoading.value = false
         
         if (result.success) {
-            alert("Factory reset complete. The database has been wiped.")
             window.location.reload()
         } else {
             resetError.value = result.error || "Reset failed."
