@@ -25,7 +25,7 @@ To maintain a stable, secure, and cohesive platform, all contributions to HoneyW
 
 HoneyWire relies on strict JSON contracts to communicate across distributed components. Any changes to API payloads must be backward compatible.
 
-*   Before modifying telemetry shapes, review the Data Contracts.
+*   Before modifying telemetry shapes, review the [Data Contracts](../architecture/dataContracts.md).
 *   Sensors and the Hub must agree on the standard. If you introduce a new field to an event, ensure the frontend can render it without crashing if the field is missing from older events.
 
 ## 3. Testing Requirements
@@ -34,7 +34,7 @@ All submissions must pass automated CI checks.
 
 *   **Unit Tests:** New business logic in the Go backend (`internal/services/`) requires accompanying `_test.go` files.
 *   **Test Mode Compliance:** If you submit a new sensor, it must support `HW_TEST_MODE=true`. When this flag is passed, the container must immediately fire a synthetic alert to the Hub and exit with code 0.
-*   **Security Scanning:** Your PR must pass automated CodeQL (static analysis) and Trivy (container vulnerability) scans. 
+*   **Security Scanning:** Your PR must pass automated CodeQL (or Semgrep) static analysis and Trivy container vulnerability scans. 
 
 ## 4. Pull Request Expectations
 
@@ -50,4 +50,4 @@ All submissions must pass automated CI checks.
 
 If you discover a vulnerability in HoneyWire, **do not open a public issue or PR.** 
 
-Please use GitHub Private Vulnerability Reporting via the Security tab on the repository, as outlined in `SECURITY.md`.
+Please use GitHub Private Vulnerability Reporting via the Security tab on the repository, as outlined in [SECURITY.md](../../SECURITY.md).

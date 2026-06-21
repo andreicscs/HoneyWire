@@ -2,7 +2,7 @@
 
 The Wizard is HoneyWire's ephemeral, host-side orchestration engine. This guide covers how to navigate its architecture to add new commands, modify discovery logic, or debug deployment behavior.
 
-For a conceptual overview of how the Wizard operates, see `Docs/architecture/wizard/overview.md`.
+For a conceptual overview of how the Wizard operates, see [`Docs/architecture/wizard/overview.md`](../architecture/wizard/overview.md).
 
 ---
 

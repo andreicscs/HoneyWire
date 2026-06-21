@@ -2,7 +2,7 @@
 
 This guide covers how to set up HoneyWire for local development. 
 
-For advanced CI/CD simulation (e.g., local Gitea and private Docker registries), see `maintainer-workflow.md`.
+For advanced CI/CD simulation (e.g., local Gitea and private Docker registries), see [maintainer-workflow.md](./maintainer-workflow.md).
 
 ## Prerequisites
 
@@ -75,4 +75,4 @@ If you are building a sensor and only want to test its telemetry output without 
      your-sensor-image:latest
    ```
 
-If successful, the Mock Hub will print `[EVENT] OK` to the console, proving your sensor's JSON payload adheres to the required data contracts.
+If successful, the Mock Hub will print `[EVENT] OK` to the console, proving your sensor's JSON payload adheres to the required [Data Contracts](../architecture/dataContracts.md).

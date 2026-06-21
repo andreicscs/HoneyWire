@@ -1,11 +1,17 @@
-# HoneyWire Go Sensor Template
+# HoneyWire Sensor Templates
 
-Welcome to the HoneyWire ecosystem! This template provides the boilerplate to build a custom, Dockerized Go security sensor.
+Welcome to the HoneyWire ecosystem! This directory provides the boilerplate to build custom, Dockerized security sensors that natively report to the HoneyWire Hub.
+
+We provide templates for the two primary supported languages:
+* **`go-sensor`**
+* **`python-sensor`**
 
 ## How to Build Your Sensor
 
-1. **Copy this folder** and rename it to your sensor's name (e.g., `ssh-watcher`).
-2. **Write your logic** inside `main.go`. It comes pre-wired with the `sdk-go` event loop.
+1. **Copy a template folder** (either `go-sensor` or `python-sensor`) and rename it to your sensor's name (e.g., `ssh-watcher`).
+2. **Write your logic** in the main application file:
+   * **Go Template:** Inside `main.go`. It comes pre-wired with the `sdk-go` event loop.
+   * **Python Template:** Inside `sensor.py`. Add any extra Python libraries you need to `requirements.txt`.
 3. **Update `manifest.json`**: Add any custom `HW_` variables your sensor needs to the `env_vars` array so the Hub can dynamically configure them.
 
 ## Deployment
@@ -13,7 +19,7 @@ Welcome to the HoneyWire ecosystem! This template provides the boilerplate to bu
 In the HoneyWire architecture, sensors are driven by the Hub and Wizard via `manifest.json`. 
 
 1. Define your sensor in `manifest.json`.
-2. Build and push your image to a registry.
+2. Build and push your Docker image to a registry.
 3. Sync the manifest to your Hub, and deploy it securely using `wizard apply`.
 
 ## Testing Your Sensor
@@ -22,6 +28,7 @@ HoneyWire provides two distinct ways to test your sensor's payload delivery safe
 
 1. **Local Boot-Time Testing (CI/CD)**: Use the internal Mock Hub to validate your payload format without booting the full server environment.
    ```bash
+   # Note: The mock hub script itself requires Python 3 to run, regardless of your sensor's language.
    python3 scripts/mock_hub.py &
    docker run --rm -e HW_HUB_ENDPOINT=http://<LOCAL_IP>:8080 -e HW_HUB_KEY=test_key -e HW_SENSOR_ID=test_sensor -e HW_TEST_MODE=true your-sensor-image:latest
    ```

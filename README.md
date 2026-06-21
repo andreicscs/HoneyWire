@@ -31,13 +31,14 @@
 - [Operational Checklist](#operational-checklist)
 
 ## Overview
-**HoneyWire Sentinel** is a lightweight, Distributed High-Signal Security Early-Warning System, designed for internal networks. It replaces the "magnifying glass" approach of traditional SIEMs, which often drown analysts in false positives by surveilling legitimate traffic, with a High-Fidelity Tripwire model. 
+**HoneyWire** is a lightweight, Distributed High-Signal Security Early-Warning System Builder, designed for internal networks. It leverages its architecture and UX to make it incredibly easy to build a new Cyber Canary server or deploy HoneyWires on existing ones. Using deception technology, it replaces the "magnifying glass" approach of traditional SIEMs which often drown analysts in false positives by surveilling legitimate traffic with a High-Fidelity Tripwire model. 
 
 Place a sensor exactly where you want it. If it trips, you have an intruder.
   - **Production Tripwires**: Sound the alarm when active services are being poked in ways they shouldn't be. By placing a sensor on a sensitive file that should never be read or a service port that should never be accessed, you identify intruders by their deviation from the "authorized path."
   - **Synthetic Deception**: Deploy lures like the [ICMP Canary](./Sensors/official/IcmpCanary/) or [Network Scan Detector](./Sensors/official/NetworkScanDetector/) to act as decoys. Since these sensors provide no legitimate business value, 100% of their traffic is actionable intelligence.
 
 Set up multiple and you start to have a pretty clear idea of the lateral movement of an intruder. No tuning, no noise, just instant forensics.
+If you have legitimate automated security scanners tripping HoneyWires just whitelist them from the Hub's settings.
 
 ## Showcase
 
@@ -50,38 +51,38 @@ Set up multiple and you start to have a pretty clear idea of the lateral movemen
 ## 🔌 The Universal Event Standard (Bring Your Own Sensor)
 
 [**Community Sensors**](./Sensors/community/)
+> Note: If you build your sensor using the official HoneyWire SDKs, this JSON formatting and delivery is handled for you automatically.
 
-The true power of HoneyWire is that the Hub is **completely sensor-agnostic**. You are not limited to the included official sensors. 
+The true power of HoneyWire is that the Hub and Wizard are **completely sensor-agnostic**. You are not limited to the included official sensors. 
 
-By adhering to the **HoneyWire Event Standard V1.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data. 
+By adhering to the **HoneyWire Event Standard V2.0**, you can write a script in *any* language (Bash, Go, Rust, Python) to monitor *anything*, and the Sentinel UI will dynamically parse, syntax-highlight, and render your forensic data. 
 
 Whether it is a **Deep Packet Inspection (DPI)** engine, a **DNS sinkhole**, a **Canary Token** embedded in a PDF, an **Email Honeypot**, or a simple **TCP Port Tripwire**, just POST the **Universal Event Standard** JSON payload to the Hub. 
 
-> 📖 **[View the full Event Data Contract here](./Docs/architecture/dataContracts.md#1-the-universal-event-standard)**
-
-> Note: If you build your sensor using the official HoneyWire SDKs, this JSON formatting and delivery is handled for you automatically.
-
-*The Hub's frontend automatically translates arrays into syntax-highlighted code blocks and primitive values into clean detail tags.*
+> **[View the full Event Data Contract here](./Docs/architecture/dataContracts.md#1-the-universal-event-standard)** 
 
 ## Features
 
-- **The Sentinel Hub UI:** A fully responsive, Vue 3-powered dashboard featuring Dark/Light mode, live WebSocket event streaming, and dynamic forensic payload inspection.
-- **In-Browser Configuration:** Manage Master Passwords, Node Keys, Data Retention policies, and Webhooks directly from the UI. No need to touch `.env` files or restart containers to update alert targets.
-- **Universal Push Notifications:** Native, zero-dependency integration for routing critical alerts to **Discord, Slack, Ntfy, and Gotify**.
-- **Enterprise SIEM Integration:** Native RFC 3164 Syslog forwarding (TCP/UDP) for seamlessly pushing structured telemetry to Splunk, Elastic, Wazuh, or Vector.
-- **Suite of Official Sensors:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
+- **The Sentinel Hub UI:** A fully responsive, Vue 3-powered dashboard featuring dynamic forensic payload inspection, Nodes and Sensors deployment and management, including sensor updates, directly from the UI.
+  - **Universal Push Notifications:** Native, zero-dependency integration for routing critical alerts to **Discord, Slack, Ntfy, and Gotify**.
+  - **Enterprise SIEM Integration:** Native RFC5424 Syslog forwarding (TCP/UDP) for seamlessly pushing structured telemetry to Splunk, Elastic, Wazuh, or Vector.
+- **The Setup Wizard:** A deployment and testing automation tool, developed explicitly to not be a 24/7 running agent. It is simply a TUI CLI tool that automates operator tasks like applying and reconciling the Hub's desired state for a given Node, automatically handling configuration, deployment, and rollbacks on failed deployments.
+- **Suite of Official HoneyWires:** Includes native [TCP Tarpit](./Sensors/official/TcpTarpit/), [Web Router Decoy](./Sensors/official/WebRouterDecoy/), [File Canary (FIM)](./Sensors/official/FileCanary/), [ICMP Canary](./Sensors/official/IcmpCanary/), and [Network Scan Detector](./Sensors/official/NetworkScanDetector/).
 
 ## Architecture
 
-HoneyWire is split into three independent microservices:
+HoneyWire is split into four independent microservices:
 
 1. `/Hub`: The central brain. A pure Go binary running an embedded SQLite database and the Vue.js dashboard. It runs as a non-root user inside a Distroless container, safely mounting data to a dedicated volume.
 2. `/Sensors`: The decoy nodes. Statically-linked Go binaries that listen on vulnerable ports, trap attackers, and securely POST intrusion data back to the Hub.
 3. `/SDKs`: Official libraries (like `sdk-go`) that handle secure Hub communication so community developers can easily build new sensors.
+4. `/wizard`: Setup wizard cli tool to automate operator tasks such as discovery, deployment and testing of HoneyWires.
+
+> **[Check out the full architecture docs](./Docs/architecture/README.md)**
 
 ## 🚀 Quick Start Guide
 
-Deploying the HoneyWire Hub takes less than 60 seconds using our pre-built GitHub Container images. No compiling is required.
+Deploying the HoneyWire Hub takes less than 60 seconds using our pre-built GitHub Container images.
 
 ### 1. Deploy the Hub
 Create a new directory on your server, create a `docker-compose.yml` file, and paste the following:
@@ -91,24 +92,24 @@ services:
   # 1. THE PERMISSION FIXER: Runs once to ensure the Hub can write to the data volume
   permission-fixer:
     image: alpine:latest
+    container_name: honeywire-permission-fixer
     command: sh -c "chown -R 65532:65532 /data"
     volumes:
       - ./honeywire_data:/data
 
   # 2. THE HUB: The central Go-based dashboard and API
   hub:
-    image: ghcr.io/andreicscs/honeywire-hub:latest
+    image: registry.honeywire.dev/honeywire-hub:latest
     container_name: honeywire-hub
     restart: unless-stopped
     ports:
-      # Change 8080 to whatever port you prefer
       - "8080:8080"
     volumes:
       - ./honeywire_data:/data
     depends_on:
       permission-fixer:
         condition: service_completed_successfully
-    
+        
     # Strict Security Sandbox
     user: "65532:65532"
     read_only: true
@@ -118,6 +119,7 @@ services:
     environment:
       - HW_ENV=development # Required if not using HTTPS, or the cookie will have the secure flag set, in production it is highly recommended to remove this and run this behind a reverse proxy using https
       - HW_PORT=8080
+      - HW_DB_PATH=/data/honeywire.db
       # Optional: Hardcode the dashboard password (disables the UI password reset feature)
       # - HW_DASHBOARD_PASSWORD=admin
 ```
@@ -128,49 +130,35 @@ docker compose up -d
 ```
 
 ### 2. Initialize the System
-Navigate to `http://<your-server-ip>:8080` in your browser. You will be greeted by the **Initialize Sentinel** screen.
+Navigate to `http://<your-server-ip>:HW_PORT` in your browser. You will be greeted by the **Initialize Sentinel** screen.
 1. Create your Master Password.
 2. Verify your Hub Endpoint URL (the IP/URL where sensors will reach the Hub).
-3. Provision a Node and generate its secure Node Key.
-4. Click "Initialize Hub".
+3. Click "Initialize Hub".
 
 ### 3. Deploy Sensors
-Inside the Dashboard, navigate to the **Sensor Store**. Click on any sensor (e.g., the TCP Tarpit) to view its documentation. The Hub will automatically generate a ready-to-use `docker-compose.yml` script pre-filled with your Hub\'s IP and Node Key. Copy that script, drop it on your target machine, and run `docker compose up -d`!
+1. Create a new Node and paste the provided command to install and link the Setup Wizard to the hub
+2. Install sensors directly from the Hub and then run `honeywire apply` on the node to reconcile desired state or run `honeywire discover` to let the Setup wizard automatically scan and suggest HoneyWires based on environment.
 
+### 4. Testing the HoneyWires
 
-### 4. Testing the Trap
-
-Once your containers are up, the Tarpit sensor should appear as `ONLINE` in the **Fleet Health** section of the dashboard within 30 seconds.
-
-If you deployed the TcpTarpit sensor, to verify the detection loop, use `netcat` from a different machine (or a different terminal) to trigger the decoy:
-
-```bash
-# Connect to your decoy port (e.g., 2222) at localhost (or your server's IP).
-nc localhost 2222
-```
-
-1. **Observe the Lure:** If `HW_TARPIT_MODE` is set to `hold` or `echo`, you will see your fake service banner immediately.
-2. **Interact:** The connection will be intentionally stalled (Tarpit). Type a string (e.g., `admin` or `exploit_payload`) and press Enter.
-3. **Close:** Press `Ctrl+C` to terminate the test connection.
-4. **Verify Capture:**
-   - Check the HoneyWire Dashboard; the event, your Source IP, and the payload will appear instantly.
-   - If configured, you will receive a push notification on your mobile device.
-
+Once your containers are up, the Tarpit sensor should appear as `ONLINE` within 30 seconds.
+Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to test connectivity.
 
 ---
 
 ## Security Notes
+* **Threat Model:** For a deep dive into trust boundaries, architecture risks, and sandboxing rules, see the **[THREATMODEL.md](./THREATMODEL.md)**.
 * **Node Keys:** Ensure your sensors use their unique `Node Key` to communicate with the Hub. The Hub will reject any payloads with mismatched or invalid keys.
 * **System Arming:** You can toggle the "System Armed" button in the Hub UI to temporarily disable push notifications while doing internal network maintenance or vulnerability scanning.
 * **Container Hardening:** HoneyWire utilizes `gcr.io/distroless/static-debian12:nonroot`. We follow the principle of least privilege to make sure that if a container is compromised, the blast is contained.
 * **Distributed Deployment:** It is highly recommended to run the Hub and its Sensors on separate physical or virtual machines. If an attacker compromises a sensor node, they should not have immediate local access to the centralized Hub.
-* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web GUI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your Dashboard password and Node Keys to network sniffing.
+* ⚠️ **Encryption (HTTPS):** Always serve the Hub Web UI and API over HTTPS using a reverse proxy (like Nginx, Caddy, or Traefik) in production. Failure to do so exposes your Dashboard password and Node Keys to network sniffing.
 
 
 ## Tech Stack
 * **Backend:** Go 1.25, `net/http` (Standard Library), SQLite (ModernC Pure Go Driver)
 * **Frontend:** Vue 3 (Composition API), TailwindCSS, Chart.js
-* **Infrastructure:** Docker, Docker Compose, Distroless Linux Sandbox
+* **Infrastructure:** Docker, Docker Compose v5.0.0+
 
 
 ## Versioning and API Reference
@@ -178,14 +166,5 @@ nc localhost 2222
 - HoneyWire uses a single source of truth version file: `VERSION` in the repo root.
 - The runtime version is exposed via an env override: `HW_VERSION` (Hub + Sensors), which defaults to `VERSION`.
 - `Hub` endpoint:
-  - `GET /api/v1/version` → returns `{ "version": "1.0.0" }`
-- API docs file: [📖 API.md](./Docs/API.md) with full backend route reference and sample payloads.
-
-
-
-## Operational Checklist
-- [x] Complete the Web UI Initial Setup to set the Master Password.
-- [x] Provision a Node and retrieve the generated `Node Key` to apply it to your sensors.
-- [x] Configure your push notification webhooks via the Settings UI.
-
-- [x] Rebuild/redeploy containers after any version bump in `VERSION` or e
+  - `GET /api/v1/version` → returns `{ "version": "2.0.0" }`
+- API docs file: [API.md](./Docs/architecture/hub/backend/API.md) with full backend route reference and sample payloads.
