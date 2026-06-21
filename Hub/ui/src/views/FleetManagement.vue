@@ -26,18 +26,18 @@ onMounted(async () => {
         if (isInitialLoading.value) showSkeleton.value = true
     }, 350)
 
-    try {
-        const [, manifests] = await Promise.all([
-            fleetStore.fetchFleet(),
-            fleetStore.fetchManifests().catch(err => {
-                console.error('Failed to load manifests', err)
-                return []
-            })
-        ])
+    fleetStore.fetchManifests().then(manifests => {
         manifestData.value = manifests
+    }).catch(err => {
+        console.error('Failed to load manifests', err)
+    }).finally(() => {
+        isManifestLoading.value = false
+    })
+
+    try {
+        await fleetStore.fetchFleet()
     } finally {
         clearTimeout(skeletonTimer)
-        isManifestLoading.value = false
         isInitialLoading.value = false
         showSkeleton.value = false
     }
