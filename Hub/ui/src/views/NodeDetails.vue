@@ -235,12 +235,11 @@ const openSensor = (sensor: any) => {
   isEditingSensor.value = false
   editingSensorId.value = null
   initialEnvVars.value = {}
-  initialEnvVars.value['HW_SEVERITY'] = 'critical'
   initialEnvVars.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
   initialEnvVars.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
 
   sensor.deployment?.env_vars?.forEach((env: any) => {
-    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
+    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY'].includes(env.name)) {
       initialEnvVars.value[env.name] = getUIDefault(env.default)
     }
   })
@@ -270,12 +269,11 @@ const editSensor = async (installedSensor: any) => {
   isEditingSensor.value = true
   editingSensorId.value = installedSensor.sensorId
   initialEnvVars.value = {}
-  initialEnvVars.value['HW_SEVERITY'] = 'critical'
   initialEnvVars.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
   initialEnvVars.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
   
   manifest.deployment?.env_vars?.forEach((env: any) => {
-    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY', 'HW_SEVERITY'].includes(env.name)) {
+    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY'].includes(env.name)) {
       initialEnvVars.value[env.name] = getUIDefault(env.default)
     }
   })
