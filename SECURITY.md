@@ -1,5 +1,7 @@
 # Security Policy
 
+For security and trust boundaries insights, see the **[THREATMODEL.md](./THREATMODEL.md)**.
+
 ## Reporting a Vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.** To ensure the safety of the community and prevent premature disclosure of exploits, we utilize **GitHub Private Vulnerability Reporting**.
