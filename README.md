@@ -1,0 +1,1 @@
+# HoneyWire Sensor Registry
