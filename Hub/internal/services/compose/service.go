@@ -261,8 +261,8 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion s
 		envMap := composeEngine.BuildEnv(manifest, userVars, sysVars)
 		svcCompose, err := composeEngine.BuildService(sensor.ID, manifest, envMap)
 		if err != nil {
-			log.Printf("[ERROR] Compose build failed for sensor %s (Node %s): %v", sensor.ID, nodeID, err)
-			return nil, fmt.Errorf("build_failed: %w", err)
+			log.Printf("[ERROR] Compose build failed for sensor %s (Node %s)", sensor.ID, nodeID)
+			return nil, fmt.Errorf("build_failed")
 		}
 		finalCompose.Services = append(finalCompose.Services, svcCompose.Services...)
 	}
