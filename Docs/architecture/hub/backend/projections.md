@@ -36,7 +36,7 @@ The Severity Projection provides a comprehensive breakdown of event severities b
 
 ### API Endpoint
 
-`GET /api/v1/events/severity`
+`GET /api/v2/events/severity`
 
 **Query Parameters:**
 - `timeframe`: The time window (`alltime`, `24H`, etc.) (default: `alltime`)
@@ -63,7 +63,7 @@ To maintain real-time reactivity without frontend recomputation:
 
 1. A new event triggers a WebSocket broadcast (`NEW_EVENT`).
 2. The frontend Vue store receives the event and checks if it falls within the currently active filter context.
-3. If relevant, the frontend simply **invalidates** the current projection and re-fetches `/api/v1/events/severity`.
+3. If relevant, the frontend simply **invalidates** the current projection and re-fetches `/api/v2/events/severity`.
 4. The Vue Store replaces the snapshot reference, and the chart re-renders effortlessly.
 
 This guarantees that the backend always remains the single source of truth for analytics.

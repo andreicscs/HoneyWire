@@ -206,7 +206,7 @@ class HoneyWireSensor(ABC):
         }
 
         try:
-            resp = self.client.post(f"{self.hub_endpoint}/api/v1/event", json=payload, timeout=10)
+            resp = self.client.post(f"{self.hub_endpoint}/api/v2/event", json=payload, timeout=10)
             if resp.status_code >= 400:
                 print(f"[-] Test mode failed to send event: HTTP {resp.status_code}")
                 return False
@@ -258,7 +258,7 @@ class HoneyWireSensor(ABC):
         for attempt in range(MAX_RETRIES_PER_EVENT):
             resp, exc = None, None
             try:
-                resp = self.client.post(f"{self.hub_endpoint}/api/v1/event", json=event, timeout=10)
+                resp = self.client.post(f"{self.hub_endpoint}/api/v2/event", json=event, timeout=10)
             except Exception as e:
                 exc = e
 
@@ -285,7 +285,7 @@ class HoneyWireSensor(ABC):
         while not self._event_queue.empty():
             try:
                 event = self._event_queue.get_nowait()
-                self.client.post(f"{self.hub_endpoint}/api/v1/event", json=event, timeout=2)
+                self.client.post(f"{self.hub_endpoint}/api/v2/event", json=event, timeout=2)
             except Exception:
                 pass
         print("[*] Event queue gracefully drained.")
@@ -309,7 +309,7 @@ class HoneyWireSensor(ABC):
 
             resp, exc = None, None
             try:
-                resp = self.client.post(f"{self.hub_endpoint}/api/v1/heartbeat", json=payload, timeout=10)
+                resp = self.client.post(f"{self.hub_endpoint}/api/v2/heartbeat", json=payload, timeout=10)
             except Exception as e:
                 exc = e
 
@@ -329,7 +329,7 @@ class HoneyWireSensor(ABC):
             "reason": reason
         }
         try:
-            self.client.post(f"{self.hub_endpoint}/api/v1/offline", json=payload, timeout=2)
+            self.client.post(f"{self.hub_endpoint}/api/v2/offline", json=payload, timeout=2)
         except Exception:
             pass
 

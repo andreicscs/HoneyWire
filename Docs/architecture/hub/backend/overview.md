@@ -82,4 +82,4 @@ HoneyWire employs a multi-tiered authentication strategy depending on the actor:
 
 1. **UI Dashboard (Humans):** Secured via short-lived Sessions and HTTP-Only, Secure, SameSite `hw_auth` Cookies. Handled via `UIAuthMiddleware`.
 2. **Sensors/Agents (Machines):** Secured via statically generated, cryptographically random API Keys (`hw_key_...`). Passed via `Authorization: Bearer` or `X-Api-Key` headers and validated by `AgentAuthMiddleware`. These are aggressively cached in memory to prevent database bottlenecks during heartbeat storms.
-3. **Dual-Auth Endpoints:** Shared endpoints (like `/api/v1/manifests`) are protected by `DualAuthMiddleware`, which attempts Bearer authentication first before falling back to Cookie validation.
+3. **Dual-Auth Endpoints:** Shared endpoints (like `/api/v2/manifests`) are protected by `DualAuthMiddleware`, which attempts Bearer authentication first before falling back to Cookie validation.

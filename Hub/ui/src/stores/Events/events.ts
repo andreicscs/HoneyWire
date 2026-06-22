@@ -144,7 +144,7 @@ export const useEventsStore = defineStore('events', () => {
 
   const refreshUnreadCount = async (): Promise<void> => {
     try {
-      const res = await api.get('/api/v1/events/unread')
+      const res = await api.get('/api/v2/events/unread')
       const data = await res.json()
       state.value.unreadCount = data.count
     } catch {
@@ -160,7 +160,7 @@ export const useEventsStore = defineStore('events', () => {
       if (nodeId) params.append('nodeId', nodeId)
       if (sensorId) params.append('sensorId', sensorId)
 
-      const res = await api.get(`/api/v1/events?${params.toString()}`)
+      const res = await api.get(`/api/v2/events?${params.toString()}`)
       state.value.events = (await res.json() as any[]).map(normalizeEvent)
 
       await refreshUnreadCount()
@@ -180,7 +180,7 @@ export const useEventsStore = defineStore('events', () => {
       if (nodeId) params.append('node', nodeId)
       if (sensorId) params.append('sensor', sensorId)
 
-      const response = await api.get(`/api/v1/events/severity?${params.toString()}`, { signal: severityAbortController.signal })
+      const response = await api.get(`/api/v2/events/severity?${params.toString()}`, { signal: severityAbortController.signal })
       state.value.severityProjection = (await response.json()) as SeverityProjection
     } catch (e: any) {
       if (e.name !== 'AbortError') console.error('Failed to fetch severity projection', e)
@@ -197,7 +197,7 @@ export const useEventsStore = defineStore('events', () => {
       if (nodeId) params.append('nodeId', nodeId)
       if (sensorId) params.append('sensorId', sensorId)
 
-      const response = await api.get(`/api/v1/events/velocity?${params.toString()}`, { signal: velocityAbortController.signal })
+      const response = await api.get(`/api/v2/events/velocity?${params.toString()}`, { signal: velocityAbortController.signal })
       state.value.threatVelocityProjection = (await response.json()) as ThreatVelocityProjection
     } catch (e: any) {
       if (e.name !== 'AbortError') console.error('Velocity fetch failed:', e)
@@ -216,7 +216,7 @@ export const useEventsStore = defineStore('events', () => {
       if (nodeId) params.append('nodeId', nodeId)
       if (sensorId) params.append('sensorId', sensorId)
 
-      const response = await api.get(`/api/v1/events/summary?${params.toString()}`, { signal: summaryAbortController.signal })
+      const response = await api.get(`/api/v2/events/summary?${params.toString()}`, { signal: summaryAbortController.signal })
       state.value.summaryProjection = (await response.json()) as SummaryProjection
     } catch (e: any) {
       if (e.name !== 'AbortError') console.error('Summary fetch failed:', e)
@@ -231,7 +231,7 @@ export const useEventsStore = defineStore('events', () => {
 
   const markAllRead = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      await api.patch('/api/v1/events/read')
+      await api.patch('/api/v2/events/read')
       state.value.events.forEach(e => (e.isRead = true))
       state.value.unreadCount = 0
       return { success: true }
@@ -250,7 +250,7 @@ export const useEventsStore = defineStore('events', () => {
     state.value.unreadCount = Math.max(0, state.value.unreadCount - 1)
 
     try {
-      await api.patch(`/api/v1/events/${eventId}/read`)
+      await api.patch(`/api/v2/events/${eventId}/read`)
       return { success: true }
     } catch (err) {
       ev.isRead = wasRead
@@ -263,7 +263,7 @@ export const useEventsStore = defineStore('events', () => {
   const archiveEvent = async (eventId: string): Promise<{ success: boolean; error?: string }> => {
     const originalEvents = [...state.value.events]
     try {
-      await api.patch(`/api/v1/events/${eventId}/archive`)
+      await api.patch(`/api/v2/events/${eventId}/archive`)
       state.value.events = state.value.events.filter(e => e.id !== eventId)
       state.value.activeEvent = null
       await refreshUnreadCount()
@@ -281,7 +281,7 @@ export const useEventsStore = defineStore('events', () => {
 
   const archiveAll = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      await api.patch('/api/v1/events/archive-all')
+      await api.patch('/api/v2/events/archive-all')
       await fetchEvents(false, fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)
       // Refetch analytics projections so the charts zero out
       fetchSeverityProjection('alltime', fleetStore.selectedNode?.id, fleetStore.selectedSensor?.sensorId)

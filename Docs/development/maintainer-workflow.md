@@ -135,4 +135,4 @@ To sync the catalog:
 1. Run `honeywire status` via the edge node CLI, OR
 2. go into Fleet Management or Node Details view in the Hub Dashboard.
 
-This triggers an on-demand registry fetch. The Hub will compare the latest compatible versions against deployed sensors and flag nodes with an **"Update Available"** indicator. Users must manually trigger the `/api/v1/nodes/{id}/upgrade` endpoint (via the UI) or run `honeywire apply` to instruct the node to pull the new version schema and execute a compose restart.
+This triggers an on-demand registry fetch. The Hub will compare the latest compatible versions against deployed sensors and flag nodes with an **"Update Available"** indicator. Users must manually trigger the `/api/v2/nodes/{id}/upgrade` endpoint (via the UI) or run `honeywire apply` to instruct the node to pull the new version schema and execute a compose restart.

@@ -8,7 +8,7 @@ This document serves as the **single source of truth** for all cross-component d
 
 This is the standard telemetry payload that all sensors (official or community) must POST to the Hub when an intrusion is detected. The Hub's frontend dynamically parses, syntax-highlights, and renders this JSON.
 
-**Endpoint:** `POST /api/v1/event`
+**Endpoint:** `POST /api/v2/event`
 **Authentication:** `Authorization: Bearer <HW_NODE_KEY>`
 
 ```json
@@ -43,7 +43,7 @@ This is the standard telemetry payload that all sensors (official or community) 
 
 This payload is emitted continuously (typically every 30 seconds) by sensors to prove they are alive and running the expected configuration.
 
-**Endpoint:** `POST /api/v1/heartbeat`
+**Endpoint:** `POST /api/v2/heartbeat`
 **Authentication:** `Authorization: Bearer <HW_NODE_KEY>`
 
 ```json

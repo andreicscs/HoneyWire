@@ -95,7 +95,7 @@ func (h *AnalyticsHandler) GetSeverityAnalytics(w http.ResponseWriter, r *http.R
 	SendJSON(w, http.StatusOK, projection)
 }
 
-// GetUptime handles GET /api/v1/uptime and returns the fleet uptime projection
+// GetUptime handles GET /api/v2/uptime and returns the fleet uptime projection
 func (h *AnalyticsHandler) GetUptime(w http.ResponseWriter, r *http.Request) {
 	// Parse timeframe from query string (default to 24H)
 	timeframe := r.URL.Query().Get("timeframe")

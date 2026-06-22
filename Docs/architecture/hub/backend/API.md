@@ -1,6 +1,6 @@
 # HoneyWire Hub — API Reference
 
-All Hub routes are prefixed with `/api/v1` unless otherwise noted.
+All Hub routes are prefixed with `/api/v2` unless otherwise noted.
 
 ## Authentication
 
@@ -21,7 +21,7 @@ Authorization: Bearer <HW_NODE_KEY>
 
 ## Public Endpoints
 
-### GET /api/v1/version
+### GET /api/v2/version
 
 Returns the running Hub version.
 
@@ -49,7 +49,7 @@ Invalidates the current dashboard session and redirects the client to `/`.
 
 **Response:** `303 See Other`
 
-### GET /api/v1/setup/status
+### GET /api/v2/setup/status
 
 Returns whether the Hub requires initial setup.
 When `HW_DASHBOARD_PASSWORD` is set, setup is considered locked and this endpoint returns `requires_setup: false`.
@@ -59,7 +59,7 @@ When `HW_DASHBOARD_PASSWORD` is set, setup is considered locked and this endpoin
 { "requiresSetup": true }
 ```
 
-### POST /api/v1/setup
+### POST /api/v2/setup
 
 Completes first-time hub setup and stores the hashed admin password, hub endpoint, and hub API key.
 If `HW_DASHBOARD_PASSWORD` is set, setup is blocked.
@@ -81,7 +81,7 @@ If `HW_DASHBOARD_PASSWORD` is set, setup is blocked.
 
 These endpoints require a valid `hw_auth` session cookie.
 
-### GET /api/v1/ws
+### GET /api/v2/ws
 
 Upgrades the connection to a WebSocket for realtime dashboard updates.
 
@@ -100,18 +100,18 @@ Common message types:
 - `SILENCE_SENSOR` — a sensor silence state changed.
 - `SYNC_CHARTS` — instructs UIs to refresh chart data.
 
-### GET /api/v1/manifests
+### GET /api/v2/manifests
 
 Fetches the sensor manifest catalog from `RegistryURL` or the default public manifest registry.
 
-### GET /api/v1/manifests/{sensorId}/versions
+### GET /api/v2/manifests/{sensorId}/versions
 
 Fetches a specific historical version schema of a sensor manifest from the registry.
 
 **Query parameters:**
 - `version` — The exact version string to fetch (e.g. `2.0.6`).
 
-### POST /api/v1/compose/generate
+### POST /api/v2/compose/generate
 
 Generates a `docker-compose.yml` preview from the selected sensor manifests and UI-provided environment values.
 
@@ -136,7 +136,7 @@ Generates a `docker-compose.yml` preview from the selected sensor manifests and 
 
 ### Nodes and Sensors
 
-#### POST /api/v1/nodes
+#### POST /api/v2/nodes
 
 Creates a new node entry and returns the generated node credentials.
 
@@ -156,7 +156,7 @@ Creates a new node entry and returns the generated node credentials.
 }
 ```
 
-#### GET /api/v1/nodes
+#### GET /api/v2/nodes
 
 Returns all registered nodes and their installed sensors. Each node includes current status and pending config state.
 
@@ -182,11 +182,11 @@ Returns all registered nodes and their installed sensors. Each node includes cur
 ]
 ```
 
-#### GET /api/v1/nodes/{nodeId}
+#### GET /api/v2/nodes/{nodeId}
 
 Returns details for a single node, including installed sensors and per-sensor event counts.
 
-#### PATCH /api/v1/nodes/{nodeId}
+#### PATCH /api/v2/nodes/{nodeId}
 
 Updates a node's alias, tags, public IP, or private IP.
 
@@ -200,15 +200,15 @@ Updates a node's alias, tags, public IP, or private IP.
 }
 ```
 
-#### POST /api/v1/nodes/{nodeId}/upgrade
+#### POST /api/v2/nodes/{nodeId}/upgrade
 
 Triggers a fleet-wide sync command over WebSockets to force the node to pull the newest compose definitions and automatically pull the latest manifest versions for all of its installed sensors.
 
-#### DELETE /api/v1/nodes/{nodeId}
+#### DELETE /api/v2/nodes/{nodeId}
 
 Deletes a node and cascades to remove its sensors, event history, and heartbeat records.
 
-#### POST /api/v1/nodes/{nodeId}/sensors
+#### POST /api/v2/nodes/{nodeId}/sensors
 
 Adds a sensor to a node and flags the node as pending configuration sync.
 
@@ -223,19 +223,19 @@ Adds a sensor to a node and flags the node as pending configuration sync.
 }
 ```
 
-#### PUT /api/v1/nodes/{nodeId}/sensors/{sensorId}
+#### PUT /api/v2/nodes/{nodeId}/sensors/{sensorId}
 
 Updates a sensor's custom name and config values and marks the parent node pending sync.
 
-#### DELETE /api/v1/nodes/{nodeId}/sensors/{sensorId}
+#### DELETE /api/v2/nodes/{nodeId}/sensors/{sensorId}
 
 Removes a sensor from the node and marks the node pending sync.
 
-#### POST /api/v1/nodes/{nodeId}/sensors/{sensorId}/upgrade
+#### POST /api/v2/nodes/{nodeId}/sensors/{sensorId}/upgrade
 
 Upgrades a specific sensor to the latest available manifest version listed in the registry, and marks the node pending sync.
 
-#### PATCH /api/v1/nodes/{nodeId}/sensors/{sensorId}/silence
+#### PATCH /api/v2/nodes/{nodeId}/sensors/{sensorId}/silence
 
 Toggles a sensor's silence state. Silenced sensors still log events but suppress push notifications.
 
@@ -255,7 +255,7 @@ Toggles a sensor's silence state. Silenced sensors still log events but suppress
 
 ### Configuration and System Settings
 
-#### GET /api/v1/config
+#### GET /api/v2/config
 
 Returns runtime configuration loaded from SQLite. 
 
@@ -285,7 +285,7 @@ Returns runtime configuration loaded from SQLite.
 }
 ```
 
-#### PATCH /api/v1/config
+#### PATCH /api/v2/config
 
 Updates runtime settings. Only supported fields are applied. This endpoint also hot-reloads webhook and SIEM configuration.
 
@@ -309,7 +309,7 @@ Updates runtime settings. Only supported fields are applied. This endpoint also 
 }
 ```
 
-#### GET /api/v1/system/state
+#### GET /api/v2/system/state
 
 Returns whether the Hub is armed.
 
@@ -318,7 +318,7 @@ Returns whether the Hub is armed.
 { "isArmed": true }
 ```
 
-#### PATCH /api/v1/system/state
+#### PATCH /api/v2/system/state
 
 Sets the armed/disarmed state.
 
@@ -327,7 +327,7 @@ Sets the armed/disarmed state.
 { "isArmed": false }
 ```
 
-#### PATCH /api/v1/system/password
+#### PATCH /api/v2/system/password
 
 Changes the dashboard admin password. When `HW_DASHBOARD_PASSWORD` is set, this operation is forbidden.
 
@@ -339,7 +339,7 @@ Changes the dashboard admin password. When `HW_DASHBOARD_PASSWORD` is set, this 
 }
 ```
 
-#### POST /api/v1/system/reset
+#### POST /api/v2/system/reset
 
 Performs a full factory reset of the runtime database, clearing events, sensors, heartbeats, and config.
 Requires the current admin password.
@@ -353,7 +353,7 @@ Requires the current admin password.
 
 ## Fleet and Events
 
-### GET /api/v1/events/unread
+### GET /api/v2/events/unread
 
 Returns the count of active, unread events.
 
@@ -362,7 +362,7 @@ Returns the count of active, unread events.
 { "count": 12 }
 ```
 
-### GET /api/v1/events
+### GET /api/v2/events
 
 Returns a list of events, newest first.
 
@@ -371,23 +371,23 @@ Returns a list of events, newest first.
 - `nodeId` — filter by node ID
 - `sensorId` — filter by sensor ID
 
-### PATCH /api/v1/events/read
+### PATCH /api/v2/events/read
 
 Marks all active events as read.
 
-### PATCH /api/v1/events/{eventId}/read
+### PATCH /api/v2/events/{eventId}/read
 
 Marks a single event as read.
 
-### PATCH /api/v1/events/{eventId}/archive
+### PATCH /api/v2/events/{eventId}/archive
 
 Archives a single event and marks it as read.
 
-### PATCH /api/v1/events/archive-all
+### PATCH /api/v2/events/archive-all
 
 Archives all active events.
 
-### DELETE /api/v1/events
+### DELETE /api/v2/events
 
 Deletes all events permanently.
 
@@ -408,7 +408,7 @@ Deletes all events permanently.
 { "status": "success", "dryrun": false }
 ```
 
-### GET /api/v1/events/severity
+### GET /api/v2/events/severity
 
 Returns severity distribution analytics for the fleet.
 
@@ -431,7 +431,7 @@ Returns severity distribution analytics for the fleet.
 }
 ```
 
-### GET /api/v1/events/velocity
+### GET /api/v2/events/velocity
 
 Returns time-bucketed velocity analytics for the fleet.
 
@@ -463,7 +463,7 @@ Returns time-bucketed velocity analytics for the fleet.
 
 ## Uptime and Health
 
-### GET /api/v1/uptime
+### GET /api/v2/uptime
 
 Returns uptime blocks for fleet health charts.
 
@@ -532,7 +532,7 @@ Returns uptime blocks for fleet health charts.
 
 ## Node Compose
 
-### GET /api/v1/nodes/compose
+### GET /api/v2/nodes/compose
 
 Returns a generated `docker-compose.yml` for a node based on the node's current installed sensors.
 
@@ -544,7 +544,7 @@ This endpoint is read-only for node deployment: it returns the current or reques
 
 These endpoints are used by sensor agents and require the node API key bearer token.
 
-### POST /api/v1/heartbeat
+### POST /api/v2/heartbeat
 
 Reports a sensor heartbeat and updates its versioning state.
 
@@ -561,7 +561,7 @@ Reports a sensor heartbeat and updates its versioning state.
 { "status": "alive" }
 ```
 
-### POST /api/v1/event
+### POST /api/v2/event
 
 Reports an intrusion event to the Hub.
 

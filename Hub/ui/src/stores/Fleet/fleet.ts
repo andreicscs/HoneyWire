@@ -378,7 +378,7 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- ACTIONS: STRUCTURAL INGESTION ---
   const fetchFleet = async (): Promise<void> => {
     try {
-      const res = await api.get('/api/v1/nodes')
+      const res = await api.get('/api/v2/nodes')
       const raw = await res.json() || []
       const incoming = Array.isArray(raw) ? raw : raw.nodes || []
   
@@ -410,7 +410,7 @@ export const useFleetStore = defineStore('fleet', () => {
     abortControllers.set(nodeId, controller)
 
     try {
-      const res = await api.get(`/api/v1/nodes/${encodeURIComponent(nodeId)}`, { signal: controller.signal })
+      const res = await api.get(`/api/v2/nodes/${encodeURIComponent(nodeId)}`, { signal: controller.signal })
       const rawNode = await res.json()
       const node = normalizeNodeData(rawNode)
       if (!node) return
@@ -504,7 +504,7 @@ export const useFleetStore = defineStore('fleet', () => {
   const fetchUptime = async (timeframe?: string): Promise<void> => {
     const target = timeframe || state.value.activeTimeframe
     try {
-      const res = await api.get(`/api/v1/uptime?timeframe=${target}`)
+      const res = await api.get(`/api/v2/uptime?timeframe=${target}`)
       state.value.uptimeData = (await res.json()) as UptimeData
     } catch (e) {
       console.error('Failed to fetch uptime', e)
@@ -513,7 +513,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const fetchManifests = async (): Promise<any[]> => {
     try {
-      const res = await api.get('/api/v1/manifests')
+      const res = await api.get('/api/v2/manifests')
       const data = await res.json()
       // The API returns the raw index.json which has a top-level { sensors: [] } wrapper
       const sensorsArray = Array.isArray(data) ? data : (data?.sensors || [])
@@ -528,7 +528,7 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- ACTIONS: COMPOSE / SYNC ---
   const fetchCompose = async (apiKey: string): Promise<string> => {
     try {
-      const res = await api.request('/api/v1/nodes/compose', {
+      const res = await api.request('/api/v2/nodes/compose', {
         headers: { Authorization: `Bearer ${apiKey}` },
       })
       return await res.text()
@@ -540,7 +540,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const generateCompose = async (payload: any): Promise<string> => {
     try {
-      const res = await api.post('/api/v1/compose/generate', payload)
+      const res = await api.post('/api/v2/compose/generate', payload)
       return await res.text()
     } catch (err) {
       console.error('Failed to generate compose:', err)
@@ -566,7 +566,7 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- ACTIONS: NODE MUTATIONS ---
   const createNode = async (alias: string, tags: string[] = []): Promise<{ nodeId: string, apiKey: string }> => {
     try {
-      const res = await api.post('/api/v1/nodes', { alias, tags })
+      const res = await api.post('/api/v2/nodes', { alias, tags })
       const data = await res.json()
       await fetchFleet()
 
@@ -584,7 +584,7 @@ export const useFleetStore = defineStore('fleet', () => {
     let previousState: FleetNode | null = null
     try {
       previousState = patchNode(nodeId, payload)
-      await api.patch(`/api/v1/nodes/${nodeId}`, payload)
+      await api.patch(`/api/v2/nodes/${nodeId}`, payload)
     } catch (err) {
       if (previousState) patchNode(nodeId, previousState)
       console.error('Failed to update node:', err)
@@ -594,7 +594,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
   const upgradeNode = async (nodeId: string): Promise<void> => {
     try {
-      await api.post(`/api/v1/nodes/${nodeId}/upgrade`)
+      await api.post(`/api/v2/nodes/${nodeId}/upgrade`)
       fetchNodeDetails(nodeId)
     } catch (err: any) {
       console.error('Node Upgrade Failed:', err.message || 'Failed to upgrade node')
@@ -606,7 +606,7 @@ export const useFleetStore = defineStore('fleet', () => {
     markNodeAction(nodeId, 'deleting')
 
     try {
-      await api.delete(`/api/v1/nodes/${nodeId}`)
+      await api.delete(`/api/v2/nodes/${nodeId}`)
       if (state.value.selectedNodeId === nodeId) {
         state.value.selectedNodeId = null
         state.value.selectedSensorId = null
@@ -625,7 +625,7 @@ export const useFleetStore = defineStore('fleet', () => {
   // --- ACTIONS: SENSOR MUTATIONS ---
   const addSensor = async (nodeId: string, { sensorId: rawSensorId, customName, configValues }: { sensorId: string, customName?: string, configValues?: Record<string, string> }): Promise<void> => {
     try {
-      await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors`, {
+      await api.post(`/api/v2/nodes/${encodeURIComponent(nodeId)}/sensors`, {
         sensorId: rawSensorId,
         customName: customName || rawSensorId,
         configValues: configValues,
@@ -641,7 +641,7 @@ export const useFleetStore = defineStore('fleet', () => {
     if (!nodeId || !rawSensorId) throw new Error('Missing required parameters')
     
     try {
-      await api.post(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/upgrade`)
+      await api.post(`/api/v2/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/upgrade`)
       fetchNodeDetails(nodeId)
     } catch (err: any) {
       console.error('Sensor Upgrade Failed:', err.message || 'Failed to upgrade sensor')
@@ -653,7 +653,7 @@ export const useFleetStore = defineStore('fleet', () => {
     const sensor = getSensor(nodeId, rawSensorId)
     if (!sensor) return
     try {
-      await api.put(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`, {
+      await api.put(`/api/v2/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`, {
         customName: customName || rawSensorId,
         configValues: configValues,
       })
@@ -669,7 +669,7 @@ export const useFleetStore = defineStore('fleet', () => {
     if (!sensor) return { success: false, error: 'Sensor not found.' }
 
     try {
-      await api.delete(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`)
+      await api.delete(`/api/v2/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}`)
       await fetchNodeDetails(nodeId)
       const compositeId = `${nodeId}:${rawSensorId}`
       if (state.value.selectedSensorId === compositeId) state.value.selectedSensorId = null
@@ -688,7 +688,7 @@ export const useFleetStore = defineStore('fleet', () => {
     const previousState = patchSensor(sensor.id, { isSilenced: targetState })
 
     try {
-      await api.patch(`/api/v1/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/silence`, {
+      await api.patch(`/api/v2/nodes/${encodeURIComponent(nodeId)}/sensors/${encodeURIComponent(rawSensorId)}/silence`, {
         isSilenced: targetState,
       })
     } catch (err) {
@@ -713,7 +713,7 @@ export const useFleetStore = defineStore('fleet', () => {
 
     try {
       await Promise.all(nodeSensors.map(s =>
-        api.patch(`/api/v1/nodes/${nodeId}/sensors/${encodeURIComponent(s.sensorId)}/silence`, {
+        api.patch(`/api/v2/nodes/${nodeId}/sensors/${encodeURIComponent(s.sensorId)}/silence`, {
           isSilenced: targetState,
         })
       ))

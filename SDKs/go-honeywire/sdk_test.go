@@ -202,7 +202,7 @@ func TestReportEvent_Serialization(t *testing.T) {
 	payloadReceived := make(chan map[string]any, 1)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/event" {
+		if r.URL.Path != "/api/v2/event" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -277,10 +277,10 @@ func TestDrainQueueOnStop(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/v1/event":
+		case "/api/v2/event":
 			eventRequests <- struct{}{}
 			w.WriteHeader(http.StatusOK)
-		case "/api/v1/offline":
+		case "/api/v2/offline":
 			// Acknowledge the offline message sent by s.Stop()
 			w.WriteHeader(http.StatusOK)
 		default:

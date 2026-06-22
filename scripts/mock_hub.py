@@ -6,7 +6,7 @@ import os
 class MockHubHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         """Handles the HoneyWire SDK synchronization handshake."""
-        if self.path == '/api/v1/version':
+        if self.path == '/api/v2/version':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -27,7 +27,7 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
         try:
             payload = json.loads(post_data.decode('utf-8'))
             
-            if self.path == '/api/v1/event':
+            if self.path == '/api/v2/event':
                 # 1. Enforce the updated V1.0 Contract
                 required_keys = [
                     "eventTrigger", "source", "target", "details"
@@ -54,12 +54,12 @@ class MockHubHandler(http.server.BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.end_headers()
 
-            elif self.path == '/api/v1/heartbeat':
+            elif self.path == '/api/v2/heartbeat':
                 self.send_response(200)
                 self.end_headers()
                 print(f"[HEARTBEAT]  OK | Sensor: {payload.get('sensorId', 'unknown')}")
 
-            elif self.path == '/api/v1/offline':
+            elif self.path == '/api/v2/offline':
                 self.send_response(200)
                 self.end_headers()
                 print(f"[OFFLINE]    OK | Sensor: {payload.get('sensorId', 'unknown')}")

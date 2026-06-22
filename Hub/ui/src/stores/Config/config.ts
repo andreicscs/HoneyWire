@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, readonly } from 'vue'
 import { api } from '../../api/client'
 
-// Represents the exact JSON schema returned by GET /api/v1/config
+// Represents the exact JSON schema returned by GET /api/v2/config
 export interface ConfigApiResponse {
   hubEndpoint: string
   registryUrl: string
@@ -48,7 +48,7 @@ export const useConfigStore = defineStore('config', () => {
 
   const fetchConfig = async (): Promise<void> => {
     try {
-      const res = await api.get('/api/v1/config')
+      const res = await api.get('/api/v2/config')
       const data = (await res.json()) as ConfigApiResponse
       
       state.value.hubEndpoint = data.hubEndpoint || window.location.origin
@@ -75,7 +75,7 @@ export const useConfigStore = defineStore('config', () => {
 
   const patchConfig = async (updates: Partial<Omit<ConfigState, 'isLoaded'>>): Promise<boolean> => {
     try {
-      await api.patch('/api/v1/config', updates)
+      await api.patch('/api/v2/config', updates)
 
       Object.assign(state.value, updates)
       return true

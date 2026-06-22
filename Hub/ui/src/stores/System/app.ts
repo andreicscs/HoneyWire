@@ -103,7 +103,7 @@ export const useAppStore = defineStore('app', () => {
 
   const fetchSystemState = async (): Promise<{ success: boolean; status?: number }> => {
     try {
-      const res = await api.get('/api/v1/system/state')
+      const res = await api.get('/api/v2/system/state')
       const data = (await res.json()) as SystemStatePayload
       commitSystemState(data)
       return { success: true }
@@ -124,7 +124,7 @@ export const useAppStore = defineStore('app', () => {
     const targetState = !state.value.isArmed
     
     try {
-      await api.patch('/api/v1/system/state', { isArmed: targetState })
+      await api.patch('/api/v2/system/state', { isArmed: targetState })
       await fetchSystemState()
       return { success: true }
     } catch (err) {
@@ -136,7 +136,7 @@ export const useAppStore = defineStore('app', () => {
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      await api.patch('/api/v1/system/password', { currentPassword, newPassword })
+      await api.patch('/api/v2/system/password', { currentPassword, newPassword })
       return { success: true }
     } catch (err: any) {
       return { 
@@ -148,7 +148,7 @@ export const useAppStore = defineStore('app', () => {
 
   const factoryReset = async (password: string, dryrun: boolean = false): Promise<{ success: boolean; error?: string; stats?: any }> => {
     try {
-      const url = dryrun ? '/api/v1/system/reset?dryrun=true' : '/api/v1/system/reset'
+      const url = dryrun ? '/api/v2/system/reset?dryrun=true' : '/api/v2/system/reset'
       const response = await api.post(url, { password })
       
       let stats = undefined
@@ -194,7 +194,7 @@ export const useAppStore = defineStore('app', () => {
   const completeSetup = async (password: string, hubEndpoint: string): Promise<{ success: boolean; error?: string }> => {
     state.value.setupError = null
     try {
-      await api.post('/api/v1/setup', { password, hubEndpoint })
+      await api.post('/api/v2/setup', { password, hubEndpoint })
       state.value.requiresSetup = false
       transitionSession('unauthenticated')
       return { success: true }
@@ -207,15 +207,15 @@ export const useAppStore = defineStore('app', () => {
   // --- ACTIONS: BOOTSTRAP ---
   
   const checkRequiresSetup = async (): Promise<void> => {
-    const res = await api.get('/api/v1/setup/status')
+    const res = await api.get('/api/v2/setup/status')
     const data = (await res.json()) as { requiresSetup: boolean }
     state.value.requiresSetup = data.requiresSetup || false
   }
 
   const checkCoreConfiguration = async (): Promise<void> => {
     const [stateRes, verRes] = await Promise.allSettled([
-      api.get('/api/v1/system/state').then(r => r.json()),
-      api.get('/api/v1/version').then(r => r.json())
+      api.get('/api/v2/system/state').then(r => r.json()),
+      api.get('/api/v2/version').then(r => r.json())
     ])
 
     if (verRes.status === 'fulfilled') commitVersionState(verRes.value as VersionPayload)

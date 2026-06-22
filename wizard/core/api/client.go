@@ -134,7 +134,7 @@ func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string,
 		return "", fmt.Errorf("failed to marshal create node request: %w", err)
 	}
 
-	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v1/nodes", bytes.NewReader(body), map[string]string{
+	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v2/nodes", bytes.NewReader(body), map[string]string{
 		"Content-Type": "application/json",
 		"Cookie":       "hw_auth=" + cookie,
 	})
@@ -173,7 +173,7 @@ func (c *HubClient) CreateNode(ctx context.Context, alias string, tags []string,
 }
 
 func (c *HubClient) GetCurrentNode(ctx context.Context, apiKey string) (*NodeInfo, error) {
-	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v1/nodes/me", nil, map[string]string{
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v2/nodes/me", nil, map[string]string{
 		"Authorization": "Bearer " + apiKey,
 	})
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *HubClient) AddSensor(ctx context.Context, nodeID, cookie, sensorID, cus
 		return fmt.Errorf("failed to marshal add sensor request: %w", err)
 	}
 
-	path := fmt.Sprintf("/api/v1/nodes/%s/sensors", nodeID)
+	path := fmt.Sprintf("/api/v2/nodes/%s/sensors", nodeID)
 	resp, err := c.doRequest(ctx, http.MethodPost, path, bytes.NewReader(body), map[string]string{
 		"Content-Type": "application/json",
 		"Cookie":       "hw_auth=" + cookie,
@@ -225,7 +225,7 @@ func (c *HubClient) AddSensor(ctx context.Context, nodeID, cookie, sensorID, cus
 }
 
 func (c *HubClient) FetchCompose(ctx context.Context, apiKey string) ([]byte, error) {
-	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v1/nodes/compose", nil, map[string]string{
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v2/nodes/compose", nil, map[string]string{
 		"Authorization": "Bearer " + apiKey,
 	})
 	if err != nil {
@@ -284,7 +284,7 @@ type addSensorRequest struct {
 }
 
 func (c *HubClient) FetchManifests(ctx context.Context, apiKey string) ([]*schema.SensorManifest, error) {
-	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v1/manifests", nil, map[string]string{
+	resp, err := c.doRequest(ctx, http.MethodGet, "/api/v2/manifests", nil, map[string]string{
 		"Authorization": "Bearer " + apiKey,
 	})
 	if err != nil {

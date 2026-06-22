@@ -17,7 +17,7 @@ Workers are decoupled from the HTTP transport layer and managed exclusively via 
 
 ## Data Flow Example (Event Processing)
 
-To understand how the layers interact, consider the lifecycle of an intrusion event when a sensor POSTs to `/api/v1/event`:
+To understand how the layers interact, consider the lifecycle of an intrusion event when a sensor POSTs to `/api/v2/event`:
 
 1. **Router (`internal/api/router.go`):** Matches the route and invokes `AgentAuthMiddleware`.
 2. **Middleware:** 

@@ -258,7 +258,7 @@ const editSensor = async (installedSensor: any) => {
   
   if (installedSensor.deployedVersion) {
       try {
-          const res = await api.get(`/api/v1/manifests/${encodeURIComponent(installedSensor.sensorId || installedSensor.id || installedSensor.name)}/versions?version=${encodeURIComponent(installedSensor.deployedVersion)}`)
+          const res = await api.get(`/api/v2/manifests/${encodeURIComponent(installedSensor.sensorId || installedSensor.id || installedSensor.name)}/versions?version=${encodeURIComponent(installedSensor.deployedVersion)}`)
           manifest = await res.json()
       } catch (err) {
           console.error("Failed to fetch deployed manifest version schema:", err)

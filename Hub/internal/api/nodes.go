@@ -10,7 +10,7 @@ import (
 )
 
 // CreateNode handles UI-first node creation
-// Route: POST /api/v1/nodes
+// Route: POST /api/v2/nodes
 type NodeHandler struct {
 	service *node.Service
 }
@@ -49,7 +49,7 @@ func (h *NodeHandler) CreateNode(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateNode handles UI requests to edit a Node's metadata
-// Route: PATCH /api/v1/nodes/{id}
+// Route: PATCH /api/v2/nodes/{id}
 func (h *NodeHandler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
@@ -78,7 +78,7 @@ func (h *NodeHandler) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// GetNodes handles GET /api/v1/nodes
+// GetNodes handles GET /api/v2/nodes
 func (h *NodeHandler) GetNodes(w http.ResponseWriter, r *http.Request) {
 	nodes, err := h.service.GetNodes()
 	if err != nil {
@@ -90,7 +90,7 @@ func (h *NodeHandler) GetNodes(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, nodes)
 }
 
-// GetNodeDetails handles GET /api/v1/nodes/{id}
+// GetNodeDetails handles GET /api/v2/nodes/{id}
 func (h *NodeHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
@@ -117,7 +117,7 @@ func (h *NodeHandler) GetNodeDetails(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// AddNodeSensor handles POST /api/v1/nodes/{id}/sensors
+// AddNodeSensor handles POST /api/v2/nodes/{id}/sensors
 func (h *NodeHandler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
@@ -145,7 +145,7 @@ func (h *NodeHandler) AddNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Sensor added, node pending sync"})
 }
 
-// EditNodeSensor handles PUT /api/v1/nodes/{id}/sensors/{sensorId}
+// EditNodeSensor handles PUT /api/v2/nodes/{id}/sensors/{sensorId}
 func (h *NodeHandler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
@@ -168,7 +168,7 @@ func (h *NodeHandler) EditNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// UpgradeNodeSensor handles POST /api/v1/nodes/{id}/sensors/{sensorId}/upgrade
+// UpgradeNodeSensor handles POST /api/v2/nodes/{id}/sensors/{sensorId}/upgrade
 func (h *NodeHandler) UpgradeNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
@@ -181,7 +181,7 @@ func (h *NodeHandler) UpgradeNodeSensor(w http.ResponseWriter, r *http.Request) 
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Sensor upgraded, node pending sync"})
 }
 
-// DeleteNodeSensor handles DELETE /api/v1/nodes/{id}/sensors/{sensorId}
+// DeleteNodeSensor handles DELETE /api/v2/nodes/{id}/sensors/{sensorId}
 func (h *NodeHandler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 	sensorID := chi.URLParam(r, "sensorId")
@@ -194,7 +194,7 @@ func (h *NodeHandler) DeleteNodeSensor(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// DeleteNode handles DELETE /api/v1/nodes/{id}
+// DeleteNode handles DELETE /api/v2/nodes/{id}
 func (h *NodeHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
@@ -206,7 +206,7 @@ func (h *NodeHandler) DeleteNode(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// UpgradeNode handles POST /api/v1/nodes/{id}/upgrade
+// UpgradeNode handles POST /api/v2/nodes/{id}/upgrade
 func (h *NodeHandler) UpgradeNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := chi.URLParam(r, "nodeId")
 
@@ -218,7 +218,7 @@ func (h *NodeHandler) UpgradeNode(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success", "message": "Node upgraded, pending sync"})
 }
 
-// GetCurrentNode handles GET /api/v1/nodes/me
+// GetCurrentNode handles GET /api/v2/nodes/me
 // Used by wizard agents authenticated via Bearer token
 func (h *NodeHandler) GetCurrentNode(w http.ResponseWriter, r *http.Request) {
 

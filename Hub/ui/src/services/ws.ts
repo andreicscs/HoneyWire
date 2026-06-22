@@ -102,7 +102,7 @@ export class HoneyWireWS {
 
     const protocol = this.baseUrl.startsWith('https') ? 'wss:' : 'ws:';
     const host = this.baseUrl.replace(/^https?:\/\//, '');
-    const wsUrl = `${protocol}//${host}/api/v1/ws`;
+    const wsUrl = `${protocol}//${host}/api/v2/ws`;
 
     this.ws = new WebSocket(wsUrl);
 

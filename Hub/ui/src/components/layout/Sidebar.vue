@@ -16,7 +16,7 @@ const { sidebarOpen, viewingArchive, version } = storeToRefs(appStore)
 
 const clearLogs = async () => {
     try {
-        const dryRes = await fetch('/api/v1/events?dryrun=true', { method: 'DELETE' })
+        const dryRes = await fetch('/api/v2/events?dryrun=true', { method: 'DELETE' })
         if (!dryRes.ok) throw new Error("Failed to fetch dryrun data")
         
         const dryData = await dryRes.json()
@@ -28,7 +28,7 @@ const clearLogs = async () => {
         }
 
         if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
-            const response = await fetch('/api/v1/events?dryrun=false', {
+            const response = await fetch('/api/v2/events?dryrun=false', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
             })

@@ -248,7 +248,7 @@ func (s *Sensor) RunTestMode() bool {
 		"details":         details,
 	}
 
-	resp, err := s.postToHub("/api/v1/event", payload)
+	resp, err := s.postToHub("/api/v2/event", payload)
 	if err != nil {
 		log.Printf("[-] Test mode failed to send event: %v", err)
 		return false
@@ -321,7 +321,7 @@ func (s *Sensor) eventLoop() {
 
 func (s *Sensor) processEvent(event map[string]any) {
 	for attempt := 0; attempt < MaxRetriesPerEvent; attempt++ {
-		resp, err := s.postToHub("/api/v1/event", event)
+		resp, err := s.postToHub("/api/v2/event", event)
 		fact := classify(err, resp)
 
 		if resp != nil {
@@ -357,7 +357,7 @@ func (s *Sensor) drainQueue() {
 	for {
 		select {
 		case event := <-s.eventCh:
-			if resp, err := s.postToHub("/api/v1/event", event); err == nil && resp != nil {
+			if resp, err := s.postToHub("/api/v2/event", event); err == nil && resp != nil {
 				resp.Body.Close()
 			}
 		default:
@@ -405,7 +405,7 @@ func (s *Sensor) sendHeartbeat() (*http.Response, error) {
 		"sensorId":        s.SensorID,
 		"configRev":       s.ConfigRev,
 	}
-	return s.postToHub("/api/v1/heartbeat", payload)
+	return s.postToHub("/api/v2/heartbeat", payload)
 }
 
 // ==========================================
@@ -419,7 +419,7 @@ func (s *Sensor) GoOffline(reason string) {
 	payload := map[string]any{"sensorId": s.SensorID, "reason": reason}
 
 	jsonData, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", s.HubEndpoint+"/api/v1/offline", bytes.NewReader(jsonData))
+	req, _ := http.NewRequest("POST", s.HubEndpoint+"/api/v2/offline", bytes.NewReader(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.HubKey)
 
