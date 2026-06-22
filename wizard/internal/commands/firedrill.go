@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/honeywire/wizard/internal/cli"
@@ -48,7 +48,7 @@ func HandleFiredrill() error {
 	f.Add("label", fmt.Sprintf("com.docker.compose.project=%s", deploy.ProjectName))
 
 	listCtx, listCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	containers, err := dockerClient.ContainerList(listCtx, types.ContainerListOptions{
+	containers, err := dockerClient.ContainerList(listCtx, container.ListOptions{
 		Filters: f,
 	})
 	listCancel()

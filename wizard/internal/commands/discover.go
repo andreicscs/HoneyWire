@@ -17,7 +17,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/honeywire/wizard/core/discovery"
 	"github.com/honeywire/wizard/core/scanner"
@@ -468,7 +468,7 @@ func buildDockerPortMap() (map[int]string, error) {
 	}
 	defer cli.Close()
 
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := cli.ContainerList(ctx, container.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
