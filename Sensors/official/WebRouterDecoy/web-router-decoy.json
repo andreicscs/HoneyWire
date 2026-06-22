@@ -24,7 +24,7 @@
         "content": [
           "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
           "Execution Privilege: Runs as container root (UID 0) to allow bridging network modes.",
-          "Required Capabilities: None required. Relies purely on isolated internal container routing."
+          "Required Capabilities: Adds 'NET_BIND_SERVICE' to allow binding to ports below 1024 without needing full host network control."
         ]
       }
     ]
@@ -55,6 +55,9 @@
   "deployment": {
     "network_mode": "host",
     "user": "0:0",
+    "cap_add": [
+      "NET_BIND_SERVICE"
+    ],
     "env_vars": [
       {
         "name": "HW_HUB_ENDPOINT",
