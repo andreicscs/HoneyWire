@@ -37,7 +37,7 @@ func Load() *Config {
 		DashboardPassword: getEnv("HW_DASHBOARD_PASSWORD", ""),
 		DBPath:            getEnv("HW_DB_PATH", "honeywire.db"),
 		Port:              getEnv("HW_PORT", "8080"),
-		Version:           getEnv("HW_VERSION", "1.1.0"),
+		Version:           models.HubVersion,
 		Env:               getEnv("HW_ENV", "production"),
 		TrustProxy:        isProxyTrusted,
 	}

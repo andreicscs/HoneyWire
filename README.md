@@ -166,8 +166,7 @@ Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to
 
 ## Versioning and API Reference
 
-- HoneyWire uses a single source of truth version file: `VERSION` in the repo root.
-- The runtime version is exposed via an env override: `HW_VERSION` (Hub + Sensors), which defaults to `VERSION`.
+- HoneyWire versions are managed via Git Tags.
 - `Hub` endpoint:
-  - `GET /api/v1/version` → returns `{ "version": "2.0.0" }`
+  - `GET /api/v1/version` → returns `{ "version": "v2.0.0" }`
 - API docs file: [API.md](./Docs/architecture/hub/backend/API.md) with full backend route reference and sample payloads.
