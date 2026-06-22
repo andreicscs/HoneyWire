@@ -36,7 +36,7 @@ const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <!-- Event Volume (24h) -->
         <div class="bg-bg-surface w-full max-w-2xl border border-border-default rounded-lg p-5 shadow-sm flex flex-col">
-            <h3 class="text-sm font-semibold text-text-h mb-4">Event Volume (24h)</h3>
+            <h3 class="text-base font-semibold text-text-h mb-4">Event Volume (24h)</h3>
             <div v-if="topSensors.length > 0" class="space-y-3 overflow-y-auto custom-scroll max-h-[240px] pr-1">
                 <div v-for="sensor in topSensors" :key="sensor.id">
                     <div class="flex items-center justify-between mb-1.5">
@@ -54,7 +54,7 @@ const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
         <!-- Recent Activity — mini event table -->
         <div class="bg-bg-surface border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
             <div class="px-4 py-3 border-b border-border-default flex items-center justify-between bg-bg-surface shrink-0">
-                <h3 class="text-sm font-semibold text-text-h">Recent Activity</h3>
+                <h3 class="text-base font-semibold text-text-h">Recent Activity</h3>
                 <button @click="$emit('viewAllEvents')" class="text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none">View All &rarr;</button>
             </div>
             
