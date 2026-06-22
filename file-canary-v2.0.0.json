@@ -1,0 +1,147 @@
+{
+  "id": "hw-sensor-file-canary",
+  "version": "2.0.0",
+  "name": "File Canary (FIM)",
+  "category": "file",
+  "osi_layer": "Host Level",
+  "icon_svg": "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  "description": "Honeypot and File Integrity Monitor. Watches files/directories for unauthorized modifications.",
+  "documentation": {
+    "summary": "The File Canary acts as both a Honeypot and a File Integrity Monitor (FIM). It watches a specified directory or file on the host machine for unauthorized access, modifications, or encryption attempts (e.g., Ransomware spreading across the LAN).",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Context-Aware Lures: Automatically generates realistic trap files based on detected host services (database backups, web config files, etc.).",
+          "Safe Permissions Handling: Uses Access Control Lists (ACLs) to securely read target directories without altering original host ownership.",
+          "Real-time Alerting: Instant telemetry transmission on file access, modification, or deletion."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs completely unprivileged as UID 65532 to prevent system-level modifications even in the event of a breach.",
+          "Required Capabilities: DAC_OVERRIDE, operates purely through monitored Volume Mounts."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {
+      "processes": [
+        "python3",
+        "node",
+        "java",
+        "nginx",
+        "apache2",
+        "httpd",
+        "php-fpm",
+        "docker-proxy",
+        "ruby",
+        "perl",
+        "go"
+      ]
+    },
+    "recommendation_reason": "Application runtime detected. Deploying a file integrity monitor is highly recommended to catch suspicious canary file interactions or ransomware activity."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "65532:65532",
+    "init_containers": [
+      {
+        "name": "fim-decoy-provisioner",
+        "command": "/app/file-canary init",
+        "user": "0:0",
+        "cap_add": [
+          "DAC_OVERRIDE"
+        ],
+        "security_opt": [
+          "no-new-privileges:true"
+        ],
+        "volume_mounts": [
+          {
+            "type": "dynamic_dir_bind",
+            "source_env": "HW_DECOY_FILES",
+            "target_prefix": "/host",
+            "read_only": false
+          }
+        ],
+        "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+        "image_tag": "v2.0.0",
+        "image_digest": "sha256:89a7b0888563cd9834aeff0464cd86451c853515fff1fd919783ee62703e066b"
+      }
+    ],
+    "volume_mounts": [
+      {
+        "type": "dynamic_file_bind",
+        "source_env": "HW_DECOY_FILES",
+        "target_prefix": "/canaries",
+        "read_only": true
+      }
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-file-canary",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "critical",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_ALERT_ON_OPEN",
+        "description": "Generate alerts when a file is simply read or opened (noisier).",
+        "default": "false",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_DECOY_FILES",
+        "description": "Comma-separated list of absolute file paths to deploy and monitor.",
+        "default": "{{ if .HasWeb }}/var/www/html/.backup-config.php{{ else if .HasDB }}/var/lib/db/dump.sql.bak{{ else }}/opt/.env.backup{{ end }}{{ if gt (len .MatchedServices) 1 }},/home/admin/vpn_keys.txt{{ end }}",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-filecanary",
+    "image_tag": "v2.0.0",
+    "image_digest": "sha256:89a7b0888563cd9834aeff0464cd86451c853515fff1fd919783ee62703e066b"
+  }
+}
