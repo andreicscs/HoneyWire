@@ -128,7 +128,7 @@
         "hidden": false
       }
     ],
-    "image_repository": "192.168.1.11:5000/honeywire-tcptarpit",
+    "image_repository": "ghcr.io/andreicscs/honeywire-tcptarpit",
     "image_tag": "dev",
     "image_digest": ""
   }

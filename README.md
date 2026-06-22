@@ -100,7 +100,7 @@ services:
 
   # 2. THE HUB: The central Go-based dashboard and API
   hub:
-    image: registry.honeywire.dev/honeywire-hub:latest
+    image: ghcr.io/andreicscs/honeywire-hub:latest
     container_name: honeywire-hub
     restart: unless-stopped
     ports:
