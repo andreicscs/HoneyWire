@@ -1,6 +1,18 @@
 {
-  "generated": "2026-06-22T17:33:36Z",
+  "generated": "2026-06-22T17:33:49Z",
   "sensors": [
+    {
+      "id": "hw-sensor-tcp-tarpit",
+      "name": "TCP Tarpit (Credential Trap)",
+      "category": "network",
+      "icon_svg": "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+      "latest": "2.0.0",
+      "versions": [
+        {
+          "v": "2.0.0"
+        }
+      ]
+    },
     {
       "id": "hw-sensor-web-router-decoy",
       "name": "Web Router Decoy",
