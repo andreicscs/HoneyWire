@@ -1,0 +1,134 @@
+name: Publish Sensor to Registry
+
+on:
+  push:
+    tags:
+      - 'sensor/**/v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    name: "📦 Publish Sensor Manifest"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract sensor name and version from tag
+        id: vars
+        run: |
+          TAG_REF="${GITHUB_REF#refs/tags/}"
+          SENSOR_NAME=$(echo "$TAG_REF" | sed 's|^sensor/||' | sed 's|/v[0-9].*$||')
+          VERSION=$(echo "$TAG_REF" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+
+          if [ -z "$SENSOR_NAME" ] || [ -z "$VERSION" ]; then
+            exit 1
+          fi
+
+          echo "SENSOR_NAME=$SENSOR_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Validate source manifest
+        id: validate
+        run: |
+          EXPECTED_ID="hw-sensor-${{ steps.vars.outputs.SENSOR_NAME }}"
+          SOURCE=$(find Sensors/official -name "*.json" | while read file; do
+              ID=$(jq -r '.id // empty' "$file" 2>/dev/null || true)
+              if [ "$ID" = "$EXPECTED_ID" ]; then
+                  echo "$file"
+                  exit 0
+              fi
+          done)
+
+          if [ -z "$SOURCE" ]; then
+            exit 1
+          fi
+          echo "SOURCE=$SOURCE" >> $GITHUB_OUTPUT
+
+      - name: Build versioned manifest
+        id: build
+        run: |
+          SOURCE="${{ steps.validate.outputs.SOURCE }}"
+          SENSOR_NAME="${{ steps.vars.outputs.SENSOR_NAME }}"
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          OUTPUT_FILE="${SENSOR_NAME}-v${VERSION}.json"
+
+          jq --arg ver "$VERSION" --arg tag "v$VERSION" \
+             '.version = $ver |
+              .deployment.image_tag = $tag |
+              if .deployment.init_containers then
+                .deployment.init_containers = [
+                  .deployment.init_containers[] | .image_tag = $tag
+                ]
+              else . end' \
+             "$SOURCE" > "/tmp/$OUTPUT_FILE"
+
+          echo "OUTPUT_FILE=$OUTPUT_FILE" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Push Docker Image
+        run: |
+          SOURCE="${{ steps.validate.outputs.SOURCE }}"
+          SENSOR_DIR=$(dirname "$SOURCE")
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          
+          IMAGE_REPO=$(jq -r '.deployment.image_repository // empty' "$SOURCE")
+          if [ -z "$IMAGE_REPO" ]; then
+             exit 0
+          fi
+
+          IMAGE_TAG="$IMAGE_REPO:v$VERSION"
+          docker build -t "$IMAGE_TAG" -f "$SENSOR_DIR/Dockerfile" .
+          docker push "$IMAGE_TAG" | tee push_out.log
+          
+          DIGEST=$(grep -o 'sha256:[a-f0-9]\{64\}' push_out.log | tail -n 1)
+          if [ -n "$DIGEST" ]; then
+             OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
+             jq --arg digest "$DIGEST" '.deployment.image_digest = $digest | if .deployment.init_containers then .deployment.init_containers[].image_digest = $digest else . end' "/tmp/$OUTPUT_FILE" > "/tmp/$OUTPUT_FILE.tmp" && mv "/tmp/$OUTPUT_FILE.tmp" "/tmp/$OUTPUT_FILE"
+          else
+             exit 1
+          fi
+
+      - name: Checkout registry-pages branch
+        run: |
+          cp scripts/build-registry-index.sh /tmp/build-registry-index.sh
+          chmod +x /tmp/build-registry-index.sh
+
+          git config user.name "HoneyWire CI"
+          git config user.email "ci@honeywire.dev"
+
+          if git ls-remote --exit-code --heads origin registry-pages >/dev/null 2>&1; then
+            git fetch origin registry-pages
+            git checkout registry-pages
+          else
+            git checkout --orphan registry-pages
+            git rm -rf . 2>/dev/null || true
+            echo "# HoneyWire Sensor Registry" > README.md
+            git add README.md
+            git commit -m "Initialize registry-pages branch"
+          fi
+
+      - name: Write versioned manifest to registry
+        run: |
+          OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
+          cp "/tmp/$OUTPUT_FILE" "./$OUTPUT_FILE"
+
+      - name: Rebuild index.json
+        run: /tmp/build-registry-index.sh
+
+      - name: Commit and push to registry-pages
+        run: |
+          SENSOR_NAME="${{ steps.vars.outputs.SENSOR_NAME }}"
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
+
+          git add "$OUTPUT_FILE" index.json
+          git commit -m "registry: publish ${SENSOR_NAME} v${VERSION}"
+          git push origin registry-pages
