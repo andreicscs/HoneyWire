@@ -1,0 +1,88 @@
+{
+  "id": "hw-sensor-icmp-canary",
+  "version": "2.0.0",
+  "name": "ICMP Canary",
+  "category": "network",
+  "osi_layer": "Network Layer",
+  "icon_svg": "M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+  "description": "Detects internal network discovery (ping sweeps) from compromised assets.",
+  "documentation": {
+    "summary": "The ICMP Canary monitors for Internet Control Message Protocol (ICMP) Echo Request packets. In secure enterprise environments, receiving an internal ping on an isolated workload is highly indicative of a compromised asset performing subnet mapping.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Passive Monitoring: Listens for ICMP traffic directly on the host interface without generating responses.",
+          "Detailed Logging: Captures source IP, TTL, packet size, and timing information.",
+          "Network Discovery Detection: Identifies internal subnet scanning and host enumeration instantly."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to initialize the raw network socket.",
+          "Required Capabilities: Adds 'NET_RAW' to allow direct packet inspection bypassing traditional NIDS frameworks."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {},
+    "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments (e.g., Uptime Kuma)."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "0:0",
+    "cap_add": [
+      "NET_RAW"
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-icmp-canary",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "info",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-icmpcanary",
+    "image_tag": "v2.0.0",
+    "image_digest": "sha256:42d8619ccaa19a2d0e43a8043e710834231ea2716d26a27ef7b9f8d8ae9b2598"
+  }
+}
