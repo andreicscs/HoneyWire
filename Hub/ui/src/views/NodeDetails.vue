@@ -229,6 +229,12 @@ onMounted(async () => {
   }
 })
 
+watch(() => node.value?.hasPendingConfig, (newVal) => {
+  if (newVal === false && showSyncModal.value) {
+    showSyncModal.value = false
+  }
+})
+
 const openSensor = (sensor: any) => {
   const apiKey = node.value?.apiKey
   selectedSensor.value = sensor
