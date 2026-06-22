@@ -28,7 +28,6 @@
 - [Security Notes](#security-notes)
 - [Tech Stack](#tech-stack)
 - [Versioning and API Reference](#versioning-and-api-reference)
-- [Operational Checklist](#operational-checklist)
 
 ## Overview
 **HoneyWire** is a lightweight, Distributed High-Signal Security Early-Warning System Builder, designed for internal networks. It leverages its architecture and UX to make it incredibly easy to build a new Cyber Canary server or deploy HoneyWires on existing ones. Using deception technology, it replaces the "magnifying glass" approach of traditional SIEMs which often drown analysts in false positives by surveilling legitimate traffic with a High-Fidelity Tripwire model. 
