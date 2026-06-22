@@ -34,7 +34,7 @@ jobs:
           IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/honeywire-hub:v$VERSION"
           LATEST_TAG="ghcr.io/${{ github.repository_owner }}/honeywire-hub:latest"
           
-          docker build -t "$IMAGE_TAG" -t "$LATEST_TAG" -f Hub/Dockerfile .
+          docker build -t "$IMAGE_TAG" -t "$LATEST_TAG" -f Hub/Dockerfile Hub/
           docker push "$IMAGE_TAG"
           docker push "$LATEST_TAG"
 
