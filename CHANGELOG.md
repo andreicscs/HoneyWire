@@ -9,6 +9,8 @@
 ### Features
 * **Event Exporting:** Added a native "Export JSON" button to the Event Table to download forensic event data contextually (respects active vs archived views).
 
+**To update the Hub run: `docker compose up -d --pull always hub`**
+
 
 # [v2.0.0] - "The Security and UX Update" (2026-06-22)
 ## This is a massive, breaking architectural update that transitions HoneyWire from a passive event listener into a comprehensive, distributed fleet management platform.
