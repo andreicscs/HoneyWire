@@ -159,7 +159,7 @@ const handleSilenceNode = () => {
 
 const handleDeleteNode = async () => {
     if (!node.value?.id) return
-    if (confirm(`Delete node "${node.value.alias}"? This cannot be undone.`)) {
+    if (confirm(`Delete Node "${node.value.alias}" aka "${node.value.id}", ALL of its underlying sensors and events?`)) {
         const res = await fleetStore.deleteNode(node.value.id)
         if (res.success) {
             router.push('/fleet')

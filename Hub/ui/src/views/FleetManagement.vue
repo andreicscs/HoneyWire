@@ -72,7 +72,9 @@ const handleUpdateNode = async (nodeId: string, updates: Partial<FleetNode>) => 
  
 const handleSilenceNode = (nodeId: string) => fleetStore.silenceNode(nodeId)
 const handleForgetNode = async (nodeId: string) => {
-    if (!confirm(`Delete Node "${nodeId}" and ALL of its underlying sensors?`)) return
+    const node = fleetStore.nodes.find(n => n.id === nodeId)
+    const alias = node ? node.alias : nodeId
+    if (!confirm(`Delete Node "${alias}" aka "${nodeId}", ALL of its underlying sensors and events?`)) return
     const res = await fleetStore.deleteNode(nodeId)
     if (!res.success) alert(res.error)
 }

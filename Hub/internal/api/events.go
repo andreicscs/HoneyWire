@@ -99,6 +99,31 @@ func (h *EventHandler) MarkEventsRead(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
+func (h *EventHandler) ExportEvents(w http.ResponseWriter, r *http.Request) {
+	archivedParam := r.URL.Query().Get("archived")
+	isArchived := 0
+	if archivedParam == "true" {
+		isArchived = 1
+	}
+
+	nodeID := r.URL.Query().Get("nodeId")
+	sensorID := r.URL.Query().Get("sensorId")
+
+	events, err := h.service.GetEvents(isArchived, nodeID, sensorID)
+	if err != nil {
+		RespondError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename=honeywire_events.json")
+	w.Header().Set("Content-Type", "application/json")
+	
+	if err := json.NewEncoder(w).Encode(events); err != nil {
+		http.Error(w, "Failed to encode events", http.StatusInternalServerError)
+		return
+	}
+}
+
 func (h *EventHandler) ArchiveEvent(w http.ResponseWriter, r *http.Request) {
 	eventID := chi.URLParam(r, "eventId")
 	if err := h.service.ArchiveEvent(eventID); err != nil {

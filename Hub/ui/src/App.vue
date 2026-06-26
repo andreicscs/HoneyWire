@@ -68,7 +68,13 @@ const loadAppData = async () => {
     wsService.on('onSensorHeartbeat', (payload: any) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
     wsService.on('onNewNode', (payload: any) => fleetStore.handleWsUpdate('NEW_NODE', payload))
     wsService.on('onUpdateNode', (payload: any) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
-    wsService.on('onDeleteNode', (payload: any) => fleetStore.handleWsUpdate('DELETE_NODE', payload))
+    wsService.on('onDeleteNode', (payload: any) => {
+      fleetStore.handleWsUpdate('DELETE_NODE', payload)
+      eventsStore.fetchEvents().catch(() => {})
+      eventsStore.fetchSeverityProjection('alltime', fleetStore.selectedNodeId, fleetStore.selectedSensorId).catch(() => {})
+      eventsStore.fetchSummaryProjection('24H', fleetStore.selectedNodeId, fleetStore.selectedSensorId).catch(() => {})
+      eventsStore.invalidateThreatVelocityProjection()
+    })
     wsService.on('onNodeSynced', (payload: any) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
     wsService.on('onCatalogUpdated', (payload: any) => fleetStore.handleWsUpdate('CATALOG_UPDATED', payload))
 

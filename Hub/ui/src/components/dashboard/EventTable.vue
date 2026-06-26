@@ -148,6 +148,19 @@ const getDataType = (val: any) => {
     if (typeof val === 'object') return 'object'
     return 'primitive'
 }
+const handleExport = () => {
+    const url = new URL('/api/v2/events/export', window.location.origin)
+    url.searchParams.append('archived', viewingArchive.value ? 'true' : 'false')
+    if (fleetStore.selectedNodeId) url.searchParams.append('nodeId', fleetStore.selectedNodeId)
+    if (fleetStore.selectedSensorId) url.searchParams.append('sensorId', fleetStore.selectedSensorId)
+    const a = document.createElement('a')
+    a.href = url.toString()
+    a.download = 'honeywire_events.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+}
+
 const formatTime = (timestamp: string) => {
     if (!timestamp) return ''
     const dateObj = new Date(timestamp)
@@ -174,14 +187,24 @@ const formatTime = (timestamp: string) => {
     <div class="bg-bg-surface border border-border-default rounded-lg overflow-hidden flex flex-col shadow-sm w-full relative z-0">
         
         <div class="px-5 py-3 border-b border-border-default flex justify-between items-center bg-bg-surface shrink-0">
-            <h3 class="text-base font-medium text-text-h">
-                {{ viewingArchive ? 'Archived Events' : 'Active Threat Queue' }}
-            </h3>
-            <div class="justify-between items-center flex gap-2">
-                <div v-show="!viewingArchive" class="hidden sm:flex items-center gap-2 pr-1">
+            <div class="flex items-center gap-3">
+                <h3 class="text-base font-medium text-text-h">
+                    {{ viewingArchive ? 'Archived Events' : 'Active Threat Queue' }}
+                </h3>
+                <div v-show="!viewingArchive" class="hidden sm:flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-success-main animate-pulse shadow-[0_0_8px_var(--color-success-main)]"></span>
-                    <span class="text-base font-medium tracking-wide text-text-m">Live</span>
+                    <span class="text-sm font-medium tracking-wide text-text-m">Live</span>
                 </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button v-show="displayEvents.length > 0" @click="handleExport"
+                        type="button"
+                        title="Export JSON"
+                        aria-label="Export all events as JSON"
+                        class="p-1.5 rounded-md text-text-m transition-colors outline-none hover:bg-secondary-hover hover:text-text-h active:scale-95">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
                 <button v-show="!viewingArchive && displayEvents.length > 0" @click="handleArchiveAll"
                         type="button"
                         aria-label="Archive all active events"

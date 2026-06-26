@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import BaseModal from '../ui/feedback/BaseModal.vue'
 import BaseButton from '../ui/forms/BaseButton.vue'
 import BaseInput from '../ui/forms/BaseInput.vue'
@@ -17,14 +17,15 @@ const { copiedStates, handleCopy } = useClipboard() as any
 const step = ref(1)
 const form = ref({ alias: '' })
 const nodeKey = ref('')
-
 const hubUrl = computed(() => configStore.config.hubEndpoint)
+const createdNodeId = ref('')
 
 const submit = async () => {
     if (!form.value.alias) return
     try {
         const result = await fleetStore.createNode(form.value.alias)
         nodeKey.value = result.apiKey
+        createdNodeId.value = result.nodeId
         step.value = 2
     } catch (err) {
         alert('Could not create node. Please try again.')
@@ -37,8 +38,23 @@ const close = () => {
         step.value = 1
         form.value.alias = ''
         nodeKey.value = ''
+        createdNodeId.value = ''
     }, 300)
 }
+
+watch(() => createdNodeId.value, (newId) => {
+    if (newId) {
+        const unwatch = watch(
+            () => fleetStore.nodes.find(n => n.id === newId)?.lastHeartbeat,
+            (newHeartbeat) => {
+                if (newHeartbeat) {
+                    close()
+                    unwatch()
+                }
+            }
+        )
+    }
+})
 </script>
 
 <template>

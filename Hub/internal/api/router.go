@@ -99,6 +99,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Get("/api/v2/events/unread", cfg.Events.GetUnreadCount)
 		r.Patch("/api/v2/events/read", cfg.Events.MarkEventsRead)
 		r.Patch("/api/v2/events/{eventId}/read", cfg.Events.MarkSingleEventRead)
+		r.Get("/api/v2/events/export", cfg.Events.ExportEvents)
 		r.Delete("/api/v2/events", cfg.Events.ClearEvents)
 		r.Patch("/api/v2/events/{eventId}/archive", cfg.Events.ArchiveEvent)
 		r.Patch("/api/v2/events/archive-all", cfg.Events.ArchiveAll)

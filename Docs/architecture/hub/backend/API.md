@@ -371,6 +371,15 @@ Returns a list of events, newest first.
 - `nodeId` — filter by node ID
 - `sensorId` — filter by sensor ID
 
+### GET /api/v2/events/export
+
+Exports events as a downloadable JSON file (`honeywire_events.json`).
+
+**Query parameters:**
+- `archived` — `true` or `false` (default: `false`)
+- `nodeId` — filter by node ID
+- `sensorId` — filter by sensor ID
+
 ### PATCH /api/v2/events/read
 
 Marks all active events as read.
