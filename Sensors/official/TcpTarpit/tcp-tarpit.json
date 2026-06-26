@@ -1,6 +1,6 @@
 {
   "id": "hw-sensor-tcp-tarpit",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "name": "TCP Tarpit (Credential Trap)",
   "category": "network",
   "osi_layer": "Network Layer",
@@ -106,7 +106,7 @@
       {
         "name": "HW_DECOY_PORTS",
         "description": "Comma-separated list of internal ports to tarpit.",
-        "default": "2222,3306",
+        "default": "{{ availablePort 2222 }},{{ availablePort 3306 }}",
         "type": "string",
         "required": false,
         "hidden": false
