@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/andreicscs/HoneyWire/releases">
-    <img src="https://img.shields.io/badge/release-v2.0.0-blue.svg?style=flat-square" alt="Latest Release" />
+    <img src="https://img.shields.io/badge/release-v2.0.1-blue.svg?style=flat-square" alt="Latest Release" />
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-AGPLv3-blue.svg?style=flat-square" alt="License: GPLv3" />
