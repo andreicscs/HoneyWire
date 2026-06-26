@@ -1,5 +1,16 @@
-# [v2.0.0] - "The Security and UX Update" (2026-06-22)
+# [v2.0.1] - Hotfix & Export Features (2026-06-26)
 
+### Bug Fixes
+* **Hub Auto-Updates:** Fixed a race condition where the Hub would instantly autoupdate sensors before a manual sync was triggered. Deployed sensor versions are now correctly pinned until the user runs `honeywire apply`.
+* **TCP Tarpit Port Collision:** Fixed an issue where the TCP Tarpit sensor template didn't use `{{ availablePort }}`, which caused conflicts with the Hub's web server if deployed on the same Node via the Wizard.
+* **UI Deletion Desync:** Deleting a Node now dynamically clears associated UI events via WebSocket without requiring a hard page refresh. Clarified deletion confirm prompts.
+* **Modal UX:** The Fleet Deploy Modal now cleanly auto-closes the moment a newly linked node connects to the Hub.
+
+### Features
+* **Event Exporting:** Added a native "Export JSON" button to the Event Table to download forensic event data contextually (respects active vs archived views).
+
+
+# [v2.0.0] - "The Security and UX Update" (2026-06-22)
 ## This is a massive, breaking architectural update that transitions HoneyWire from a passive event listener into a comprehensive, distributed fleet management platform.
 
 ### ⚠️ Breaking Changes
