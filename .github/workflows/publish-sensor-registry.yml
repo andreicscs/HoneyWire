@@ -86,8 +86,10 @@ jobs:
           fi
 
           IMAGE_TAG="$IMAGE_REPO:v$VERSION"
-          docker build -t "$IMAGE_TAG" -f "$SENSOR_DIR/Dockerfile" .
+          LATEST_TAG="$IMAGE_REPO:latest"
+          docker build -t "$IMAGE_TAG" -t "$LATEST_TAG" -f "$SENSOR_DIR/Dockerfile" .
           docker push "$IMAGE_TAG" | tee push_out.log
+          docker push "$LATEST_TAG"
           
           DIGEST=$(grep -o 'sha256:[a-f0-9]\{64\}' push_out.log | tail -n 1)
           if [ -n "$DIGEST" ]; then
