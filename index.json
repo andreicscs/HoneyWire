@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-22T17:34:21Z",
+  "generated": "2026-06-26T11:06:56Z",
   "sensors": [
     {
       "id": "hw-sensor-file-canary",
@@ -42,10 +42,13 @@
       "name": "TCP Tarpit (Credential Trap)",
       "category": "network",
       "icon_svg": "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
         {
           "v": "2.0.0"
+        },
+        {
+          "v": "2.0.1"
         }
       ]
     },
