@@ -215,6 +215,11 @@ func (s *Service) GetNodeCompose(token, hostFallback string, currentHubVersion s
 		targetVersion := sensor.DeployedVersion
 		if targetVersion == "" {
 			targetVersion, _ = s.catalog.GetLatestCompatibleVersion(sensor.ID, currentHubVersion)
+			
+			// Lock the resolved version in the database so it doesn't float with the catalog
+			if targetVersion != "" {
+				_ = s.store.SetNodeSensorDeployedVersion(nodeID, sensor.ID, targetVersion)
+			}
 		}
 
 		manifestPtr, err := s.FetchSpecificManifest(sensor.ID, targetVersion)
