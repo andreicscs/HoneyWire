@@ -42,7 +42,7 @@ If you have legitimate automated security scanners tripping HoneyWires just whit
 ## Showcase
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/f9f222cd-f934-4ebf-a4a0-d674db175573" autoplay loop muted playsinline width="100%"></video>
+  <video src="https://github.com/user-attachments/assets/b82d3c18-9fc9-4393-84c8-4cd7046d9517" autoplay loop muted playsinline width="100%"></video>
 </div>
 
 
