@@ -82,13 +82,11 @@ func main() {
 		"Wizard Firedrill",
 		"Multiple Ports",
 		sdk.EventDetails{
-			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
-			{Key: "ports_hit", Value: []uint16{22, 80, 443, 3306, 8080}},
+			{Key: "ports_hit", Value: []string{"22", "80", "443", "3306", "8080", "..."}},
+			{Key: "count", Value: 1000},
 			{Key: "scan_type", Value: "Stealth SYN Port Scan"},
 			{Key: "tool_guess", Value: "Likely Nmap / Masscan"},
-			{Key: "count", Value: 5},
 			{Key: "window_sec", Value: 5.0},
-			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -304,9 +302,13 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 	mu.Unlock()
 
 	if shouldAlert {
-		displayPorts := uniquePortsList
-		if len(displayPorts) > 5 {
-			displayPorts = displayPorts[:5]
+		var displayPorts []string
+		for i, p := range uniquePortsList {
+			if i >= 5 {
+				displayPorts = append(displayPorts, "...")
+				break
+			}
+			displayPorts = append(displayPorts, strconv.Itoa(int(p)))
 		}
 
 		log.Printf("[!] %s detected from %s: %v | Tool: %s", scanType, srcIP, displayPorts, tool)
@@ -317,11 +319,10 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 			"Multiple Ports",
 			sdk.EventDetails{
 				{Key: "ports_hit", Value: displayPorts},
+				{Key: "count", Value: len(uniquePortsList)},
 				{Key: "scan_type", Value: scanType},
 				{Key: "tool_guess", Value: tool},
-				{Key: "count", Value: len(uniquePortsList)},
 				{Key: "window_sec", Value: window.Seconds()},
-				{Key: "action_taken", Value: "logged"},
 			},
 		)
 	}
