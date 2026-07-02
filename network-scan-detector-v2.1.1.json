@@ -1,0 +1,120 @@
+{
+  "id": "hw-sensor-network-scan-detector",
+  "version": "2.1.1",
+  "name": "Network Scan Detector",
+  "category": "network",
+  "osi_layer": "Network Layer",
+  "icon_svg": "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z M10 7v3m0 0v3m0-3h3m-3 0H7",
+  "description": "Detects horizontal port scanning (Nmap sweeps) across the LAN.",
+  "documentation": {
+    "summary": "The Network Scan Detector identifies compromised internal machines performing horizontal port scans. By silently tracking SYN packets on the network interface, it catches internal Nmap sweeps before they map out the local network.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Threshold-Based Detection: Configurable scan detection parameters for noisy environments.",
+          "Intelligent Filtering: Automatically ignores legitimate internal services to prevent false positives.",
+          "Source Tracking: Logs internal attacker IP addresses and precise scan patterns."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to initialize the raw network socket.",
+          "Required Capabilities: Adds 'NET_RAW' to allow deep packet-level inspection of TCP headers."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {},
+    "recommendation_reason": "Core Network Sensor, tracks stealthy subnet mapping. Might generate false positives in noisy environments."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "0:0",
+    "cap_add": [
+      "NET_RAW"
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-network-scan-detector",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "high",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SCAN_THRESHOLD",
+        "description": "Minimum unique ports scanned to trigger an alert (stealth scans bypass this).",
+        "default": "5",
+        "type": "int",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_SCAN_WINDOW",
+        "description": "Time window in seconds for scan detection.",
+        "default": "5",
+        "type": "int",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_IGNORE_LOCALHOST",
+        "description": "Ignore traffic originating from the host machine to prevent false positives.",
+        "default": "true",
+        "type": "boolean",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_IGNORE_PORTS",
+        "description": "Comma-separated list of ports to exclude from scan detection.",
+        "default": "{{ if .IgnorePorts }}{{ .IgnorePorts }}{{ else }}22,80,443{{ end }}",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-networkscandetector",
+    "image_tag": "v2.1.1",
+    "image_digest": "sha256:6c71700983fe26b8f65f88af8851cd6b56f94651762b7535eaada6c25cadfd27"
+  }
+}
