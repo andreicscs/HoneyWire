@@ -83,6 +83,6 @@
     ],
     "image_repository": "ghcr.io/andreicscs/honeywire-icmpcanary",
     "image_tag": "v2.1.0",
-    "image_digest": "sha256:ab7f494d030460c576f091eaaa5634a6ffdb20a94441b385fdeea6ac64bbf781"
+    "image_digest": "sha256:b7a60057e15b6fa0a64c822f2d71260bf607c9e6bb2af1a67591ad903e9a2136"
   }
 }
