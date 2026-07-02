@@ -82,7 +82,7 @@
       },
       {
         "name": "HW_SCAN_THRESHOLD",
-        "description": "Number of ports that must be scanned to trigger detection.",
+        "description": "Minimum unique ports scanned to trigger an alert (stealth scans bypass this).",
         "default": "5",
         "type": "int",
         "required": false,
@@ -97,6 +97,14 @@
         "hidden": false
       },
       {
+        "name": "HW_IGNORE_LOCALHOST",
+        "description": "Ignore traffic originating from the host machine to prevent false positives.",
+        "default": "true",
+        "type": "boolean",
+        "required": false,
+        "hidden": false
+      },
+      {
         "name": "HW_IGNORE_PORTS",
         "description": "Comma-separated list of ports to exclude from scan detection.",
         "default": "{{ if .IgnorePorts }}{{ .IgnorePorts }}{{ else }}22,80,443{{ end }}",
@@ -107,6 +115,6 @@
     ],
     "image_repository": "ghcr.io/andreicscs/honeywire-networkscandetector",
     "image_tag": "v2.1.0",
-    "image_digest": "sha256:07b1962d2e65d5f93df9ab0c7c533e7855a6e487560cab60b4b733a510232dbf"
+    "image_digest": "sha256:34cb77ee414ba16a3c7fa869fe558d8ceb000191b619c77ec80dfb56e4fe775b"
   }
 }
