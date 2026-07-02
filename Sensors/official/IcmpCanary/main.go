@@ -20,15 +20,15 @@ func main() {
 	}
 
 	hw.SetTestPayload(
-		"icmp_ping_received",
+		"icmp_scan_received",
 		"Wizard Firedrill",
 		"ICMP Listener",
 		sdk.EventDetails{
 			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "icmp_type", Value: "Timestamp Request"},
 			{Key: "packet_size", Value: 64},
 			{Key: "icmp_id", Value: 1337},
 			{Key: "icmp_seq", Value: 1},
-			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -78,32 +78,44 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 			continue
 		}
 
-		if msg.Type != ipv4.ICMPTypeEcho {
-			continue
-		}
-
 		// Clean the IP string
 		sourceIP := addr.String()
 		if host, _, err := net.SplitHostPort(sourceIP); err == nil {
 			sourceIP = host
 		}
 
-		echo, ok := msg.Body.(*icmp.Echo)
-		if !ok {
-			continue
+		var icmpTypeStr string
+		var icmpID, icmpSeq int
+
+		if msg.Type == ipv4.ICMPTypeEcho {
+			icmpTypeStr = "Echo Request (Ping)"
+			if echo, ok := msg.Body.(*icmp.Echo); ok {
+				icmpID = echo.ID
+				icmpSeq = echo.Seq
+			}
+		} else if msg.Type == ipv4.ICMPTypeTimestamp {
+			icmpTypeStr = "Timestamp Request"
+			// Type 13 usually carries 12 bytes of data (ID, Seq, Timestamps).
+			// x/net/icmp parses it into a RawBody
+			if raw, ok := msg.Body.(*icmp.RawBody); ok && len(raw.Data) >= 4 {
+				icmpID = int(raw.Data[0])<<8 | int(raw.Data[1])
+				icmpSeq = int(raw.Data[2])<<8 | int(raw.Data[3])
+			}
+		} else {
+			continue // We only care about Ping and Timestamp scans
 		}
 
-		log.Printf("[+] ICMP Echo Request from %s (seq=%d size=%d)", sourceIP, echo.Seq, n)
+		log.Printf("[+] ICMP %s from %s (seq=%d size=%d)", icmpTypeStr, sourceIP, icmpSeq, n)
 
 		hw.ReportEvent(
-			"icmp_ping_received",
+			"icmp_scan_received",
 			sourceIP,
 			"ICMP Listener",
 			sdk.EventDetails{
+				{Key: "icmp_type", Value: icmpTypeStr},
 				{Key: "packet_size", Value: n},
-				{Key: "icmp_id", Value: echo.ID},
-				{Key: "icmp_seq", Value: echo.Seq},
-				{Key: "action_taken", Value: "logged"},
+				{Key: "icmp_id", Value: icmpID},
+				{Key: "icmp_seq", Value: icmpSeq},
 			},
 		)
 	}
