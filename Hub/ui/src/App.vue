@@ -47,6 +47,7 @@ const loadAppData = async () => {
 
     await Promise.all([
       fleetStore.fetchFleet().catch(e => console.error("Fleet fetch error:", e)),
+      fleetStore.fetchManifests().catch(e => console.error("Manifests fetch error:", e)),
       fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(e => console.error("Uptime fetch error:", e)),
       eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
     ])
@@ -82,6 +83,7 @@ const loadAppData = async () => {
       console.log("WebSocket Reconnected: Syncing missed data...")
       await Promise.all([
         fleetStore.fetchFleet().catch(() => {}),
+        fleetStore.fetchManifests().catch(() => {}),
         fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(() => {}),
         eventsStore.fetchEvents().catch(() => {}),
       ])

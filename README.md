@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/andreicscs/HoneyWire/releases">
-    <img src="https://img.shields.io/badge/release-v2.0.2-blue.svg?style=flat-square" alt="Latest Release" />
+    <img src="https://img.shields.io/badge/release-v2.0.3-blue.svg?style=flat-square" alt="Latest Release" />
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-AGPLv3-blue.svg?style=flat-square" alt="License: GPLv3" />
@@ -167,5 +167,5 @@ Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to
 
 - HoneyWire versions are managed via Git Tags.
 - `Hub` endpoint:
-  - `GET /api/v2/version` → returns `{ "version": "v2.0.2" }`
+  - `GET /api/v2/version` → returns `{ "version": "v2.0.3" }`
 - API docs file: [API.md](./Docs/architecture/hub/backend/API.md) with full backend route reference and sample payloads.
