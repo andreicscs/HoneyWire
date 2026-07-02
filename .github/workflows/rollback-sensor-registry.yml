@@ -8,6 +8,9 @@ on:
         required: true
         default: 'all'
 
+permissions:
+  contents: write
+
 jobs:
   rollback:
     name: "🔄 Rollback Sensor Version"
