@@ -87,13 +87,14 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 		var icmpTypeStr string
 		var icmpID, icmpSeq int
 
-		if msg.Type == ipv4.ICMPTypeEcho {
+		switch msg.Type {
+		case ipv4.ICMPTypeEcho:
 			icmpTypeStr = "Echo Request (Ping)"
 			if echo, ok := msg.Body.(*icmp.Echo); ok {
 				icmpID = echo.ID
 				icmpSeq = echo.Seq
 			}
-		} else if msg.Type == ipv4.ICMPTypeTimestamp {
+		case ipv4.ICMPTypeTimestamp:
 			icmpTypeStr = "Timestamp Request"
 			// Type 13 usually carries 12 bytes of data (ID, Seq, Timestamps).
 			// x/net/icmp parses it into a RawBody
@@ -101,7 +102,7 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 				icmpID = int(raw.Data[0])<<8 | int(raw.Data[1])
 				icmpSeq = int(raw.Data[2])<<8 | int(raw.Data[3])
 			}
-		} else {
+		default:
 			continue // We only care about Ping and Timestamp scans
 		}
 

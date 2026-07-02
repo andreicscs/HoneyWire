@@ -84,7 +84,10 @@ const goToDashboard = () => {
                     class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
                     :class="route.name === 'fleet' || route.name === 'node-details' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
                     :title="!sidebarOpen ? 'Fleet Management' : ''">
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+                <div class="relative flex shrink-0 items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+                    <span v-if="fleetStore.hasUpdatesAvailable" class="absolute -top-1 -right-1 w-2 h-2 bg-low/80 shadow-[0_0_6px_rgba(var(--color-low),0.6)] rounded-full ring-2 ring-bg-base animate-pulse"></span>
+                </div>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
                      :class="sidebarOpen ? 'max-w-[150px] ml-3 opacity-100' : 'max-w-0 ml-0 opacity-0'">
                     <span>Fleet Management</span>

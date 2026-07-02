@@ -145,12 +145,18 @@ export const useFleetStore = defineStore('fleet', () => {
 
   // --- DYNAMIC READ MODELS ---
   const sensorsByNodeId = computed<Record<string, InstalledSensor[]>>(() => {
-    const map: Record<string, InstalledSensor[]> = {}
-    for (const s of Object.values(state.value.sensorsById)) {
-      if (!map[s.nodeId]) map[s.nodeId] = []
-      map[s.nodeId].push(s)
+    const res: Record<string, InstalledSensor[]> = {}
+    for (const sensor of Object.values(state.value.sensorsById)) {
+      if (!res[sensor.nodeId]) res[sensor.nodeId] = []
+      res[sensor.nodeId].push(sensor)
     }
-    return map
+    return res
+  })
+
+  const hasUpdatesAvailable = computed(() => {
+    if (Object.values(state.value.nodesById).some(node => node.hasUpdateAvailable)) return true
+    if (Object.values(state.value.sensorsById).some(sensor => sensor.updateAvailable)) return true
+    return false
   })
 
   const nodes = computed<FleetNode[]>(() => {
@@ -732,7 +738,7 @@ export const useFleetStore = defineStore('fleet', () => {
     selectedNodeId, selectedSensorId, activeTimeframe, uptimeData,
     pendingNodeActions, pendingSensorActions,
     selectedNode, selectedSensor,
-    nodes, sensorsByNodeId, overallUptime, manifests,
+    nodes, sensorsByNodeId, hasUpdatesAvailable, overallUptime, manifests,
     getNode, getSensor, hydratedUptimeGroups, enrichedNodes,
     isNodeActionPending, isNodeSilenced,
     fetchFleet, fetchNodeDetails, fetchUptime, fetchManifests,
