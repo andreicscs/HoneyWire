@@ -82,7 +82,7 @@
       },
       {
         "name": "HW_SCAN_THRESHOLD",
-        "description": "Number of ports that must be scanned to trigger detection.",
+        "description": "Minimum unique ports scanned to trigger an alert (stealth scans bypass this).",
         "default": "5",
         "type": "int",
         "required": false,
@@ -93,6 +93,14 @@
         "description": "Time window in seconds for scan detection.",
         "default": "5",
         "type": "int",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_IGNORE_LOCALHOST",
+        "description": "Ignore traffic originating from the host machine to prevent false positives.",
+        "default": "true",
+        "type": "boolean",
         "required": false,
         "hidden": false
       },

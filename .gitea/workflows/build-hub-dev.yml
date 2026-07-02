@@ -40,8 +40,12 @@ jobs:
           RED='\033[0;31m'
           DIM='\033[2m'
 
-          # Pointing to your local Gitea/Dev registry
-          TAG="192.168.1.11:5000/honeywire-hub:dev"
+          # Pointing to your local Gitea/Dev registry or ghcr fallback
+          LOCAL_REG="${{ vars.LOCAL_REGISTRY }}"
+          if [ -z "$LOCAL_REG" ]; then
+            LOCAL_REG="ghcr.io/andreicscs/"
+          fi
+          TAG="${LOCAL_REG}honeywire-hub:dev"
 
           echo -e "${BOLD}Targeting component: HoneyWire Hub${RESET}"
 

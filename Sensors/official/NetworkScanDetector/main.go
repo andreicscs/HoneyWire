@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,22 +16,60 @@ import (
 )
 
 type ScanState struct {
-	history   []hit
-	lastAlert time.Time
+	history    []hit
+	lastAlerts map[string]time.Time
 }
 
 type hit struct {
 	timestamp time.Time
 	port      uint16
+	flags     uint8
+	winSize   uint16
 }
+
+const maxTrackers = 10000
 
 var (
 	threshold   = getEnvInt("HW_SCAN_THRESHOLD", 5)
 	window      = time.Duration(getEnvInt("HW_SCAN_WINDOW", 5)) * time.Second
 	cooldown    = 60 * time.Second
 	ignorePorts = parseIgnorePorts(getEnv("HW_IGNORE_PORTS", "80,443"))
+
+	mu          sync.Mutex
 	trackers    = make(map[string]*ScanState)
+	trackerList []string
 )
+
+func analyzePacket(flags uint8, winSize uint16) (string, string) {
+	if flags == 0x2B {
+		return "Likely Nmap", "OS Detection Probe (T3)"
+	}
+
+	isScannerWindow := (winSize == 1024 || winSize == 2048 || winSize == 4096)
+
+	switch flags {
+	case 0x02:
+		if isScannerWindow {
+			return "Likely Nmap / Masscan", "Stealth SYN Port Scan"
+		}
+		return "Generic/Evasive Scanner", "SYN Port Probe"
+
+	case 0x00:
+		return "Likely Nmap", "Stealth NULL Scan"
+
+	case 0x01:
+		return "Likely Nmap", "Stealth FIN Scan"
+
+	case 0x29:
+		return "Likely Nmap", "Stealth XMAS Scan"
+	}
+
+	return "Generic/Evasive Scanner", "Unidentified Port Probe"
+}
+
+func htons(val uint16) uint16 {
+	return (val << 8) | (val >> 8)
+}
 
 func main() {
 	hw, err := sdk.NewSensor()
@@ -43,11 +82,11 @@ func main() {
 		"Wizard Firedrill",
 		"Multiple Ports",
 		sdk.EventDetails{
-			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
-			{Key: "ports_hit", Value: []uint16{22, 80, 443, 3306, 8080}},
-			{Key: "count", Value: 5},
+			{Key: "ports_hit", Value: []string{"22", "80", "443", "3306", "8080", "..."}},
+			{Key: "count", Value: 1000},
+			{Key: "scan_type", Value: "Stealth SYN Port Scan"},
+			{Key: "tool_guess", Value: "Likely Nmap / Masscan"},
 			{Key: "window_sec", Value: 5.0},
-			{Key: "action_taken", Value: "logged"},
 		},
 	)
 
@@ -58,16 +97,75 @@ func main() {
 		os.Exit(1)
 	}
 
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
+	// AF_PACKET + SOCK_DGRAM bypasses host firewalls (iptables) that drop invalid TCP packets.
+	// ETH_P_IP (0x0800) filters for IPv4, and SOCK_DGRAM automatically strips the Ethernet/VLAN link headers
+	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_DGRAM, int(htons(0x0800)))
 	if err != nil {
-		log.Fatalf("[!] FATAL: Failed to open raw socket (requires root/CAP_NET_RAW): %v", err)
+		log.Fatalf("[!] FATAL: Failed to open packet socket (requires root/CAP_NET_RAW): %v", err)
 	}
 	defer syscall.Close(fd)
+
+	// Drop privileges immediately after opening the raw socket
+	if err := syscall.Setgid(65534); err != nil {
+		log.Printf("[-] Warning: Failed to drop GID: %v", err)
+	}
+	if err := syscall.Setuid(65534); err != nil {
+		log.Printf("[-] Warning: Failed to drop UID: %v", err)
+	} else {
+		log.Printf("[*] Dropped root privileges and CAP_NET_RAW (Running as nobody)")
+	}
 
 	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Garbage Collection Loop
+	go func() {
+		ticker := time.NewTicker(window)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				mu.Lock()
+				now := time.Now()
+				var activeList []string
+				for _, ip := range trackerList {
+					state := trackers[ip]
+					isActive := false
+					if len(state.history) > 0 {
+						if now.Sub(state.history[len(state.history)-1].timestamp) <= window {
+							isActive = true
+						}
+					}
+					if !isActive {
+						for _, lastAlert := range state.lastAlerts {
+							if now.Sub(lastAlert) <= cooldown {
+								isActive = true
+								break
+							}
+						}
+					}
+
+					if isActive {
+						activeList = append(activeList, ip)
+					} else {
+						delete(trackers, ip)
+					}
+				}
+				trackerList = activeList
+				mu.Unlock()
+			}
+		}
+	}()
+
+	ignoreLocal := getEnv("HW_IGNORE_LOCALHOST", "true") == "true"
+	loopbackIfIndex := -1
+	if lo, err := net.InterfaceByName("lo"); err == nil {
+		loopbackIfIndex = lo.Index
+	}
 
 	go func() {
 		buf := make([]byte, 65536)
@@ -76,8 +174,20 @@ func main() {
 			case <-ctx.Done():
 				return
 			default:
-				n, _, err := syscall.Recvfrom(fd, buf, 0)
+				n, from, err := syscall.Recvfrom(fd, buf, 0)
 				if err != nil || n < 20 {
+					continue
+				}
+
+				// Drop packets from the loopback interface if ignoreLocal is true
+				if ignoreLocal && loopbackIfIndex != -1 {
+					if ll, ok := from.(*syscall.SockaddrLinklayer); ok && ll.Ifindex == loopbackIfIndex {
+						continue
+					}
+				}
+
+				// Must be TCP (Protocol 6)
+				if buf[9] != 0x06 {
 					continue
 				}
 
@@ -87,20 +197,25 @@ func main() {
 				}
 
 				tcpStart := ihl
-				flags := buf[tcpStart+13]
+				// Extract flags and strip ECN/CWR bits (0x3F = 00111111) to ensure clean fingerprinting
+				flags := buf[tcpStart+13] & 0x3F
 
-				if flags != 0x02 { // SYN
+				if flags != 0x02 && flags != 0x2B && flags != 0x00 && flags != 0x01 && flags != 0x29 {
 					continue
 				}
 
 				srcIP := net.IPv4(buf[12], buf[13], buf[14], buf[15]).String()
 				dstPort := (uint16(buf[tcpStart+2]) << 8) | uint16(buf[tcpStart+3])
+				winSize := (uint16(buf[tcpStart+14]) << 8) | uint16(buf[tcpStart+15])
 
-				if ignorePorts[dstPort] {
+				// only ignore legitimate ports (80, 443) for standard SYN scans to prevent noise.
+				// Highly anomalous packets (FIN, NULL, XMAS, OS Probes) are inherently malicious
+				// and should not be ignored, even if they target an ignored port.
+				if flags == 0x02 && ignorePorts[dstPort] {
 					continue
 				}
 
-				processHit(hw, srcIP, dstPort)
+				processHit(hw, srcIP, dstPort, flags, winSize)
 			}
 		}
 	}()
@@ -113,16 +228,25 @@ func main() {
 	<-ctx.Done()
 }
 
-func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
+func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSize uint16) {
 	now := time.Now()
 
+	mu.Lock()
 	state, exists := trackers[srcIP]
 	if !exists {
-		state = &ScanState{}
+		if len(trackers) >= maxTrackers {
+			oldest := trackerList[0]
+			trackerList = trackerList[1:]
+			delete(trackers, oldest)
+		}
+		state = &ScanState{
+			lastAlerts: make(map[string]time.Time),
+		}
 		trackers[srcIP] = state
+		trackerList = append(trackerList, srcIP)
 	}
 
-	state.history = append(state.history, hit{timestamp: now, port: dstPort})
+	state.history = append(state.history, hit{timestamp: now, port: dstPort, flags: flags, winSize: winSize})
 
 	var active []hit
 	uniquePortsMap := make(map[uint16]bool)
@@ -139,25 +263,68 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 	}
 	state.history = active
 
-	if len(uniquePortsList) >= threshold {
-		if now.Sub(state.lastAlert) > cooldown {
-			state.lastAlert = now
+	// Determine the highest fidelity signature in the active window
+	tool := "Generic/Evasive Scanner"
+	scanType := "Unidentified Port Probe"
+	isInstant := false
 
-			log.Printf("[!] Port scan detected from %s: %v", srcIP, uniquePortsList)
+	// Give OS Detection the highest precedence to prevent being masked by NULL/XMAS probes
+	hasOSProbe := false
 
-			hw.ReportEvent(
-				"network_scan_detected",
-				srcIP,
-				"Multiple Ports",
-				sdk.EventDetails{
-					{Key: "ports_hit", Value: uniquePortsList},
-					{Key: "count", Value: len(uniquePortsList)},
-					{Key: "window_sec", Value: window.Seconds()},
-					{Key: "action_taken", Value: "logged"},
-				},
-			)
-			state.history = nil
+	for _, h := range active {
+		t, s := analyzePacket(h.flags, h.winSize)
+		if t != "Generic/Evasive Scanner" {
+			tool = t
+			scanType = s
 		}
+		if h.flags == 0x2B {
+			hasOSProbe = true
+			isInstant = true
+		} else if !hasOSProbe && (h.flags == 0x00 || h.flags == 0x29 || h.flags == 0x01) {
+			isInstant = true
+		}
+	}
+
+	if hasOSProbe {
+		tool, scanType = analyzePacket(0x2B, 0)
+	}
+
+	shouldAlert := false
+	if isInstant || len(uniquePortsList) >= threshold {
+		if now.Sub(state.lastAlerts[scanType]) > cooldown {
+			state.lastAlerts[scanType] = now
+			shouldAlert = true
+			if !isInstant {
+				state.history = nil
+			}
+		}
+	}
+	mu.Unlock()
+
+	if shouldAlert {
+		var displayPorts []string
+		for i, p := range uniquePortsList {
+			if i >= 5 {
+				displayPorts = append(displayPorts, "...")
+				break
+			}
+			displayPorts = append(displayPorts, strconv.Itoa(int(p)))
+		}
+
+		log.Printf("[!] %s detected from %s: %v | Tool: %s", scanType, srcIP, displayPorts, tool)
+
+		hw.ReportEvent(
+			"network_scan_detected",
+			srcIP,
+			"Multiple Ports",
+			sdk.EventDetails{
+				{Key: "ports_hit", Value: displayPorts},
+				{Key: "count", Value: len(uniquePortsList)},
+				{Key: "scan_type", Value: scanType},
+				{Key: "tool_guess", Value: tool},
+				{Key: "window_sec", Value: window.Seconds()},
+			},
+		)
 	}
 }
 

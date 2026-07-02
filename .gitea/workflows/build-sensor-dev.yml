@@ -69,7 +69,11 @@ jobs:
             if [ -n "$SENSOR" ]; then
               SENSOR_PATH="Sensors/official/$SENSOR"
               LOWER_NAME=$(echo "$SENSOR" | tr '[:upper:]' '[:lower:]')
-              TAG="192.168.1.11:5000/honeywire-$LOWER_NAME:dev"
+              LOCAL_REG="${{ vars.LOCAL_REGISTRY }}"
+              if [ -z "$LOCAL_REG" ]; then
+                LOCAL_REG="ghcr.io/andreicscs/"
+              fi
+              TAG="${LOCAL_REG}honeywire-$LOWER_NAME:dev"
 
               echo -e "\n${CYAN}========================================${RESET}"
               echo -e "${CYAN}${BOLD}STAGE 1: Go Unit Tests for $SENSOR${RESET}"
