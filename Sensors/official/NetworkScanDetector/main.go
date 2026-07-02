@@ -98,7 +98,7 @@ func main() {
 	}
 
 	// AF_PACKET + SOCK_DGRAM bypasses host firewalls (iptables) that drop invalid TCP packets.
-	// ETH_P_IP (0x0800) filters for IPv4, and SOCK_DGRAM automatically strips the Ethernet/VLAN link headers!
+	// ETH_P_IP (0x0800) filters for IPv4, and SOCK_DGRAM automatically strips the Ethernet/VLAN link headers
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_DGRAM, int(htons(0x0800)))
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to open packet socket (requires root/CAP_NET_RAW): %v", err)
@@ -208,9 +208,9 @@ func main() {
 				dstPort := (uint16(buf[tcpStart+2]) << 8) | uint16(buf[tcpStart+3])
 				winSize := (uint16(buf[tcpStart+14]) << 8) | uint16(buf[tcpStart+15])
 
-				// We only ignore legitimate ports (80, 443) for standard SYN scans to prevent noise.
+				// only ignore legitimate ports (80, 443) for standard SYN scans to prevent noise.
 				// Highly anomalous packets (FIN, NULL, XMAS, OS Probes) are inherently malicious
-				// and should NEVER be ignored, even if they target an ignored port.
+				// and should not be ignored, even if they target an ignored port.
 				if flags == 0x02 && ignorePorts[dstPort] {
 					continue
 				}
