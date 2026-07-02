@@ -94,13 +94,17 @@ jobs:
           echo "   Source:    $SOURCE"
           echo "   Output:    $OUTPUT_FILE"
 
+          LOCAL_REG="${{ vars.LOCAL_REGISTRY }}"
+
           # Inject version, update deployment.image_tag, and update init_containers tags
-          jq --arg ver "$VERSION" --arg tag "v$VERSION" \
+          jq --arg ver "$VERSION" --arg tag "v$VERSION" --arg localReg "$LOCAL_REG" \
              '.version = $ver |
               .deployment.image_tag = $tag |
+              (if $localReg != "" then .deployment.image_repository |= sub("ghcr.io/[^/]+/"; $localReg) else . end) |
               if .deployment.init_containers then
                 .deployment.init_containers = [
-                  .deployment.init_containers[] | .image_tag = $tag
+                  .deployment.init_containers[] | .image_tag = $tag | 
+                  (if $localReg != "" then .image_repository |= sub("ghcr.io/[^/]+/"; $localReg) else . end)
                 ]
               else . end' \
              "$SOURCE" > "/tmp/$OUTPUT_FILE"
@@ -123,8 +127,9 @@ jobs:
           SOURCE="${{ steps.validate.outputs.SOURCE }}"
           SENSOR_DIR=$(dirname "$SOURCE")
           VERSION="${{ steps.vars.outputs.VERSION }}"
+          OUTPUT_FILE="${{ steps.build.outputs.OUTPUT_FILE }}"
           
-          IMAGE_REPO=$(jq -r '.deployment.image_repository // empty' "$SOURCE")
+          IMAGE_REPO=$(jq -r '.deployment.image_repository // empty' "/tmp/$OUTPUT_FILE")
           
           if [ -z "$IMAGE_REPO" ]; then
              echo "⚠️ No image_repository found in manifest. Skipping Docker build."
