@@ -97,6 +97,14 @@
         "hidden": false
       },
       {
+        "name": "HW_IGNORE_LOCALHOST",
+        "description": "Ignore scans originating from the host machine (loopback interface). Turn off if you want to test scans from the same machine.",
+        "default": "true",
+        "type": "boolean",
+        "required": false,
+        "hidden": false
+      },
+      {
         "name": "HW_IGNORE_PORTS",
         "description": "Comma-separated list of ports to exclude from scan detection.",
         "default": "{{ if .IgnorePorts }}{{ .IgnorePorts }}{{ else }}22,80,443{{ end }}",

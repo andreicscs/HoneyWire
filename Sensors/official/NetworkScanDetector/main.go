@@ -99,12 +99,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	// AF_PACKET to bypass host iptables/firewalls which silently drop anomalous packets
-	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_ALL)))
+	// AF_PACKET + SOCK_DGRAM bypasses host firewalls (iptables) that drop invalid TCP packets.
+	// ETH_P_IP (0x0800) filters for IPv4, and SOCK_DGRAM automatically strips the Ethernet/VLAN link headers!
+	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_DGRAM, int(htons(0x0800)))
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to open packet socket (requires root/CAP_NET_RAW): %v", err)
 	}
 	defer syscall.Close(fd)
+
+	// Drop privileges immediately after opening the raw socket
+	if err := syscall.Setgid(65534); err != nil {
+		log.Printf("[-] Warning: Failed to drop GID: %v", err)
+	}
+	if err := syscall.Setuid(65534); err != nil {
+		log.Printf("[-] Warning: Failed to drop UID: %v", err)
+	} else {
+		log.Printf("[*] Dropped root privileges and CAP_NET_RAW (Running as nobody)")
+	}
 
 	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
 
@@ -152,6 +163,12 @@ func main() {
 		}
 	}()
 
+	ignoreLocal := getEnv("HW_IGNORE_LOCALHOST", "true") == "true"
+	loopbackIfIndex := -1
+	if lo, err := net.InterfaceByName("lo"); err == nil {
+		loopbackIfIndex = lo.Index
+	}
+
 	go func() {
 		buf := make([]byte, 65536)
 		for {
@@ -159,31 +176,29 @@ func main() {
 			case <-ctx.Done():
 				return
 			default:
-				n, _, err := syscall.Recvfrom(fd, buf, 0)
-				// 14 bytes (Ethernet) + 20 bytes (IP min) + 20 bytes (TCP min) = 54
-				if err != nil || n < 54 {
+				n, from, err := syscall.Recvfrom(fd, buf, 0)
+				if err != nil || n < 20 {
 					continue
 				}
 
-				// Check if EtherType is IPv4 (0x0800)
-				if buf[12] != 0x08 || buf[13] != 0x00 {
+				// Drop packets from the loopback interface if ignoreLocal is true
+				if ignoreLocal && loopbackIfIndex != -1 {
+					if ll, ok := from.(*syscall.SockaddrLinklayer); ok && ll.Ifindex == loopbackIfIndex {
+						continue
+					}
+				}
+
+				// Must be TCP (Protocol 6)
+				if buf[9] != 0x06 {
 					continue
 				}
 
-				ipStart := 14
-
-				// Check Protocol (must be TCP, which is 0x06)
-				if buf[ipStart+9] != 0x06 {
+				ihl := int(buf[0]&0x0F) * 4
+				if n < ihl+20 {
 					continue
 				}
 
-				ihl := int(buf[ipStart]&0x0F) * 4
-				if n < ipStart+ihl+20 {
-					continue
-				}
-
-				tcpStart := ipStart + ihl
-
+				tcpStart := ihl
 				// Extract flags and strip ECN/CWR bits (0x3F = 00111111) to ensure clean fingerprinting
 				flags := buf[tcpStart+13] & 0x3F
 
@@ -191,11 +206,14 @@ func main() {
 					continue
 				}
 
-				srcIP := net.IPv4(buf[ipStart+12], buf[ipStart+13], buf[ipStart+14], buf[ipStart+15]).String()
+				srcIP := net.IPv4(buf[12], buf[13], buf[14], buf[15]).String()
 				dstPort := (uint16(buf[tcpStart+2]) << 8) | uint16(buf[tcpStart+3])
 				winSize := (uint16(buf[tcpStart+14]) << 8) | uint16(buf[tcpStart+15])
 
-				if ignorePorts[dstPort] {
+				// We only ignore legitimate ports (80, 443) for standard SYN scans to prevent noise.
+				// Highly anomalous packets (FIN, NULL, XMAS, OS Probes) are inherently malicious
+				// and should NEVER be ignored, even if they target an ignored port.
+				if flags == 0x02 && ignorePorts[dstPort] {
 					continue
 				}
 
@@ -258,6 +276,7 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 			tool = t
 			scanType = s
 		}
+		// Bypass port threshold for highly anomalous packets
 		if h.flags == 0x2B || h.flags == 0x00 || h.flags == 0x29 || h.flags == 0x01 {
 			isInstant = true
 			break // highest fidelity found
