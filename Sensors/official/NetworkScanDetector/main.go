@@ -105,16 +105,6 @@ func main() {
 	}
 	defer syscall.Close(fd)
 
-	// Drop privileges immediately after opening the raw socket
-	if err := syscall.Setgid(65534); err != nil {
-		log.Printf("[-] Warning: Failed to drop GID: %v", err)
-	}
-	if err := syscall.Setuid(65534); err != nil {
-		log.Printf("[-] Warning: Failed to drop UID: %v", err)
-	} else {
-		log.Printf("[*] Dropped root privileges and CAP_NET_RAW (Running as nobody)")
-	}
-
 	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
