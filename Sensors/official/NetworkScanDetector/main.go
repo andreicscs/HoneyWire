@@ -16,8 +16,8 @@ import (
 )
 
 type ScanState struct {
-	history   []hit
-	lastAlert time.Time
+	history    []hit
+	lastAlerts map[string]time.Time
 }
 
 type hit struct {
@@ -67,6 +67,10 @@ func analyzePacket(flags uint8, winSize uint16) (string, string) {
 	return "Generic/Evasive Scanner", "Unidentified Port Probe"
 }
 
+func htons(val uint16) uint16 {
+	return (val << 8) | (val >> 8)
+}
+
 func main() {
 	hw, err := sdk.NewSensor()
 	if err != nil {
@@ -81,7 +85,7 @@ func main() {
 			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
 			{Key: "ports_hit", Value: []uint16{22, 80, 443, 3306, 8080}},
 			{Key: "scan_type", Value: "Stealth SYN Port Scan"},
-			{Key: "tool_fingerprint", Value: "Likely Nmap / Masscan"},
+			{Key: "tool_guess", Value: "Likely Nmap / Masscan"},
 			{Key: "count", Value: 5},
 			{Key: "window_sec", Value: 5.0},
 			{Key: "action_taken", Value: "logged"},
@@ -95,9 +99,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
+	// AF_PACKET to bypass host iptables/firewalls which silently drop anomalous packets
+	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_ALL)))
 	if err != nil {
-		log.Fatalf("[!] FATAL: Failed to open raw socket (requires root/CAP_NET_RAW): %v", err)
+		log.Fatalf("[!] FATAL: Failed to open packet socket (requires root/CAP_NET_RAW): %v", err)
 	}
 	defer syscall.Close(fd)
 
@@ -125,9 +130,13 @@ func main() {
 						if now.Sub(state.history[len(state.history)-1].timestamp) <= window {
 							isActive = true
 						}
-					} else {
-						if now.Sub(state.lastAlert) <= cooldown {
-							isActive = true
+					}
+					if !isActive {
+						for _, lastAlert := range state.lastAlerts {
+							if now.Sub(lastAlert) <= cooldown {
+								isActive = true
+								break
+							}
 						}
 					}
 
@@ -151,23 +160,38 @@ func main() {
 				return
 			default:
 				n, _, err := syscall.Recvfrom(fd, buf, 0)
-				if err != nil || n < 20 {
+				// 14 bytes (Ethernet) + 20 bytes (IP min) + 20 bytes (TCP min) = 54
+				if err != nil || n < 54 {
 					continue
 				}
 
-				ihl := int(buf[0]&0x0F) * 4
-				if n < ihl+20 {
+				// Check if EtherType is IPv4 (0x0800)
+				if buf[12] != 0x08 || buf[13] != 0x00 {
 					continue
 				}
 
-				tcpStart := ihl
-				flags := buf[tcpStart+13]
+				ipStart := 14
+
+				// Check Protocol (must be TCP, which is 0x06)
+				if buf[ipStart+9] != 0x06 {
+					continue
+				}
+
+				ihl := int(buf[ipStart]&0x0F) * 4
+				if n < ipStart+ihl+20 {
+					continue
+				}
+
+				tcpStart := ipStart + ihl
+
+				// Extract flags and strip ECN/CWR bits (0x3F = 00111111) to ensure clean fingerprinting
+				flags := buf[tcpStart+13] & 0x3F
 
 				if flags != 0x02 && flags != 0x2B && flags != 0x00 && flags != 0x01 && flags != 0x29 {
 					continue
 				}
 
-				srcIP := net.IPv4(buf[12], buf[13], buf[14], buf[15]).String()
+				srcIP := net.IPv4(buf[ipStart+12], buf[ipStart+13], buf[ipStart+14], buf[ipStart+15]).String()
 				dstPort := (uint16(buf[tcpStart+2]) << 8) | uint16(buf[tcpStart+3])
 				winSize := (uint16(buf[tcpStart+14]) << 8) | uint16(buf[tcpStart+15])
 
@@ -199,7 +223,9 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 			trackerList = trackerList[1:]
 			delete(trackers, oldest)
 		}
-		state = &ScanState{}
+		state = &ScanState{
+			lastAlerts: make(map[string]time.Time),
+		}
 		trackers[srcIP] = state
 		trackerList = append(trackerList, srcIP)
 	}
@@ -221,30 +247,37 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 	}
 	state.history = active
 
+	// Determine the highest fidelity signature in the active window
+	tool := "Generic/Evasive Scanner"
+	scanType := "Unidentified Port Probe"
+	isInstant := false
+
+	for _, h := range active {
+		t, s := analyzePacket(h.flags, h.winSize)
+		if t != "Generic/Evasive Scanner" {
+			tool = t
+			scanType = s
+		}
+		if h.flags == 0x2B || h.flags == 0x00 || h.flags == 0x29 || h.flags == 0x01 {
+			isInstant = true
+			break // highest fidelity found
+		}
+	}
+
 	shouldAlert := false
-	if len(uniquePortsList) >= threshold {
-		if now.Sub(state.lastAlert) > cooldown {
-			state.lastAlert = now
+	if isInstant || len(uniquePortsList) >= threshold {
+		if now.Sub(state.lastAlerts[scanType]) > cooldown {
+			state.lastAlerts[scanType] = now
 			shouldAlert = true
-			state.history = nil
+			if !isInstant {
+				state.history = nil
+			}
 		}
 	}
 	mu.Unlock()
 
 	if shouldAlert {
-		tool := "Generic/Evasive Scanner"
-		scanType := "Unidentified Port Probe"
-
-		for _, h := range active {
-			t, s := analyzePacket(h.flags, h.winSize)
-			if t != "Generic/Evasive Scanner" {
-				tool = t
-				scanType = s
-				break
-			}
-		}
-
-		log.Printf("[!] Port scan detected from %s: %v | Tool: %s", srcIP, uniquePortsList, tool)
+		log.Printf("[!] %s detected from %s: %v | Tool: %s", scanType, srcIP, uniquePortsList, tool)
 
 		hw.ReportEvent(
 			"network_scan_detected",
