@@ -1,0 +1,123 @@
+{
+  "id": "hw-sensor-web-router-decoy",
+  "version": "2.0.0",
+  "name": "Web Router Decoy",
+  "category": "web",
+  "osi_layer": "Application Layer",
+  "icon_svg": "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
+  "description": "Fake internal admin panel that logs reconnaissance attempts.",
+  "documentation": {
+    "summary": "The Web Router Decoy mimics vulnerable internal administration interfaces to catch rogue insiders or compromised network assets scanning the LAN for easy targets.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Router Simulation: Mimics popular router brands (Netgear, TP-Link, Cisco) to trick attackers.",
+          "Credential Logging: Captures and alerts on attempted login credentials from internal threats.",
+          "Browser Fingerprinting: Logs user-agent and request patterns for forensic analysis."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) to allow bridging network modes.",
+          "Required Capabilities: Adds 'NET_BIND_SERVICE' to allow binding to ports below 1024 without needing full host network control."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {
+      "processes": [
+        "nginx",
+        "apache2",
+        "httpd",
+        "lighttpd",
+        "docker-proxy",
+        "traefik",
+        "caddy",
+        "envoy",
+        "haproxy"
+      ],
+      "ports": [
+        80,
+        443,
+        8080,
+        8443,
+        9000
+      ]
+    },
+    "recommendation_reason": "Live web proxy or HTTP server detected. Deploy a fake administrative panel to catch internal network snooping and directory brute-forcing."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "0:0",
+    "cap_add": [
+      "NET_BIND_SERVICE"
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-web-router-decoy",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "critical",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_BIND_PORT",
+        "description": "Port to bind the decoy web server.",
+        "default": "{{ availablePort 8080 }}",
+        "type": "int",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_ROUTER_BRAND",
+        "description": "Router brand to simulate.",
+        "default": "Netgear",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-webrouterdecoy",
+    "image_tag": "dev",
+    "image_digest": ""
+  }
+}

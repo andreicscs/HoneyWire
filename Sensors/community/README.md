@@ -1,42 +1,40 @@
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](../../LICENSE)
-
 # Community Sensor Lab
 
-Welcome to the **HoneyWire Community Sensor Lab**. While our official sensors provide the core foundation, this directory is where the decentralized deception ecosystem truly thrives.
+Welcome to the HoneyWire Community Sensor Lab. This directory provides a space to deploy, share, and experiment with custom deception sensors.
 
-The power of HoneyWire lies in the **Universal Event Standard**—the architectural flexibility for anyone to build a specialized trap for any niche protocol and see that telemetry normalized on a central dashboard. Whether you have engineered a DNS sinkhole, a malformed JWT detector, or a custom file-integrity monitor, this is the environment to deploy and share it.
+HoneyWire's architecture allows you to build a specialized trap for any protocol and visualize its telemetry in a unified dashboard using the Universal Event Standard.
 
----
+## Data-Driven Architecture
 
-## 🛠️ Engineering Resources
-Don't start from a blank repository. We have provided the scaffolding to move your sensor from a conceptual trap to a hardened, deployed container in minutes:
+To add a sensor to the ecosystem, you only need to define it using a `manifest.json` file. This JSON schema is responsible for:
+1. Generating interactive UI forms and configuration cards in the HoneyWire Hub.
+2. Providing heuristic metadata to the Wizard CLI for host recommendations.
+3. Defining the deployment parameters (containers, mounts, variables) required for execution.
 
-* **[🐹 Go Sensor Template](./../templates/go-sensor-template/README.md):** The high-velocity starting point, natively integrated with the HoneyWire Go SDK and pre-configured for Distroless isolation.
-* **[📖 Contribution Guide](./../../CONTRIBUTING.md):** **Mandatory reading.** Contains the "Golden Rules" for capability stripping, environment parity, and the JSON Contract.
-* **[🔬 Reference Implementation](./../official/TcpTarpit/README.md):** A deep dive into the architecture of our production-grade TCP Tarpit, demonstrating Go routine concurrency and semaphore limits.
+Please refer to the official documentation for the complete manifest schema:
+**[View the Sensor Manifest Data Contract](../../Docs/architecture/dataContracts.md)**
 
-> **🛡️ Security Standard:** The HoneyWire ecosystem has moved past heavy interpreters. We strongly encourage community submissions to follow our official architecture: **pure Go, statically-linked binaries running as unprivileged users inside `:nonroot` Distroless containers, with all Linux kernel capabilities dropped.**
+## Engineering Resources
 
----
+To ensure structural consistency and security, start with the provided scaffolding:
 
-## 🛡️ The Security Policy
-To protect our users, every sensor submitted here undergoes a rigorous automated gauntlet before a human maintainer even looks at the code:
+* **[Sensor Template](../templates/README.md):** The recommended starting point, natively integrated with the HoneyWire Go SDK and pre-configured for Distroless execution.
+* **[Contribution Guide](../../CONTRIBUTING.md):** Mandatory reading covering required capability stripping, container best practices, and the JSON Contract.
 
-1.  **Static Analysis:** CodeQL scans your Go logic for security vulnerabilities and memory leaks.
-2.  **Container Security:** Trivy scans your `Dockerfile` and base images for known CVEs.
-3.  **Functional Testing:** Our CI/CD spins up your sensor with `HW_TEST_MODE=true` and verifies its "Heartbeat" and "Event" logic against a mock network contract.
+**Security Standard:** We encourage community submissions to follow the official architecture: statically-linked binaries running as unprivileged users inside `:nonroot` Distroless containers, with all Linux kernel capabilities that are needed explicitly added, all capabilities are dropped by default (`cap_drop: ["ALL"]`).
 
-> **Note:** Community sensors expand the ecosystem's detection capabilities significantly, but always remember to review the code and container privileges before deploying them in your own production environment!
+## Contribution Policy
 
----
+Community submissions undergo automated validation before review:
 
-## 🤝 How to Contribute?
-1.  **Fork** the repository.
-2.  **Create** your sensor directory: `Sensors/community/your-sensor-name`.
-3.  **Implement** your logic using the [HoneyWire Go SDK](../../SDKs/go-honeywire) based on the provided template.
-4.  **Harden** your `docker-compose.yml` to adhere to the principle of least privilege.
-5.  **Open a Pull Request**.
+1. **Static Analysis:** Scanning for security vulnerabilities and memory leaks (e.g., CodeQL).
+2. **Container Security:** Image vulnerability scanning (e.g., Trivy).
+3. **Functional Testing:** Automated verification against a mock network contract in `HW_TEST_MODE`.
 
-**Join us in building a smarter, faster, and more resilient distributed defense.** 🐝
+## Submitting a Sensor
 
----
+1. Fork the repository.
+2. Create your sensor directory under `Sensors/community/your-sensor-name`.
+3. Implement your sensor logic using the [HoneyWire Go SDK](../../SDKs/go-honeywire) or equivalent language SDK.
+4. Define your `manifest.json` according to the official schema.
+5. Open a Pull Request for review.

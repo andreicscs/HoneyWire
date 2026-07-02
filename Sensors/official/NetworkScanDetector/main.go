@@ -38,6 +38,19 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"network_scan_detected",
+		"Wizard Firedrill",
+		"Multiple Ports",
+		sdk.EventDetails{
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "ports_hit", Value: []uint16{22, 80, 443, 3306, 8080}},
+			{Key: "count", Value: 5},
+			{Key: "window_sec", Value: 5.0},
+			{Key: "action_taken", Value: "logged"},
+		},
+	)
+
 	if hw.TestMode {
 		if hw.RunTestMode() {
 			os.Exit(0)
@@ -45,18 +58,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
-	}
-	defer hw.Stop()
-
-	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
-
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to open raw socket (requires root/CAP_NET_RAW): %v", err)
 	}
 	defer syscall.Close(fd)
+
+	log.Printf("[*] HoneyWire Scan Detector | Threshold: %d ports | Window: %v", threshold, window)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -97,6 +105,11 @@ func main() {
 		}
 	}()
 
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
+
 	<-ctx.Done()
 }
 
@@ -129,19 +142,18 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16) {
 	if len(uniquePortsList) >= threshold {
 		if now.Sub(state.lastAlert) > cooldown {
 			state.lastAlert = now
-			
+
 			log.Printf("[!] Port scan detected from %s: %v", srcIP, uniquePortsList)
 
 			hw.ReportEvent(
-				"high",
 				"network_scan_detected",
 				srcIP,
 				"Multiple Ports",
-				map[string]any{
-					"ports_hit":    uniquePortsList,
-					"count":        len(uniquePortsList),
-					"window_sec":   window.Seconds(),
-					"action_taken": "logged",
+				sdk.EventDetails{
+					{Key: "ports_hit", Value: uniquePortsList},
+					{Key: "count", Value: len(uniquePortsList)},
+					{Key: "window_sec", Value: window.Seconds()},
+					{Key: "action_taken", Value: "logged"},
 				},
 			)
 			state.history = nil
@@ -153,21 +165,29 @@ func parseIgnorePorts(raw string) map[uint16]bool {
 	ports := make(map[uint16]bool)
 	for _, p := range strings.Split(raw, ",") {
 		p = strings.TrimSpace(p)
-		if p == "" { continue }
+		if p == "" {
+			continue
+		}
 		val, err := strconv.ParseUint(p, 10, 16)
-		if err == nil { ports[uint16(val)] = true }
+		if err == nil {
+			ports[uint16(val)] = true
+		}
 	}
 	return ports
 }
 
 func getEnv(key, fallback string) string {
-	if val, exists := os.LookupEnv(key); exists { return val }
+	if val, exists := os.LookupEnv(key); exists {
+		return val
+	}
 	return fallback
 }
 
 func getEnvInt(key string, fallback int) int {
 	if val, exists := os.LookupEnv(key); exists {
-		if intVal, err := strconv.Atoi(val); err == nil { return intVal }
+		if intVal, err := strconv.Atoi(val); err == nil {
+			return intVal
+		}
 	}
 	return fallback
 }

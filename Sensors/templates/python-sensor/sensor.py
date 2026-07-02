@@ -9,17 +9,22 @@ from honeywire import HoneyWireSensor
 class MyCustomSensor(HoneyWireSensor):
     def __init__(self):
         # Initialize the base class. 
-        super().__init__(sensor_type="custom")
+        super().__init__()
         
         # Custom config overrides
-        self.severity = os.getenv("HW_SEVERITY", "medium")
         self.target = os.getenv("HW_CUSTOM_TARGET", "/tmp/honey")
+        
+        # IMPORTANT LIFECYCLE NOTE:
+        # If your sensor binds to a port or requires an exclusive system resource,
+        # you should attempt to acquire it here (or before starting the main loop).
+        # This ensures the sensor crashes cleanly on failure BEFORE reporting
+        # a false-positive "online" heartbeat to the HoneyWire Hub.
 
     async def monitor(self):
         """
         REQUIRED METHOD: This is the main loop of your sensor.
         """
-        print(f"[*] Starting Custom Sensor | Target: {self.target} | Severity: {self.severity}")
+        print(f"[*] Starting Custom Sensor | Target: {self.target}")
         
         try:
             while True:
@@ -41,7 +46,6 @@ class MyCustomSensor(HoneyWireSensor):
                 await asyncio.to_thread(
                     self.report_event,
                     event_trigger="custom_anomaly_detected",
-                    severity=self.severity,
                     source="192.168.1.100", # Replace with actual IP
                     target=self.target,
                     details=details
@@ -57,6 +61,18 @@ if __name__ == "__main__":
     except ValueError as e:
         print(f"[!] FATAL: {e}")
         sys.exit(1)
+
+    # Register test payload for CI/CD and Wizard validation
+    sensor.set_test_payload(
+        event_trigger="custom_anomaly_detected",
+        source="192.168.1.100",
+        target=sensor.target,
+        details={
+            "attack_type": "example_probe",
+            "raw_payload": "GET /etc/passwd HTTP/1.1",
+            "test_message": "Wizard triggered a synthetic event firedrill."
+        }
+    )
 
     # 2. Handle Test Mode
     if sensor.test_mode:

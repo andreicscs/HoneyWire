@@ -31,15 +31,35 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"tcp_connection",
+		"Wizard Firedrill",
+		"Mock Tarpit Port",
+		sdk.EventDetails{
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "payload", Value: []string{"SSH-2.0-Firedrill-Test\r\n"}},
+			{Key: "duration_sec", Value: 5.2},
+			{Key: "action_taken", Value: "hold"},
+		},
+	)
+
 	if hw.TestMode {
-		if hw.RunTestMode() { os.Exit(0) }
+		if hw.RunTestMode() {
+			os.Exit(0)
+		}
 		os.Exit(1)
 	}
 
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
+	var listeners []net.Listener
+	var lc net.ListenConfig
+	for _, port := range decoyPorts {
+		addr := fmt.Sprintf("0.0.0.0:%d", port)
+		l, err := lc.Listen(context.Background(), "tcp", addr)
+		if err != nil {
+			log.Fatalf("[!] FATAL: Failed to bind to port %d: %v", port, err)
+		}
+		listeners = append(listeners, l)
 	}
-	defer hw.Stop()
 
 	log.Printf("[*] HoneyWire Tarpit | Mode: %s", strings.ToUpper(tarpitMode))
 
@@ -47,23 +67,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	for _, port := range decoyPorts {
-		go startListener(ctx, hw, port, semaphore)
+	for i, listener := range listeners {
+		go startListener(ctx, hw, decoyPorts[i], listener, semaphore)
 	}
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop()
 
 	<-ctx.Done()
 	log.Println("[*] Tarpit shutting down.")
 }
 
-func startListener(ctx context.Context, hw *sdk.Sensor, port int, semaphore chan struct{}) {
-	addr := fmt.Sprintf("0.0.0.0:%d", port)
-	
-    var lc net.ListenConfig
-	listener, err := lc.Listen(ctx, "tcp", addr)
-	if err != nil {
-		log.Printf("[!] Failed to bind to port %d: %v", port, err)
-		return
-	}
+func startListener(ctx context.Context, hw *sdk.Sensor, port int, listener net.Listener, semaphore chan struct{}) {
 	defer listener.Close()
 
 	log.Printf("[+] Tarpit listening on port %d", port)
@@ -92,10 +109,12 @@ func startListener(ctx context.Context, hw *sdk.Sensor, port int, semaphore chan
 func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 	defer conn.Close()
 	start := time.Now()
-	
+
 	remoteAddr := conn.RemoteAddr().String()
 	srcIP, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil { srcIP = remoteAddr }
+	if err != nil {
+		srcIP = remoteAddr
+	}
 
 	var payload []string
 	consumedBytes := 0
@@ -117,12 +136,12 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 					conn.Write([]byte{0})
 					continue
 				}
-				break 
+				break
 			}
 
 			if n > 0 {
 				consumedBytes += n
-				
+
 				if len(payload) < maxLines {
 					text := strings.TrimSpace(strings.ToValidUTF8(string(buf[:n]), "?"))
 					if text != "" {
@@ -143,14 +162,13 @@ func handleConnection(hw *sdk.Sensor, conn net.Conn, port int) {
 	duration := time.Since(start).Seconds()
 
 	hw.ReportEvent(
-		"high",
 		"tcp_connection",
 		srcIP,
 		fmt.Sprintf("Port %d", port),
-		map[string]any{
-			"duration_sec": duration,
-			"payload":      payload,
-			"action_taken": tarpitMode, 
+		sdk.EventDetails{
+			{Key: "duration_sec", Value: duration},
+			{Key: "payload", Value: payload},
+			{Key: "action_taken", Value: tarpitMode},
 		},
 	)
 }
@@ -159,12 +177,16 @@ func parsePorts(raw string) []int {
 	var ports []int
 	for _, p := range strings.Split(raw, ",") {
 		p = strings.TrimSpace(p)
-		if p == "" { continue }
+		if p == "" {
+			continue
+		}
 		if val, err := strconv.Atoi(p); err == nil {
 			ports = append(ports, val)
 		}
 	}
-	if len(ports) == 0 { return []int{2222, 3306} }
+	if len(ports) == 0 {
+		return []int{2222, 3306}
+	}
 	return ports
 }
 
@@ -175,6 +197,8 @@ func parseBanner(raw string) string {
 }
 
 func getEnv(key, fallback string) string {
-	if val, exists := os.LookupEnv(key); exists { return val }
+	if val, exists := os.LookupEnv(key); exists {
+		return val
+	}
 	return fallback
 }

@@ -1,0 +1,45 @@
+name: Publish Hub
+
+on:
+  push:
+    tags:
+      - 'hub/v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    name: Build and Push Hub Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Version
+        id: vars
+        run: |
+          TAG_REF="${GITHUB_REF#refs/tags/}"
+          VERSION=$(echo "$TAG_REF" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Push Hub Docker Image
+        run: |
+          VERSION="${{ steps.vars.outputs.VERSION }}"
+          IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/honeywire-hub:v$VERSION"
+          LATEST_TAG="ghcr.io/${{ github.repository_owner }}/honeywire-hub:latest"
+          
+          docker build -t "$IMAGE_TAG" -t "$LATEST_TAG" -f Hub/Dockerfile Hub/
+          docker push "$IMAGE_TAG"
+          docker push "$LATEST_TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Hub v${{ steps.vars.outputs.VERSION }}"
+          generate_release_notes: true

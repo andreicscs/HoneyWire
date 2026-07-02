@@ -1,0 +1,86 @@
+name: Manual Dev Hub Build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths: [ 'Hub/**' ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------
+      # 1. ENVIRONMENT SETUP
+      # -----------------------------------------------------
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # -----------------------------------------------------
+      # 2. BUILD, TEST, AND PUSH
+      # -----------------------------------------------------
+      - name: Build, Test, and Push Hub
+        run: |
+          # ANSI Color Codes
+          RESET='\033[0m'
+          BOLD='\033[1m'
+          CYAN='\033[0;36m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[0;33m'
+          RED='\033[0;31m'
+          DIM='\033[2m'
+
+          # Pointing to your local Gitea/Dev registry
+          TAG="192.168.1.11:5000/honeywire-hub:dev"
+
+          echo -e "${BOLD}Targeting component: HoneyWire Hub${RESET}"
+
+          echo -e "\n${CYAN}========================================${RESET}"
+          echo -e "${CYAN}${BOLD}STAGE 1: Build Vue Frontend${RESET}"
+          echo -e "${CYAN}========================================${RESET}"
+
+          echo -e "${DIM}Installing Node dependencies...${RESET}"
+          cd Hub/ui
+          npm ci
+          echo -e "${DIM}Compiling Vue application for embedding...${RESET}"
+          npm run build
+          cd ../..
+
+          echo -e "\n${CYAN}========================================${RESET}"
+          echo -e "${CYAN}${BOLD}STAGE 2: Go Unit Tests${RESET}"
+          echo -e "${CYAN}========================================${RESET}"
+
+          echo -e "${DIM}Running Hub backend tests...${RESET}"
+          cd Hub
+          # go test -v ./...
+          echo -e "${YELLOW}Tests are currently pending implementation. Skipping...${RESET}"
+          cd ..
+
+          echo -e "\n${CYAN}========================================${RESET}"
+          echo -e "${CYAN}${BOLD}STAGE 3: Building Image -> $TAG${RESET}"
+          echo -e "${CYAN}========================================${RESET}"
+
+          echo -e "${DIM}Running Docker build for the Hub...${RESET}"
+          docker build -t "$TAG" ./Hub
+
+          echo -e "\n${CYAN}========================================${RESET}"
+          echo -e "${CYAN}${BOLD}STAGE 4: Pushing Image${RESET}"
+          echo -e "${CYAN}========================================${RESET}"
+
+          echo -e "${DIM}Pushing to local registry...${RESET}"
+          if docker push "$TAG"; then
+            echo -e "\n${GREEN}✅ Hub Build and Push Complete!${RESET}"
+          else
+            echo -e "\n${RED}❌ Failed to push the Hub image!${RESET}"
+            exit 1
+          fi

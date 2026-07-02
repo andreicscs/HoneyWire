@@ -1,136 +1,76 @@
 package api
 
 import (
-	"crypto/subtle"
 	"encoding/json"
-	"log"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/honeywire/hub/internal/auth"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/honeywire/hub/internal/services/auth"
+	"github.com/honeywire/hub/internal/services/config"
 )
 
-// --- Brute-Force Protection State ---
-type loginState struct {
-	attempts    int
-	lockedUntil time.Time
+const AuthCookieName = "hw_auth"
+
+type AuthHandler struct {
+	service *auth.Service
+	Cfg     *config.Config
 }
 
-var (
-	authTracker = make(map[string]*loginState)
-	authMutex   sync.Mutex
-)
-
-// Background routine to prevent memory leaks from abandoned IPs
-func (h *Handler) cleanupAuthTracker() {
-	for {
-		time.Sleep(5 * time.Minute)
-		authMutex.Lock()
-		now := time.Now()
-		for ip, state := range authTracker {
-			if now.After(state.lockedUntil) {
-				delete(authTracker, ip)
-			}
-		}
-		authMutex.Unlock()
+func NewAuthHandler(svc *auth.Service, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{
+		service: svc,
+		Cfg:     cfg,
 	}
 }
 
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	ip := h.getRealIP(r)
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	ip := GetRealIP(r, h.Cfg.TrustProxy)
 
-	// Rate Limiter Pre-Check
-	authMutex.Lock()
-	if state, exists := authTracker[ip]; exists {
-		if state.attempts >= 10 {
-			if time.Now().Before(state.lockedUntil) {
-				authMutex.Unlock()
-				http.Error(w, "Too many failed attempts. Try again later.", http.StatusTooManyRequests)
-				return
-			}
-			// Lockout expired, wipe the slate clean
-			delete(authTracker, ip)
-		}
-	}
-	authMutex.Unlock()
-
-	// Parse Request
 	var req struct {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		RespondError(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	// Evaluate Authorization
-	var isAuthorized bool
-
-	if h.Cfg.DashboardPassword != "" {
-		// Layer A: Infrastructure Override (.env file)
-		isAuthorized = subtle.ConstantTimeCompare([]byte(req.Password), []byte(h.Cfg.DashboardPassword)) == 1
-	} else {
-		// Layer B: Runtime Database Hash (Setup UI)
-		var dbHash string
-		err := h.Store.DB.QueryRow("SELECT value FROM config WHERE key='admin_hash'").Scan(&dbHash)
-		if err == nil {
-			err = bcrypt.CompareHashAndPassword([]byte(dbHash), []byte(req.Password))
-			isAuthorized = (err == nil)
-		}
-	}
-
-	if isAuthorized {
-		// Clear failed attempts for this IP on successful login
-		authMutex.Lock()
-		delete(authTracker, ip)
-		authMutex.Unlock()
-
-		token, err := h.SessionStore.Create()
-		if err != nil {
-			http.Error(w, "Session creation failed", http.StatusInternalServerError)
+	token, err := h.service.Login(req.Password, ip)
+	if err != nil {
+		if err.Error() == "too_many_requests" {
+			RespondError(w, "Too many failed attempts. Try again later.", http.StatusTooManyRequests)
 			return
 		}
-
-		isProd := h.Cfg.Env == "production"
-		http.SetCookie(w, &http.Cookie{
-			Name:     auth.CookieName,
-			Value:    token,
-			MaxAge:   2592000,
-			HttpOnly: true,
-			Secure:   isProd,
-			SameSite: http.SameSiteStrictMode,
-			Path:     "/",
-		})
-
-		SendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		RespondError(w, "Invalid Password", http.StatusUnauthorized)
 		return
 	}
 
-	// Handle Failure & Increment Rate Limiter
-	authMutex.Lock()
-	if _, exists := authTracker[ip]; !exists {
-		authTracker[ip] = &loginState{}
-	}
-	authTracker[ip].attempts++
 	
-	if authTracker[ip].attempts >= 10 {
-		authTracker[ip].lockedUntil = time.Now().Add(15 * time.Minute)
-		log.Printf("[!] AUDIT: IP %s locked out of dashboard for 15 minutes due to brute-force", ip)
-	}
-	authMutex.Unlock()
+	isProd := h.Cfg.Env == "production"
+	// codeql[go/insecure-cookie] Dev environment toggle.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
+	http.SetCookie(w, &http.Cookie{
+		Name:     AuthCookieName,
+		Value:    token,
+		MaxAge:   2592000, // 30 days in seconds
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
+		HttpOnly: true,
+		Secure:   isProd,
+		SameSite: http.SameSiteStrictMode,
+		Path:     "/",
+	})
 
-	http.Error(w, "Invalid Password", http.StatusUnauthorized)
+	SendJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	if cookie, err := r.Cookie(auth.CookieName); err == nil {
-		h.SessionStore.Delete(cookie.Value)
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if cookie, err := r.Cookie(AuthCookieName); err == nil {
+		h.service.DeleteSession(cookie.Value)
 	}
-
+	
+	// codeql[go/insecure-cookie] Clearing cookie on logout.
+    // nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{
-		Name:     auth.CookieName,
+		Name:     AuthCookieName,
 		Value:    "",
 		MaxAge:   -1,
 		HttpOnly: true,

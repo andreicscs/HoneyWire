@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/honeywire/sdk-go"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
-	"github.com/honeywire/sdk-go"
 )
 
 func main() {
@@ -18,6 +18,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("[!] FATAL: Failed to initialize sensor: %v", err)
 	}
+
+	hw.SetTestPayload(
+		"icmp_ping_received",
+		"Wizard Firedrill",
+		"ICMP Listener",
+		sdk.EventDetails{
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "packet_size", Value: 64},
+			{Key: "icmp_id", Value: 1337},
+			{Key: "icmp_seq", Value: 1},
+			{Key: "action_taken", Value: "logged"},
+		},
+	)
 
 	if hw.TestMode {
 		if hw.RunTestMode() {
@@ -27,11 +40,6 @@ func main() {
 		log.Println("❌ Test mode failed to contact Hub.")
 		os.Exit(1)
 	}
-
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: Failed to sync with Hub: %v", err)
-	}
-	defer hw.Stop() // Clean up goroutines!
 
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
@@ -45,6 +53,11 @@ func main() {
 	defer stop()
 
 	go listenICMP(conn, hw)
+
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: Failed to sync with Hub: %v", err)
+	}
+	defer hw.Stop() // Clean up goroutines!
 
 	// Block until shutdown signal
 	<-ctx.Done()
@@ -83,15 +96,14 @@ func listenICMP(conn *icmp.PacketConn, hw *sdk.Sensor) {
 		log.Printf("[+] ICMP Echo Request from %s (seq=%d size=%d)", sourceIP, echo.Seq, n)
 
 		hw.ReportEvent(
-			"high",
 			"icmp_ping_received",
 			sourceIP,
 			"ICMP Listener",
-			map[string]any{
-				"packet_size":  n,
-				"icmp_id":      echo.ID,
-				"icmp_seq":     echo.Seq,
-				"action_taken": "logged",
+			sdk.EventDetails{
+				{Key: "packet_size", Value: n},
+				{Key: "icmp_id", Value: echo.ID},
+				{Key: "icmp_seq", Value: echo.Seq},
+				{Key: "action_taken", Value: "logged"},
 			},
 		)
 	}

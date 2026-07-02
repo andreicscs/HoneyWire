@@ -3,12 +3,13 @@
 # =========================
 .env
 **/.env
+.env.development
 # (Note: We do NOT ignore .env.example so users have a template)
 
 # =========================
 # Database
 # =========================
-*.db
+*.db.*
 *.sqlite3
 
 # =========================
@@ -17,6 +18,8 @@
 node_modules/
 ui/dist/
 npm-debug.log*
+
+.vite
 
 # =========================
 # Go & Binaries

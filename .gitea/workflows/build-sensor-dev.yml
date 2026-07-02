@@ -1,0 +1,155 @@
+name: Manual Dev Sensor Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      sensor:
+        description: "Exact folder name (e.g.FileCanary, TcpTarpit, NetworkScanDetector, WebRouterDecoy) or 'all'"
+        required: true
+        default: "all"
+        type: string
+
+jobs:
+  build-test-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------
+      # 1. ENVIRONMENT SETUP
+      # -----------------------------------------------------
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21' # Update this to your project's Go version
+
+      - name: Setup Python (For MockHub)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # -----------------------------------------------------
+      # 2. BUILD, TEST, AND PUSH
+      # -----------------------------------------------------
+
+      - name: Build, Test, and Push Sensors
+        env: # Bind the input to a safe environment variable first
+          SENSOR_INPUT: ${{ inputs.sensor }}
+        run: |
+          # ANSI Color Codes
+          RESET='\033[0m'
+          BOLD='\033[1m'
+          CYAN='\033[0;36m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[0;33m'
+          RED='\033[0;31m'
+          DIM='\033[2m'
+
+          INPUT="$SENSOR_INPUT"
+          if [ -z "$INPUT" ] || [ "$INPUT" == "all" ]; then
+            DIRS=$(find Sensors/official -mindepth 1 -maxdepth 1 -type d -exec basename {} \;)
+          else
+            DIRS="$INPUT"
+          fi
+
+          echo -e "${BOLD}Targeting sensors: $DIRS${RESET}"
+
+          # Kill any lingering instances from previous failed runs
+          pkill -f scripts/mock_hub.py || true
+
+          # Start MockHub once in the background to avoid TCP port binding collisions between tests
+          echo -e "${DIM}Starting MockHub in background...${RESET}"
+          python scripts/mock_hub.py &
+          MOCK_PID=$!
+          sleep 2
+
+          for SENSOR in $DIRS; do
+            if [ -n "$SENSOR" ]; then
+              SENSOR_PATH="Sensors/official/$SENSOR"
+              LOWER_NAME=$(echo "$SENSOR" | tr '[:upper:]' '[:lower:]')
+              TAG="192.168.1.11:5000/honeywire-$LOWER_NAME:dev"
+
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 1: Go Unit Tests for $SENSOR${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
+              # Navigate to the sensor directory and run unit tests
+              cd "$SENSOR_PATH"
+              go test -v ./...
+              # The pipeline will automatically fail and exit here if tests fail
+              cd - > /dev/null
+
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 2: Building Image -> $TAG${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
+              docker build -t "$TAG" -f "$SENSOR_PATH/Dockerfile" .
+
+              echo -e "\n${CYAN}========================================${RESET}"
+              echo -e "${CYAN}${BOLD}STAGE 3: MockHub Contract Test${RESET}"
+              echo -e "${CYAN}========================================${RESET}"
+
+              # 1. Ensure clean slate
+              rm -f /tmp/test_passed
+
+              # Detect network environment for MockHub routing (Handles both VM and Docker-in-Docker runners)
+              RUNNER_NET=$(docker network ls --format '{{.Name}}' | grep -E 'GITEA-ACTIONS|act-|github_network' | head -n 1 || true)
+              if [ -n "$RUNNER_NET" ]; then
+                NET_OPT="--network $RUNNER_NET"
+                RUNNER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || hostname -i | awk '{print $1}')
+                HUB_ENDPOINT="http://$RUNNER_IP:8080"
+                echo -e "${DIM}Detected Containerized CI Runner. Linking MockHub via network: $RUNNER_NET ($RUNNER_IP)${RESET}"
+              else
+                NET_OPT="--network host"
+                HUB_ENDPOINT="http://127.0.0.1:8080"
+                echo -e "${DIM}Detected VM CI Runner. Linking MockHub via localhost.${RESET}"
+              fi
+
+              # 2. Run the newly built sensor container
+              echo -e "${DIM}Launching test container...${RESET}"
+              docker rm -f test-sensor 2>/dev/null || true
+              docker run -d --name test-sensor \
+                -e HW_HUB_ENDPOINT=$HUB_ENDPOINT \
+                -e HW_HUB_KEY=ci-test-key \
+                -e HW_SENSOR_ID=ci-test-sensor \
+                -e HW_TEST_MODE=true \
+                $NET_OPT "$TAG"
+
+              # 3. Poll for the success file created by MockHub
+              TIMEOUT=30
+              TEST_PASSED=false
+
+              echo -e "${YELLOW}Waiting up to $TIMEOUT seconds for sensor to sync and send valid event...${RESET}"
+              while [ $TIMEOUT -gt 0 ]; do
+                if [ -f /tmp/test_passed ] && grep -q 'success' /tmp/test_passed; then
+                  TEST_PASSED=true
+                  break
+                fi
+                sleep 1
+                TIMEOUT=$((TIMEOUT-1))
+              done
+
+              # 4. Cleanup Testing Environment
+              echo -e "${DIM}Cleaning up test container...${RESET}"
+              docker stop test-sensor || true
+
+              # 5. Evaluate Test Results
+              if [ "$TEST_PASSED" = true ]; then
+                echo -e "${GREEN}✅ Integration Test Passed! Pushing image to registry...${RESET}"
+                docker push "$TAG"
+                docker rm -f test-sensor || true
+              else
+                echo -e "${RED}❌ Integration Test Failed or Timed Out!${RESET}"
+                echo -e "${YELLOW}--- Sensor Container Logs ---${RESET}"
+                docker logs test-sensor || true
+                docker rm -f test-sensor || true
+                exit 1 # Halt the entire pipeline
+              fi
+
+            fi
+          done
+
+          # Final Cleanup
+          kill $MOCK_PID || true

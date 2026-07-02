@@ -15,18 +15,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --target /app/lib -r requirements.txt
 
 # --- Stage 2: Distroless (Production) ---
-FROM gcr.io/distroless/python3-debian12
+FROM gcr.io/distroless/python3-debian12:nonroot
 WORKDIR /app
 
 # Copy the FLAT library folder. No symlinks, just code.
-COPY --from=builder /app/lib /app/lib
+COPY --chown=65532:65532 --from=builder /app/lib /app/lib
 
 # Copy the custom sensor script
-COPY sensor.py .
+COPY --chown=65532:65532 sensor.py .
 
 # Tell Python to look in our lib folder first
 ENV PYTHONPATH="/app/lib"
 ENV PYTHONUNBUFFERED=1
 
+USER 65532
 # Distroless runs /usr/bin/python3 by default
 CMD ["sensor.py"]

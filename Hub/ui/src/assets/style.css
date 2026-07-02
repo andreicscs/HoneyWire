@@ -1,5 +1,329 @@
 @import "tailwindcss";
-@variant dark (&:where(.dark, .dark *)); /* <-- ADD THIS LINE */
+@variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   HONEYWIRE DESIGN SYSTEM
+   ========================================================================== */
+
+:root {
+  /* --- 1. Colors: Structural (OKLCH) --- */
+  --bg: oklch(92% 0.01 250);
+  --bg-base: oklch(96% 0.01 250);
+  --bg-surface: oklch(98% 0.01 250);
+  --bg-inset: oklch(85% 0.01 250);
+  --surface-highlight: oklch(100% 0 0); 
+  
+  --border-default: oklch(80% 0.02 250);
+
+  /* --- 2. Colors: Actions & Interactive --- */
+  --primary-main: oklch(20% 0.02 250);
+  --primary-hover: oklch(30% 0.02 250);
+  --primary-selected: oklch(15% 0.02 250);
+  --primary-text: oklch(98% 0 0);
+  --primary-border: oklch(85% 0.02 250);
+
+  --secondary-main: oklch(98% 0.01 285);
+  --secondary-hover: oklch(94% 0.01 250);
+  --secondary-selected: oklch(88% 0.02 250);
+  --secondary-text: oklch(45% 0.02 250);
+  --secondary-border: oklch(85% 0.02 250);
+
+  --disabled-bg: oklch(90% 0.01 250);
+  --disabled-text: oklch(70% 0.01 250);
+  --disabled-border: oklch(60% 0.01 250);
+  
+  --input-bg: oklch(98% 0.01 250);          
+  --input-border: oklch(85% 0.02 250);
+
+  /* --- 3. Colors: States & Severities --- */
+
+  /* --- Severities (Light Mode) --- */
+  --sev-critical: oklch(60% 0.22 20);
+  --sev-high: oklch(65% 0.18 50);
+  --sev-medium: oklch(75% 0.15 85);
+  --sev-low: oklch(60% 0.15 250);
+  --sev-info: oklch(55% 0.02 250);
+
+  --danger-main: oklch(65% 0.2 25);
+  --danger-hover: oklch(85% 0.15 25);
+  --danger-bg: oklch(90% 0.05 20);
+  --danger-text: oklch(25% 0.1 20);
+  --danger-border: oklch(70% 0.2 20);
+
+  --archive-text: oklch(35% 0.1 85);
+  --archive-bg: oklch(90% 0.05 85);
+  --archive-hover: oklch(85% 0.08 85);
+  --archive-border: oklch(60% 0.2 85);
+
+  --success-main: oklch(65% 0.15 150);
+  --success-selected: oklch(75% 0.12 150);
+  --success-text: oklch(45% 0.08 150);
+  --success-bg: oklch(90% 0.06 150);
+  --success-border: oklch(80% 0.1 150);
+
+  --highlight-bg: oklch(96% 0.03 250);
+  --highlight-border: oklch(75% 0.1 250);
+  --highlight-text: oklch(35% 0.1 250);
+  --highlight-ring: oklch(75% 0.1 250 / 0.3);
+
+  --select-solid-bg: oklch(25% 0.02 250);
+  --select-solid-text: oklch(98% 0 0);
+  --select-group-bg: oklch(97% 0.01 250 / 0.5);
+  --select-group-border: oklch(85% 0.02 250);
+  --select-row-bg: oklch(93.967% 0.015 251.307);
+  --select-row-border: oklch(85% 0.02 250);
+
+  /* --- 4. Typography --- */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --text-h1: 1.5rem;
+  --text-base: 0.875rem;
+  --text-sm: 0.75rem;
+
+  --font-weight-bold: 800;
+  --font-weight-medium: 600;
+  --font-weight-normal: 400;
+
+  --text-leading-tight: 1.2;
+  --text-leading-normal: 1.5;
+
+  --text-h: oklch(25% 0.02 250); /* High Contrast */
+  --text-m: oklch(45% 0.02 250); /* Medium Contrast */
+  --text-l: oklch(60% 0.02 250); /* Low Contrast */
+
+  /* --- 5. Border Radius --- */
+  --radius-sm: 0.25rem;   /* 4px - Checkboxes, small pills */
+  --radius-md: 0.375rem;  /* 6px - Buttons, Inputs */
+  --radius-lg: 0.5rem;    /* 8px - Cards, Modals */
+  --radius-full: 9999px;  /* Circular pills, avatars */
+
+  /* --- 2. SPACING KNOBS --- */
+  --space-card-p: 1.5rem;          /* Internal padding of cards */
+  --space-flow: 1.5rem;            /* Standard vertical gap between blocks */
+  --space-label-gap: 0.25rem;      /* Gap between label and input */
+
+  /* --- 6. Z-Index Scale --- */
+  --z-base: 0;
+  --z-elevated: 10;       /* Cards, relatively positioned items */
+  --z-sticky: 30;         /* Sticky table headers */
+  --z-dropdown: 40;       /* Meatball menus, select dropdowns */
+  --z-overlay: 50;        /* Modal backdrops */
+  --z-modal: 100;         /* Modals */
+  --z-toast: 200;         /* Notifications */
+
+  /* --- 7. Motion & Transitions --- */
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+
+  /* --- 8. Light Mode Shadows --- */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* --- DARK MODE --- */
+.dark {
+  /* --- 1. Colors: Structural (OKLCH) --- */
+  --bg: oklch(10% 0.01 250);
+  --bg-base: oklch(16% 0.01 250);
+  --bg-surface: oklch(22% 0.01 250);
+  --bg-inset: oklch(12% 0.01 250);
+  --surface-highlight: oklch(35% 0.02 250);
+  
+  --border-default: oklch(30% 0.02 250);
+ 
+  /* --- 2. Colors: Actions & Interactive --- */
+  --primary-main: oklch(90% 0.01 250);
+  --primary-hover: oklch(100% 0 0);
+  --primary-selected: oklch(85% 0.01 250);
+  --primary-text: oklch(15% 0.01 250);
+  --primary-border: oklch(40% 0.02 250);
+ 
+  --secondary-main: oklch(22% 0.01 250);
+  --secondary-hover: oklch(26% 0.02 250);
+  --secondary-selected: oklch(35% 0.02 250);
+  --secondary-text: oklch(70% 0.02 250);
+  --secondary-border: oklch(30% 0.02 250);
+ 
+  --disabled-bg: oklch(16.081% 0.00909 240.653);
+  --disabled-text: oklch(45% 0.01 250);
+  --disabled-border: oklch(40% 0.01 250);
+  
+  --input-bg: oklch(14% 0.01 250);           
+  --input-border: oklch(30% 0.01 250);
+ 
+  /* --- 3. Colors: States & Severities --- */
+ 
+  /* --- Severities (Dark Mode) --- */
+  --sev-critical: oklch(60% 0.22 20);
+  --sev-high: oklch(65% 0.18 50);
+  --sev-medium: oklch(75% 0.15 85);
+  --sev-low: oklch(60% 0.15 250);
+  --sev-info: oklch(55% 0.02 250);
+ 
+  --danger-main: oklch(58% 0.16 25);
+  --danger-hover: oklch(10% 0.16 25);
+  --danger-bg: oklch(25% 0.05 25);
+  --danger-text: oklch(95% 0.16 25);
+  --danger-border: oklch(40% 0.1 25);
+ 
+  --archive-text: oklch(85% 0.1 85);
+  --archive-bg: oklch(48% 0.1 85 / 0.25);
+  --archive-hover: oklch(15% 0.16 85 / 0.2);
+  --archive-border: oklch(50% 0.15 85 / 0.3);
+ 
+  --success-main: oklch(65% 0.15 150);
+  --success-selected: oklch(60% 0.15 150 / 0.3);
+  --success-text: oklch(80% 0.12 150);
+  --success-bg: oklch(35% 0.1 150 / 0.18);
+  --success-border: oklch(40% 0.1 150 / 0.5);
+ 
+  --highlight-bg: transparent;
+  --highlight-border: oklch(70% 0.02 250);
+  --highlight-text: oklch(90% 0.01 250);
+  --highlight-ring: oklch(70% 0.02 250 / 0.5);
+ 
+  --select-solid-bg: oklch(90% 0.01 250);
+  --select-solid-text: oklch(15% 0.01 250);
+  --select-group-bg: oklch(100% 0 0 / 0.05);
+  --select-group-border: oklch(40% 0.02 250);
+  --select-row-bg: oklch(26% 0.02 250);
+  --select-row-border: oklch(50% 0.02 250);
+ 
+  /* --- 4. Typography --- */
+  --text-h: oklch(95% 0.01 250); /* High Contrast */
+  --text-m: oklch(70% 0.02 250); /* Medium Contrast */
+  --text-l: oklch(50% 0.01 250); /* Low Contrast */
+ 
+  /* --- 9. Dark Mode Shadows --- */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.384);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+}
+ 
+/* --- TAILWIND THEME LOADER --- */
+@theme {
+  /* Structural Colors */
+  --color-bg: var(--bg);
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-inset: var(--bg-inset);
+  --color-border-default: var(--border-default);
+ 
+  /* Primary Actions */
+  --color-primary-main: var(--primary-main);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-selected: var(--primary-selected);
+  --color-primary-text: var(--primary-text);
+  --color-primary-border: var(--primary-border);
+ 
+  /* Secondary Actions */
+  --color-secondary-main: var(--secondary-main);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-selected: var(--secondary-selected);
+  --color-secondary-text: var(--secondary-text);
+  --color-secondary-border: var(--secondary-border);
+ 
+  /* Disabled States */
+  --color-disabled-bg: var(--disabled-bg);
+  --color-disabled-text: var(--disabled-text);
+  --color-disabled-border: var(--disabled-border);
+  
+  /* Input States */
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+ 
+  /* Severity Levels */
+  --color-critical: var(--sev-critical);
+  --color-high: var(--sev-high);
+  --color-medium: var(--sev-medium);
+  --color-low: var(--sev-low);
+  --color-info: var(--sev-info);
+ 
+  /* Danger Actions */
+  --color-danger-main: var(--danger-main);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-text: var(--danger-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+ 
+  /* Archive Actions */
+  --color-archive-text: var(--archive-text);
+  --color-archive-bg: var(--archive-bg);
+  --color-archive-hover: var(--archive-hover);
+  --color-archive-border: var(--archive-border);
+ 
+  /* Success Actions */
+  --color-success-main: var(--success-main);
+  --color-success-selected: var(--success-selected);
+  --color-success-text: var(--success-text);
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+ 
+  /* Highlight Actions */
+  --color-highlight-bg: var(--highlight-bg);
+  --color-highlight-border: var(--highlight-border);
+  --color-highlight-text: var(--highlight-text);
+  --color-highlight-ring: var(--highlight-ring);
+ 
+  /* Selection Layers */
+  --color-select-solid-bg: var(--select-solid-bg);
+  --color-select-solid-text: var(--select-solid-text);
+  --color-select-group-bg: var(--select-group-bg);
+  --color-select-group-border: var(--select-group-border);
+  --color-select-row-bg: var(--select-row-bg);
+  --color-select-row-border: var(--select-row-border);
+ 
+  /* Typography */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  
+  --text-h1: var(--text-h1);
+  --text-base: var(--text-base);
+  --text-sm: var(--text-sm);
+ 
+  --text-weight-bold: var(--font-weight-bold);
+  --text-weight-medium: var(--font-weight-medium);
+  --text-weight-normal: var(--font-weight-normal);
+ 
+  --text-leading-tight: var(--text-leading-tight);
+  --text-leading-normal: var(--text-leading-normal);
+ 
+  /* Text Colors */
+  --color-text-h: var(--text-h);
+  --color-text-m: var(--text-m);
+  --color-text-l: var(--text-l);
+ 
+  /* Border Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+ 
+  /* Spacing */
+  --space-card-p: var(--space-card-p);
+  --space-flow: var(--space-flow);
+  --space-label-gap: var(--space-label-gap);
+ 
+  /* Z-Index */
+  --z-base: var(--z-base);
+  --z-elevated: var(--z-elevated);
+  --z-sticky: var(--z-sticky);
+  --z-dropdown: var(--z-dropdown);
+  --z-overlay: var(--z-overlay);
+  --z-modal: var(--z-modal);
+  --z-toast: var(--z-toast);
+ 
+  /* Motion */
+  --duration-fast: var(--duration-fast);
+  --duration-normal: var(--duration-normal);
+ 
+  /* Shadows */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
 
 /* -- HoneyWire Custom Styles -- */
 [x-cloak] { display: none !important; }

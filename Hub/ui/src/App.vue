@@ -1,185 +1,184 @@
-<script setup>
-  import { ref, onMounted, onUnmounted } from 'vue'
-  import Sidebar from './components/Sidebar.vue'
-  import Header from './components/Header.vue'
-  import Dashboard from './views/Dashboard.vue'
-  import Login from './views/Login.vue'
-  import { useSentinel } from './api/useSentinel'
-  import Store from './views/Store.vue'
-  import Settings from './views/Settings.vue'
-  import { useConfig } from './api/useConfig'
-  import Setup from './views/Setup.vue'
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 
-  const { 
-    version, 
-    isArmed, 
-    unreadCount, 
-    viewingArchive, 
-    startRealtimeSync, 
-    stopRealtimeSync,
-    toggleArmed, 
-    markAllRead,
-    events,
-    logout,
-    purgeEvents
-  } = useSentinel()
-  const { fetchConfig } = useConfig()
+import Sidebar from './components/layout/Sidebar.vue'
+import Header from './components/layout/Header.vue'
+import Setup from './views/Setup.vue'
+import Login from './views/Login.vue'
 
-  const requiresSetup = ref(false)
-  const isAuthenticated = ref(false)
-  const currentView = ref('dashboard')
-  const sidebarOpen = ref(true)
- 
-  const checkAuthAndInit = async () => {
-    try {
-        const setupRes = await fetch('/api/v1/setup/status')
-        if (setupRes.ok) {
-            const setupData = await setupRes.json()
-            if (setupData.requires_setup) {
-                requiresSetup.value = true
-                isAuthenticated.value = false
-                return
-            }
-        }
-        
-        requiresSetup.value = false
+import { useConfigStore } from './stores/Config/config'
+import { useAppStore } from './stores/System/app'
+import { useFleetStore } from './stores/Fleet/fleet'
+import { useEventsStore } from './stores/Events/events'
+import { HoneyWireWS } from './services/ws'
 
-        const res = await fetch('/api/v1/system/state')
-        if (res.ok) {
-            isAuthenticated.value = true
-            await fetchConfig() 
-            
-            startRealtimeSync()
-        } else {
-            isAuthenticated.value = false
-        }
-    } catch (e) {
-        console.error("Hub connection error:", e)
-        isAuthenticated.value = false
+const configStore = useConfigStore()
+const appStore = useAppStore()
+const fleetStore = useFleetStore()
+const eventsStore = useEventsStore()
+
+const router = useRouter()
+const route = useRoute()
+
+const { isInitialized, requiresSetup, isAuthenticated, viewingArchive, bootstrapError } = storeToRefs(appStore)
+
+watch([viewingArchive, () => fleetStore.selectedNode?.id, () => fleetStore.selectedSensor?.sensorId],
+  ([isArchived, nodeId, sensorId]) => {
+    eventsStore.fetchEvents(isArchived as boolean, (nodeId as string) || null, (sensorId as string) || null)
+})
+
+watch(() => fleetStore.activeTimeframe, (newTimeframe) => {
+    fleetStore.fetchUptime(newTimeframe)
+})
+
+const wsService = new HoneyWireWS()
+
+const isDataLoaded = ref(false)
+
+const loadAppData = async () => {
+  isDataLoaded.value = false
+  try {
+    await configStore.fetchConfig().catch(e => console.warn("Config fetch non-fatal error:", e))
+
+    // Reconcile system state (isArmed) now that we have an active session
+    await appStore.fetchSystemState().catch(() => {})
+
+    await Promise.all([
+      fleetStore.fetchFleet().catch(e => console.error("Fleet fetch error:", e)),
+      fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(e => console.error("Uptime fetch error:", e)),
+      eventsStore.fetchEvents().catch(e => console.error("Events fetch error:", e)),
+    ])
+
+    // TODO: REMOVE DEBUG OVERRIDE BEFORE PRODUCTION
+    // You can test the "First Startup" UI state at any time by running:
+    // localStorage.setItem('DEBUG_FIRST_STARTUP', 'true') in your browser console.
+    if ((fleetStore.nodes.length === 0 || localStorage.getItem('DEBUG_FIRST_STARTUP') === 'true') && route.name !== 'fleet') {
+      await router.push('/fleet').catch(() => {})
     }
+
+    wsService.on('onNewEvent', (payload: any) => {
+      eventsStore.handleWsEvent(payload)
+      fleetStore.handleWsUpdate('NEW_EVENT', payload)
+    })
+    wsService.on('onNewSensor', (payload: any) => fleetStore.handleWsUpdate('NEW_SENSOR', payload))
+    wsService.on('onDeleteSensor', (payload: any) => fleetStore.handleWsUpdate('DELETE_SENSOR', payload))
+    wsService.on('onSilenceSensor', (payload: any) => fleetStore.handleWsUpdate('SILENCE_SENSOR', payload))
+    wsService.on('onSensorHeartbeat', (payload: any) => fleetStore.handleWsUpdate('SENSOR_HEARTBEAT', payload))
+    wsService.on('onNewNode', (payload: any) => fleetStore.handleWsUpdate('NEW_NODE', payload))
+    wsService.on('onUpdateNode', (payload: any) => fleetStore.handleWsUpdate('UPDATE_NODE', payload))
+    wsService.on('onDeleteNode', (payload: any) => {
+      fleetStore.handleWsUpdate('DELETE_NODE', payload)
+      eventsStore.fetchEvents().catch(() => {})
+      eventsStore.fetchSeverityProjection('alltime', fleetStore.selectedNodeId, fleetStore.selectedSensorId).catch(() => {})
+      eventsStore.fetchSummaryProjection('24H', fleetStore.selectedNodeId, fleetStore.selectedSensorId).catch(() => {})
+      eventsStore.invalidateThreatVelocityProjection()
+    })
+    wsService.on('onNodeSynced', (payload: any) => fleetStore.handleWsUpdate('NODE_SYNCED', payload))
+    wsService.on('onCatalogUpdated', (payload: any) => fleetStore.handleWsUpdate('CATALOG_UPDATED', payload))
+
+    wsService.on('onReconnect', async () => {
+      console.log("WebSocket Reconnected: Syncing missed data...")
+      await Promise.all([
+        fleetStore.fetchFleet().catch(() => {}),
+        fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(() => {}),
+        eventsStore.fetchEvents().catch(() => {}),
+      ])
+    })
+
+    wsService.on('onSyncCharts', () => {
+      fleetStore.fetchUptime(fleetStore.activeTimeframe)
+    })
+
+    wsService.connect()
+
+  } catch (e) {
+    console.error("Critical failure during loadAppData:", e)
+  } finally {
+    isDataLoaded.value = true
   }
-  
-  const toggleTheme = () => {
-    const html = document.documentElement
-    if (html.classList.contains('dark')) {
-        html.classList.remove('dark')
-        localStorage.setItem('theme', 'light')
-    } else {
-        html.classList.add('dark')
-        localStorage.setItem('theme', 'dark')
-    }
-  }
+}
 
-  // --- DRYRUN PURGE LOGIC ---
-  const clearLogs = async () => {
-    try {
-        //Perform the Dry Run to get the exact count
-        const dryRes = await fetch('/api/v1/events?dryrun=true', { method: 'DELETE' })
-        if (!dryRes.ok) throw new Error("Failed to fetch dryrun data")
-        
-        const dryData = await dryRes.json()
-        const count = dryData.would_delete || 0
-
-        if (count === 0) {
-            alert("The database is already empty.")
-            return
-        }
-
-        //Ask user with the specific count
-        if (confirm(`Confirm Database Purge?\n\nThis will permanently delete ${count} active and archived event logs.\n\nThis action cannot be undone.`)) {
-            try {
-                //The actual deletion
-                const response = await fetch('/api/v1/events?dryrun=false', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' }
-                })
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`)
-                }
-                
-                // Only update UI after successful server deletion
-                purgeEvents()
-                console.log("Database purged successfully.")
-                alert("Database purged successfully.")
-            } catch(error) {
-                console.error("Failed to purge logs:", error)
-                alert("Failed to purge logs. The database remains unchanged.")
-            }
-        }
-    } catch (error) {
-        console.error("Network error while purging logs:", error)
-        alert("Network error. Could not reach the Hub.")
-    }
+const checkAuthAndInit = async () => {
+  // TODO remove debug override before production
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('debug') === 'setup') {
+    appStore.enableDebugSetup()
+    return
   }
 
-  onMounted(() => {
-    checkAuthAndInit()
-  })
+  try {
+    await appStore.initAppStore()
 
-  onUnmounted(() => {
-    stopRealtimeSync()
-  })
-</script>
+    if (requiresSetup.value) {
+      return
+    }
 
-<script>
-  if (localStorage.theme === 'dark' || (!('theme' in localStorage) && 
-      window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    if (bootstrapError.value) {
+      return
+    }
+
+  } catch (e) {
+    console.error("Hub connection error:", e)
+  }
+}
+
+watch(isAuthenticated, (isAuth) => {
+  if (isAuth) {
+    loadAppData()
+  } else {
+    isDataLoaded.value = false
+  }
+})
+
+onMounted(() => {
+  // Restore saved theme before any rendering
+  const savedTheme = localStorage.getItem('theme')
+  if (savedTheme === 'dark') {
     document.documentElement.classList.add('dark')
+  } else if (savedTheme === 'light') {
+    document.documentElement.classList.remove('dark')
+  } else {
+    // No preference saved — check system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark')
+    }
   }
+
+  checkAuthAndInit()
+})
+
+onUnmounted(() => {
+  wsService.disconnect()
+})
 </script>
 
 <template>
-  <div v-if="requiresSetup" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
-    <Setup @setup-complete="checkAuthAndInit" @toggle-theme="toggleTheme" />
-  </div>
-  
-  <div v-if="!isAuthenticated" class="h-screen bg-slate-100 dark:bg-[#0a0a0c]">
-    <Login 
-      @login-success="checkAuthAndInit" 
-      @toggle-theme="toggleTheme"
-    /> 
+  <div v-if="!isInitialized || (isAuthenticated && !isDataLoaded)" class="h-screen bg-bg flex items-center justify-center z-50">
+     <div class="animate-pulse flex flex-col items-center gap-4">
+         <svg class="w-10 h-10 text-primary-main animate-spin" fill="none" viewBox="0 0 24 24">
+             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+         </svg>
+         <span class="text-text-m font-medium tracking-wide">{{ !isInitialized ? 'Initializing...' : 'Loading Telemetry...' }}</span>
+     </div>
   </div>
 
-  <div v-else class="flex h-screen overflow-hidden bg-slate-200/60 dark:bg-[#0a0a0c] text-slate-700 dark:text-zinc-200 transition-colors duration-200">
-    
-    <Sidebar 
-      :isOpen="sidebarOpen" 
-      :currentView="currentView" 
-      :version="version" 
-      :viewingArchive="viewingArchive"
-      @change-view="v => currentView = v" 
-      @toggle-archive="viewingArchive = !viewingArchive" 
-      @clear-logs="clearLogs"
-      @toggle-sidebar="sidebarOpen = !sidebarOpen" 
-    />
+  <div v-else-if="requiresSetup" class="h-screen bg-bg">
+    <Setup @toggle-theme="appStore.toggleTheme" />
+  </div>
 
+  <div v-else-if="!isAuthenticated" class="h-screen bg-bg">
+    <Login @toggle-theme="appStore.toggleTheme" />
+  </div>
+
+  <div v-else class="flex h-screen overflow-hidden bg-bg text-text-h transition-colors duration-200">
+    <Sidebar />
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
-      
-      <Header 
-        :currentView="currentView" 
-        :isArmed="isArmed" 
-        :unreadCount="unreadCount" 
-        @toggle-theme="toggleTheme" 
-        @toggle-armed="toggleArmed" 
-        @mark-all-read="markAllRead" 
-        @logout="logout" 
-      />
-      
+      <Header />
       <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
-        
-        <div v-if="currentView === 'dashboard'">
-          <Dashboard /> 
-        </div>
-
-        <div v-else-if="currentView === 'store'">
-          <Store />
-        </div>
-
-        <div v-else-if="currentView === 'settings'">
-          <Settings />
-        </div>
-
+        <router-view />
       </div>
     </main>
   </div>

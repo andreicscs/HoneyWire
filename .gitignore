@@ -1,18 +1,49 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# local env files
+.env.local
+.env.*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# hub binary
+/hub
+/Hub/hub
+/hub.exe
+/Hub/hub.exe
+
+# =========================
+# OS & IDE Clutter
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+
 # =========================
 # Secrets and Config
 # =========================
 .env
 **/.env
+.token
 # (Note: We do NOT ignore .env.example so users have a template)
 
 # =========================
-# Database
+# Database & Backups
 # =========================
 *.db
 *.db-wal
 *.db-shm
-
 *.sqlite3
+*.bak
+*.swp
+*.*.bak # Catches honeywire.db.bak and any other backups
 
 # =========================
 # Python
@@ -22,14 +53,21 @@ __pycache__/
 venv/
 .venv/
 *.egg-info/
-build/
 dist/
 
 # =========================
-# OS & IDE Clutter
+# Go & Builds
 # =========================
-.DS_Store
-Thumbs.db
-.vscode/
+# Logs
+*.log
+*.log.*
+
+# Build artifacts
+build/
+wizard/build/
+Hub/cmd/hub/hub
+*.exe
+*.test
 
 # (Notice: .dockerignore is intentionally NOT here. It must be tracked by Git!)
+Hub/ui/.env.development

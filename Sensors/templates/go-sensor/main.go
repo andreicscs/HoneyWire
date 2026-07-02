@@ -13,7 +13,6 @@ import (
 
 var (
 	// Load custom configuration from environment variables
-	severity = getEnv("HW_SEVERITY", "medium")
 	target   = getEnv("HW_CUSTOM_TARGET", "/tmp/honey")
 )
 
@@ -24,6 +23,16 @@ func main() {
 		log.Fatalf("[!] FATAL: %v", err)
 	}
 
+	hw.SetTestPayload(
+		"custom_anomaly_detected",
+		"Wizard Firedrill",
+		"Mock Custom Target",
+		sdk.EventDetails{
+			{Key: "test_message", Value: "Wizard triggered a synthetic event firedrill."},
+			{Key: "action_taken", Value: "logged"},
+		},
+	)
+
 	// 2. Handle CI/CD Test Mode
 	if hw.TestMode {
 		if hw.RunTestMode() {
@@ -32,20 +41,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 3. Start the SDK (Syncs Hub version, starts heartbeats)
-	if err := hw.Start(); err != nil {
-		log.Fatalf("[!] FATAL: %v", err)
-	}
-	defer hw.Stop() // Cleans up the background heartbeat goroutine
+	log.Printf("[*] Starting Custom Go Sensor | Target: %s", target)
 
-	log.Printf("[*] Starting Custom Go Sensor | Target: %s | Severity: %s", target, severity)
-
-	// 4. Setup graceful shutdown via OS signals
+	// 3. Setup graceful shutdown and acquire resources (e.g., net.Listen)
+	// IMPORTANT: Always acquire resources and start your background listeners BEFORE calling hw.Start().
+	// This prevents the sensor from reporting a false "online" state to the Hub if it crashes immediately (e.g., port already in use).
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Spin off your sensor logic into a non-blocking goroutine
 	go runSensor(ctx, hw)
+
+	// 4. Start the SDK (Syncs Hub version, starts heartbeats)
+	if err := hw.Start(); err != nil {
+		log.Fatalf("[!] FATAL: %v", err)
+	}
+	defer hw.Stop() // Cleans up the background heartbeat goroutine
 
 	// Block main thread until Ctrl+C is pressed
 	<-ctx.Done()
@@ -70,14 +81,13 @@ func runSensor(ctx context.Context, hw *sdk.Sensor) {
 
 			// Send the alert to the Hub using the SDK's built-in method
 			hw.ReportEvent(
-				severity,                  // 1. Severity
-				"custom_anomaly_detected", // 2. Event Trigger
-				sourceIP,                  // 3. Source
-				target,                    // 4. Target
-				map[string]any{            // 5. Details
-					"attack_type":  "example_probe",
-					"raw_payload":  "GET /etc/passwd HTTP/1.1",
-					"action_taken": "logged",
+				"custom_anomaly_detected", // 1. Event Trigger
+				sourceIP,                  // 2. Source
+				target,                    // 3. Target
+				sdk.EventDetails{ // 4. Details
+					{Key: "attack_type", Value: "example_probe"},
+					{Key: "raw_payload", Value: "GET /etc/passwd HTTP/1.1"},
+					{Key: "action_taken", Value: "logged"},
 				},
 			)
 		}

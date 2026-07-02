@@ -1,40 +1,91 @@
 package api
 
 import (
-	"crypto/subtle"
+	"context"
 	"net/http"
 	"strings"
+	"sync"
 
-	"github.com/honeywire/hub/internal/auth"
-	"github.com/honeywire/hub/internal/store"
+	"golang.org/x/mod/semver"
+
+	"github.com/honeywire/hub/internal/models"
+	"golang.org/x/time/rate"
 )
 
+type SessionValidator interface {
+	IsValid(string) bool
+}
+
+type NodeAuthenticator interface {
+	AuthenticateNodeRequest(token string) (string, error)
+}
+
+type contextKey string
+
+const (
+	NodeIDKey     contextKey = "nodeID"
+)
+
+// RateLimiter controls the frequency of requests on a per-node basis.
+type RateLimiter struct {
+	limiters map[string]*rate.Limiter
+	mu       sync.RWMutex
+}
+
+// NewRateLimiter creates a new rate limiter.
+func NewRateLimiter() *RateLimiter {
+	return &RateLimiter{
+		limiters: make(map[string]*rate.Limiter),
+	}
+}
+
+// Allow checks if a request from a given nodeID is permitted.
+func (rl *RateLimiter) Allow(nodeID string) bool {
+	rl.mu.RLock()
+	limiter, exists := rl.limiters[nodeID]
+	rl.mu.RUnlock()
+
+	if !exists {
+		rl.mu.Lock()
+		limiter, exists = rl.limiters[nodeID]
+		if !exists {
+			// Limit: ~1.66 requests per second (100 per minute), Burst: 100
+			limiter = rate.NewLimiter(rate.Limit(100.0/60.0), 100)
+			rl.limiters[nodeID] = limiter
+		}
+		rl.mu.Unlock()
+	}
+
+	return limiter.Allow()
+}
+
+func NodeIDFromContext(ctx context.Context) string {
+	val, ok := ctx.Value(NodeIDKey).(string)
+	if !ok {
+		return ""
+	}
+	return val
+}
+
 // UIAuthMiddleware strictly requires a valid session cookie for ALL dashboard routes
-func UIAuthMiddleware(sessionStore *auth.SessionStore) func(http.Handler) http.Handler {
+func UIAuthMiddleware(sessionValidator SessionValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(auth.CookieName)
-			if err != nil || !sessionStore.IsValid(cookie.Value) {
+			cookie, err := r.Cookie(AuthCookieName)
+			if err != nil || !sessionValidator.IsValid(cookie.Value) {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-// AgentAuthMiddleware securely validates sensor heartbeats/events against the DB Config
-func AgentAuthMiddleware(s *store.Store) func(http.Handler) http.Handler {
+// AgentAuthMiddleware securely validates sensor heartbeats/events via the Auth Service
+func AgentAuthMiddleware(auth NodeAuthenticator, rateLimiter *RateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var configuredKey string
-			err := s.DB.QueryRow("SELECT value FROM config WHERE key='hub_key'").Scan(&configuredKey)
-			if err != nil || configuredKey == "" {
-				http.Error(w, "Hub is not fully configured.", http.StatusServiceUnavailable)
-				return
-			}
-
 			token := r.Header.Get("X-Api-Key")
 			if token == "" {
 				authHeader := r.Header.Get("Authorization")
@@ -43,13 +94,77 @@ func AgentAuthMiddleware(s *store.Store) func(http.Handler) http.Handler {
 				}
 			}
 
-			//Constant Time Compare prevents timing-attack vulnerability scanning
-			if token == "" || len(token) != len(configuredKey) || subtle.ConstantTimeCompare([]byte(token), []byte(configuredKey)) != 1 {
+			nodeID, err := auth.AuthenticateNodeRequest(token)
+			if err != nil || nodeID == "" {
 				http.Error(w, "Unauthorized Sensor", http.StatusUnauthorized)
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			if !rateLimiter.Allow(nodeID) {
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
+
+			// Version handshake
+			wizardVersionStr := r.Header.Get("X-Wizard-Version")
+			if wizardVersionStr != "" {
+				reqVer := strings.TrimSpace(wizardVersionStr)
+				if !strings.HasPrefix(reqVer, "v") { reqVer = "v" + reqVer }
+				curVer := models.HubVersion
+				if !strings.HasPrefix(curVer, "v") { curVer = "v" + curVer }
+
+				if !semver.IsValid(reqVer) {
+					http.Error(w, "Invalid X-Wizard-Version format", http.StatusBadRequest)
+					return
+				}
+				if semver.Major(curVer) != semver.Major(reqVer) {
+					http.Error(w, "This Wizard version ("+wizardVersionStr+") is incompatible with this Hub. Please update.", http.StatusUpgradeRequired)
+					return
+				}
+			}
+
+			ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// DualAuthMiddleware permits either UI Dashboard Sessions OR Agent API Keys
+func DualAuthMiddleware(sessionValidator SessionValidator, auth NodeAuthenticator, rateLimiter *RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			// 1. Try Node API Key
+			token := r.Header.Get("X-Api-Key")
+			if token == "" {
+				authHeader := r.Header.Get("Authorization")
+				if strings.HasPrefix(authHeader, "Bearer ") {
+					token = strings.TrimSpace(authHeader[7:])
+				} else if r.URL.Query().Get("key") != "" {
+					token = r.URL.Query().Get("key")
+				}
+			}
+			if token != "" {
+				if nodeID, err := auth.AuthenticateNodeRequest(token); err == nil && nodeID != "" {
+					if !rateLimiter.Allow(nodeID) {
+						http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+						return
+					}
+
+					ctx := context.WithValue(r.Context(), NodeIDKey, nodeID)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+
+			// 2. Try UI Session Cookie (Fallback)
+			cookie, err := r.Cookie(AuthCookieName)
+			if err == nil && cookie.Value != "" && sessionValidator.IsValid(cookie.Value) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		})
 	}
 }

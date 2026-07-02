@@ -1,5 +1,7 @@
 # Security Policy
 
+For security and trust boundaries insights, see the **[THREATMODEL.md](./THREATMODEL.md)**.
+
 ## Reporting a Vulnerability
 
 **Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.** To ensure the safety of the community and prevent premature disclosure of exploits, we utilize **GitHub Private Vulnerability Reporting**.
@@ -13,6 +15,8 @@
    - The potential impact (e.g., DoS, Remote Code Execution, Authentication Bypass).
    - Any potential mitigation or fix you might suggest.
 
-As a solo maintainer, I will do my best to acknowledge receipt of your vulnerability report within 48-72 hours and will work with you to patch the issue before a public CVE or advisory is published. 
+Optionally you can send an email at info@honeywire.dev.
+
+As a solo maintainer, I will do my best to acknowledge receipt of your vulnerability report and will work with you to patch the issue before a public CVE or advisory is published. 
 
 Thank you for helping keep HoneyWire secure!
