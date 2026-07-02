@@ -82,7 +82,7 @@
       },
       {
         "name": "HW_SCAN_THRESHOLD",
-        "description": "Number of ports that must be scanned to trigger detection.",
+        "description": "Number of ports that must be scanned to trigger detection. Highly anomalous packets (e.g. NULL/XMAS scans) bypass this threshold.",
         "default": "5",
         "type": "int",
         "required": false,
@@ -98,7 +98,7 @@
       },
       {
         "name": "HW_IGNORE_LOCALHOST",
-        "description": "Ignore scans originating from the host machine (loopback interface). Turn off if you want to test scans from the same machine.",
+        "description": "Ignore scans originating from the host machine (loopback interface). Disabling this might generate false positives on noisy host environments.",
         "default": "true",
         "type": "boolean",
         "required": false,

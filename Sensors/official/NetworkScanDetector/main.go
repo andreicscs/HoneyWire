@@ -270,17 +270,25 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 	scanType := "Unidentified Port Probe"
 	isInstant := false
 
+	// Give OS Detection the highest precedence to prevent being masked by NULL/XMAS probes
+	hasOSProbe := false
+
 	for _, h := range active {
 		t, s := analyzePacket(h.flags, h.winSize)
 		if t != "Generic/Evasive Scanner" {
 			tool = t
 			scanType = s
 		}
-		// Bypass port threshold for highly anomalous packets
-		if h.flags == 0x2B || h.flags == 0x00 || h.flags == 0x29 || h.flags == 0x01 {
+		if h.flags == 0x2B {
+			hasOSProbe = true
 			isInstant = true
-			break // highest fidelity found
+		} else if !hasOSProbe && (h.flags == 0x00 || h.flags == 0x29 || h.flags == 0x01) {
+			isInstant = true
 		}
+	}
+
+	if hasOSProbe {
+		tool, scanType = analyzePacket(0x2B, 0)
 	}
 
 	shouldAlert := false
@@ -296,14 +304,19 @@ func processHit(hw *sdk.Sensor, srcIP string, dstPort uint16, flags uint8, winSi
 	mu.Unlock()
 
 	if shouldAlert {
-		log.Printf("[!] %s detected from %s: %v | Tool: %s", scanType, srcIP, uniquePortsList, tool)
+		displayPorts := uniquePortsList
+		if len(displayPorts) > 5 {
+			displayPorts = displayPorts[:5]
+		}
+
+		log.Printf("[!] %s detected from %s: %v | Tool: %s", scanType, srcIP, displayPorts, tool)
 
 		hw.ReportEvent(
 			"network_scan_detected",
 			srcIP,
 			"Multiple Ports",
 			sdk.EventDetails{
-				{Key: "ports_hit", Value: uniquePortsList},
+				{Key: "ports_hit", Value: displayPorts},
 				{Key: "scan_type", Value: scanType},
 				{Key: "tool_guess", Value: tool},
 				{Key: "count", Value: len(uniquePortsList)},
