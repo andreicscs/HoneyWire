@@ -62,7 +62,8 @@ func initializeDefaultConfigTx(tx *sql.Tx) error {
 		"auto_archive_days": "0",
 		"auto_purge_days":   "0",
 		"siem_address":      "",
-		"siem_protocol":     "tcp",
+		"siem_protocol":     "udp",
+		"whitelisted_sources": "",
 		"registry_url": "https://raw.githubusercontent.com/andreicscs/HoneyWire/registry-pages",
 	}
 

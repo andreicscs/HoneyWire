@@ -322,9 +322,14 @@ func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http
 	}
 
 	payload := map[string]interface{}{
-		"title":    title,   // now "Threat detected on <node>"
+		"title":    title,
 		"message":  message,
 		"priority": priority,
+		"extras": map[string]interface{}{
+			"client::display": map[string]interface{}{
+				"contentType": "text/markdown",
+			},
+		},
 	}
 	body, _ := json.Marshal(payload)
 
@@ -346,6 +351,7 @@ func (s *Service) sendNtfy(webhookURL, title, message, severity string) (*http.R
 	req.Header.Set("Title", title)
 	req.Header.Set("Priority", priority)
 	req.Header.Set("Tags", ntfyTags(severity))
+	req.Header.Set("Markdown", "yes")
 	return s.client.Do(req)
 }
 

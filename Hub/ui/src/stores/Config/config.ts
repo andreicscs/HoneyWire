@@ -42,7 +42,7 @@ export const useConfigStore = defineStore('config', () => {
     webhookUrl: '',
     webhookEvents: [],
     siemAddress: '',
-    siemProtocol: 'tcp',
+    siemProtocol: 'udp',
     whitelistedSources: ''
   })
 
@@ -64,7 +64,7 @@ export const useConfigStore = defineStore('config', () => {
         state.value.webhookEvents = ['critical', 'high', 'medium', 'low', 'info']
       }
       state.value.siemAddress = data.siemAddress || ''
-      state.value.siemProtocol = data.siemProtocol || 'tcp'
+      state.value.siemProtocol = data.siemProtocol || 'udp'
       state.value.whitelistedSources = data.whitelistedSources || ''
       
       state.value.isLoaded = true

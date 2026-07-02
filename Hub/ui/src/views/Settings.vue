@@ -34,7 +34,7 @@ const settings = ref({
     webhookUrl: '',
     webhookEvents: [],
     siemAddress: '',
-    siemProtocol: 'tcp'
+    siemProtocol: 'udp'
 })
 
 const initialSettings = ref(null)
@@ -52,7 +52,7 @@ watch(() => configStore.config.isLoaded, (loaded) => {
                 ? [...configStore.config.webhookEvents] 
                 : ['critical', 'high', 'medium', 'low', 'info'],
             siemAddress: configStore.config.siemAddress || '',
-            siemProtocol: configStore.config.siemProtocol || 'tcp',
+            siemProtocol: configStore.config.siemProtocol || 'udp',
             whitelistedSources: configStore.config.whitelistedSources || ''
         }
         settings.value = JSON.parse(JSON.stringify(loadedSettings))
