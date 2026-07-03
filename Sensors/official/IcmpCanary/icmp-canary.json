@@ -1,6 +1,6 @@
 {
   "id": "hw-sensor-icmp-canary",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "name": "ICMP Canary",
   "category": "network",
   "osi_layer": "Network Layer",

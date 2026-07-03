@@ -6,7 +6,7 @@ replace github.com/honeywire/sdk-go => ../../../SDKs/go-honeywire
 
 require (
 	github.com/honeywire/sdk-go v0.0.0-00010101000000-000000000000
-	golang.org/x/net v0.52.0
+	golang.org/x/net v0.56.0
 )
 
-require golang.org/x/sys v0.42.0 // indirect
+require golang.org/x/sys v0.46.0 // indirect
