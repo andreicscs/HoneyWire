@@ -17,7 +17,7 @@
     <img src="https://img.shields.io/badge/Docker-Native-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Native" />
   </a>
   <a href="https://www.bestpractices.dev/projects/13523">
-    <img src="https://www.bestpractices.dev/projects/13523/badge" alt="OpenSSF Best Practices" />
+    <img src="https://img.shields.io/badge/OpenSSF%20Best%20Practices-passing-2E8B57.svg?style=flat-square" alt="OpenSSF Best Practices" />
   </a>
 </p>
 
