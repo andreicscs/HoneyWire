@@ -16,6 +16,9 @@
   <a href="Hub/docker-compose.yml">
     <img src="https://img.shields.io/badge/Docker-Native-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Native" />
   </a>
+  <a href="https://www.bestpractices.dev/projects/13523">
+    <img src="https://www.bestpractices.dev/projects/13523/badge" alt="OpenSSF Best Practices" />
+  </a>
 </p>
 
 ## 📋 Table of Contents
