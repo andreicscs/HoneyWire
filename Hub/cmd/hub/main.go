@@ -24,7 +24,7 @@ import (
 	"github.com/honeywire/hub/internal/store"
 )
 
-const Version = "2.0.0"
+const Version = "2.0.4"
 const HubAPIVersion = 1
 
 // loadConfigSafe is a helper to fetch DB configs without panicking on empty/missing rows

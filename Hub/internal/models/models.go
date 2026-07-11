@@ -3,7 +3,7 @@ package models
 import "encoding/json"
 
 // HubVersion defines the backend protocol version for resolving compatible sensors and authenticating Agents.
-const HubVersion = "2.0.1"
+const HubVersion = "2.0.4"
 
 // SetupPayload represents the initial setup POST request
 type SetupPayload struct {

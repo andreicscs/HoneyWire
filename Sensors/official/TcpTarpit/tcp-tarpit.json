@@ -1,6 +1,6 @@
 {
   "id": "hw-sensor-tcp-tarpit",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "name": "TCP Tarpit (Credential Trap)",
   "category": "network",
   "osi_layer": "Network Layer",
