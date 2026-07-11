@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-11T06:20:04Z",
+  "generated": "2026-07-11T08:42:00Z",
   "sensors": [
     {
       "id": "hw-sensor-file-canary",
@@ -69,10 +69,13 @@
       "name": "Web Router Decoy",
       "category": "web",
       "icon_svg": "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
         {
           "v": "2.0.0"
+        },
+        {
+          "v": "2.0.1"
         }
       ]
     }
