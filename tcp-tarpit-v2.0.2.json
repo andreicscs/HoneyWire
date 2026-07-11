@@ -1,0 +1,135 @@
+{
+  "id": "hw-sensor-tcp-tarpit",
+  "version": "2.0.2",
+  "name": "TCP Tarpit (Credential Trap)",
+  "category": "network",
+  "osi_layer": "Network Layer",
+  "icon_svg": "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  "description": "Slows credential brute-force attacks by holding connections open indefinitely.",
+  "documentation": {
+    "summary": "The TCP Tarpit acts as a credential trap for internal network sweeps and compromised devices attempting to pivot. It responds to connection attempts on decoy ports with slow, hanging responses that consume the attacker's resources.",
+    "sections": [
+      {
+        "title": "Features",
+        "type": "list",
+        "content": [
+          "Connection Exhaustion: Holds malicious lateral connections open for extended periods to stall automated tools.",
+          "Banner Spoofing: Mimics legitimate internal services (like SSH or MySQL) to attract rogue scanning.",
+          "Resource Denial: Consumes attacker threads and bandwidth silently without risking host exhaustion."
+        ]
+      },
+      {
+        "title": "Security Architecture",
+        "type": "list",
+        "content": [
+          "Global Sandbox Baseline: Enforced by the HoneyWire Hub. Drops ALL default Linux kernel capabilities, enforces a read-only filesystem, and applies strict log rotation.",
+          "Execution Privilege: Runs as container root (UID 0) strictly to bind to low-numbered decoy ports.",
+          "Required Capabilities: Adds 'NET_BIND_SERVICE' to allow binding to ports below 1024 without needing full host network control."
+        ]
+      }
+    ]
+  },
+  "heuristics": {
+    "triggers": {
+      "processes": [
+        "mysqld",
+        "postgres",
+        "redis-server",
+        "mongod",
+        "mariadb",
+        "sshd",
+        "docker-proxy",
+        "memcached",
+        "rabbitmq",
+        "etcd"
+      ],
+      "ports": [
+        3306,
+        5432,
+        6379,
+        27017,
+        22,
+        11211,
+        5672,
+        2379
+      ]
+    },
+    "recommendation_reason": "Critical datastore or SSH service detected. Deploy tarpit to isolate and stall internal lateral movement attempts targeting these specific services."
+  },
+  "deployment": {
+    "network_mode": "host",
+    "user": "0:0",
+    "cap_add": [
+      "NET_BIND_SERVICE"
+    ],
+    "env_vars": [
+      {
+        "name": "HW_HUB_ENDPOINT",
+        "description": "The URL of your central HoneyWire Hub.",
+        "default": "__HUB_ENDPOINT__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_HUB_KEY",
+        "description": "The shared Node Key.",
+        "default": "__HUB_KEY__",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SENSOR_ID",
+        "description": "Unique identifier for this specific trap.",
+        "default": "hw-sensor-tcp-tarpit",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_SEVERITY",
+        "description": "Alert severity sent to the Hub.",
+        "default": "high",
+        "type": "string",
+        "required": false,
+        "hidden": true
+      },
+      {
+        "name": "HW_TEST_MODE",
+        "description": "Enable CI/CD synthetic alerts.",
+        "default": "false",
+        "type": "string",
+        "required": true,
+        "hidden": true
+      },
+      {
+        "name": "HW_DECOY_PORTS",
+        "description": "Comma-separated list of internal ports to tarpit.",
+        "default": "{{ availablePort 2222 }},{{ availablePort 3306 }}",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_TARPIT_MODE",
+        "description": "Tarpit behavior mode (hold, echo, close).",
+        "default": "hold",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      },
+      {
+        "name": "HW_TARPIT_BANNER",
+        "description": "Service banner to spoof.",
+        "default": "SSH-2.0-OpenSSH_8.2p1\\r\\n",
+        "type": "string",
+        "required": false,
+        "hidden": false
+      }
+    ],
+    "image_repository": "ghcr.io/andreicscs/honeywire-tcptarpit",
+    "image_tag": "v2.0.2",
+    "image_digest": "sha256:b05eb867c5e421ead318fb08ed7055ad8cff5f64cf661ba21cd6b27f0c27f3b5"
+  }
+}
