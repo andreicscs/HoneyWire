@@ -48,3 +48,13 @@ To cleanly remove HoneyWire from a host:
    ```
    This will immediately tear down all running decoy containers, networks, and persistent volumes associated with HoneyWire on that specific host.
 2. **Delete from Hub:** Return to the Hub UI and delete the Node. This permanently revokes the Node's API Key, ensuring it can never authenticate again.
+
+## 6. Updating the Setup Wizard
+
+The Setup Wizard itself is updated independently from the sensors. The same curl script provided by the Hub to install the wizard can also be used to safely update it in place:
+
+```bash
+curl -fsSL https://get.honeywire.dev | bash
+```
+
+This will download the latest binary for your architecture and replace the existing installation without affecting any running sensors or node configurations.
