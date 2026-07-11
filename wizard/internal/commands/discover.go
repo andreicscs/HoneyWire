@@ -364,11 +364,20 @@ func renderManifestTemplates(recs []*discovery.Recommendation, dockerMap map[int
 			for {
 				if !usedPorts[p] {
 					addr := fmt.Sprintf(":%d", p)
-					ln, err := net.Listen("tcp", addr)
-					if err == nil {
-						ln.Close()
-						usedPorts[p] = true
-						return fmt.Sprintf("%d", p)
+					
+					// 1. Strictly check IPv4 to prevent dual-stack masking on kernels with bindv6only=1
+					ln4, err4 := net.Listen("tcp4", addr)
+					if err4 == nil {
+						ln4.Close()
+						
+						// 2. Check the default stack (dual-stack tcp6, or tcp4 if IPv6 is disabled natively).
+						// This perfectly handles systems without IPv6 without requiring brittle error string parsing.
+						ln, err := net.Listen("tcp", addr)
+						if err == nil {
+							ln.Close()
+							usedPorts[p] = true
+							return fmt.Sprintf("%d", p)
+						}
 					}
 				}
 				p++

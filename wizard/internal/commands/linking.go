@@ -172,8 +172,10 @@ func linkExistingNode(hubURL, apiKey string, force bool) error {
 						return HandleFiredrill()
 					}
 					fmt.Printf("\n    %sRun 'honeywire firedrill' when ready.%s\n\n", cli.Dim, cli.Reset)
+				} else if err != nil {
+					fmt.Printf("\n    %s[!] Apply failed, but the node remains linked. Run 'honeywire apply' to try again after fixing the Hub config.%s\n\n", cli.Yellow, cli.Reset)
 				}
-				return err
+				return nil
 			}
 			fmt.Printf("    %sRun 'honeywire apply' to deploy this node's sensors.%s\n\n", cli.Dim, cli.Reset)
 			return nil

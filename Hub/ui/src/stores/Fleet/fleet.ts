@@ -445,7 +445,17 @@ export const useFleetStore = defineStore('fleet', () => {
   const handleWsUpdate = (type: string, payload: any): void => {
     if (type === 'SENSOR_HEARTBEAT') {
       const compositeSensorId = `${payload.nodeId}:${payload.sensorId}`
-      patchNode(payload.nodeId, { lastHeartbeat: payload.timestamp, status: 'up' })
+      const node = state.value.nodesById[payload.nodeId]
+      if (node) {
+        const sensors = Object.values(state.value.sensorsById).filter(s => s.nodeId === payload.nodeId)
+        let compositeStatus = 'up'
+        if (sensors.length > 0) {
+          const onlineCount = sensors.filter(s => s.status === 'up').length
+          if (onlineCount === 0) compositeStatus = 'down'
+          else if (onlineCount < sensors.length) compositeStatus = 'degraded'
+        }
+        patchNode(payload.nodeId, { lastHeartbeat: payload.timestamp, status: compositeStatus })
+      }
       patchSensor(compositeSensorId, { lastHeartbeat: payload.timestamp, status: 'up' })
       return
     }
