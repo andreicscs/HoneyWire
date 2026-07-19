@@ -21,4 +21,10 @@ To help you find what you're looking for, our documentation is split into severa
 
 ---
 
+> [!WARNING]
+> **HTTPS & Reverse Proxy Required**
+> The HoneyWire Hub **does not** natively terminate TLS/HTTPS. It is critical that you deploy the Hub behind a secure reverse proxy (such as Nginx, Caddy, or Traefik) configured with SSL/TLS. Exposing the Hub over raw HTTP will expose your API keys, deployment manifests, and event telemetry to network interception. For more details on the system's trust boundaries and security posture, please review the [Threat Model](/THREATMODEL.md) and [Security Policy](/SECURITY.md).
+
+---
+
 **Tip:** If you're just getting started and want to deploy your first sensor, start by reading the **[Operations Guide](/Docs/operations.md)**!
