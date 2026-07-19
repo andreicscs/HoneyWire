@@ -37,6 +37,8 @@ This is the standard telemetry payload that all sensors (official or community) 
 - `target` (string, required): The decoy service or port that was attacked.
 - `details` (object, optional): A flexible JSON object containing forensic artifacts. Primitive values are rendered as tags; arrays are rendered as syntax-highlighted code blocks in the UI.
 
+*(Note: When querying the Hub's API or viewing the SQLite DB, the backend automatically enriches this payload with `id`, `nodeId`, `timestamp`, `isRead`, `isArchived`, and `count`)*
+
 ---
 
 ## 2. Heartbeat Payload
@@ -95,6 +97,8 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
     "network_mode": "host",
     "user": "65532:65532",
     "cap_add": ["NET_BIND_SERVICE"],
+    "cap_drop": ["ALL"],
+    "security_opt": ["no-new-privileges:true"],
     "port_assignments": [
       {
         "env_var_name": "HW_TARPIT_PORT",
@@ -102,6 +106,15 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
         "auto_shift": true
       }
     ],
+    "volume_mounts": [
+      {
+        "source": "/var/log/tarpit",
+        "target": "/logs",
+        "type": "bind",
+        "read_only": false
+      }
+    ],
+    "init_containers": [],
     "env_vars": [
       {
         "name": "HW_TARPIT_MODE",
@@ -119,4 +132,6 @@ The Sensor Manifest is the declarative JSON schema used to describe a decoy. It 
 - `heuristics.triggers`: Used by the Wizard Discovery Engine. If the Wizard observes matching `processes`, `ports`, or `file_patterns` on the host, it will recommend this sensor.
 - `deployment`: Used by the Wizard Deployment Engine to generate the Intermediate Representation (IR) and final `docker-compose.yml`.
 - `deployment.env_vars`: Rendered in the Hub UI so users can configure the sensor dynamically.
- Rendered in the Hub UI so users can configure the sensor dynamically.
+
+> [!TIP]
+> **Automatic Sandbox Enforcement:** You do not need to manually specify `cap_drop: ["ALL"]`, `security_opt: ["no-new-privileges:true"]`, or `read_only: true` in your manifest for the primary sensor container. The Hub's **Compose Compiler** unconditionally injects these fields into the final deployment plan to guarantee a strict security baseline. It will also default `user` to `1000:1000` if omitted to prevent root execution as a baseline.
