@@ -25,14 +25,15 @@ The backend architecture is built upon five foundational principles:
 
 The backend source code is structured as follows:
 
-```text
-internal/
-├── api/            # Transport Layer (HTTP Handlers, Middleware, Router)
-├── compose/        # Secure Compose Compiler & Validation Engine
-├── models/         # Core Domain Entities (Structs, JSON tags)
-├── projections/    # CQRS Read-Models (Analytics, Dashboards)
-├── services/       # Domain Layer (Business Logic, Orchestration)
-└── store/          # Persistence Layer (SQLite implementation)
+```mermaid
+graph LR
+    Internal[internal/]
+    Internal --> API[api/ <br/> Transport Layer]
+    Internal --> Compose[compose/ <br/> Secure Compose Compiler]
+    Internal --> Models[models/ <br/> Core Domain Entities]
+    Internal --> Proj[projections/ <br/> CQRS Read-Models]
+    Internal --> Services[services/ <br/> Domain Layer]
+    Internal --> Store[store/ <br/> Persistence Layer]
 ```
 
 ## Core Subsystems & Layers

@@ -17,12 +17,12 @@ The system is designed around **centralized visibility and decentralized executi
 
 HoneyWire is separated into four primary components. 
 
-```text
-HoneyWire
-├── Hub
-├── Wizard
-├── Sensors
-└── SDKs
+```mermaid
+graph TD
+    HW[HoneyWire] --> Hub
+    HW --> Wizard
+    HW --> Sensors
+    HW --> SDKs
 ```
 
 ### [Hub](/Docs/architecture/hub/)
@@ -70,34 +70,12 @@ Libraries for building custom community sensors.
 
 ## System Interaction Diagram
 
-```text
-+---------+
-| Wizard  |
-+---------+
-     |
-     | Discovery
-     v
-+---------+
-|  Host   |
-+---------+
-     |
-     | Deploy Sensors
-     v
-+---------+
-| Sensors |
-+---------+
-     |
-     | Telemetry
-     v
-+---------+
-|   Hub   |
-+---------+
-     |
-     | Analytics
-     v
-+----------+
-| Frontend |
-+----------+
+```mermaid
+graph TD
+    Wizard[Wizard] -- Discovery --> Host[Host]
+    Host -- Deploy Sensors --> Sensors[Sensors]
+    Sensors -- Telemetry --> Hub[Hub]
+    Hub -- Analytics --> Frontend[Frontend]
 ```
 
 ---
@@ -119,41 +97,30 @@ Users can bypass the Wizard entirely via the Hub UI. The dashboard allows users 
 Understanding the data flow across component boundaries is crucial for contributing to HoneyWire.
 
 ### Deployment Flow
-```text
-Hub
-  ↓
-Manifest
-  ↓
-Wizard
-  ↓
-Compose Generation
-  ↓
-Docker
-  ↓
-Sensors
+```mermaid
+graph TD
+    Hub[Hub] --> Manifest[Manifest]
+    Manifest --> Wizard[Wizard]
+    Wizard --> Compose[Compose Generation]
+    Compose --> Docker[Docker]
+    Docker --> Sensors[Sensors]
 ```
 
 ### Telemetry Flow
-```text
-Sensor
-  ↓
-SDK
-  ↓
-Hub API
-  ↓
-Storage
+```mermaid
+graph TD
+    Sensor[Sensor] --> SDK[SDK]
+    SDK --> HubAPI[Hub API]
+    HubAPI --> Storage[Storage]
 ```
 
 ### Analytics Flow
 *See [Projections Architecture](/Docs/architecture/hub/backend/projections.md) for more details.*
-```text
-Stored Events
-    ↓
-Projection Engine
-    ↓
-DTOs
-    ↓
-Frontend
+```mermaid
+graph TD
+    Events[Stored Events] --> Engine[Projection Engine]
+    Engine --> DTOs[DTOs]
+    DTOs --> Frontend[Frontend]
 ```
 
 ---
@@ -210,12 +177,13 @@ The `registry-pages` branch is served as a static file host (Gitea Pages, GitHub
 
 The monorepo structure reflects the major components and clear ownership boundaries:
 
-```text
-HoneyWire/
-├── Hub/             # The central API, database, and Vue UI
-├── wizard/          # The Go-based CLI for discovery and provisioning
-├── Sensors/         # Official decoys and templates
-└── SDKs/            # Libraries (Go, Python) for custom sensors
+```mermaid
+graph LR
+    Repo[HoneyWire/]
+    Repo --> Hub[Hub/ <br/> The central API, database, and Vue UI]
+    Repo --> Wizard[wizard/ <br/> The Go-based CLI for discovery and provisioning]
+    Repo --> Sensors[Sensors/ <br/> Official decoys and templates]
+    Repo --> SDKs[SDKs/ <br/> Libraries for custom sensors]
 ```
 
 - **[Hub](/Hub/)**
@@ -229,19 +197,32 @@ HoneyWire/
 
 A high-level view of internal subsystem boundaries:
 
-```text
-**Hub**
+```mermaid
+graph TD
+    subgraph Hub
+        API[API Layer]
+        Compose[Compose Compiler]
+        Services[Services]
+        Store[Store]
+        Proj[Projections]
+    end
 
-├── API Layer
-├── Compose Compiler
-├── Services
-├── Store
-├── Projections
-└── Frontend
+    subgraph Frontend
+        Views[Views & Components]
+        Pinia[Stores]
+        WS[API / WebSocket]
+    end
 
-**Wizard**
-├── Discovery
-├── Heuristics
-├── Deployment
-└── CLI
+    subgraph Wizard
+        Disc[Discovery]
+        Heur[Heuristics]
+        Deploy[Deployment]
+        CLI[CLI]
+    end
+
+    subgraph Sensors
+        Init[Init & Sync]
+        Worker[Event Workers]
+        Heart[Heartbeats]
+    end
 ```

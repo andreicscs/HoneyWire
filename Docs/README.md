@@ -18,7 +18,6 @@ To help you find what you're looking for, our documentation is split into severa
 **Who it's for:** Contributors, Maintainers, and Custom Sensor Authors.
 **What you'll learn:** How to get your hands dirty with the HoneyWire codebase. This directory contains contribution rules, local setup guides, maintainer workflows, and comprehensive tutorials on how to build and publish your own custom HoneyWire sensors.
 
-### [4. User & Security (`/user`)](/Docs/user/)
 
 ---
 

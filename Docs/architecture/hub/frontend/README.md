@@ -15,20 +15,11 @@ The HoneyWire frontend leverages a modern, highly reactive stack optimized for r
 
 The application enforces unidirectional dependencies:
 
-```text
-┌─────────────────────────────────────────┐
-│  Views & Components                     │
-│  (UI rendering + ephemeral state)       │
-├─────────────────────────────────────────┤
-│  Stores (Pinia)                         │
-│  (Business logic + state ownership)     │
-├─────────────────────────────────────────┤
-│  API Client · WebSocket Service         │
-│  (Transport + error handling)           │
-├─────────────────────────────────────────┤
-│  Utils & Helpers                        │
-│  (Shared functions)                     │
-└─────────────────────────────────────────┘
+```mermaid
+graph TD
+    Views[Views & Components <br/> UI rendering + ephemeral state] --> Stores[Stores - Pinia <br/> Business logic + state ownership]
+    Stores --> Services[API Client / WebSocket Service <br/> Transport + error handling]
+    Services --> Utils[Utils & Helpers <br/> Shared functions]
 ```
 
 **Key Rules:**
@@ -67,15 +58,24 @@ Examples: `severityProjection`, `threatVelocityProjection`
 Data flows predictably through the system:
 
 **1. User Action (Optimistic Update)**
-```text
-View clicks action → Store saves previous state → Store updates state optimistically → Store calls API
-  ↳ If API succeeds: Do nothing (UI already updated).
-  ↳ If API fails: Rollback state to previous, show error toast.
+```mermaid
+graph TD
+    Click[View clicks action] --> Save[Store saves previous state]
+    Save --> Update[Store updates state optimistically]
+    Update --> API[Store calls API]
+    API --> Success{If API succeeds}
+    API --> Fail{If API fails}
+    Success --> DoNothing[Do nothing - UI already updated]
+    Fail --> Rollback[Rollback state to previous, show error toast]
 ```
 
 **2. API Fetch**
-```text
-Component requests data → Store calls API → Normalize payload → Merge with existing state (in-place) → UI re-renders.
+```mermaid
+graph LR
+    Req[Component requests data] --> Store[Store calls API]
+    Store --> Norm[Normalize payload]
+    Norm --> Merge[Merge with existing state]
+    Merge --> UI[UI re-renders]
 ```
 
 ## Realtime & WebSocket Integration

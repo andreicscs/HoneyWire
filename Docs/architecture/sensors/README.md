@@ -17,13 +17,13 @@ To ensure consistency, resilience, and strict adherence to the [**HoneyWire Even
 
 The sensor architecture is built on a concurrent, multi-pipeline design that strictly separates domain rules (Policy) from network transport (Pipelines).
 
-```text
-Sensor (SDK)
-├── Initialization & Sync
-├── Shared Classifier
-├── Policy Interpreters
-├── Event Worker Pipeline
-└── Heartbeat Worker Pipeline
+```mermaid
+graph TD
+    Init[Initialization & Sync]
+    Init --> Classify[Shared Classifier]
+    Classify --> Policy[Policy Interpreters]
+    Policy --> Event[Event Worker Pipeline]
+    Policy --> Heartbeat[Heartbeat Worker Pipeline]
 ```
 
 ---

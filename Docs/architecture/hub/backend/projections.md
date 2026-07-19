@@ -13,14 +13,11 @@ To keep dashboard widgets fast and lightweight, the backend employs a CQRS-style
 
 The backend projection architecture operates in four distinct phases:
 
-```text
-Raw Events
-    ↓
-Backend Filtering (timeframe/node/sensor/archive)
-    ↓
-Backend Aggregation (Calculator)
-    ↓
-Flat Projection DTO
+```mermaid
+graph TD
+    Raw[Raw Events] --> Filter[Backend Filtering <br/> timeframe/node/sensor/archive]
+    Filter --> Agg[Backend Aggregation <br/> Calculator]
+    Agg --> DTO[Flat Projection DTO]
 ```
 
 ### Components
