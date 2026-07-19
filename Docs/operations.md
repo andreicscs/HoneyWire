@@ -7,8 +7,8 @@ This guide covers the day-to-day operations and lifecycle management of your Hon
 A **Node** is any physical or virtual machine where you want to deploy deceptive sensors. 
 
 1. **Create the Node:** In the Sentinel Hub UI, navigate to the **Nodes** page and click "New Node". Give it a descriptive name (e.g., `DMZ-Web-Server`).
-2. **Provisioning:** Once created, the Hub will generate a unique Node API Key and a pairing command. 
-3. **Link the Node:** SSH into your target machine and run the provided `honeywire link` command. This securely pairs the host's Setup Wizard to the Hub, establishing trust for future deployments.
+2. **Provisioning:** Once created, the Hub will generate a unique Node API Key and a setup command. 
+3. **Link the Node:** SSH into your target machine and run the provided command. This command is an all-in-one script (`curl -fsSL ... | bash`) that installs the Setup Wizard on the host and immediately links the node to the Hub, establishing trust for its first deployment and all future deployment updates.
 
 ## 2. Sensor Deployment
 
@@ -36,7 +36,7 @@ Because the Setup Wizard is an ephemeral, on-demand CLI tool rather than a const
 When community maintainers or official developers push a new version of a sensor to the Registry, you can manage the upgrade lifecycle directly from the UI.
 
 1. **Updates:** If a newer version of an installed sensor is available, an "Update Available" badge will appear next to it on the Node page. Click the update button to queue the new version in the desired state. Run `honeywire apply` on the Node to execute the upgrade.
-2. **Rollbacks:** If an update breaks your environment, you can easily revert it. **Note:** Rollbacks are initiated using the exact same interface as updates. You simply click the version dropdown, select the older, stable version, and click the "Update" button. The Hub will treat the downgrade as a state change, and the next `honeywire apply` will seamlessly roll the container back to the older image.
+2. **Rollbacks:** The operator cannot perform a rollback independently. Rollbacks are managed by the core maintainers when a published update goes wrong. If a rollback is issued by the developers, it appears in the UI identically to an upgrade: an "Update Available" badge will appear, and clicking "Update" will actually revert the sensor to the older, stable version. The next `honeywire apply` will then seamlessly roll the container back.
 
 ## 5. Node Teardown
 
@@ -46,7 +46,7 @@ To cleanly remove HoneyWire from a host:
    ```bash
    honeywire uninstall
    ```
-   This will immediately tear down all running decoy containers, networks, and persistent volumes associated with HoneyWire on that specific host.
+   This action strictly targets HoneyWire resources. It will cleanly stop and remove the isolated Docker containers, delete the `/opt/honeywire` configuration directory, remove the node identity file at `/etc/honeywire/config.json`, and delete the CLI binary itself. It will **not** blindly wipe files or perform wide-ranging host cleanups, ensuring no important host data is ever accidentally deleted.
 2. **Delete from Hub:** Return to the Hub UI and delete the Node. This permanently revokes the Node's API Key, ensuring it can never authenticate again.
 
 ## 6. Updating the Setup Wizard
@@ -58,3 +58,17 @@ curl -fsSL https://get.honeywire.dev | bash
 ```
 
 This will download the latest binary for your architecture and replace the existing installation without affecting any running sensors or node configurations.
+
+## 7. Updating the Sentinel Hub
+
+Because the Hub is deployed as a standard Docker container, updating it is incredibly straightforward. You just need to pull the latest image and restart your compose stack. On the server hosting the Hub, run:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+This will cleanly restart the Hub with the newest release while preserving all of your persistent data, node identities, and configurations (which are safely stored in the mapped volumes).
+
+> [!WARNING]
+> **Major Version Upgrades:** While minor and patch updates (e.g., `v2.0.1` to `v2.0.4`) are safe to pull automatically, **Major** version bumps (e.g., `v2.x` to `v3.0`) often contain breaking changes, database schema migrations, or new environment variables. Always read the [GitHub Release Notes](https://github.com/AndReicscs/HoneyWire/releases) before pulling a major version to ensure you do not corrupt your Hub instance.
