@@ -189,30 +189,30 @@ Deployment State
 
 ### Discovery Flow
 ```text
-User runs discovery
+User runs `wizard discover`
         ↓
-Scanner builds service inventory
+`commands.HandleDiscover()` orchestrates flow
         ↓
-Discovery engine evaluates heuristics
+`scanner.NewProcScanner().Scan()` builds host inventory
         ↓
-Matching sensors identified
+`api.FetchManifests()` retrieves schema from Hub
         ↓
-Recommendations returned
+`discovery.NewEngine().GetRecommendations()` evaluates heuristics
+        ↓
+Matching sensors identified & configured
 ```
 
 ### Deployment Flow
 ```text
-User selects sensors (or automated apply)
+`commands.HandleApply()` or user selects sensors
         ↓
-Manifest resolution
+`api.FetchNodeState()` gets Hub Desired State
         ↓
-Compose generation
+`deploy.GenerateIR()` creates Intermediate Representation
         ↓
-Validation
+`deploy.GenerateCompose()` compiles final YAML
         ↓
-Docker deployment
-        ↓
-State synchronization
+`docker compose up -d -p honeywire` applies state
 ```
 
 ### Synchronization Flow
