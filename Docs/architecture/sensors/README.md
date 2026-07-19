@@ -9,7 +9,7 @@ Their core responsibilities are:
 - Emitting continuous health heartbeats
 - Operating with total independence (no sensor-to-sensor communication)
 
-To ensure consistency, resilience, and strict adherence to the [**HoneyWire Event Standard**](../dataContracts.md#1-the-universal-event-standard), all official sensors are built using HoneyWire's Language SDKs (available in Go and Python). This document outlines the architectural contract and behavior enforced by these SDKs.
+To ensure consistency, resilience, and strict adherence to the [**HoneyWire Event Standard**](/Docs/architecture/dataContracts.md#1-the-universal-event-standard), all official sensors are built using HoneyWire's Language SDKs (available in Go and Python). This document outlines the architectural contract and behavior enforced by these SDKs.
 
 ---
 

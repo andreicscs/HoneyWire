@@ -4,7 +4,7 @@ This directory contains the technical documentation required for developing, tes
 
 ## Getting Started
 
-To initialize a local development environment, proceed to the **[Local Environment Setup](./setup.md)** guide.
+To initialize a local development environment, proceed to the **[Local Environment Setup](/Docs/development/setup.md)** guide.
 
 ---
 
@@ -12,13 +12,13 @@ To initialize a local development environment, proceed to the **[Local Environme
 
 This directory is strictly organized by functional purpose:
 
-*   **`setup.md`**: Instructions for configuring local Hub, UI, and Wizard execution environments.
-*   **`structure.md`**: A static map of the monorepo. Identifies component locations.
-*   **`workflows.md`**: Step-by-step action guides for common development tasks (e.g., adding API routes).
-*   **`sensors.md`**: Technical requirements for building decoy containers and integrating Language SDKs.
-*   **`wizard.md`**: Guide for extending the Wizard (CLI commands, heuristic rules, scanner logic).
-*   **`contribution-rules.md`**: Governance, coding standards, and Pull Request requirements.
-*   **`maintainer-workflow.md`**: *Internal use only.* Advanced CI/CD and registry workflows.
+*   **[`setup.md`](/Docs/development/setup.md)**: Instructions for configuring local Hub, UI, and Wizard execution environments.
+*   **[`structure.md`](/Docs/development/structure.md)**: A static map of the monorepo. Identifies component locations.
+*   **[`workflows.md`](/Docs/development/workflows.md)**: Step-by-step action guides for common development tasks (e.g., adding API routes).
+*   **[`sensors.md`](/Docs/development/sensors.md)**: Technical requirements for building decoy containers and integrating Language SDKs.
+*   **[`wizard.md`](/Docs/development/wizard.md)**: Guide for extending the Wizard (CLI commands, heuristic rules, scanner logic).
+*   **[`contributionRules.md`](/Docs/development/contributionRules.md)**: Governance, coding standards, and Pull Request requirements.
+*   **[`maintainer-workflow.md`](/Docs/development/maintainer-workflow.md)**: *Internal use only.* Advanced CI/CD and registry workflows.
 
 ---
 

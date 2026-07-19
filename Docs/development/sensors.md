@@ -17,8 +17,8 @@ While you can technically write a sensor in any language using HTTP POST request
 
 ### Basic Implementation
 
-Instead of starting from scratch, always use the official templates located at [`Sensors/templates/`](../../Sensors/templates/). 
-See the [Templates README](../../Sensors/templates/README.md) and the [Community Sensors README](../../Sensors/community/README.md) for more details. These directories contain pre-configured `main.go` and `sensor.py` files with detailed comments, hardened `Dockerfile`s, and `docker-compose.yml` files that orchestrate the required security capabilities out-of-the-box.
+Instead of starting from scratch, always use the official templates located at [`Sensors/templates/`](/Sensors/templates/). 
+See the [Templates README](/Sensors/templates/README.md) and the [Community Sensors README](/Sensors/community/README.md) for more details. These directories contain pre-configured `main.go` and `sensor.py` files with detailed comments, hardened `Dockerfile`s, and `docker-compose.yml` files that orchestrate the required security capabilities out-of-the-box.
 
 ---
 
@@ -26,14 +26,14 @@ See the [Templates README](../../Sensors/templates/README.md) and the [Community
 
 The manifest is the single source of truth for your sensor. It defines how the Hub renders its UI card, how the Wizard deploys it, and what heuristics trigger a recommendation.
 
-Instead of starting from scratch, base your manifest on the templates provided at [`Sensors/templates/go-sensor/manifest.json`](../../Sensors/templates/go-sensor/manifest.json) or [`Sensors/templates/python-sensor/manifest.json`](../../Sensors/templates/python-sensor/manifest.json).
+Instead of starting from scratch, base your manifest on the templates provided at [`Sensors/templates/go-sensor/manifest.json`](/Sensors/templates/go-sensor/manifest.json) or [`Sensors/templates/python-sensor/manifest.json`](/Sensors/templates/python-sensor/manifest.json).
 
 ### Key Sections
 *   **`heuristics`:** Instructs the Wizard when to recommend this sensor. For example, if you build an Nginx honeypot, you would set `"processes": ["nginx"]` and `"ports": [80, 443]`.
 *   **`deployment.env_vars`:** Defines configurable parameters that the Hub UI will generate forms for. If your sensor needs a custom configurable port, define it here.
 *   **`deployment.image`:** The Docker image to pull.
 
-*(See [`Docs/architecture/dataContracts.md`](../architecture/dataContracts.md) for the full manifest schema and required fields).*
+*(See [`Docs/architecture/dataContracts.md`](/Docs/architecture/dataContracts.md) for the full manifest schema and required fields).*
 
 ---
 
@@ -41,7 +41,7 @@ Instead of starting from scratch, base your manifest on the templates provided a
 
 HoneyWire treats sensors as untrusted, potentially hostile execution units. **If a sensor is compromised, the blast radius must be minimal.**
 
-To ensure compliance, **always use the `Dockerfile` and `docker-compose.yml` or manifest deployment configuration provided in the templates (e.g., [`Sensors/templates/go-sensor/`](../../Sensors/templates/go-sensor/))**. It is pre-configured to enforce the following baseline rules:
+To ensure compliance, **always use the `Dockerfile` and `docker-compose.yml` or manifest deployment configuration provided in the templates (e.g., [`Sensors/templates/go-sensor/`](/Sensors/templates/go-sensor/))**. It is pre-configured to enforce the following baseline rules:
 
 1.  **Distroless Base:** The Dockerfile must use a minimal base image like `gcr.io/distroless/static-debian12`. No shells (`/bin/sh`), no package managers, no utilities.
 2.  **Prefer unprivileged Execution:** It is better for the to container run as a non-root user (e.g., `USER 65532:65532`).

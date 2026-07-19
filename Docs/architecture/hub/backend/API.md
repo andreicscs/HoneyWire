@@ -575,7 +575,7 @@ Reports a sensor heartbeat and updates its versioning state.
 Reports an intrusion event to the Hub.
 
 **Request:**
-> 📖 **[View the Universal Event Standard Contract](./architecture/dataContracts.md#1-the-universal-event-standard)**
+> 📖 **[View the Universal Event Standard Contract](/Docs/architecture/dataContracts.md#1-the-universal-event-standard)**
 
 **Severity values:** `info`, `low`, `medium`, `high`, `critical`
 

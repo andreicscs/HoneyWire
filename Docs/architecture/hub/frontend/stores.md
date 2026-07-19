@@ -10,7 +10,7 @@ HoneyWire uses three primary Pinia stores to manage its domain state. Components
 - **Actions:** Login/Logout, completing the initial setup, toggling the system arming state.
 - **Note:** `isAuthenticated` acts as a final gatekeeper. During a cold boot, it is only set to `true` *after* all underlying data (fleet, events) has finished loading.
 
-> 📖 **[View the detailed App Store Architecture](./store-app.md)**
+> 📖 **[View the detailed App Store Architecture](/Docs/architecture/hub/frontend/store-app.md)**
 
 ## 2. Fleet Store (`fleet.ts`)
 
@@ -21,7 +21,7 @@ HoneyWire uses three primary Pinia stores to manage its domain state. Components
 - **Composite Keys:** Sensors are only unique within a node. The store strictly uses the composite key `nodeId + sensorId`.
 - **Actions:** Fetches node lists, handles sensor creation/deletion, and optimistic updates for toggling sensor silence.
 
-> 📖 **[View the detailed Fleet Store Architecture](./store-fleet.md)**
+> 📖 **[View the detailed Fleet Store Architecture](/Docs/architecture/hub/frontend/store-fleet.md)**
 
 ## 3. Events Store (`events.ts`)
 
@@ -31,7 +31,7 @@ HoneyWire uses three primary Pinia stores to manage its domain state. Components
 - **Filtering:** All filtering by archive mode, selected node, or selected sensor occurs *reactively inside the store*. Components do not implement filtering logic.
 - **Actions:** Fetching events based on context, marking as read, and appending new incoming WebSocket events.
 
-> 📖 **[View the detailed Events Store Architecture](./store-events.md)**
+> 📖 **[View the detailed Events Store Architecture](/Docs/architecture/hub/frontend/store-events.md)**
 
 ## Reactive Identity Preservation
 

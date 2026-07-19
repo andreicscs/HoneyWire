@@ -25,7 +25,7 @@ To maintain a stable, secure, and cohesive platform, all contributions to HoneyW
 
 HoneyWire relies on strict JSON contracts to communicate across distributed components. Any changes to API payloads must be backward compatible.
 
-*   Before modifying telemetry shapes, review the [Data Contracts](../architecture/dataContracts.md).
+*   Before modifying telemetry shapes, review the [Data Contracts](/Docs/architecture/dataContracts.md).
 *   Sensors and the Hub must agree on the standard. If you introduce a new field to an event, ensure the frontend can render it without crashing if the field is missing from older events.
 
 ## 3. Testing Requirements
@@ -50,4 +50,4 @@ All submissions must pass automated CI checks.
 
 If you discover a vulnerability in HoneyWire, **do not open a public issue or PR.** 
 
-Please use GitHub Private Vulnerability Reporting via the Security tab on the repository, as outlined in [SECURITY.md](../../SECURITY.md).
+Please use GitHub Private Vulnerability Reporting via the Security tab on the repository, as outlined in [SECURITY.md](/SECURITY.md).

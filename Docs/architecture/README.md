@@ -25,9 +25,9 @@ HoneyWire
 └── SDKs
 ```
 
-### Hub
+### [Hub](/Docs/architecture/hub/)
 The central orchestrator and data aggregator. 
-*For deep-dives into the Hub, see the [Backend Architecture](./hub/backend/overview.md), and [Frontend Architecture](./hub/frontend/overview.md).*
+*For deep-dives into the Hub, see the [Backend Architecture](/Docs/architecture/hub/backend/README.md), and [Frontend Architecture](/Docs/architecture/hub/frontend/README.md).*
 
 **Responsibilities:**
 - Stores events
@@ -38,7 +38,7 @@ The central orchestrator and data aggregator.
 - Aggregates telemetry
 
 
-### Wizard
+### [Wizard](/Docs/architecture/wizard/)
 The deployment and node provisioning engine.
 
 **Responsibilities:**
@@ -48,7 +48,7 @@ The deployment and node provisioning engine.
 - Applies Compose deployments
 - Synchronizes node state
 
-### Sensors
+### [Sensors](/Docs/architecture/sensors/)
 The individual decoy containers placed throughout the network.
 
 **Responsibilities:**
@@ -145,7 +145,7 @@ Storage
 ```
 
 ### Analytics Flow
-*See [Projections Architecture](./hub/backend/projections.md) for more details.*
+*See [Projections Architecture](/Docs/architecture/hub/backend/projections.md) for more details.*
 ```text
 Stored Events
     ↓
@@ -217,6 +217,11 @@ HoneyWire/
 ├── Sensors/         # Official decoys and templates
 └── SDKs/            # Libraries (Go, Python) for custom sensors
 ```
+
+- **[Hub](/Hub/)**
+- **[Wizard](/wizard/)**
+- **[Sensors](/Sensors/)**
+- **[SDKs](/SDKs/)**
 
 ---
 

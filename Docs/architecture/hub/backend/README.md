@@ -45,7 +45,7 @@ The entry point for all network requests.
     - **SPA Routing & Frontend Embedding:** The router securely serves the embedded Vue 3 frontend. It enforces strict API protection (returning pure 404 JSON for unmatched `/api/` routes) while providing a transparent SPA fallback (serving `index.html`) for unrecognized paths, enabling seamless frontend History API navigation (e.g., `/dashboard`) without reload errors.
 
 ### 2. Secure Compose Compiler (`internal/compose`)
-Responsible for compiling deterministic, hardened `honeywire-compose.yml` configurations served to remote edge nodes. See the [Compose Compiler Architecture](./compose.md) for more details.
+Responsible for compiling deterministic, hardened `honeywire-compose.yml` configurations served to remote edge nodes. See the [Compose Compiler Architecture](/Docs/architecture/hub/backend/compose.md) for more details.
 - **Secure Defaults by Inversion:** Explicitly maps specific allowed schema primitives (e.g. strict Linux capabilities, normalized volume paths) into a locked-down Compose base instead of attempting to filter arbitrary config maps.
 - **Validation Engine:** Sanitizes configurations, normalizes directory paths via `filepath.Clean()`, enforces a capability allowlist, and rejects potentially unsafe interpolation patterns.
 - **Dual-Manifest Version Resolution:** Supports manual updates and historical rollbacks. When a node requests its configuration, the compiler resolves the specific deployed version:
