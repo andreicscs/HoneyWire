@@ -30,6 +30,7 @@ const settings = ref({
     registryUrl: '',
     autoArchiveDays: 0,
     autoPurgeDays: 0,
+    autoPurgeHeartbeatsDays: 0,
     webhookType: 'ntfy',
     webhookUrl: '',
     webhookEvents: [],
@@ -46,6 +47,7 @@ watch(() => configStore.config.isLoaded, (loaded) => {
             registryUrl: configStore.config.registryUrl || '',
             autoArchiveDays: configStore.config.autoArchiveDays !== undefined ? configStore.config.autoArchiveDays : 0,
             autoPurgeDays: configStore.config.autoPurgeDays !== undefined ? configStore.config.autoPurgeDays : 0,
+            autoPurgeHeartbeatsDays: configStore.config.autoPurgeHeartbeatsDays !== undefined ? configStore.config.autoPurgeHeartbeatsDays : 0,
             webhookType: configStore.config.webhookType || 'ntfy',
             webhookUrl: configStore.config.webhookUrl || '',
             webhookEvents: configStore.config.webhookEvents && configStore.config.webhookEvents.length > 0 
@@ -248,25 +250,43 @@ const submitFactoryReset = async () => {
 
                 <div v-show="activeTab === 'data'">
                     <BaseCard title="Database Retention Policies">
-                        <BaseNumberStepper 
-                            v-model="settings.autoArchiveDays" 
-                            label="Auto-Archive Events" 
-                            description="Move events from the Live Queue to the Archive automatically."
-                            :min="0" :max="365" 
-                            :suffix="settings.autoArchiveDays === 1 ? 'Day' : 'Days'"
-                            :class="settings.autoArchiveDays === 0 ? '[&_input]:!text-disabled-text' : ''"
-                        />
-                        
-                        <BaseDivider />
-                        
-                        <BaseNumberStepper 
-                            v-model="settings.autoPurgeDays" 
-                            label="Auto-Purge Archive" 
-                            description="Permanently delete archived events from the SQLite database." 
-                            :min="0" :max="365" 
-                            :suffix="settings.autoPurgeDays === 1 ? 'Day' : 'Days'"
-                            :class="settings.autoPurgeDays === 0 ? '[&_input]:!text-disabled-text' : ''"
-                        />
+                        <div class="space-y-6">
+                            <div>
+                                <h3 class="text-sm text-text-m font-medium mb-4">Events Data</h3>
+                                <div class="space-y-4">
+                                    <BaseNumberStepper 
+                                        v-model="settings.autoArchiveDays" 
+                                        label="Auto-Archive Events" 
+                                        description="Move events from the Live Queue to the Archive automatically."
+                                        :min="0" :max="365" 
+                                        :suffix="settings.autoArchiveDays === 1 ? 'Day' : 'Days'"
+                                        :class="settings.autoArchiveDays === 0 ? '[&_input]:!text-disabled-text' : ''"
+                                    />
+                                    <BaseNumberStepper 
+                                        v-model="settings.autoPurgeDays" 
+                                        label="Auto-Purge Archive" 
+                                        description="Permanently delete archived events from the SQLite database." 
+                                        :min="0" :max="365" 
+                                        :suffix="settings.autoPurgeDays === 1 ? 'Day' : 'Days'"
+                                        :class="settings.autoPurgeDays === 0 ? '[&_input]:!text-disabled-text' : ''"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <BaseDivider />
+                            
+                            <div>
+                                <h3 class="text-sm text-text-m font-medium mb-4">Uptime Data</h3>
+                                <BaseNumberStepper 
+                                    v-model="settings.autoPurgeHeartbeatsDays" 
+                                    label="Auto-Purge Uptime Data" 
+                                    description="Permanently delete historical uptime state changes from the database." 
+                                    :min="0" :max="365" 
+                                    :suffix="settings.autoPurgeHeartbeatsDays === 1 ? 'Day' : 'Days'"
+                                    :class="settings.autoPurgeHeartbeatsDays === 0 ? '[&_input]:!text-disabled-text' : ''"
+                                />
+                            </div>
+                        </div>
                     </BaseCard>
                 </div>
 

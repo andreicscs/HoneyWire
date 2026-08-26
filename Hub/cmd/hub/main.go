@@ -20,6 +20,7 @@ import (
 	"github.com/honeywire/hub/internal/services/notify"
 	"github.com/honeywire/hub/internal/services/sensor"
 	"github.com/honeywire/hub/internal/services/siem"
+	"github.com/honeywire/hub/internal/services/statemonitor"
 	"github.com/honeywire/hub/internal/services/websocket"
 	"github.com/honeywire/hub/internal/store"
 )
@@ -63,6 +64,7 @@ func main() {
 	eventSvc := event.NewService(dbStore, wsService, siemService, notifyService)
 	configService := config.NewService(dbStore, authService, siemService, notifyService, cfg.DashboardPassword, cfg.Version)
 	composeService := composesvc.NewService(dbStore, catalogService)
+	monitorService := statemonitor.NewStateMonitor(dbStore.DB, wsService)
 
 	authHandler := api.NewAuthHandler(authService, cfg)
 	nodeHandler := api.NewNodeHandler(nodeSvc)
@@ -95,6 +97,7 @@ func main() {
 	go siemService.StartWorker(rootCtx)
 	go notifyService.StartWorker(rootCtx)
 	go nodeSvc.StartWorker(rootCtx)
+	go monitorService.Start(rootCtx)
 
 	// 2. Load Runtime Configurations Safely
 	isArmed := loadConfigSafe(dbStore, "is_armed", "false") == "true"

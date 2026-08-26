@@ -64,3 +64,35 @@ To maintain real-time reactivity without frontend recomputation:
 4. The Vue Store replaces the snapshot reference, and the chart re-renders effortlessly.
 
 This guarantees that the backend always remains the single source of truth for analytics.
+
+## Example: Uptime Analytics
+
+The Uptime Projection generates historical block-based availability matrices (similar to GitHub status charts) for sensors.
+
+### Implementation Details
+- **Discrete State Tracking:** Unlike previous architectures that scanned thousands of individual heartbeats, the engine strictly queries the `sensor_status_changes` table, calculating exact time deltas between `online` and `offline` states.
+- **Strict Availability Threshold:** A time block is only labeled as `up` if its calculated availability is **≥ 99%**. Any downtime dropping a block below 99% marks it as `degraded` (or `down` if 0%).
+- **First-Seen Alignment:** To prevent false `degraded` penalties during the gap between sensor registration and its initial heartbeat, the engine dynamically aligns the start of the first uptime block with the exact timestamp of the sensor's first `online` state change.
+
+### API Endpoint
+
+`GET /api/v2/uptime`
+
+**Query Parameters:**
+- `timeframe`: The time window (`1H`, `24H`, `7D`, `30D`) (default: `24H`)
+
+**Example Response:**
+```json
+{
+  "uptime_percentage": 100.0,
+  "nodes": [
+    {
+      "node_id": "hw-node-1",
+      "blocks": [
+        {"status": "up", "label": "Online", "timeLabel": "23 hours ago"},
+        {"status": "degraded", "label": "Degraded (98.5% uptime)", "timeLabel": "22 hours ago"}
+      ]
+    }
+  ]
+}
+```

@@ -87,7 +87,7 @@ func (s *SQLiteStore) UpdateConfigBatch(req map[string]interface{}) error {
 					return err
 				}
 			}
-		case "auto_archive_days", "auto_purge_days":
+		case "auto_archive_days", "auto_purge_days", "auto_purge_heartbeats_days":
 			if numVal, ok := val.(float64); ok {
 				if _, err := tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", key, strconv.Itoa(int(numVal))); err != nil {
 					return err
@@ -123,7 +123,7 @@ func (s *SQLiteStore) FactoryReset() error {
 	// It is best practice to be explicit, even though ON DELETE CASCADE is enabled.
 	queries := []string{
 		"DELETE FROM events",
-		"DELETE FROM sensor_heartbeats",
+		"DELETE FROM sensor_status_changes",
 		"DELETE FROM node_sensors",
 		"DELETE FROM nodes",
 		"DELETE FROM config",
@@ -150,8 +150,8 @@ func (s *SQLiteStore) FactoryResetDryRun() (map[string]int, error) {
 	stats := make(map[string]int)
 
 	queries := map[string]string{
-		"events":            "SELECT COUNT(*) FROM events",
-		"sensor_heartbeats": "SELECT COUNT(*) FROM sensor_heartbeats",
+		"events":                "SELECT COUNT(*) FROM events",
+		"sensor_status_changes": "SELECT COUNT(*) FROM sensor_status_changes",
 		"node_sensors":      "SELECT COUNT(*) FROM node_sensors",
 		"nodes":             "SELECT COUNT(*) FROM nodes",
 	}

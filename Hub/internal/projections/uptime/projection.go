@@ -17,7 +17,7 @@ type FilterCriteria struct {
 type ProjectionStore interface {
 	GetNodes() ([]models.Node, error)
 	GetSensorsForUptime(cutoffStr string) ([]store.SensorUptimeData, error)
-	GetHeartbeatsSince(cutoffStr string) ([]store.HeartbeatData, error)
+	GetStatusChangesSince(cutoffStr string) ([]store.StatusChangeData, error)
 	IsSensorSilenced(nodeID, sensorID string) (bool, error)
 }
 
@@ -42,7 +42,7 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 		return nil, err
 	}
 
-	heartbeats, err := p.Store.GetHeartbeatsSince(params.Cutoff.Format(time.RFC3339))
+	changes, err := p.Store.GetStatusChangesSince(params.Cutoff.Format(time.RFC3339))
 	if err != nil {
 		return nil, err
 	}
@@ -52,10 +52,7 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 		return nil, err
 	}
 
-	// 3. Build heartbeat history
-	history := BuildHeartbeatHistory(sensors, heartbeats, params)
-
-	// 4. Build a map for fast node lookup by ID and live status
+	// 3. Build a map for fast node lookup by ID and live status
 	nodesMap := make(map[string]models.Node)
 	sensorLiveStatusMap := make(map[string]string)
 	for _, node := range nodes {
@@ -64,6 +61,9 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 			sensorLiveStatusMap[node.ID+":"+ns.ID] = ns.Status
 		}
 	}
+
+	// 4. Build uptime history
+	history := BuildUptimeHistory(sensors, changes, params, criteria.Now, sensorLiveStatusMap)
 
 	// 5. Group sensors by NodeID and build DTOs
 	groupsMap := make(map[string]*UptimeGroup)

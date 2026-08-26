@@ -20,8 +20,8 @@ const adjust = (delta) => {
 <template>
     <div class="flex items-center justify-between gap-4 max-w-2xl">
         <div>
-            <label class="block text-base text-text-h">{{ label }}</label>
-            <p v-if="description" class="text-sm text-text-m mt-[var(--space-label-gap)]">{{ description }}</p>
+            <label class="block text-xs text-text-h mb-1">{{ label }}</label>
+            <p v-if="description" class="text-xs text-text-m">{{ description }}</p>
         </div>
         <div class="flex items-center gap-3">
             <div class="flex items-center rounded-md border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-primary-main transition-colors duration-fast">

@@ -24,7 +24,7 @@ type Store interface {
 	GetEventCount() (int, error)
 	ClearAllEvents() error
 	GetConfigValue(key string) (string, error)
-	EnforceRetention(archiveDays, purgeDays int) error
+	EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDays int) error
 }
 
 type Broadcaster interface {
@@ -142,12 +142,14 @@ func (s *Service) StartRetentionWorker(ctx context.Context) {
 		case <-ticker.C:
 			archiveStr, _ := s.store.GetConfigValue("auto_archive_days")
 			purgeStr, _ := s.store.GetConfigValue("auto_purge_days")
+			purgeHeartbeatsStr, _ := s.store.GetConfigValue("auto_purge_heartbeats_days")
 
 			archiveDays, _ := strconv.Atoi(archiveStr)
 			purgeDays, _ := strconv.Atoi(purgeStr)
+			purgeHeartbeatsDays, _ := strconv.Atoi(purgeHeartbeatsStr)
 
-			if archiveDays > 0 || purgeDays > 0 {
-				if err := s.store.EnforceRetention(archiveDays, purgeDays); err != nil {
+			if archiveDays > 0 || purgeDays > 0 || purgeHeartbeatsDays > 0 {
+				if err := s.store.EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDays); err != nil {
 					log.Printf("[WARNING] Event retention task failed: %v", err)
 				}
 			}

@@ -16,8 +16,9 @@ type SetupPayload struct {
 type ConfigPayload struct {
 	HubEndpoint        string   `json:"hubEndpoint"`
 	RegistryURL        string   `json:"registryUrl"`
-	AutoArchiveDays    int      `json:"autoArchiveDays"`
-	AutoPurgeDays      int      `json:"autoPurgeDays"`
+	AutoArchiveDays         int      `json:"autoArchiveDays"`
+	AutoPurgeDays           int      `json:"autoPurgeDays"`
+	AutoPurgeHeartbeatsDays int      `json:"autoPurgeHeartbeatsDays"`
 	WebhookURL         string   `json:"webhookUrl"`
 	WebhookType        string   `json:"webhookType"`
 	WebhookEvents      []string `json:"webhookEvents"`

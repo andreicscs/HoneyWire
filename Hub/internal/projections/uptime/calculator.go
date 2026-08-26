@@ -2,6 +2,7 @@ package uptime
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/honeywire/hub/internal/store"
@@ -9,29 +10,27 @@ import (
 
 // UptimeCalculationParams holds parameters needed for uptime calculations
 type UptimeCalculationParams struct {
-	NumBlocks     int
-	Delta         time.Duration
-	ExpectedPings float64
-	Cutoff        time.Time
+	NumBlocks int
+	Delta     time.Duration
+	Cutoff    time.Time
 }
 
 // CalculateParams determines the calculation parameters based on timeframe
 func CalculateParams(timeframe string, now time.Time) UptimeCalculationParams {
 	var numBlocks int
 	var delta time.Duration
-	var expectedPings float64
 
 	switch timeframe {
 	case "1H":
-		numBlocks, delta, expectedPings = 30, 2*time.Minute, 2
+		numBlocks, delta = 30, 2*time.Minute
 	case "7D":
-		numBlocks, delta, expectedPings = 7, 24*time.Hour, 1440
+		numBlocks, delta = 7, 24*time.Hour
 	case "30D":
-		numBlocks, delta, expectedPings = 30, 24*time.Hour, 1440
+		numBlocks, delta = 30, 24*time.Hour
 	case "24H":
 		fallthrough
 	default:
-		numBlocks, delta, expectedPings = 24, time.Hour, 60
+		numBlocks, delta = 24, time.Hour
 	}
 
 	// Align the grid to the delta boundary to prevent phase-shift visual jitter,
@@ -39,24 +38,19 @@ func CalculateParams(timeframe string, now time.Time) UptimeCalculationParams {
 	cutoff := now.Truncate(delta).Add(-delta * time.Duration(numBlocks-1))
 
 	return UptimeCalculationParams{
-		NumBlocks:     numBlocks,
-		Delta:         delta,
-		ExpectedPings: expectedPings,
-		Cutoff:        cutoff,
+		NumBlocks: numBlocks,
+		Delta:     delta,
+		Cutoff:    cutoff,
 	}
 }
 
-// HistoryBucket represents aggregated heartbeat data for a sensor in a time period
-type HistoryBucket struct {
-	SensorKey string
-	Pings     []float64
-}
-
-// BuildHeartbeatHistory aggregates heartbeat data into time-based buckets
-func BuildHeartbeatHistory(
+// BuildUptimeHistory aggregates status changes to compute seconds spent 'online' per block.
+func BuildUptimeHistory(
 	sensors []store.SensorUptimeData,
-	heartbeats []store.HeartbeatData,
+	changes []store.StatusChangeData,
 	params UptimeCalculationParams,
+	now time.Time,
+	sensorLiveStatusMap map[string]string,
 ) map[string][]float64 {
 	history := make(map[string][]float64)
 	for _, s := range sensors {
@@ -64,24 +58,117 @@ func BuildHeartbeatHistory(
 		history[historyKey] = make([]float64, params.NumBlocks)
 	}
 
-	for _, hb := range heartbeats {
-		parsedBucket, err := time.Parse(time.RFC3339, hb.TimeBucket)
-		if err != nil {
-			continue
+	// Group changes by sensor
+	changesBySensor := make(map[string][]store.StatusChangeData)
+	for _, c := range changes {
+		key := c.NodeID + ":" + c.SensorID
+		changesBySensor[key] = append(changesBySensor[key], c)
+	}
+
+	for key, sensorChanges := range changesBySensor {
+		if _, ok := history[key]; !ok {
+			continue // Skip unknown sensors
 		}
 
-		if parsedBucket.Before(params.Cutoff) {
-			continue
+		// Sort changes by timestamp
+		sort.Slice(sensorChanges, func(i, j int) bool {
+			return sensorChanges[i].Timestamp < sensorChanges[j].Timestamp
+		})
+
+		// Determine initial status at cutoff.
+		isOnline := false
+		if len(sensorChanges) > 0 {
+			if sensorChanges[0].Status == "offline" {
+				isOnline = true
+			}
+		} else {
+			if sensorLiveStatusMap[key] == "up" {
+				isOnline = true
+			}
 		}
 
-		idx := int(parsedBucket.Sub(params.Cutoff) / params.Delta)
-		if idx >= params.NumBlocks {
-			idx = params.NumBlocks - 1
-		}
+		changeIdx := 0
 
-		historyKey := hb.NodeID + ":" + hb.SensorID
-		if idx >= 0 && history[historyKey] != nil {
-			history[historyKey][idx]++
+		for i := 0; i < params.NumBlocks; i++ {
+			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
+			blockEnd := blockStart.Add(params.Delta)
+			if blockEnd.After(now) {
+				blockEnd = now
+			}
+
+			if blockStart.After(now) || blockStart.Equal(now) {
+				break
+			}
+
+			uptimeSeconds := 0.0
+			blockCurrentTime := blockStart
+
+			for blockCurrentTime.Before(blockEnd) {
+				var nextChangeTime time.Time
+				var nextStatus string
+				hasChange := false
+
+				if changeIdx < len(sensorChanges) {
+					t, err := time.Parse(time.RFC3339, sensorChanges[changeIdx].Timestamp)
+					if err == nil {
+						nextChangeTime = t
+						nextStatus = sensorChanges[changeIdx].Status
+						hasChange = true
+					}
+				}
+
+				if hasChange && !nextChangeTime.After(blockCurrentTime) {
+					// Change happened before or at the current time we are tracking
+					if nextStatus == "online" {
+						isOnline = true
+					} else {
+						isOnline = false
+					}
+					changeIdx++
+					continue
+				}
+
+				endTime := blockEnd
+				if hasChange && nextChangeTime.Before(blockEnd) {
+					endTime = nextChangeTime
+				}
+
+				duration := endTime.Sub(blockCurrentTime).Seconds()
+				if isOnline {
+					uptimeSeconds += duration
+				}
+
+				blockCurrentTime = endTime
+				if hasChange && blockCurrentTime.Equal(nextChangeTime) {
+					if nextStatus == "online" {
+						isOnline = true
+					} else {
+						isOnline = false
+					}
+					changeIdx++
+				}
+			}
+
+			history[key][i] = uptimeSeconds
+		}
+	}
+
+	// For sensors with NO changes in the period, fill their history based on live status.
+	for _, s := range sensors {
+		key := s.NodeID + ":" + s.SensorID
+		if len(changesBySensor[key]) == 0 {
+			if sensorLiveStatusMap[key] == "up" {
+				for i := 0; i < params.NumBlocks; i++ {
+					blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
+					blockEnd := blockStart.Add(params.Delta)
+					if blockEnd.After(now) {
+						blockEnd = now
+					}
+					if blockStart.Before(now) {
+						history[key][i] = blockEnd.Sub(blockStart).Seconds()
+					}
+				}
+			}
 		}
 	}
 
@@ -96,77 +183,43 @@ type BlockStatus struct {
 
 // CalculateBlockStatus determines the uptime status for a single time block
 func CalculateBlockStatus(
-	blockStart, blockEnd, now, firstSeen, firstPingTime time.Time,
-	pings float64,
+	blockStart, blockEnd, now, firstSeen time.Time,
+	uptimeSeconds float64,
 	params UptimeCalculationParams,
 	blockIndex int,
 	isLiveOffline bool,
 ) BlockStatus {
-	status, label := "", ""
-
 	if !blockEnd.After(firstSeen) {
-		// Sensor not yet deployed at this time
-		status, label = "nodata", "No Data (Not Deployed Yet)"
-	} else if !firstPingTime.IsZero() && !blockEnd.After(firstPingTime) {
-		// Deployed, but before the first successful heartbeat. This is the "pending" phase.
-		status, label = "pending", "Awaiting Initial Check-in"
-	} else if firstPingTime.IsZero() && !isLiveOffline {
-		// Deployed, but no heartbeats ever recorded, and it's not currently considered offline.
-		status, label = "pending", "Awaiting Initial Check-in"
-	} else {
-		targetPings := params.ExpectedPings
-
-		// Adjust expected pings if deployment or first check-in occurred mid-block
-		effectiveStart := blockStart
-		if firstSeen.After(effectiveStart) {
-			effectiveStart = firstSeen
-		}
-		if !firstPingTime.IsZero() && firstPingTime.After(effectiveStart) {
-			effectiveStart = firstPingTime
-		}
-
-		if effectiveStart.After(blockStart) && effectiveStart.Before(blockEnd) {
-			activeDuration := blockEnd.Sub(effectiveStart)
-			targetPings = activeDuration.Minutes()
-			if targetPings > params.ExpectedPings {
-				targetPings = params.ExpectedPings
-			}
-			if targetPings < 1 && activeDuration > 0 {
-				targetPings = 1
-			}
-		}
-
-		// Strict 85% SLA threshold
-		acceptablePings := targetPings * 0.85
-
-		if blockIndex == params.NumBlocks-1 {
-			if isLiveOffline {
-				status, label = "down", "Offline"
-			} else {
-				remainingDuration := blockEnd.Sub(now)
-				if remainingDuration < 0 {
-					remainingDuration = 0
-				}
-				maxPossiblePings := pings + remainingDuration.Minutes()
-
-				if maxPossiblePings < acceptablePings {
-					status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
-				} else {
-					status, label = "up", "Online"
-				}
-			}
-		} else {
-			if pings == 0 && targetPings >= 1 {
-				status, label = "down", "Offline"
-			} else if targetPings > 0 && pings < acceptablePings {
-				status, label = "degraded", fmt.Sprintf("Degraded (%.0f/%.0f pings)", pings, targetPings)
-			} else {
-				status, label = "up", "Online"
-			}
-		}
+		return BlockStatus{Status: "nodata", Label: "No Data (Not Deployed Yet)"}
 	}
 
-	return BlockStatus{Status: status, Label: label}
+	effectiveStart := blockStart
+	if firstSeen.After(effectiveStart) {
+		effectiveStart = firstSeen
+	}
+
+	effectiveEnd := blockEnd
+	if now.Before(effectiveEnd) {
+		effectiveEnd = now
+	}
+
+	blockDuration := effectiveEnd.Sub(effectiveStart).Seconds()
+	if blockDuration <= 0 {
+		return BlockStatus{Status: "nodata", Label: "No Data"}
+	}
+
+	if blockIndex == params.NumBlocks-1 && isLiveOffline {
+		return BlockStatus{Status: "down", Label: "Offline"}
+	}
+
+	ratio := uptimeSeconds / blockDuration
+
+	if ratio >= 0.99 {
+		return BlockStatus{Status: "up", Label: "Online"}
+	} else if ratio > 0 {
+		return BlockStatus{Status: "degraded", Label: fmt.Sprintf("Degraded (%.1f%% uptime)", ratio*100)}
+	}
+	return BlockStatus{Status: "down", Label: "Offline"}
 }
 
 // GenerateBlocks creates the heatmap blocks for a sensor
@@ -181,24 +234,9 @@ func GenerateBlocks(
 	firstSeenParsed, _ := time.Parse(time.RFC3339, sensorData.FirstSeen)
 	blocks := make([]UptimeBlock, params.NumBlocks)
 
-	var firstPingTime time.Time
-	// Find the start time of the first block that has pings.
-	for i, pings := range history {
-		if pings > 0 {
-			firstPingTime = params.Cutoff.Add(time.Duration(i) * params.Delta)
-			break
-		}
-	}
-	// If no pings in history, but sensor is live, the first ping is now.
-	// This handles the case where the very first ping just occurred.
-	if firstPingTime.IsZero() && liveStatus == "up" {
-		firstPingTime = now
-	}
-
 	for i := 0; i < params.NumBlocks; i++ {
 		blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 		blockEnd := blockStart.Add(params.Delta)
-
 		stepsAgo := params.NumBlocks - 1 - i
 		timeLabel := formatTimeLabel(stepsAgo, params.Delta, timeframe)
 
@@ -220,7 +258,7 @@ func GenerateBlocks(
 		}
 
 		isLiveOffline := liveStatus == "down"
-		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, firstPingTime, history[i], params, i, isLiveOffline)
+		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, history[i], params, i, isLiveOffline)
 		blocks[i] = UptimeBlock{
 			Status:    blockStatus.Status,
 			Label:     blockStatus.Label,
@@ -261,7 +299,6 @@ func ResolveWorstStatus(statuses []string) string {
 			return "degraded"
 		}
 	}
-	// All are "up" or "nodata"
 	for _, status := range statuses {
 		if status == "up" {
 			return "up"
@@ -272,7 +309,6 @@ func ResolveWorstStatus(statuses []string) string {
 			return "pending"
 		}
 	}
-	// All are "nodata"
 	return ""
 }
 
@@ -298,25 +334,13 @@ func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string
 		}
 
 		firstSeenParsed, _ := time.Parse(time.RFC3339, sensor.FirstSeen)
-
-		var firstPingTime time.Time
-		for i, pings := range sensorHistory {
-			if pings > 0 {
-				firstPingTime = params.Cutoff.Add(time.Duration(i) * params.Delta)
-				break
-			}
-		}
-		if firstPingTime.IsZero() && liveStatus == "up" {
-			firstPingTime = now
-		}
-
 		isLiveOffline := liveStatus == "down"
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 			blockEnd := blockStart.Add(params.Delta)
 
-			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, firstPingTime, sensorHistory[i], params, i, isLiveOffline)
+			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, sensorHistory[i], params, i, isLiveOffline)
 			if blockStatus.Status == "nodata" || blockStatus.Status == "pending" {
 				continue
 			}

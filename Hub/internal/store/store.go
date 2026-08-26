@@ -30,11 +30,12 @@ type DataStore interface {
 
 	// Sensors
 	UpsertSensor(hb *models.Heartbeat, nowStr, metadataStr string) error
-	InsertHeartbeat(nodeID, sensorID, timeBucket string) error
+	InsertStatusChange(nodeID, sensorID, status, timestamp string) error
 	GetAllSensors() ([]models.NodeSensor, error)
 	GetSensorsForUptime(nowStr string) ([]SensorUptimeData, error)
-	GetHeartbeatsSince(cutoffStr string) ([]HeartbeatData, error)
+	GetStatusChangesSince(cutoffStr string) ([]StatusChangeData, error)
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
+	EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDays int) error
 	DeleteSensor(nodeID, sensorID string) (int64, error)
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 

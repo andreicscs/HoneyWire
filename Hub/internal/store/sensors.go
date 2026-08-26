@@ -12,10 +12,11 @@ type SensorUptimeData struct {
 	FirstSeen string
 }
 
-type HeartbeatData struct {
-	NodeID     string
-	SensorID   string
-	TimeBucket string
+type StatusChangeData struct {
+	NodeID    string
+	SensorID  string
+	Status    string
+	Timestamp string
 }
 
 // ProcessHeartbeat safely handles node updates and config reconciliation
@@ -84,10 +85,10 @@ func (s *SQLiteStore) ProcessHeartbeat(nodeID, sensorID, configRev, nowStr strin
 	return justSynced, tx.Commit()
 }
 
-func (s *SQLiteStore) InsertHeartbeat(nodeID, sensorID, timeBucket string) error {
+func (s *SQLiteStore) InsertStatusChange(nodeID, sensorID, status, timestamp string) error {
 	_, err := s.DB.Exec(
-		"INSERT OR IGNORE INTO sensor_heartbeats (node_id, sensor_id, time_bucket) VALUES (?, ?, ?)",
-		nodeID, sensorID, timeBucket,
+		"INSERT INTO sensor_status_changes (node_id, sensor_id, status, timestamp) VALUES (?, ?, ?, ?)",
+		nodeID, sensorID, status, timestamp,
 	)
 	return err
 }
@@ -95,7 +96,11 @@ func (s *SQLiteStore) InsertHeartbeat(nodeID, sensorID, timeBucket string) error
 func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, error) {
 	// Join nodes and node_sensors to get the creation date and the parent node's last heartbeat
 	rows, err := s.DB.Query(`
-		SELECT ns.node_id, ns.sensor_id, n.last_heartbeat, ns.created_at 
+		SELECT ns.node_id, ns.sensor_id, n.last_heartbeat, 
+		       COALESCE(
+		           (SELECT timestamp FROM sensor_status_changes WHERE node_id = ns.node_id AND sensor_id = ns.sensor_id ORDER BY timestamp ASC LIMIT 1), 
+		           ns.created_at
+		       ) as first_seen
 		FROM node_sensors ns
 		JOIN nodes n ON ns.node_id = n.id
 		ORDER BY ns.node_id, ns.sensor_id`)
@@ -123,22 +128,22 @@ func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, er
 	return sensors, nil
 }
 
-func (s *SQLiteStore) GetHeartbeatsSince(cutoffStr string) ([]HeartbeatData, error) {
-	rows, err := s.DB.Query("SELECT node_id, sensor_id, time_bucket FROM sensor_heartbeats WHERE time_bucket >= ?", cutoffStr)
+func (s *SQLiteStore) GetStatusChangesSince(cutoffStr string) ([]StatusChangeData, error) {
+	rows, err := s.DB.Query("SELECT node_id, sensor_id, status, timestamp FROM sensor_status_changes WHERE timestamp >= ? ORDER BY timestamp ASC", cutoffStr)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var hbs []HeartbeatData
+	var changes []StatusChangeData
 	for rows.Next() {
-		var hb HeartbeatData
-		if err := rows.Scan(&hb.NodeID, &hb.SensorID, &hb.TimeBucket); err != nil {
+		var change StatusChangeData
+		if err := rows.Scan(&change.NodeID, &change.SensorID, &change.Status, &change.Timestamp); err != nil {
 			return nil, err
 		}
-		hbs = append(hbs, hb)
+		changes = append(changes, change)
 	}
-	return hbs, nil
+	return changes, nil
 }
 
 func (s *SQLiteStore) UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error {
@@ -199,3 +204,16 @@ func (s *SQLiteStore) MarkSensorOffline(nodeID, sensorID, offlineTime string) er
 
 	return tx.Commit()
 }
+
+func (s *SQLiteStore) GetSensorLastHeartbeat(nodeID, sensorID string) (string, error) {
+	var lastHeartbeat sql.NullString
+	err := s.DB.QueryRow("SELECT last_heartbeat FROM node_sensors WHERE node_id = ? AND sensor_id = ?", nodeID, sensorID).Scan(&lastHeartbeat)
+	if err != nil {
+		return "", err
+	}
+	if !lastHeartbeat.Valid {
+		return "", nil
+	}
+	return lastHeartbeat.String, nil
+}
+

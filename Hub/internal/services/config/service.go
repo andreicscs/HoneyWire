@@ -120,6 +120,7 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 
 	archiveDays, _ := strconv.Atoi(kv["auto_archive_days"])
 	purgeDays, _ := strconv.Atoi(kv["auto_purge_days"])
+	purgeHeartbeatsDays, _ := strconv.Atoi(kv["auto_purge_heartbeats_days"])
 
 	var events []string
 	if kv["webhook_events"] != "" {
@@ -129,8 +130,9 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 	return models.ConfigPayload{
 		HubEndpoint:     kv["hub_endpoint"],
 		RegistryURL:     kv["registry_url"],
-		AutoArchiveDays: archiveDays,
-		AutoPurgeDays:   purgeDays,
+		AutoArchiveDays:         archiveDays,
+		AutoPurgeDays:           purgeDays,
+		AutoPurgeHeartbeatsDays: purgeHeartbeatsDays,
 		WebhookURL:      kv["webhook_url"],
 		WebhookType:     kv["webhook_type"],
 		WebhookEvents:   events,
@@ -146,8 +148,9 @@ func (s *Service) UpdateConfig(req map[string]interface{}) error {
 	mapping := map[string]string{
 		"hubEndpoint":     "hub_endpoint",
 		"registryUrl":     "registry_url",
-		"autoArchiveDays": "auto_archive_days",
-		"autoPurgeDays":   "auto_purge_days",
+		"autoArchiveDays":         "auto_archive_days",
+		"autoPurgeDays":           "auto_purge_days",
+		"autoPurgeHeartbeatsDays": "auto_purge_heartbeats_days",
 		"webhookType":     "webhook_type",
 		"webhookUrl":      "webhook_url",
 		"webhookEvents":   "webhook_events",

@@ -25,7 +25,14 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 
 	// Connection Pooling for SQLite performance
 	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
+	db.SetMaxIdleConns(25)
+
+	// Fix for read-only containers: force SQLite to use the writable /data volume for temporary files
+	_, err = db.Exec("PRAGMA temp_store_directory = '/data';")
+	if err != nil {
+		log.Printf("Warning: Failed to set SQLite temp_store_directory: %v", err)
+	}
+
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := RunMigrations(db); err != nil {

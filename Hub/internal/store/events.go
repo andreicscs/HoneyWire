@@ -130,7 +130,7 @@ func (s *SQLiteStore) ClearAllEvents() error {
 }
 
 // EnforceRetention automatically archives and deletes old events based on configured days
-func (s *SQLiteStore) EnforceRetention(archiveDays, purgeDays int) error {
+func (s *SQLiteStore) EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDays int) error {
 	now := time.Now().UTC()
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -150,6 +150,14 @@ func (s *SQLiteStore) EnforceRetention(archiveDays, purgeDays int) error {
 	if purgeDays > 0 {
 		purgeCutoff := now.AddDate(0, 0, -purgeDays).Format(time.RFC3339)
 		if _, err := tx.Exec("DELETE FROM events WHERE timestamp < ?", purgeCutoff); err != nil {
+			return err
+		}
+	}
+
+	// 3. Auto-Purge Heartbeats (if enabled)
+	if purgeHeartbeatsDays > 0 {
+		purgeCutoff := now.AddDate(0, 0, -purgeHeartbeatsDays).Format(time.RFC3339)
+		if _, err := tx.Exec("DELETE FROM sensor_status_changes WHERE timestamp < ?", purgeCutoff); err != nil {
 			return err
 		}
 	}

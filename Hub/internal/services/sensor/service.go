@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"log"
-	"strings"
 	"time"
 )
 
 // Store defines exactly what the Sensor service needs from internal/store
 type Store interface {
 	ProcessHeartbeat(nodeID, sensorID, configRev, nowStr string) (bool, error)
-	InsertHeartbeat(nodeID, sensorID, minuteBucket string) error
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
 	GetTransitionedOfflineNodes(offlineThreshold time.Duration, lastCheck time.Time) (map[string]bool, error)
+	GetSensorLastHeartbeat(nodeID, sensorID string) (string, error)
+	InsertStatusChange(nodeID, sensorID, status, timestamp string) error
 }
 
 // Broadcaster defines how the service sends real-time updates
@@ -40,26 +40,33 @@ func NewService(store Store, broadcaster Broadcaster) *Service {
 func (s *Service) ProcessHeartbeat(nodeID, sensorID, configRev string) error {
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 
-	justSynced, err := s.store.ProcessHeartbeat(nodeID, sensorID, configRev, nowStr)
+	lastHeartbeatStr, err := s.store.GetSensorLastHeartbeat(nodeID, sensorID)
+	if err != nil {
+		log.Printf("[ERROR] Failed to fetch last heartbeat for node %s sensor %s: %v", nodeID, sensorID, err)
+	}
+
+	isOffline := true
+	if lastHeartbeatStr != "" {
+		lastHeartbeat, err := time.Parse(time.RFC3339, lastHeartbeatStr)
+		if err == nil && time.Since(lastHeartbeat) <= 60*time.Second {
+			isOffline = false
+		}
+	}
+
+	_, err = s.store.ProcessHeartbeat(nodeID, sensorID, configRev, nowStr)
 	if err != nil {
 		log.Printf("[ERROR] Heartbeat DB update failed for node %s: %v", nodeID, err)
 		return err
 	}
 
-	minuteBucket := time.Now().UTC().Truncate(time.Minute).Format(time.RFC3339)
-	if err := s.store.InsertHeartbeat(nodeID, sensorID, minuteBucket); err != nil {
-		if strings.Contains(err.Error(), "FOREIGN KEY") {
-			return ErrSensorNotRegistered
-		} else {
-			log.Printf("[WARNING] Failed to log heartbeat bucket: %v", err)
+	if isOffline {
+		if err := s.store.InsertStatusChange(nodeID, sensorID, "online", nowStr); err != nil {
+			log.Printf("[WARNING] Failed to log status change: %v", err)
 		}
-	}
-
-	// Dynamic typing for WebSocket payloads to match UI expectations
-	if justSynced {
 		s.broadcaster.Broadcast("NODE_SYNCED", map[string]interface{}{
 			"nodeId": nodeID,
 		})
+		s.broadcaster.Broadcast("SYNC_CHARTS", nil)
 	}
 
 	s.broadcaster.Broadcast("SENSOR_HEARTBEAT", map[string]interface{}{
@@ -119,6 +126,8 @@ func (s *Service) ProcessOffline(nodeID, sensorID, reason string) error {
 		"nodeId":          nodeID,
 		"trigger_refresh": true,
 	})
+
+	_ = s.store.InsertStatusChange(nodeID, sensorID, "offline", time.Now().UTC().Format(time.RFC3339))
 
 	return nil
 }

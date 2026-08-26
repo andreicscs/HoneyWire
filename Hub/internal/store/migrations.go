@@ -63,13 +63,14 @@ CREATE TABLE IF NOT EXISTS events (
     FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
 );
 
--- Sensor Heartbeats: Routine health pings from sensors
-CREATE TABLE IF NOT EXISTS sensor_heartbeats (
-    node_id     TEXT NOT NULL,
-    sensor_id   TEXT NOT NULL,
-    time_bucket TEXT NOT NULL,
-    PRIMARY KEY (node_id, sensor_id, time_bucket),
-    FOREIGN KEY (node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
+-- Sensor Status Changes: Discrete event log for uptime calculation
+CREATE TABLE IF NOT EXISTS sensor_status_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL,
+    sensor_id TEXT NOT NULL,
+    status TEXT NOT NULL, -- 'online' or 'offline'
+    timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
 );
 
 -- System Configuration
@@ -83,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_events_archived ON events(is_archived, id DESC);
 CREATE INDEX IF NOT EXISTS idx_events_node_sensor ON events(node_id, sensor_id);
 CREATE INDEX IF NOT EXISTS idx_events_severity ON events(severity);
 CREATE INDEX IF NOT EXISTS idx_sensors_node ON node_sensors(node_id);
-CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON sensor_heartbeats(time_bucket);
+CREATE INDEX IF NOT EXISTS idx_ssc_time ON sensor_status_changes(node_id, sensor_id, timestamp);
 `
 
 // WARNING: Schema Migrations & Foreign Keys
@@ -104,6 +105,100 @@ var migrations = []Migration{
 		Description: "Base v2 schema",
 		Up: func(tx *sql.Tx) error {
 			_, err := tx.Exec(v2Schema)
+			return err
+		},
+	},
+	{
+		Version:     2,
+		Description: "Migrate heartbeats to discrete state changes",
+		Up: func(tx *sql.Tx) error {
+			// 1. Create new table (handled by v2Schema in fresh installs, but explicitly here for existing instances)
+			_, err := tx.Exec(`
+				CREATE TABLE IF NOT EXISTS sensor_status_changes (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					node_id TEXT NOT NULL,
+					sensor_id TEXT NOT NULL,
+					status TEXT NOT NULL,
+					timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY(node_id, sensor_id) REFERENCES node_sensors(node_id, sensor_id) ON DELETE CASCADE
+				);
+				CREATE INDEX IF NOT EXISTS idx_ssc_time ON sensor_status_changes(node_id, sensor_id, timestamp);
+			`)
+			if err != nil {
+				return err
+			}
+
+			// 2. Migrate existing data
+			rows, err := tx.Query(`SELECT node_id, sensor_id, time_bucket FROM sensor_heartbeats ORDER BY node_id, sensor_id, time_bucket ASC`)
+			if err != nil {
+				// Table might not exist or be empty
+				return nil
+			}
+			
+			type hb struct {
+				NodeID   string
+				SensorID string
+				Bucket   time.Time
+			}
+			var heartbeats []hb
+			for rows.Next() {
+				var n, s, b string
+				if err := rows.Scan(&n, &s, &b); err == nil {
+					t, err := time.Parse(time.RFC3339, b)
+					if err == nil {
+						heartbeats = append(heartbeats, hb{NodeID: n, SensorID: s, Bucket: t})
+					}
+				}
+			}
+			rows.Close()
+
+			stmt, err := tx.Prepare(`INSERT INTO sensor_status_changes (node_id, sensor_id, status, timestamp) VALUES (?, ?, ?, ?)`)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+
+			if len(heartbeats) > 0 {
+				var lastNode, lastSensor string
+				var lastTime time.Time
+				nowTime := time.Now().UTC()
+
+				closeSensorSequence := func() {
+					if lastNode != "" && lastSensor != "" {
+						if nowTime.Sub(lastTime) > time.Minute {
+							offlineTime := lastTime.Add(time.Minute)
+							stmt.Exec(lastNode, lastSensor, "offline", offlineTime.Format(time.RFC3339))
+						}
+					}
+				}
+
+				for _, h := range heartbeats {
+					if h.NodeID != lastNode || h.SensorID != lastSensor {
+						// Close previous sensor sequence if it died before now
+						closeSensorSequence()
+
+						// New sensor sequence: insert 'online'
+						stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339))
+					} else {
+						// Existing sequence: check gap
+						gap := h.Bucket.Sub(lastTime)
+						if gap > time.Minute { // Missed at least one minute bucket (>60s gap)
+							offlineTime := lastTime.Add(time.Minute)
+							stmt.Exec(h.NodeID, h.SensorID, "offline", offlineTime.Format(time.RFC3339))
+							stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339))
+						}
+					}
+					lastNode = h.NodeID
+					lastSensor = h.SensorID
+					lastTime = h.Bucket
+				}
+				
+				// Close the final sensor sequence
+				closeSensorSequence()
+			}
+
+			// 3. Drop old table
+			_, err = tx.Exec(`DROP TABLE IF EXISTS sensor_heartbeats`)
 			return err
 		},
 	},
