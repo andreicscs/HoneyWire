@@ -59,32 +59,43 @@ const checkScroll = () => {
     showOfflineWarning.value = lastWarning.getBoundingClientRect().right > (container.getBoundingClientRect().right + 5)
 }
 
-watch(() => selectedNode.value?.id, (newVal) => {
+const scrollToSelectedPill = () => {
     nextTick(() => {
-        const el = document.getElementById(newVal ? `pill-${newVal}` : 'pill-all')
+        const node = selectedNode.value
+        const el = document.getElementById(node?.id ? `pill-${node.id}` : 'pill-all')
         if (el && scrollArea.value) {
             const container = scrollArea.value
             const scrollLeft = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
             container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' })
         }
     })
+}
+
+watch(() => selectedNode.value?.id, () => {
+    scrollToSelectedPill()
 })
 
-watch(() => selectedSensor.value?.sensorId, (newSensorId) => {
+watch(() => selectedSensor.value?.sensorId, () => {
+    scrollToSelectedPill()
+})
+
+watch(activeNodes, () => {
     nextTick(() => {
-        const elId = newSensorId && selectedNode.value?.id ? `pill-${selectedNode.value?.id}` : 'pill-all'
-        const el = document.getElementById(elId)
-        if (el && scrollArea.value) {
-            const container = scrollArea.value
-            const scrollLeft = el.offsetLeft - container.clientWidth / 2 + el.clientWidth / 2
-            container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' })
+        checkScroll()
+        if (selectedNode.value?.id) {
+            scrollToSelectedPill()
+        }
+    })
+}, { deep: true })
+
+onMounted(() => {
+    nextTick(() => {
+        checkScroll()
+        if (selectedNode.value?.id) {
+            scrollToSelectedPill()
         }
     })
 })
-
-watch(activeNodes, () => nextTick(checkScroll), { deep: true })
-
-onMounted(() => nextTick(checkScroll))
 </script>
 
 <template>

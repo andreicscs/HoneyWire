@@ -68,37 +68,54 @@ const scrollToBottom = () => {
     if (scrollArea.value) scrollArea.value.scrollTo({ top: scrollArea.value.scrollHeight, behavior: 'smooth' })
 }
 
-watch(() => selectedSensor.value?.sensorId, (newSensorId) => {
-    const node = selectedNode.value
-    if (newSensorId && node) {
-        nextTick(() => {
-            const el = document.getElementById(`row-${node.id}-${newSensorId}`)
+const scrollToSelection = () => {
+    nextTick(() => {
+        const node = selectedNode.value
+        const sensor = selectedSensor.value
+        if (sensor && node) {
+            const el = document.getElementById(`row-${node.id}-${sensor.sensorId}`)
             if (el && scrollArea.value) {
                 const container = scrollArea.value
                 const scrollTop = el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2
                 container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
+                return
             }
-        })
-    }
-})
-
-watch(() => selectedNode.value?.id, (newNodeId) => {
-    if (newNodeId) {
-        nextTick(() => {
-            const el = document.getElementById(`group-${newNodeId}`)
+        }
+        if (node) {
+            const el = document.getElementById(`group-${node.id}`)
             if (el && scrollArea.value) {
                 const container = scrollArea.value
-                const scrollTop = el.offsetTop - 10 // Provide a slight padding above the group header
+                const scrollTop = el.offsetTop - 10 // Provide slight padding above group header
                 container.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
             }
-        })
-    }
+        }
+    })
+}
+
+watch(() => selectedSensor.value?.sensorId, () => {
+    scrollToSelection()
 })
 
-watch(hydratedUptimeGroups, () => nextTick(checkScroll), { deep: true })
+watch(() => selectedNode.value?.id, () => {
+    scrollToSelection()
+})
+
+watch(hydratedUptimeGroups, () => {
+    nextTick(() => {
+        checkScroll()
+        if (selectedNode.value?.id) {
+            scrollToSelection()
+        }
+    })
+}, { deep: true })
 
 onMounted(() => { 
-    nextTick(checkScroll)
+    nextTick(() => {
+        checkScroll()
+        if (selectedNode.value?.id) {
+            scrollToSelection()
+        }
+    })
 })
 
 const legendItems = [
