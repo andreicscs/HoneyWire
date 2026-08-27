@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
+  <a href="https://honeywire.dev">
+    <img src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
+  </a>
 </p>
 <h1 align="center">HoneyWire</h1>
 
