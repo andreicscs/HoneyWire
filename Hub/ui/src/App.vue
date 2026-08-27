@@ -81,6 +81,7 @@ const loadAppData = async () => {
     wsService.on('onReconnect', async () => {
       console.log("WebSocket Reconnected: Syncing missed data...")
       await Promise.all([
+        appStore.initAppStore().catch(() => {}),
         fleetStore.fetchFleet().catch(() => {}),
         fleetStore.fetchUptime(fleetStore.activeTimeframe).catch(() => {}),
         eventsStore.fetchEvents().catch(() => {}),
@@ -177,7 +178,7 @@ onUnmounted(() => {
     <Sidebar />
     <main class="flex-1 flex flex-col min-w-0 bg-grid">
       <Header />
-      <div class="flex-1 overflow-auto custom-scroll p-4 sm:p-6">
+      <div class="flex-1 overflow-auto custom-scroll">
         <router-view />
       </div>
     </main>

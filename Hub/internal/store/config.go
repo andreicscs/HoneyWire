@@ -87,7 +87,7 @@ func (s *SQLiteStore) UpdateConfigBatch(req map[string]interface{}) error {
 					return err
 				}
 			}
-		case "auto_archive_days", "auto_purge_days", "auto_purge_heartbeats_days":
+		case "auto_archive_days", "auto_purge_days", "auto_purge_heartbeats_days", "update_check_interval_hours":
 			if numVal, ok := val.(float64); ok {
 				if _, err := tx.Exec("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", key, strconv.Itoa(int(numVal))); err != nil {
 					return err

@@ -31,6 +31,7 @@ const settings = ref({
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     autoPurgeHeartbeatsDays: 0,
+    updateCheckIntervalHours: 24,
     webhookType: 'ntfy',
     webhookUrl: '',
     webhookEvents: [],
@@ -48,6 +49,7 @@ watch(() => configStore.config.isLoaded, (loaded) => {
             autoArchiveDays: configStore.config.autoArchiveDays !== undefined ? configStore.config.autoArchiveDays : 0,
             autoPurgeDays: configStore.config.autoPurgeDays !== undefined ? configStore.config.autoPurgeDays : 0,
             autoPurgeHeartbeatsDays: configStore.config.autoPurgeHeartbeatsDays !== undefined ? configStore.config.autoPurgeHeartbeatsDays : 0,
+            updateCheckIntervalHours: configStore.config.updateCheckIntervalHours !== undefined ? configStore.config.updateCheckIntervalHours : 24,
             webhookType: configStore.config.webhookType || 'ntfy',
             webhookUrl: configStore.config.webhookUrl || '',
             webhookEvents: configStore.config.webhookEvents && configStore.config.webhookEvents.length > 0 
@@ -183,11 +185,11 @@ const submitFactoryReset = async () => {
 </script>
 
 <template>
-    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6 transition-colors duration-200">
+    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pt-4 sm:pt-6 transition-colors duration-200">
         
         <PageHeader title="System Settings" description="Manage Hub configuration, retention policies, and push notifications.">
             <template #actions>
-                <span v-if="saveMessage && isError" class="text-xs text-danger-main hidden hidden sm:block">
+                <span v-if="saveMessage && isError" class="text-xs text-danger-main hidden sm:block">
                     {{ saveMessage }}
                 </span>
 
@@ -209,7 +211,7 @@ const submitFactoryReset = async () => {
             
             <BaseVerticalNav v-model="activeTab" :tabs="settingTabs" />
 
-            <div class="flex-1 overflow-y-auto custom-scroll pr-2 space-y-6 after:content-[''] after:block after:h-6 after:shrink-0">
+            <div class="flex-1 overflow-y-auto custom-scroll pr-2 space-y-6 after:content-[''] after:block after:h-24 after:shrink-0">
                 
                 <div v-show="activeTab === 'general'">
                     <BaseCard title="Network Configuration">
@@ -233,6 +235,17 @@ const submitFactoryReset = async () => {
                                     <p class="mt-0.5 opacity-90">Using HTTP allows unencrypted man-in-the-middle attacks. It is highly recommended to use HTTPS for all URLs to protect sensor telemetry and manifests.</p>
                                 </div>
                             </div>
+                        </div>
+                    </BaseCard>
+
+                    <BaseCard title="System Updates" class="mt-6">
+                        <div class="max-w-md">
+                            <BaseNumberStepper 
+                                v-model="settings.updateCheckIntervalHours" 
+                                label="Update Check Interval (Hours)" 
+                                :min="0" :max="720"
+                                description="How often the hub checks for updates. Set to 0 to disable automatic checks." 
+                            />
                         </div>
                     </BaseCard>
 

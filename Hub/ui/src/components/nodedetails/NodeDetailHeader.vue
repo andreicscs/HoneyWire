@@ -97,10 +97,10 @@ const removeTag = (index: number) => {
                     
                     <BaseStatusDot :status="node.status || 'unknown'" />
                     
-                    <span v-if="node.hasPendingConfig" class="shrink-0 text-high" title="Pending sync — click Sync Node below to apply changes">
+                    <span v-if="node.hasPendingConfig" class="shrink-0 text-high" title="Pending sync, click Sync Node below to apply changes">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </span>
-                    <span v-if="node.hasUpdateAvailable" class="w-2.5 h-2.5 rounded-full bg-low/70 shadow-[0_0_8px_rgba(var(--color-low),0.5)] shrink-0" title="Updates available for installed sensors"></span>
+                    <span v-if="node.hasUpdateAvailable" class="w-2.5 h-2.5 rounded-full bg-update-main/70 shadow-[0_0_8px_rgba(var(--color-update-main),0.5)] shrink-0" title="Updates available for installed sensors"></span>
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-m">
@@ -151,7 +151,7 @@ const removeTag = (index: number) => {
                         {{ node.isSilenced ? 'Unsilence Node' : 'Silence Node' }}
                     </button>
                     
-                    <button v-if="node.hasUpdateAvailable" @click="$emit('upgradeAll')" class="w-full text-left px-3 py-2 text-sm font-medium text-low flex items-center gap-2 hover:bg-low/10 transition-colors group">
+                    <button v-if="node.hasUpdateAvailable" @click="$emit('upgradeAll')" class="w-full text-left px-3 py-2 text-sm font-medium text-update-main flex items-center gap-2 hover:bg-update-bg transition-colors group">
                         <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         Update Node
                     </button>

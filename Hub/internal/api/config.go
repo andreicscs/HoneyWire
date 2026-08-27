@@ -7,15 +7,17 @@ import (
 
 	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/services/config"
+	"github.com/honeywire/hub/internal/services/updater"
 )
 
 type ConfigHandler struct {
 	service *config.Service
 	Cfg     *config.Config
+	updater *updater.Service
 }
 
-func NewConfigHandler(svc *config.Service, cfg *config.Config) *ConfigHandler {
-	return &ConfigHandler{service: svc, Cfg: cfg}
+func NewConfigHandler(svc *config.Service, cfg *config.Config, upSvc *updater.Service) *ConfigHandler {
+	return &ConfigHandler{service: svc, Cfg: cfg, updater: upSvc}
 }
 
 func (h *ConfigHandler) GetSetupStatus(w http.ResponseWriter, r *http.Request) {
@@ -188,4 +190,9 @@ func (h *ConfigHandler) SetSystemState(w http.ResponseWriter, r *http.Request) {
 
 func (h *ConfigHandler) HandleVersion(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, map[string]string{"version": h.service.GetVersion()})
+}
+
+// GetSystemUpdates returns update data from the updater service
+func (h *ConfigHandler) GetSystemUpdates(w http.ResponseWriter, r *http.Request) {
+	SendJSON(w, http.StatusOK, h.updater.GetState())
 }

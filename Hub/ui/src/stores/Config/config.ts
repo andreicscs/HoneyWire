@@ -9,6 +9,7 @@ export interface ConfigApiResponse {
   autoArchiveDays: number
   autoPurgeDays: number
   autoPurgeHeartbeatsDays: number
+  updateCheckIntervalHours: number
   webhookType: string
   webhookUrl: string
   webhookEvents: string[]
@@ -25,6 +26,7 @@ export interface ConfigState {
   autoArchiveDays: number
   autoPurgeDays: number
   autoPurgeHeartbeatsDays: number
+  updateCheckIntervalHours: number
   webhookType: string
   webhookUrl: string
   webhookEvents: string[]
@@ -41,6 +43,7 @@ export const useConfigStore = defineStore('config', () => {
     autoArchiveDays: 0,
     autoPurgeDays: 0,
     autoPurgeHeartbeatsDays: 0,
+    updateCheckIntervalHours: 24,
     webhookType: 'ntfy',
     webhookUrl: '',
     webhookEvents: [],
@@ -59,6 +62,7 @@ export const useConfigStore = defineStore('config', () => {
       state.value.autoArchiveDays = data.autoArchiveDays != null ? data.autoArchiveDays : 0
       state.value.autoPurgeDays = data.autoPurgeDays != null ? data.autoPurgeDays : 0
       state.value.autoPurgeHeartbeatsDays = data.autoPurgeHeartbeatsDays != null ? data.autoPurgeHeartbeatsDays : 0
+      state.value.updateCheckIntervalHours = data.updateCheckIntervalHours != null ? data.updateCheckIntervalHours : 24
       state.value.webhookType = data.webhookType || 'ntfy'
       state.value.webhookUrl = data.webhookUrl || ''
       

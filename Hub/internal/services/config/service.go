@@ -121,6 +121,10 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 	archiveDays, _ := strconv.Atoi(kv["auto_archive_days"])
 	purgeDays, _ := strconv.Atoi(kv["auto_purge_days"])
 	purgeHeartbeatsDays, _ := strconv.Atoi(kv["auto_purge_heartbeats_days"])
+	updateCheckIntervalHours, _ := strconv.Atoi(kv["update_check_interval_hours"])
+	if kv["update_check_interval_hours"] == "" {
+		updateCheckIntervalHours = 24 // Default
+	}
 
 	var events []string
 	if kv["webhook_events"] != "" {
@@ -128,17 +132,18 @@ func (s *Service) GetConfig() (models.ConfigPayload, error) {
 	}
 
 	return models.ConfigPayload{
-		HubEndpoint:     kv["hub_endpoint"],
-		RegistryURL:     kv["registry_url"],
+		HubEndpoint:             kv["hub_endpoint"],
+		RegistryURL:             kv["registry_url"],
 		AutoArchiveDays:         archiveDays,
 		AutoPurgeDays:           purgeDays,
 		AutoPurgeHeartbeatsDays: purgeHeartbeatsDays,
-		WebhookURL:      kv["webhook_url"],
-		WebhookType:     kv["webhook_type"],
-		WebhookEvents:   events,
-		SiemAddress:     kv["siem_address"],
-		SiemProtocol:    kv["siem_protocol"],
-		WhitelistedSources: kv["whitelisted_sources"],
+		UpdateCheckIntervalHours: updateCheckIntervalHours,
+		WebhookURL:              kv["webhook_url"],
+		WebhookType:             kv["webhook_type"],
+		WebhookEvents:           events,
+		SiemAddress:             kv["siem_address"],
+		SiemProtocol:            kv["siem_protocol"],
+		WhitelistedSources:      kv["whitelisted_sources"],
 	}, nil
 }
 
@@ -151,6 +156,7 @@ func (s *Service) UpdateConfig(req map[string]interface{}) error {
 		"autoArchiveDays":         "auto_archive_days",
 		"autoPurgeDays":           "auto_purge_days",
 		"autoPurgeHeartbeatsDays": "auto_purge_heartbeats_days",
+		"updateCheckIntervalHours": "update_check_interval_hours",
 		"webhookType":     "webhook_type",
 		"webhookUrl":      "webhook_url",
 		"webhookEvents":   "webhook_events",

@@ -94,6 +94,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Get("/api/v2/uptime", cfg.Analytics.GetUptime)
 		r.Get("/api/v2/system/state", cfg.Config.GetSystemState)
 		r.Patch("/api/v2/system/state", cfg.Config.SetSystemState)
+		r.Get("/api/v2/system/updates", cfg.Config.GetSystemUpdates)
 
 		// Event Management
 		r.Get("/api/v2/events/unread", cfg.Events.GetUnreadCount)

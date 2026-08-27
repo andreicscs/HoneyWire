@@ -42,6 +42,14 @@ watch([activeTab, () => props.sensor], async ([tab, sensor]) => {
     }
 })
 
+const formatEnvName = (name: string) => {
+    return name
+        .replace(/^HW_/, '')
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+}
+
 const severityOptions = [
   { value: 'info', label: 'Info', textClass: 'text-info', hoverClass: 'hover:bg-info/10 hover:text-info' },
   { value: 'low', label: 'Low', textClass: 'text-low', hoverClass: 'hover:bg-low/10 hover:text-low' },
@@ -135,7 +143,7 @@ watch(activeEnvVar, () => applyHighlighting())
                             <div class="mb-6"><h4 class="text-sm font-semibold text-text-h mb-3">Sensor Settings</h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-1 relative"><label class="block text-sm text-text-h mb-0.5">Alert Severity</label><div @click="toggleSeverity" class="w-full px-3 py-2 text-sm bg-input-bg border rounded-md cursor-pointer flex justify-between items-center transition-all duration-[var(--duration-fast)] shadow-sm select-none" :class="isSeverityOpen ? 'border-primary-main ring-1 ring-focus-ring' : 'border-input-border hover:border-border-default'"><span :class="currentSeverity.textClass" class="font-medium flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0" :class="currentSeverity.textClass.replace('text-', 'bg-')"></span>{{ currentSeverity.label }}</span><svg class="w-4 h-4 text-text-m shrink-0 transition-transform duration-200" :class="isSeverityOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div><div v-if="isSeverityOpen" @click="closeSeverity" class="fixed inset-0 z-[var(--z-elevated)]"></div><transition enter-active-class="transition duration-100 ease-out" enter-from-class="transform scale-95 opacity-0" enter-to-class="transform scale-100 opacity-100" leave-active-class="transition duration-75 ease-in" leave-from-class="transform scale-100 opacity-100" leave-to-class="transform scale-95 opacity-0"><ul v-if="isSeverityOpen" class="absolute top-full left-0 z-[var(--z-dropdown)] w-full mt-1 bg-bg-surface border border-border-default rounded-md shadow-lg py-1 overflow-hidden"><li v-for="option in severityOptions" :key="option.value" @click="selectSeverity(option.value)" class="px-3 py-2 cursor-pointer transition-colors text-sm font-medium duration-[var(--duration-fast)] flex items-center gap-2" :class="[option.textClass, option.hoverClass]"><span class="w-2 h-2 rounded-full shrink-0" :class="option.textClass.replace('text-', 'bg-')"></span>{{ option.label }}</li></ul></transition></div>
-                                    <template v-for="env in sortedEnvVars" :key="env.name"><BaseInput v-if="env.name !== 'HW_SEVERITY'" v-model="envVarValues[env.name]" :type="getEnvType(env)" :label="env.name" :description="env.description" :placeholder="getUIDefault(env.default)" :defaultFallback="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" /></template>
+                                    <template v-for="env in sortedEnvVars" :key="env.name"><BaseInput v-if="env.name !== 'HW_SEVERITY'" v-model="envVarValues[env.name]" :type="getEnvType(env)" :label="formatEnvName(env.name)" :description="env.description" :placeholder="getUIDefault(env.default)" :defaultFallback="getUIDefault(env.default)" @focus="activeEnvVar = env.name" @blur="activeEnvVar = null" /></template>
                                 </div>
                             </div>
                             <div class="relative flex-1 min-h-[250px] mb-6">

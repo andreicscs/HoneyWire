@@ -50,6 +50,11 @@
   --danger-text: oklch(25% 0.1 20);
   --danger-border: oklch(70% 0.2 20);
 
+  --update-main: oklch(50% 0.15 250);
+  --update-hover: oklch(40% 0.15 250);
+  --update-bg: oklch(90% 0.05 250);
+  --update-text: oklch(30% 0.1 250);
+
   --archive-text: oklch(35% 0.1 85);
   --archive-bg: oklch(90% 0.05 85);
   --archive-hover: oklch(85% 0.08 85);
@@ -167,6 +172,11 @@
   --danger-bg: oklch(25% 0.05 25);
   --danger-text: oklch(95% 0.16 25);
   --danger-border: oklch(40% 0.1 25);
+
+  --update-main: oklch(65% 0.15 250);
+  --update-hover: oklch(55% 0.1 250);
+  --update-bg: oklch(60% 0.05 250);
+  --update-text: oklch(95% 0.1 250);
  
   --archive-text: oklch(85% 0.1 85);
   --archive-bg: oklch(48% 0.1 85 / 0.25);
@@ -247,6 +257,12 @@
   --color-danger-text: var(--danger-text);
   --color-danger-bg: var(--danger-bg);
   --color-danger-border: var(--danger-border);
+
+  /* Update Actions */
+  --color-update-main: var(--update-main);
+  --color-update-hover: var(--update-hover);
+  --color-update-text: var(--update-text);
+  --color-update-bg: var(--update-bg);
  
   /* Archive Actions */
   --color-archive-text: var(--archive-text);

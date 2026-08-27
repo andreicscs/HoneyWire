@@ -10,11 +10,17 @@ export interface SystemStatePayload {
 
 export interface VersionPayload {
   version?: string
+  updateAvailable?: boolean
+  latestVersion?: string | null
+  releaseNotesUrl?: string | null
 }
 
 export interface AppState {
   isArmed: boolean
   version: string
+  updateAvailable: boolean
+  latestVersion: string | null
+  releaseNotesUrl: string | null
   viewingArchive: boolean
   sidebarOpen: boolean
   activeTimeframe: string
@@ -31,7 +37,10 @@ export const useAppStore = defineStore('app', () => {
   // SINGLE STATE TREE
   const state = ref<AppState>({
     isArmed: true,
-    version: '2.0.0',
+    version: '',
+    updateAvailable: false,
+    latestVersion: null,
+    releaseNotesUrl: null,
     viewingArchive: false,
     sidebarOpen: true,
     activeTimeframe: '24H',
@@ -74,6 +83,9 @@ export const useAppStore = defineStore('app', () => {
   // ==========================================
   const isArmed = computed<boolean>(() => state.value.isArmed)
   const version = computed<string>(() => state.value.version)
+  const updateAvailable = computed<boolean>(() => state.value.updateAvailable)
+  const latestVersion = computed<string | null>(() => state.value.latestVersion)
+  const releaseNotesUrl = computed<string | null>(() => state.value.releaseNotesUrl)
   const viewingArchive = computed<boolean>(() => state.value.viewingArchive)
   const sidebarOpen = computed<boolean>(() => state.value.sidebarOpen)
   const activeTimeframe = computed<string>(() => state.value.activeTimeframe)
@@ -173,6 +185,8 @@ export const useAppStore = defineStore('app', () => {
     try {
       await api.post('/login', { password })
       transitionSession('authenticated')
+      // Fetch system state and updates after successful auth
+      await checkCoreConfiguration().catch(() => {})
       return { success: true }
     } catch (err: any) {
       transitionSession('unauthenticated')
@@ -213,26 +227,29 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const checkCoreConfiguration = async (): Promise<void> => {
-    const [stateRes, verRes] = await Promise.allSettled([
+    const [stateRes, upRes] = await Promise.allSettled([
       api.get('/api/v2/system/state').then(r => r.json()),
-      api.get('/api/v2/version').then(r => r.json())
+      api.get('/api/v2/system/updates').then(r => r.json())
     ])
 
-    if (verRes.status === 'fulfilled') commitVersionState(verRes.value as VersionPayload)
+    if (upRes.status === 'fulfilled') {
+      const up = upRes.value as any
+      state.value.updateAvailable = up.update_available || false
+      state.value.latestVersion = up.latest_version || null
+      state.value.releaseNotesUrl = up.release_notes_url || null
+    }
 
     if (stateRes.status === 'fulfilled') {
       commitSystemState(stateRes.value as SystemStatePayload)
       if (state.value.sessionState === 'unknown') {
         transitionSession('authenticated')
       }
-    } else {
-      if (stateRes.status === 'rejected') {
-        const err = stateRes.reason
-        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-          transitionSession('unauthenticated')
-        } else {
-          throw new Error('Failed to retrieve core system configuration.')
-        }
+    } else if (stateRes.status === 'rejected') {
+      const err = stateRes.reason
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        transitionSession('unauthenticated')
+      } else {
+        throw new Error('Failed to retrieve core system configuration.')
       }
     }
   }
@@ -240,6 +257,9 @@ export const useAppStore = defineStore('app', () => {
   const initAppStore = async (): Promise<void> => {
     state.value.bootstrapError = null
     try {
+      const verRes = await api.get('/api/v2/version').catch(() => null)
+      if (verRes && verRes.ok) commitVersionState(await verRes.json())
+
       await checkRequiresSetup()
       if (!state.value.requiresSetup) {
         await checkCoreConfiguration()
@@ -277,7 +297,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    isArmed, version, viewingArchive, sidebarOpen, 
+    isArmed, version, updateAvailable, latestVersion, releaseNotesUrl, viewingArchive, sidebarOpen, 
     activeTimeframe, velocityTimeframe, sessionState, 
     authError, setupError, requiresSetup, isInitialized, bootstrapError,
     isAuthenticated, isReady, isBootstrapping, canAccessDashboard,

@@ -305,7 +305,7 @@ const closeSensor = () => {
 </script>
 
 <template>
-    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
         
         <div class="mt-4 sm:mt-6 mb-4 shrink-0">
             <button @click="fleetStore.clearSelection(); router.push('/fleet')" class="flex items-center gap-1.5 text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none w-max">

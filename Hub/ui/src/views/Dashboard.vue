@@ -7,7 +7,7 @@ import ThreatVelocity from '../components/dashboard/ThreatVelocity.vue'
 </script>
 
 <template>
-    <div class="min-h-full flex flex-col gap-4 sm:gap-6 max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+    <div class="min-h-full flex flex-col gap-4 sm:gap-6 max-w-[1600px] mx-auto w-full px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
         <TrafficFilters />
 
         <div class="flex flex-wrap gap-4 sm:gap-6 shrink-0">

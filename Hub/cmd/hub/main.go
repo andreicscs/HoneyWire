@@ -12,6 +12,7 @@ import (
 
 	"github.com/honeywire/hub/internal/api"
 	"github.com/honeywire/hub/internal/catalog"
+	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/services/auth"
 	composesvc "github.com/honeywire/hub/internal/services/compose"
 	"github.com/honeywire/hub/internal/services/config"
@@ -21,11 +22,11 @@ import (
 	"github.com/honeywire/hub/internal/services/sensor"
 	"github.com/honeywire/hub/internal/services/siem"
 	"github.com/honeywire/hub/internal/services/statemonitor"
+	"github.com/honeywire/hub/internal/services/updater"
 	"github.com/honeywire/hub/internal/services/websocket"
 	"github.com/honeywire/hub/internal/store"
 )
 
-const Version = "2.0.4"
 const HubAPIVersion = 1
 
 // loadConfigSafe is a helper to fetch DB configs without panicking on empty/missing rows
@@ -38,7 +39,7 @@ func loadConfigSafe(s *store.SQLiteStore, key string, fallback string) string {
 }
 
 func main() {
-	log.Printf("Starting HoneyWire Hub v%s initialization...\n", Version)
+	log.Printf("Starting HoneyWire Hub v%s initialization...\n", models.HubVersion)
 
 	cfg := config.Load()
 
@@ -71,7 +72,8 @@ func main() {
 	sensorHandler := api.NewSensorHandler(sensorSvc, composeService)
 	eventsHandler := api.NewEventHandler(eventSvc, cfg)
 	analyticsHandler := api.NewAnalyticsHandler(dbStore)
-	configHandler := api.NewConfigHandler(configService, cfg)
+	updaterSvc := updater.NewService(configService)
+	configHandler := api.NewConfigHandler(configService, cfg, updaterSvc)
 	composeHandler := api.NewComposeHandler(composeService)
 
 	r, err := api.SetupRouter(api.RouterConfig{

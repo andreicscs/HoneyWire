@@ -186,7 +186,7 @@ const formatTime = (timestamp: string) => {
 <template>
     <div class="bg-bg-surface border border-border-default rounded-lg overflow-hidden flex flex-col shadow-sm w-full relative z-0">
         
-        <div class="px-5 py-3 border-b border-border-default flex justify-between items-center bg-bg-surface shrink-0">
+        <div class="pl-5 pr-4 py-3 border-b border-border-default flex justify-between items-center bg-bg-surface shrink-0">
             <div class="flex items-center gap-3">
                 <h3 class="text-base font-medium text-text-h">
                     {{ viewingArchive ? 'Archived Events' : 'Active Threat Queue' }}
@@ -208,7 +208,7 @@ const formatTime = (timestamp: string) => {
                 <button v-show="!viewingArchive && displayEvents.length > 0" @click="handleArchiveAll"
                         type="button"
                         aria-label="Archive all active events"
-                        class="px-2.5 py-1 rounded-md text-base font-medium transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border active:scale-95">
+                        class="px-2.5 py-1 rounded-md text-base transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border active:scale-95">
                     Archive All
                 </button>
             </div>

@@ -91,7 +91,7 @@ const handleOpenNodeDetail = (nodeId: string) => {
 </script>
 
 <template>
-    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pb-4 sm:pb-6">
+    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
 
         <div class="flex items-center justify-between shrink-0">
              <PageHeader 

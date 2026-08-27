@@ -41,7 +41,7 @@ const handleSensorClick = (s: any) => {
                 <div class="flex justify-between items-start mb-3">
                     <div class="w-10 h-10 rounded-md bg-bg-base border border-border-default/50 text-text-h flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-normal"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="s.icon_svg"></path></svg></div>
                     <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded text-sm font-medium tracking-wider bg-bg-inset text-text-m border border-border-default/50">{{ s.osi_layer }}</span>
+                        <span class="px-2 py-0.5 rounded text-sm tracking-wider bg-bg-inset/50 text-text-m border border-border-default/50">{{ s.osi_layer }}</span>
                     </div>
                 </div>
                 <h3 class="text-sm font-semibold text-text-h mb-1">{{ s.name }}</h3>
