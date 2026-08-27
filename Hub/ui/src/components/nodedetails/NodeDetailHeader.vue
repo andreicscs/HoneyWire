@@ -120,7 +120,7 @@ const removeTag = (index: number) => {
                     </div>
                     <div class="h-4 w-px bg-border-default hidden sm:block"></div>
                     <div class="flex items-center gap-1.5 flex-wrap">
-                        <span v-for="(tag, index) in (node.tags || [])" :key="tag" class="px-2 py-0.5 bg-bg-inset border border-border-default text-text-m text-sm font-medium rounded-md tracking-wider flex items-center gap-1.5 group/tag transition-colors hover:border-text-m">
+                        <span v-for="(tag, index) in (node.tags || [])" :key="tag" class="px-2 py-0.5 bg-bg-inset/50 border border-border-default text-text-m text-sm rounded-md tracking-wider flex items-center gap-1.5 group/tag transition-colors hover:border-text-m">
                             {{ tag }}
                             <button @click.stop="removeTag(index)" class="opacity-0 group-hover/tag:opacity-100 text-text-m hover:text-danger-main transition-all outline-none focus:opacity-100">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
