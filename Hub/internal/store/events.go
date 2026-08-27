@@ -157,7 +157,16 @@ func (s *SQLiteStore) EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDa
 	// 3. Auto-Purge Heartbeats (if enabled)
 	if purgeHeartbeatsDays > 0 {
 		purgeCutoff := now.AddDate(0, 0, -purgeHeartbeatsDays).Format(time.RFC3339)
-		if _, err := tx.Exec("DELETE FROM sensor_status_changes WHERE timestamp < ?", purgeCutoff); err != nil {
+		if _, err := tx.Exec(`
+			DELETE FROM sensor_status_changes 
+			WHERE timestamp < ? 
+			AND id NOT IN (
+				SELECT id FROM (
+					SELECT id, ROW_NUMBER() OVER(PARTITION BY node_id, sensor_id ORDER BY timestamp DESC) as rn 
+					FROM sensor_status_changes
+				) WHERE rn = 1
+			)
+		`, purgeCutoff); err != nil {
 			return err
 		}
 	}
