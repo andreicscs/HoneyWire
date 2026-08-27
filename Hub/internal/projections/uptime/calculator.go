@@ -77,17 +77,31 @@ func BuildUptimeHistory(
 
 		// Determine initial status at cutoff.
 		isOnline := false
-		if len(sensorChanges) > 0 {
-			if sensorChanges[0].Status == "offline" {
-				isOnline = true
-			}
-		} else {
-			if sensorLiveStatusMap[key] == "up" {
-				isOnline = true
+		changeIdx := 0
+		hasPriorChange := false
+
+		for changeIdx < len(sensorChanges) {
+			t, err := time.Parse(time.RFC3339, sensorChanges[changeIdx].Timestamp)
+			if err == nil && !t.After(params.Cutoff) {
+				isOnline = (sensorChanges[changeIdx].Status == "online")
+				hasPriorChange = true
+				changeIdx++
+			} else {
+				break
 			}
 		}
 
-		changeIdx := 0
+		if !hasPriorChange {
+			if len(sensorChanges) > 0 {
+				if sensorChanges[0].Status == "offline" {
+					isOnline = true
+				}
+			} else {
+				if sensorLiveStatusMap[key] == "up" {
+					isOnline = true
+				}
+			}
+		}
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)

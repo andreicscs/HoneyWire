@@ -129,7 +129,19 @@ func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, er
 }
 
 func (s *SQLiteStore) GetStatusChangesSince(cutoffStr string) ([]StatusChangeData, error) {
-	rows, err := s.DB.Query("SELECT node_id, sensor_id, status, timestamp FROM sensor_status_changes WHERE timestamp >= ? ORDER BY timestamp ASC", cutoffStr)
+	query := `
+		SELECT node_id, sensor_id, status, timestamp FROM (
+			SELECT node_id, sensor_id, status, timestamp FROM sensor_status_changes WHERE timestamp >= ?
+			UNION ALL
+			SELECT node_id, sensor_id, status, timestamp FROM (
+				SELECT node_id, sensor_id, status, timestamp,
+				       ROW_NUMBER() OVER(PARTITION BY node_id, sensor_id ORDER BY timestamp DESC) as rn
+				FROM sensor_status_changes
+				WHERE timestamp < ?
+			) WHERE rn = 1
+		) ORDER BY timestamp ASC
+	`
+	rows, err := s.DB.Query(query, cutoffStr, cutoffStr)
 	if err != nil {
 		return nil, err
 	}

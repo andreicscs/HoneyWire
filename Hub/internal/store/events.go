@@ -166,7 +166,14 @@ func (s *SQLiteStore) EnforceRetention(archiveDays, purgeDays, purgeHeartbeatsDa
 					FROM sensor_status_changes
 				) WHERE rn = 1
 			)
-		`, purgeCutoff); err != nil {
+			AND id NOT IN (
+				SELECT id FROM (
+					SELECT id, ROW_NUMBER() OVER(PARTITION BY node_id, sensor_id ORDER BY timestamp DESC) as rn 
+					FROM sensor_status_changes
+					WHERE timestamp <= ?
+				) WHERE rn = 1
+			)
+		`, purgeCutoff, purgeCutoff); err != nil {
 			return err
 		}
 	}

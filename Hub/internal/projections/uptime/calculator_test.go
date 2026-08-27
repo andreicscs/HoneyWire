@@ -82,6 +82,118 @@ func TestBuildUptimeHistory(t *testing.T) {
 	}
 }
 
+func TestBuildUptimeHistory_BaselinePriorToCutoff(t *testing.T) {
+	cutoff := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC)
+	now := cutoff.Add(24 * time.Hour)
+	params := UptimeCalculationParams{
+		NumBlocks: 24,
+		Delta:     time.Hour,
+		Cutoff:    cutoff,
+	}
+
+	sensors := []store.SensorUptimeData{
+		{NodeID: "node1", SensorID: "sensor1"},
+	}
+
+	// Change occurred 5 days BEFORE cutoff (online), and went offline at cutoff + 2 hours
+	changes := []store.StatusChangeData{
+		{NodeID: "node1", SensorID: "sensor1", Status: "online", Timestamp: cutoff.Add(-5 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "sensor1", Status: "offline", Timestamp: cutoff.Add(2 * time.Hour).Format(time.RFC3339)},
+	}
+
+	history := BuildUptimeHistory(sensors, changes, params, now, nil)
+	key := "node1:sensor1"
+
+	if len(history[key]) != 24 {
+		t.Fatalf("Expected 24 blocks, got %d", len(history[key]))
+	}
+
+	// Block 0 and 1 should have 3600 seconds uptime
+	if history[key][0] != 3600 {
+		t.Errorf("Block 0 expected 3600 seconds, got %v", history[key][0])
+	}
+	if history[key][1] != 3600 {
+		t.Errorf("Block 1 expected 3600 seconds, got %v", history[key][1])
+	}
+	// Block 2 onwards should have 0 seconds uptime
+	if history[key][2] != 0 {
+		t.Errorf("Block 2 expected 0 seconds, got %v", history[key][2])
+	}
+}
+
+func TestBuildUptimeHistory_MultiplePreCutoffChanges(t *testing.T) {
+	cutoff := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC)
+	now := cutoff.Add(24 * time.Hour)
+	params := UptimeCalculationParams{
+		NumBlocks: 24,
+		Delta:     time.Hour,
+		Cutoff:    cutoff,
+	}
+
+	sensors := []store.SensorUptimeData{
+		{NodeID: "node1", SensorID: "sensor1"},
+	}
+
+	// Sequence:
+	// - 10 days before cutoff: online
+	// - 5 days before cutoff: offline
+	// - 2 days before cutoff: online (final baseline at cutoff)
+	changes := []store.StatusChangeData{
+		{NodeID: "node1", SensorID: "sensor1", Status: "online", Timestamp: cutoff.Add(-10 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "sensor1", Status: "offline", Timestamp: cutoff.Add(-5 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "sensor1", Status: "online", Timestamp: cutoff.Add(-2 * 24 * time.Hour).Format(time.RFC3339)},
+	}
+
+	history := BuildUptimeHistory(sensors, changes, params, now, nil)
+	key := "node1:sensor1"
+
+	// All 24 blocks should be 3600s online because the latest pre-cutoff state was online and no further changes occurred
+	for i := 0; i < 24; i++ {
+		if history[key][i] != 3600 {
+			t.Errorf("Block %d expected 3600 seconds, got %v", i, history[key][i])
+		}
+	}
+}
+
+func TestBuildUptimeHistory_PreCutoffOfflineWithRecovery(t *testing.T) {
+	cutoff := time.Date(2026, 5, 23, 10, 0, 0, 0, time.UTC)
+	now := cutoff.Add(24 * time.Hour)
+	params := UptimeCalculationParams{
+		NumBlocks: 24,
+		Delta:     time.Hour,
+		Cutoff:    cutoff,
+	}
+
+	sensors := []store.SensorUptimeData{
+		{NodeID: "node1", SensorID: "sensor1"},
+	}
+
+	// Sequence:
+	// - 3 days before cutoff: offline (baseline at cutoff)
+	// - 2 hours after cutoff: came back online
+	changes := []store.StatusChangeData{
+		{NodeID: "node1", SensorID: "sensor1", Status: "offline", Timestamp: cutoff.Add(-3 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "sensor1", Status: "online", Timestamp: cutoff.Add(2 * time.Hour).Format(time.RFC3339)},
+	}
+
+	history := BuildUptimeHistory(sensors, changes, params, now, nil)
+	key := "node1:sensor1"
+
+	// Block 0 and 1: 0 seconds (was offline)
+	if history[key][0] != 0 {
+		t.Errorf("Block 0 expected 0 seconds, got %v", history[key][0])
+	}
+	if history[key][1] != 0 {
+		t.Errorf("Block 1 expected 0 seconds, got %v", history[key][1])
+	}
+	// Block 2 onwards: 3600 seconds (came online)
+	for i := 2; i < 24; i++ {
+		if history[key][i] != 3600 {
+			t.Errorf("Block %d expected 3600 seconds, got %v", i, history[key][i])
+		}
+	}
+}
+
 func TestCalculateBlockStatus(t *testing.T) {
 	now := time.Now()
 	params := UptimeCalculationParams{NumBlocks: 24}
