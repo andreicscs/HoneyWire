@@ -95,6 +95,7 @@ func SetupRouter(cfg RouterConfig) (*chi.Mux, error) {
 		r.Get("/api/v2/system/state", cfg.Config.GetSystemState)
 		r.Patch("/api/v2/system/state", cfg.Config.SetSystemState)
 		r.Get("/api/v2/system/updates", cfg.Config.GetSystemUpdates)
+		r.Post("/api/v2/system/wizard/acknowledge", cfg.Config.AcknowledgeWizardRelease)
 
 		// Event Management
 		r.Get("/api/v2/events/unread", cfg.Events.GetUnreadCount)

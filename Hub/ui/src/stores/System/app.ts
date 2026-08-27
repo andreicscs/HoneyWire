@@ -21,6 +21,10 @@ export interface AppState {
   updateAvailable: boolean
   latestVersion: string | null
   releaseNotesUrl: string | null
+  wizardUpdateAvailable: boolean
+  latestWizardVersion: string | null
+  wizardReleaseNotesUrl: string | null
+  acknowledgedWizardRelease: string | null
   viewingArchive: boolean
   sidebarOpen: boolean
   activeTimeframe: string
@@ -41,6 +45,10 @@ export const useAppStore = defineStore('app', () => {
     updateAvailable: false,
     latestVersion: null,
     releaseNotesUrl: null,
+    wizardUpdateAvailable: false,
+    latestWizardVersion: null,
+    wizardReleaseNotesUrl: null,
+    acknowledgedWizardRelease: null,
     viewingArchive: false,
     sidebarOpen: true,
     activeTimeframe: '24H',
@@ -86,6 +94,10 @@ export const useAppStore = defineStore('app', () => {
   const updateAvailable = computed<boolean>(() => state.value.updateAvailable)
   const latestVersion = computed<string | null>(() => state.value.latestVersion)
   const releaseNotesUrl = computed<string | null>(() => state.value.releaseNotesUrl)
+  const wizardUpdateAvailable = computed<boolean>(() => state.value.wizardUpdateAvailable)
+  const latestWizardVersion = computed<string | null>(() => state.value.latestWizardVersion)
+  const wizardReleaseNotesUrl = computed<string | null>(() => state.value.wizardReleaseNotesUrl)
+  const acknowledgedWizardRelease = computed<string | null>(() => state.value.acknowledgedWizardRelease)
   const viewingArchive = computed<boolean>(() => state.value.viewingArchive)
   const sidebarOpen = computed<boolean>(() => state.value.sidebarOpen)
   const activeTimeframe = computed<string>(() => state.value.activeTimeframe)
@@ -113,10 +125,29 @@ export const useAppStore = defineStore('app', () => {
     if (payload?.version !== undefined) state.value.version = payload.version
   }
 
+  const fetchSystemUpdates = async (): Promise<void> => {
+    try {
+      const res = await api.get('/api/v2/system/updates')
+      const up = (await res.json()) as any
+      state.value.updateAvailable = up.update_available || false
+      state.value.latestVersion = up.latest_version || null
+      state.value.releaseNotesUrl = up.release_notes_url || null
+      state.value.wizardUpdateAvailable = up.wizard_update_available || false
+      state.value.latestWizardVersion = up.latest_wizard_version || null
+      state.value.wizardReleaseNotesUrl = up.wizard_release_notes_url || null
+      state.value.acknowledgedWizardRelease = up.acknowledged_wizard_release || null
+    } catch (err) {
+      console.warn('Failed to fetch system updates:', err)
+    }
+  }
+
   const fetchSystemState = async (): Promise<{ success: boolean; status?: number }> => {
     try {
-      const res = await api.get('/api/v2/system/state')
-      const data = (await res.json()) as SystemStatePayload
+      const [stateRes] = await Promise.all([
+        api.get('/api/v2/system/state'),
+        fetchSystemUpdates()
+      ])
+      const data = (await stateRes.json()) as SystemStatePayload
       commitSystemState(data)
       return { success: true }
     } catch (err: any) {
@@ -227,30 +258,34 @@ export const useAppStore = defineStore('app', () => {
   }
 
   const checkCoreConfiguration = async (): Promise<void> => {
-    const [stateRes, upRes] = await Promise.allSettled([
-      api.get('/api/v2/system/state').then(r => r.json()),
-      api.get('/api/v2/system/updates').then(r => r.json())
-    ])
-
-    if (upRes.status === 'fulfilled') {
-      const up = upRes.value as any
-      state.value.updateAvailable = up.update_available || false
-      state.value.latestVersion = up.latest_version || null
-      state.value.releaseNotesUrl = up.release_notes_url || null
-    }
-
-    if (stateRes.status === 'fulfilled') {
-      commitSystemState(stateRes.value as SystemStatePayload)
+    try {
+      const stateRes = await api.get('/api/v2/system/state')
+      const data = (await stateRes.json()) as SystemStatePayload
+      commitSystemState(data)
       if (state.value.sessionState === 'unknown') {
         transitionSession('authenticated')
       }
-    } else if (stateRes.status === 'rejected') {
-      const err = stateRes.reason
+      await fetchSystemUpdates()
+    } catch (err: any) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         transitionSession('unauthenticated')
       } else {
         throw new Error('Failed to retrieve core system configuration.')
       }
+    }
+  }
+
+  const acknowledgeWizardUpdate = async (version?: string): Promise<{ success: boolean }> => {
+    const targetVersion = version || state.value.latestWizardVersion
+    if (!targetVersion) return { success: false }
+    try {
+      await api.post('/api/v2/system/wizard/acknowledge', { version: targetVersion })
+      state.value.wizardUpdateAvailable = false
+      state.value.acknowledgedWizardRelease = targetVersion
+      return { success: true }
+    } catch (err) {
+      console.error('Failed to acknowledge wizard release:', err)
+      return { success: false }
     }
   }
 
@@ -297,12 +332,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    isArmed, version, updateAvailable, latestVersion, releaseNotesUrl, viewingArchive, sidebarOpen, 
+    isArmed, version, updateAvailable, latestVersion, releaseNotesUrl,
+    wizardUpdateAvailable, latestWizardVersion, wizardReleaseNotesUrl, acknowledgedWizardRelease,
+    viewingArchive, sidebarOpen, 
     activeTimeframe, velocityTimeframe, sessionState, 
     authError, setupError, requiresSetup, isInitialized, bootstrapError,
     isAuthenticated, isReady, isBootstrapping, canAccessDashboard,
     toggleTheme, toggleSidebar, toggleArchive, setVelocityTimeframe,
     toggleArmed, changePassword, factoryReset, login, logout, completeSetup,
-    initAppStore, fetchSystemState, enableDebugSetup
+    acknowledgeWizardUpdate,
+    initAppStore, fetchSystemState, fetchSystemUpdates, enableDebugSetup
   }
 })

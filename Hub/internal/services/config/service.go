@@ -282,3 +282,15 @@ func (s *Service) SetSystemState(isArmed bool) error {
 func (s *Service) GetVersion() string {
 	return s.version
 }
+
+func (s *Service) GetAcknowledgedWizardRelease() (string, error) {
+	val, err := s.store.GetConfigValue("acknowledged_wizard_release")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(val), nil
+}
+
+func (s *Service) AcknowledgeWizardRelease(version string) error {
+	return s.store.UpdateConfigValue("acknowledged_wizard_release", strings.TrimSpace(version))
+}

@@ -8,9 +8,14 @@ do_install() {
     # 1. Parse Arguments passed via 'bash -s --'
     LINK_URL=""
     API_KEY=""
+    TARGET_VERSION=""
 
     while [ $# -gt 0 ]; do
         case "$1" in
+            --version)
+                TARGET_VERSION="$2"
+                shift 2
+                ;;
             --link)
                 LINK_URL="$2"
                 shift 2
@@ -43,7 +48,7 @@ do_install() {
     if command -v honeywire >/dev/null 2>&1; then
         EXISTING_PATH=$(command -v honeywire)
         echo -e "${YELLOW}${BOLD}==> Warning:${RESET}${YELLOW} Honeywire is already installed at ${EXISTING_PATH}${RESET}"
-        echo -e "${DIM}Upgrading to the latest version in 3 seconds... (Press CTRL + C to cancel)${RESET}"
+        echo -e "${DIM}Upgrading version in 3 seconds... (Press CTRL + C to cancel)${RESET}"
         sleep 3
     fi
 
@@ -70,12 +75,32 @@ do_install() {
             ;;
     esac
 
-    # 5. Fetch Latest Release Version
-    echo -e "${CYAN}==> Fetching latest release info from GitHub...${RESET}"
-    LATEST_TAG=$(curl -s https://api.github.com/repos/AndReicscs/HoneyWire/releases | grep -o '"tag_name": "wizard/[^"]*' | head -n 1 | cut -d'"' -f4)
+    # 5. Resolve Target Release Version
+    LATEST_TAG=""
+    if [ -n "$TARGET_VERSION" ]; then
+        case "$TARGET_VERSION" in
+            v*) LATEST_TAG="wizard/$TARGET_VERSION" ;;
+            *)  LATEST_TAG="wizard/v$TARGET_VERSION" ;;
+        esac
+        echo -e "${CYAN}==> Target version specified: ${BOLD}$LATEST_TAG${RESET}"
+    elif [ -n "$LINK_URL" ]; then
+        echo -e "${CYAN}==> Detecting Hub version compatibility from ${DIM}$LINK_URL${RESET}${CYAN}...${RESET}"
+        HUB_VER=$(curl -s --connect-timeout 3 "$LINK_URL/api/v2/version" 2>/dev/null | grep -o '"version":"[^"]*' | cut -d'"' -f4 || true)
+        if [ -n "$HUB_VER" ]; then
+            HUB_MAJOR=$(echo "$HUB_VER" | sed -E 's/^v?([0-9]+).*/\1/')
+            echo -e "${CYAN}==> Hub major version identified: ${BOLD}v$HUB_MAJOR${RESET}"
+            LATEST_TAG=$(curl -s https://api.github.com/repos/AndReicscs/HoneyWire/releases | grep -o "\"tag_name\": \"wizard/v$HUB_MAJOR\.[^\"]*" | head -n 1 | cut -d'"' -f4 || true)
+        fi
+    fi
+
+    # Fallback to latest available wizard release
+    if [ -z "$LATEST_TAG" ]; then
+        echo -e "${CYAN}==> Fetching latest release info from GitHub...${RESET}"
+        LATEST_TAG=$(curl -s https://api.github.com/repos/AndReicscs/HoneyWire/releases | grep -o '"tag_name": "wizard/[^"]*' | head -n 1 | cut -d'"' -f4 || true)
+    fi
 
     if [ -z "$LATEST_TAG" ]; then
-        echo -e "${RED}${BOLD}Error:${RESET}${RED} Could not determine the latest Wizard version from GitHub. Aborting.${RESET}"
+        echo -e "${RED}${BOLD}Error:${RESET}${RED} Could not determine the Wizard release version from GitHub. Aborting.${RESET}"
         exit 1
     fi
 

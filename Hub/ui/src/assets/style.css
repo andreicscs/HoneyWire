@@ -7,33 +7,33 @@
 
 :root {
   /* --- 1. Colors: Structural (OKLCH) --- */
-  --bg: oklch(92% 0.01 250);
-  --bg-base: oklch(96% 0.01 250);
-  --bg-surface: oklch(98% 0.01 250);
-  --bg-inset: oklch(85% 0.01 250);
+  --bg: oklch(95% 0.002 250);
+  --bg-base: oklch(96% 0.002 250);
+  --bg-surface: oklch(98% 0.003 0);
+  --bg-inset: oklch(88% 0.015 250);
   --surface-highlight: oklch(100% 0 0); 
   
-  --border-default: oklch(80% 0.02 250);
+  --border-default: oklch(82% 0.02 250);
 
   /* --- 2. Colors: Actions & Interactive --- */
-  --primary-main: oklch(20% 0.02 250);
-  --primary-hover: oklch(30% 0.02 250);
-  --primary-selected: oklch(15% 0.02 250);
+  --primary-main: oklch(18% 0.025 250);
+  --primary-hover: oklch(28% 0.025 250);
+  --primary-selected: oklch(12% 0.025 250);
   --primary-text: oklch(98% 0 0);
-  --primary-border: oklch(85% 0.02 250);
+  --primary-border: oklch(18% 0.025 250);
 
-  --secondary-main: oklch(98% 0.01 285);
-  --secondary-hover: oklch(94% 0.01 250);
-  --secondary-selected: oklch(88% 0.02 250);
-  --secondary-text: oklch(45% 0.02 250);
-  --secondary-border: oklch(85% 0.02 250);
+  --secondary-main: oklch(98% 0.0001 0);
+  --secondary-hover: oklch(93.5% 0.003 250);
+  --secondary-selected: oklch(88% 0.006 250);
+  --secondary-text: oklch(15% 0.03 250);
+  --secondary-border: oklch(85% 0.002 250);
 
-  --disabled-bg: oklch(90% 0.01 250);
-  --disabled-text: oklch(70% 0.01 250);
-  --disabled-border: oklch(60% 0.01 250);
+  --disabled-bg: oklch(88% 0.01 250);
+  --disabled-text: oklch(55% 0.015 250);
+  --disabled-border: oklch(78% 0.02 250);
   
-  --input-bg: oklch(98% 0.01 250);          
-  --input-border: oklch(85% 0.02 250);
+  --input-bg: oklch(100% 0 0);          
+  --input-border: oklch(76% 0.03 250);
 
   /* --- 3. Colors: States & Severities --- */
 
@@ -50,33 +50,34 @@
   --danger-text: oklch(25% 0.1 20);
   --danger-border: oklch(70% 0.2 20);
 
-  --update-main: oklch(50% 0.15 250);
-  --update-hover: oklch(40% 0.15 250);
-  --update-bg: oklch(90% 0.05 250);
-  --update-text: oklch(30% 0.1 250);
+  --update-main: oklch(55% 0.18 250);
+  --update-hover: oklch(48% 0.18 250);
+  --update-bg: oklch(95% 0.035 250);
+  --update-text: oklch(42% 0.18 250);
+  --update-border: oklch(85% 0.08 250);
 
-  --archive-text: oklch(35% 0.1 85);
-  --archive-bg: oklch(90% 0.05 85);
-  --archive-hover: oklch(85% 0.08 85);
-  --archive-border: oklch(60% 0.2 85);
+  --archive-text: oklch(45% 0.14 80);
+  --archive-bg: oklch(96% 0.035 80);
+  --archive-hover: oklch(92% 0.055 80);
+  --archive-border: oklch(84% 0.09 80);
 
-  --success-main: oklch(65% 0.15 150);
-  --success-selected: oklch(75% 0.12 150);
-  --success-text: oklch(45% 0.08 150);
-  --success-bg: oklch(90% 0.06 150);
-  --success-border: oklch(80% 0.1 150);
+  --success-main: oklch(55% 0.16 150);
+  --success-selected: oklch(92% 0.05 150);
+  --success-text: oklch(38% 0.14 150);
+  --success-bg: oklch(95% 0.035 150);
+  --success-border: oklch(84% 0.07 150);
 
-  --highlight-bg: oklch(96% 0.03 250);
-  --highlight-border: oklch(75% 0.1 250);
-  --highlight-text: oklch(35% 0.1 250);
-  --highlight-ring: oklch(75% 0.1 250 / 0.3);
+  --highlight-bg: oklch(95.5% 0.025 250);
+  --highlight-border: oklch(80% 0.1 250);
+  --highlight-text: oklch(35% 0.14 250);
+  --highlight-ring: oklch(55% 0.18 250 / 0.25);
 
-  --select-solid-bg: oklch(25% 0.02 250);
+  --select-solid-bg: oklch(18% 0.025 250);
   --select-solid-text: oklch(98% 0 0);
-  --select-group-bg: oklch(97% 0.01 250 / 0.5);
-  --select-group-border: oklch(85% 0.02 250);
-  --select-row-bg: oklch(93.967% 0.015 251.307);
-  --select-row-border: oklch(85% 0.02 250);
+  --select-group-bg: oklch(99% 0.003 250);
+  --select-group-border: oklch(74% 0.03 250);
+  --select-row-bg: oklch(78% 0.035 250);
+  --select-row-border: oklch(68% 0.04 250);
 
   /* --- 4. Typography --- */
   --font-sans: 'Inter', system-ui, sans-serif;
@@ -93,9 +94,9 @@
   --text-leading-tight: 1.2;
   --text-leading-normal: 1.5;
 
-  --text-h: oklch(25% 0.02 250); /* High Contrast */
-  --text-m: oklch(45% 0.02 250); /* Medium Contrast */
-  --text-l: oklch(60% 0.02 250); /* Low Contrast */
+  --text-h: oklch(18% 0.025 250); /* High Contrast */
+  --text-m: oklch(40% 0.025 250); /* Medium Contrast */
+  --text-l: oklch(58% 0.015 250); /* Low Contrast */
 
   /* --- 5. Border Radius --- */
   --radius-sm: 0.25rem;   /* 4px - Checkboxes, small pills */
@@ -122,9 +123,9 @@
   --duration-normal: 300ms;
 
   /* --- 8. Light Mode Shadows --- */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.03);
 }
 
 /* --- DARK MODE --- */
@@ -175,8 +176,8 @@
 
   --update-main: oklch(65% 0.15 250);
   --update-hover: oklch(55% 0.1 250);
-  --update-bg: oklch(60% 0.05 250);
-  --update-text: oklch(95% 0.1 250);
+  --update-bg: oklch(15% 0.05 250);
+  --update-text: oklch(60% 0.15 250);
  
   --archive-text: oklch(85% 0.1 85);
   --archive-bg: oklch(48% 0.1 85 / 0.25);

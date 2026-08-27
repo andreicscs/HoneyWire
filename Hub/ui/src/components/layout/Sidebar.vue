@@ -58,7 +58,7 @@ const goToDashboard = () => {
         <div class="h-14 flex items-center px-[18px] shrink-0 mb-2">
             <button @click="appStore.toggleSidebar()" 
                     type="button"
-                    class="p-1.5 rounded-md text-secondary-text text-text-h hover:bg-secondary-hover transition-colors outline-none">
+                    class="p-1.5 rounded-md text-secondary-text text-text-h hover:bg-secondary-hover transition-colors outline-none flex items-center justify-center">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
         </div>
@@ -69,8 +69,11 @@ const goToDashboard = () => {
             
             <button @click="goToDashboard" 
                     type="button"
-                    class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="route.name === 'dashboard' ? 'bg-secondary-selected  shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
+                    class="w-full flex items-center py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
+                    :class="[
+                        route.name === 'dashboard' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text hover:bg-secondary-hover hover:text-text-h',
+                        sidebarOpen ? 'px-3 justify-start' : 'justify-center px-0'
+                    ]"
                     :title="!sidebarOpen ? 'Dashboard' : ''">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
@@ -81,12 +84,18 @@ const goToDashboard = () => {
             
             <button @click="router.push('/fleet')" 
                     type="button"
-                    class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="route.name === 'fleet' || route.name === 'node-details' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
-                    :title="!sidebarOpen ? 'Fleet Management' : ''">
+                    class="w-full flex items-center py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
+                    :class="[
+                        route.name === 'fleet' || route.name === 'node-details' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text hover:bg-secondary-hover hover:text-text-h',
+                        sidebarOpen ? 'px-3 justify-start' : 'justify-center px-0'
+                    ]"
+                    :title="!sidebarOpen ? ('Fleet Management' + (fleetStore.hasUpdatesAvailable ? ' (Sensor Updates Available)' : '')) : (fleetStore.hasUpdatesAvailable ? 'Sensor Updates Available' : '')">
                 <div class="relative flex shrink-0 items-center justify-center">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
-                    <span v-if="fleetStore.hasUpdatesAvailable" class="absolute -top-1 -right-1 w-2 h-2 bg-update-main/80 shadow-[0_0_6px_rgba(var(--color-update-main),0.6)] rounded-full ring-2 ring-bg-base animate-pulse"></span>
+                    <span v-if="fleetStore.hasUpdatesAvailable" class="absolute -top-1 -right-1 flex h-2.5 w-2.5" title="Sensor Updates Available">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-update-main opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-update-main ring-2 ring-bg-base"></span>
+                    </span>
                 </div>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
                      :class="sidebarOpen ? 'max-w-[150px] ml-3 opacity-100' : 'max-w-0 ml-0 opacity-0'">
@@ -96,8 +105,11 @@ const goToDashboard = () => {
 
             <button @click="router.push('/settings')" 
                     type="button"
-                    class="w-full flex items-center px-3 py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
-                    :class="route.name === 'settings' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text  hover:bg-secondary-hover hover:text-text-h'"
+                    class="w-full flex items-center py-2.5 rounded-md text-base text-text-h transition-all border outline-none"
+                    :class="[
+                        route.name === 'settings' ? 'bg-secondary-selected shadow-sm border-secondary-border' : 'border-transparent text-secondary-text hover:bg-secondary-hover hover:text-text-h',
+                        sidebarOpen ? 'px-3 justify-start' : 'justify-center px-0'
+                    ]"
                     :title="!sidebarOpen ? 'Settings' : ''">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"
@@ -114,16 +126,14 @@ const goToDashboard = () => {
                    class="flex justify-center items-center text-[10px] pb-2 transition-all duration-fast ease-in-out group"
                    :class="[
                        updateAvailable ? 'text-update-main hover:text-update-hover cursor-pointer' : 'text-text-m/50',
-                       sidebarOpen ? 'flex-row' : 'flex-col gap-1'
+                       sidebarOpen ? 'flex-row' : 'flex-col gap-1.5'
                    ]"
                    :title="!sidebarOpen ? 'Version ' + version + (updateAvailable ? ' (Update Available!)' : '') : (updateAvailable ? 'View ' + latestVersion + ' release notes' : '')">
             
-            <template v-if="updateAvailable">
-                <div v-if="sidebarOpen" class="w-2 h-2 rounded-full bg-update-main shadow-[0_0_8px_rgba(var(--color-update-main),0.5)] shrink-0 mr-1.5"></div>
-                <svg v-else class="w-4 h-4 shrink-0 transition-transform duration-normal group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-            </template>
+            <span v-if="updateAvailable" class="relative flex h-2 w-2 shrink-0" :class="sidebarOpen ? 'mr-1.5' : ''">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-update-main opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-update-main"></span>
+            </span>
             
             <div class="whitespace-nowrap flex flex-col justify-center text-center leading-none mt-0.5">
                 v{{ version }}
@@ -139,7 +149,7 @@ const goToDashboard = () => {
             
             <button @click="appStore.toggleArchive()" 
                     type="button"
-                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all border shadow-sm outline-none"
+                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs transition-all border shadow-sm outline-none"
                     :class="viewingArchive ? 'bg-archive-bg text-archive-text border-archive-border hover:bg-archive-hover' : 'bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text'">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path v-if="viewingArchive" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7V13M12 13L14 11M12 13L10 11M4 14H6.67452C7.1637 14 7.40829 14 7.63846 14.0553C7.84254 14.1043 8.03763 14.1851 8.21657 14.2947C8.4184 14.4184 8.59136 14.5914 8.93726 14.9373L9.06274 15.0627C9.40865 15.4086 9.5816 15.5816 9.78343 15.7053C9.96237 15.8149 10.1575 15.8957 10.3615 15.9447C10.5917 16 10.8363 16 11.3255 16H12.6745C13.1637 16 13.4083 16 13.6385 15.9447C13.8425 15.8957 14.0376 15.8149 14.2166 15.7053C14.4184 15.5816 14.5914 15.4086 14.9373 15.0627L15.0627 14.9373C15.4086 14.5914 15.5816 14.4184 15.7834 14.2947C15.9624 14.1851 16.1575 14.1043 16.3615 14.0553C16.5917 14 16.8363 14 17.3255 14H20M7.2 4H16.8C17.9201 4 18.4802 4 18.908 4.21799C19.2843 4.40973 19.5903 4.71569 19.782 5.09202C20 5.51984 20 6.07989 20 7.2V16.8C20 17.9201 20 18.4802 19.782 18.908C19.5903 19.2843 19.2843 19.5903 18.908 19.782C18.4802 20 17.9201 20 16.8 20H7.2C6.0799 20 5.51984 20 5.09202 19.782C4.71569 19.5903 4.40973 19.2843 4.21799 18.908C4 18.4802 4 17.9201 4 16.8V7.2C4 6.0799 4 5.51984 4.21799 5.09202C4.40973 4.71569 4.71569 4.40973 5.09202 4.21799C5.51984 4 6.0799 4 7.2 4Z" />
@@ -153,7 +163,7 @@ const goToDashboard = () => {
 
             <button @click="clearLogs" 
                     type="button"
-                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs  transition-all shadow-sm border outline-none bg-danger-bg text-danger-text border-danger-border hover:bg-danger-hover"
+                    class="w-full flex items-center justify-center py-2 px-3 rounded-md text-xs transition-all shadow-sm border outline-none bg-danger-bg text-danger-text border-danger-border hover:bg-danger-hover"
                     :title="!sidebarOpen ? 'Purge Events' : ''">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                 <div class="overflow-hidden transition-all duration-fast ease-in-out whitespace-nowrap flex items-center"

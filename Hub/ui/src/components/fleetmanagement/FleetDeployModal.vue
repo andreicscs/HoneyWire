@@ -6,12 +6,14 @@ import BaseInput from '../ui/forms/BaseInput.vue'
 import { useClipboard } from '../../utils/useClipboard.js'
 import { useFleetStore } from '../../stores/Fleet/fleet.ts'
 import { useConfigStore } from '../../stores/Config/config.ts'
+import { useAppStore } from '../../stores/System/app.ts'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
 const fleetStore = useFleetStore()
 const configStore = useConfigStore()
+const appStore = useAppStore()
 const { copiedStates, handleCopy } = useClipboard() as any
 
 const step = ref(1)
@@ -83,7 +85,12 @@ watch(() => createdNodeId.value, (newId) => {
 
             <div>
                 <div class="flex items-center justify-between mb-1.5">
-                    <label class="block text-sm font-medium text-text-h">Wizard Installation Command</label>
+                    <div class="flex items-center gap-2">
+                        <label class="block text-sm font-medium text-text-h">Wizard Installation Command</label>
+                        <span v-if="appStore.latestWizardVersion" class="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-secondary-main text-text-m border border-secondary-border">
+                            {{ appStore.latestWizardVersion }}
+                        </span>
+                    </div>
                     <BaseButton variant="ghost" class="!py-1 !px-2 !text-xs transition-colors" :class="copiedStates['modal-cmd'] ? '!text-success-main hover:!text-success-main' : ''" @click="handleCopy('modal-cmd', `curl -fsSL https://get.honeywire.dev | bash -s -- --link ${hubUrl} --api-key ${nodeKey}`)">
                         <span class="flex items-center gap-1.5">
                             <svg v-if="!copiedStates['modal-cmd']" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>

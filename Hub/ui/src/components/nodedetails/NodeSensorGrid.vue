@@ -31,7 +31,10 @@ defineEmits<{ (e: 'edit', sensor: any): void, (e: 'toggleSilence', sensor: any):
                 </div>
                 <div class="mt-3 pt-3 border-t border-border-default flex justify-between items-center">
                     <div class="flex items-center gap-2">
-                        <span v-if="sensor.updateAvailable" class="w-2 h-2 rounded-full bg-update-main shadow-[0_0_8px_rgba(var(--color-update-main),0.5)]" title="Sensor Update Available"></span>
+                        <span v-if="sensor.updateAvailable" class="relative flex h-2 w-2 shrink-0" title="Sensor Update Available">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-update-main opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-update-main"></span>
+                        </span>
                         <span class="px-1.5 py-0.5 rounded text-sm tracking-wider bg-bg-inset/50 text-text-m border border-border-default/50">{{ sensor.osi }}</span>
                     </div>
                     <svg v-if="sensor.isSilenced" class="w-3.5 h-3.5 text-medium shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Alerts Silenced"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/></svg>

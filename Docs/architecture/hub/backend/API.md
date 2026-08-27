@@ -351,6 +351,37 @@ Requires the current admin password.
 
 **Response:** `200 OK`
 
+#### GET /api/v2/system/updates
+
+Returns release update states for both the Hub and the HoneyWire Wizard.
+
+**Response:**
+```json
+{
+  "update_available": false,
+  "latest_version": "v2.1.0",
+  "release_notes_url": "",
+  "wizard_update_available": true,
+  "latest_wizard_version": "v2.1.0",
+  "wizard_release_notes_url": "https://github.com/AndReicscs/HoneyWire/releases/tag/wizard/v2.1.0",
+  "acknowledged_wizard_release": ""
+}
+```
+
+#### POST /api/v2/system/wizard/acknowledge
+
+Acknowledges/dismisses a Wizard update announcement so the UI indicator is not shown until a newer release is published.
+
+**Request:**
+```json
+{ "version": "v2.1.0" }
+```
+
+**Response:**
+```json
+{ "status": "success" }
+```
+
 ## Fleet and Events
 
 ### GET /api/v2/events/unread
@@ -587,4 +618,3 @@ Reports an intrusion event to the Hub.
 **Errors:**
 - `400 Bad Request` for invalid JSON or missing required fields.
 - `426 Upgrade Required` if the sensor major version does not match the Hub.
-Required` if the sensor major version does not match the Hub.

@@ -196,3 +196,25 @@ func (h *ConfigHandler) HandleVersion(w http.ResponseWriter, r *http.Request) {
 func (h *ConfigHandler) GetSystemUpdates(w http.ResponseWriter, r *http.Request) {
 	SendJSON(w, http.StatusOK, h.updater.GetState())
 }
+
+// AcknowledgeWizardRelease records that the admin has dismissed or acknowledged a wizard release version
+func (h *ConfigHandler) AcknowledgeWizardRelease(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, "Invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.AcknowledgeWizardRelease(req.Version); err != nil {
+		RespondError(w, "Failed to acknowledge release", http.StatusInternalServerError)
+		return
+	}
+
+	if h.updater != nil {
+		h.updater.CheckForUpdates()
+	}
+
+	SendJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}

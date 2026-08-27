@@ -15,9 +15,13 @@ import (
 var githubAPIURL = "https://api.github.com/repos/AndReicscs/HoneyWire/releases"
 
 type UpdateState struct {
-	UpdateAvailable bool   `json:"update_available"`
-	LatestVersion   string `json:"latest_version"`
-	ReleaseNotesURL string `json:"release_notes_url"`
+	UpdateAvailable           bool   `json:"update_available"`
+	LatestVersion             string `json:"latest_version"`
+	ReleaseNotesURL           string `json:"release_notes_url"`
+	WizardUpdateAvailable     bool   `json:"wizard_update_available"`
+	LatestWizardVersion       string `json:"latest_wizard_version"`
+	WizardReleaseNotesURL     string `json:"wizard_release_notes_url"`
+	AcknowledgedWizardRelease string `json:"acknowledged_wizard_release"`
 }
 
 type Service struct {
@@ -99,73 +103,105 @@ func (s *Service) CheckForUpdates() {
 		currV = "v" + currV
 	}
 
+	var highestHubVersion string = currV
+	var latestHubURL string
+	var highestWizardVersion string
+	var latestWizardURL string
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", githubAPIURL, nil)
 	if err != nil {
 		log.Printf("[Updater] Failed to create request: %v", err)
-		return
-	}
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	// If you want to avoid rate limiting as much as possible, a simple user agent is good practice
-	req.Header.Set("User-Agent", "HoneyWire-Hub-Updater")
+	} else {
+		req.Header.Set("Accept", "application/vnd.github.v3+json")
+		// If you want to avoid rate limiting as much as possible, a simple user agent is good practice
+		req.Header.Set("User-Agent", "HoneyWire-Hub-Updater")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("[Updater] Failed to fetch releases: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("[Updater] Failed to fetch releases: %v", err)
+		} else {
+			defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("[Updater] GitHub API returned status: %d", resp.StatusCode)
-		return
-	}
-
-	var releases []struct {
-		TagName  string `json:"tag_name"`
-		HTMLURL  string `json:"html_url"`
-		Draft    bool   `json:"draft"`
-		PreRel   bool   `json:"prerelease"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		log.Printf("[Updater] Failed to decode releases: %v", err)
-		return
-	}
-
-	var highestVersion string = currV
-	var latestURL string
-
-	for _, rel := range releases {
-		if rel.Draft || rel.PreRel {
-			continue
-		}
-		if strings.HasPrefix(rel.TagName, "hub/v") {
-			tagV := strings.TrimPrefix(rel.TagName, "hub/")
-			// Ensure valid semver
-			if semver.IsValid(tagV) {
-				if semver.Compare(tagV, highestVersion) > 0 {
-					highestVersion = tagV
-					latestURL = rel.HTMLURL
+			if resp.StatusCode == http.StatusOK {
+				var releases []struct {
+					TagName string `json:"tag_name"`
+					HTMLURL string `json:"html_url"`
+					Draft   bool   `json:"draft"`
+					PreRel  bool   `json:"prerelease"`
 				}
+
+				if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+					log.Printf("[Updater] Failed to decode releases: %v", err)
+				} else {
+					for _, rel := range releases {
+						if rel.Draft || rel.PreRel {
+							continue
+						}
+						if strings.HasPrefix(rel.TagName, "hub/v") {
+							tagV := strings.TrimPrefix(rel.TagName, "hub/")
+							if !strings.HasPrefix(tagV, "v") {
+								tagV = "v" + tagV
+							}
+							// Ensure valid semver
+							if semver.IsValid(tagV) {
+								if semver.Compare(tagV, highestHubVersion) > 0 {
+									highestHubVersion = tagV
+									latestHubURL = rel.HTMLURL
+								}
+							}
+						} else if strings.HasPrefix(rel.TagName, "wizard/v") {
+							tagV := strings.TrimPrefix(rel.TagName, "wizard/")
+							if !strings.HasPrefix(tagV, "v") {
+								tagV = "v" + tagV
+							}
+							hubMajor := semver.Major(currV)
+							if semver.IsValid(tagV) && semver.Major(tagV) == hubMajor {
+								if highestWizardVersion == "" || semver.Compare(tagV, highestWizardVersion) > 0 {
+									highestWizardVersion = tagV
+									latestWizardURL = rel.HTMLURL
+								}
+							}
+						}
+					}
+				}
+			} else {
+				log.Printf("[Updater] GitHub API returned status: %d", resp.StatusCode)
 			}
 		}
 	}
 
+	ackWizard, _ := s.configService.GetAcknowledgedWizardRelease()
+	if ackWizard != "" && !strings.HasPrefix(ackWizard, "v") {
+		ackWizard = "v" + ackWizard
+	}
+
+	wizardUpdateAvailable := false
+	if highestWizardVersion != "" {
+		if ackWizard != "" {
+			if semver.Compare(highestWizardVersion, ackWizard) > 0 {
+				wizardUpdateAvailable = true
+			}
+		} else {
+			wizardUpdateAvailable = true
+		}
+	}
+
 	s.mu.Lock()
-	if highestVersion != currV {
-		s.state = UpdateState{
-			UpdateAvailable: true,
-			LatestVersion:   highestVersion,
-			ReleaseNotesURL: latestURL,
-		}
-		log.Printf("[Updater] New version available: %s", highestVersion)
-	} else {
-		s.state = UpdateState{
-			UpdateAvailable: false,
-			LatestVersion:   currV,
-			ReleaseNotesURL: "",
-		}
+	s.state = UpdateState{
+		UpdateAvailable:           highestHubVersion != currV,
+		LatestVersion:             highestHubVersion,
+		ReleaseNotesURL:           latestHubURL,
+		WizardUpdateAvailable:     wizardUpdateAvailable,
+		LatestWizardVersion:       highestWizardVersion,
+		WizardReleaseNotesURL:     latestWizardURL,
+		AcknowledgedWizardRelease: ackWizard,
+	}
+	if highestHubVersion != currV {
+		log.Printf("[Updater] New Hub version available: %s", highestHubVersion)
+	}
+	if wizardUpdateAvailable {
+		log.Printf("[Updater] New Wizard version available: %s (acknowledged: '%s')", highestWizardVersion, ackWizard)
 	}
 	s.mu.Unlock()
 }

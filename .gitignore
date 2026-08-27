@@ -24,6 +24,9 @@ yarn-error.log*
 
 .codegraph
 
+GEMINI.md
+gemini.md
+
 # =========================
 # OS & IDE Clutter
 # =========================
