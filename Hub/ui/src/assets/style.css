@@ -68,7 +68,7 @@
   --success-border: oklch(84% 0.07 150);
 
   --highlight-bg: oklch(99.5% 0.003 250);
-  --highlight-border: oklch(90% 0.01 250);
+  --highlight-border: oklch(75% 0.01 250);
   --highlight-text: oklch(35% 0.14 250);
   --highlight-ring: oklch(55% 0.18 250 / 0.25);
 

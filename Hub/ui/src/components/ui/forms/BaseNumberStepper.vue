@@ -18,23 +18,23 @@ const adjust = (delta) => {
 </script>
 
 <template>
-    <div class="flex items-center justify-between gap-4 max-w-2xl">
-        <div>
+    <div class="flex items-center justify-between gap-4 max-w-md">
+        <div class="flex-1 min-w-0 pr-2">
             <label class="block text-xs text-text-h mb-1">{{ label }}</label>
-            <p v-if="description" class="text-xs text-text-m">{{ description }}</p>
+            <p v-if="description" class="text-xs text-text-m leading-normal">{{ description }}</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 shrink-0">
             <div class="flex items-center rounded-md border border-input-border overflow-hidden bg-input-bg shadow-inner focus-within:ring-1 focus-within:ring-focus-ring focus-within:border-primary-main transition-colors duration-fast">
-                <button @click="adjust(-1)" type="button" class="px-3 py-1.5 text-text-m hover:bg-secondary-hover transition-colors duration-fast select-none outline-none">-</button>
+                <button @click="adjust(-1)" type="button" class="px-3 py-1.5 text-text-m hover:bg-secondary-hover transition-colors duration-fast select-none outline-none text-base">-</button>
                 <input 
                     :value="modelValue" 
                     @input="$emit('update:modelValue', Number($event.target.value))" 
                     type="number" :min="min" :max="max"
                     class="w-12 text-center text-base font-mono bg-transparent border-none focus:outline-none focus:ring-0 text-text-h hide-arrows p-0" 
                 />
-                <button @click="adjust(1)" type="button" class="px-3 py-1.5 text-text-m hover:bg-secondary-hover transition-colors duration-fast select-none outline-none">+</button>
+                <button @click="adjust(1)" type="button" class="px-3 py-1.5 text-text-m hover:bg-secondary-hover transition-colors duration-fast select-none outline-none text-base">+</button>
             </div>
-            <span v-if="suffix" class="text-base text-text-m w-10">{{ suffix }}</span>
+            <span v-if="suffix" class="text-base text-text-m w-12 text-left">{{ suffix }}</span>
         </div>
     </div>
 </template>
