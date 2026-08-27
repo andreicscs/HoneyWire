@@ -35,7 +35,7 @@ func NewStore(dbPath string) (*SQLiteStore, error) {
 
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	if err := RunMigrations(db); err != nil {
+	if err := RunMigrations(db, dbPath); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 

@@ -3,7 +3,9 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -231,7 +233,9 @@ var migrations = []Migration{
 }
 
 // RunMigrations applies all pending schema changes transactionally.
-func RunMigrations(db *sql.DB) error {
+// If an existing database (currentVersion > 0) is being upgraded and a dbPath is provided,
+// it creates a pre-migration backup snapshot before applying schema changes.
+func RunMigrations(db *sql.DB, dbPath ...string) error {
 	// 1. Run Integrity Check first to ensure healthy state
 	var integrityResult string
 	err := db.QueryRow("PRAGMA integrity_check;").Scan(&integrityResult)
@@ -296,7 +300,12 @@ func RunMigrations(db *sql.DB) error {
 
 	log.Printf("[DB] Running schema migration %d -> %d", currentVersion, latestVersion)
 
-	// 5. Apply pending migrations inside a single transaction
+	// 5. Pre-migration backup snapshot (for existing databases)
+	if currentVersion > 0 && len(dbPath) > 0 && dbPath[0] != "" && dbPath[0] != ":memory:" && !strings.Contains(dbPath[0], "mode=memory") {
+		_ = createPreMigrationBackup(db, dbPath[0], currentVersion)
+	}
+
+	// 6. Apply pending migrations inside a single atomic transaction
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start migration transaction: %w", err)
@@ -324,4 +333,42 @@ func RunMigrations(db *sql.DB) error {
 
 	log.Println("[DB] Database up to date.")
 	return nil
+}
+
+func createPreMigrationBackup(db *sql.DB, dbPath string, fromVersion int) error {
+	// Flush WAL to disk first
+	_, _ = db.Exec("PRAGMA wal_checkpoint(TRUNCATE);")
+
+	backupPath := fmt.Sprintf("%s.pre-v%d-%s.bak", dbPath, fromVersion, time.Now().UTC().Format("20060102150405"))
+	escapedPath := strings.ReplaceAll(backupPath, "'", "''")
+
+	_, err := db.Exec(fmt.Sprintf("VACUUM INTO '%s';", escapedPath))
+	if err != nil {
+		log.Printf("[DB] Warning: Could not create VACUUM backup (%v). Trying file copy fallback...", err)
+		// Try fallback copy if VACUUM INTO fails
+		if errCopy := copyFile(dbPath, backupPath); errCopy != nil {
+			log.Printf("[DB] Warning: Pre-migration backup fallback failed: %v", errCopy)
+			return errCopy
+		}
+	}
+
+	log.Printf("[DB] Created pre-migration backup snapshot: %s", backupPath)
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
