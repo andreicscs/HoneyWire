@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -131,10 +132,14 @@ var migrations = []Migration{
 			// 2. Migrate existing data
 			rows, err := tx.Query(`SELECT node_id, sensor_id, time_bucket FROM sensor_heartbeats ORDER BY node_id, sensor_id, time_bucket ASC`)
 			if err != nil {
-				// Table might not exist or be empty
+				// Table might not exist (fresh install) - only swallow that specific case,
+				// let any other query failure propagate and abort the migration.
+				if !strings.Contains(err.Error(), "no such table") {
+					return fmt.Errorf("querying sensor_heartbeats: %w", err)
+				}
 				return nil
 			}
-			
+
 			type hb struct {
 				NodeID   string
 				SensorID string
@@ -143,12 +148,20 @@ var migrations = []Migration{
 			var heartbeats []hb
 			for rows.Next() {
 				var n, s, b string
-				if err := rows.Scan(&n, &s, &b); err == nil {
-					t, err := time.Parse(time.RFC3339, b)
-					if err == nil {
-						heartbeats = append(heartbeats, hb{NodeID: n, SensorID: s, Bucket: t})
-					}
+				if err := rows.Scan(&n, &s, &b); err != nil {
+					rows.Close()
+					return fmt.Errorf("scanning heartbeat row: %w", err)
 				}
+				t, err := time.Parse(time.RFC3339, b)
+				if err != nil {
+					rows.Close()
+					return fmt.Errorf("parsing heartbeat timestamp %q: %w", b, err)
+				}
+				heartbeats = append(heartbeats, hb{NodeID: n, SensorID: s, Bucket: t})
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return fmt.Errorf("iterating heartbeat rows: %w", err)
 			}
 			rows.Close()
 
@@ -163,38 +176,51 @@ var migrations = []Migration{
 				var lastTime time.Time
 				nowTime := time.Now().UTC()
 
-				closeSensorSequence := func() {
+				closeSensorSequence := func() error {
 					if lastNode != "" && lastSensor != "" {
 						if nowTime.Sub(lastTime) > time.Minute {
 							offlineTime := lastTime.Add(time.Minute)
-							stmt.Exec(lastNode, lastSensor, "offline", offlineTime.Format(time.RFC3339))
+							if _, err := stmt.Exec(lastNode, lastSensor, "offline", offlineTime.Format(time.RFC3339)); err != nil {
+								return fmt.Errorf("inserting offline status for %s/%s: %w", lastNode, lastSensor, err)
+							}
 						}
 					}
+					return nil
 				}
 
 				for _, h := range heartbeats {
 					if h.NodeID != lastNode || h.SensorID != lastSensor {
 						// Close previous sensor sequence if it died before now
-						closeSensorSequence()
+						if err := closeSensorSequence(); err != nil {
+							return err
+						}
 
 						// New sensor sequence: insert 'online'
-						stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339))
+						if _, err := stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339)); err != nil {
+							return fmt.Errorf("inserting online status for %s/%s: %w", h.NodeID, h.SensorID, err)
+						}
 					} else {
 						// Existing sequence: check gap
 						gap := h.Bucket.Sub(lastTime)
 						if gap > time.Minute { // Missed at least one minute bucket (>60s gap)
 							offlineTime := lastTime.Add(time.Minute)
-							stmt.Exec(h.NodeID, h.SensorID, "offline", offlineTime.Format(time.RFC3339))
-							stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339))
+							if _, err := stmt.Exec(h.NodeID, h.SensorID, "offline", offlineTime.Format(time.RFC3339)); err != nil {
+								return fmt.Errorf("inserting offline status for %s/%s: %w", h.NodeID, h.SensorID, err)
+							}
+							if _, err := stmt.Exec(h.NodeID, h.SensorID, "online", h.Bucket.Format(time.RFC3339)); err != nil {
+								return fmt.Errorf("inserting online status for %s/%s: %w", h.NodeID, h.SensorID, err)
+							}
 						}
 					}
 					lastNode = h.NodeID
 					lastSensor = h.SensorID
 					lastTime = h.Bucket
 				}
-				
+
 				// Close the final sensor sequence
-				closeSensorSequence()
+				if err := closeSensorSequence(); err != nil {
+					return err
+				}
 			}
 
 			// 3. Drop old table
