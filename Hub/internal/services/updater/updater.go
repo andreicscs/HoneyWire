@@ -171,6 +171,7 @@ func (s *Service) CheckForUpdates() {
 		}
 	}
 
+	hubMajor := semver.Major(currV)
 	ackWizard, _ := s.configService.GetAcknowledgedWizardRelease()
 	if ackWizard != "" && !strings.HasPrefix(ackWizard, "v") {
 		ackWizard = "v" + ackWizard
@@ -178,11 +179,11 @@ func (s *Service) CheckForUpdates() {
 
 	wizardUpdateAvailable := false
 	if highestWizardVersion != "" {
-		if ackWizard != "" {
-			if semver.Compare(highestWizardVersion, ackWizard) > 0 {
-				wizardUpdateAvailable = true
-			}
-		} else {
+		if ackWizard == "" || semver.Major(ackWizard) != hubMajor {
+			// On fresh install or major suite upgrade, adopt the latest matching major release as initial baseline
+			_ = s.configService.AcknowledgeWizardRelease(highestWizardVersion)
+			ackWizard = highestWizardVersion
+		} else if semver.Compare(highestWizardVersion, ackWizard) > 0 {
 			wizardUpdateAvailable = true
 		}
 	}

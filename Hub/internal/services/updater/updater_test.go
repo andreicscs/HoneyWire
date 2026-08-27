@@ -60,7 +60,7 @@ func TestCheckForUpdatesSemver(t *testing.T) {
 	defer func() { githubAPIURL = origURL }()
 
 	store := &mockStore{values: map[string]string{
-		"acknowledged_wizard_release": "",
+		"acknowledged_wizard_release": "v2.0.0",
 	}}
 	cfgSvc := config.NewService(store, nil, nil, nil, "", "2.0.0")
 
@@ -96,5 +96,67 @@ func TestCheckForUpdatesSemver(t *testing.T) {
 	}
 	if stateAfterAck.AcknowledgedWizardRelease != "v2.1.1" {
 		t.Errorf("Expected AcknowledgedWizardRelease to be v2.1.1, got %s", stateAfterAck.AcknowledgedWizardRelease)
+	}
+}
+
+func TestCheckForUpdates_NoFalsePositiveOnStartup(t *testing.T) {
+	currentReleases := []struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Draft   bool   `json:"draft"`
+		PreRel  bool   `json:"prerelease"`
+	}{
+		{"hub/v2.0.4", "http://github.com/hub/v2.0.4", false, false},
+		{"wizard/v2.0.1", "http://github.com/wizard/v2.0.1", false, false},
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(currentReleases)
+	}))
+	defer ts.Close()
+
+	origURL := githubAPIURL
+	githubAPIURL = ts.URL
+	defer func() { githubAPIURL = origURL }()
+
+	// Fresh install: no acknowledgment stored yet, Hub version is 2.0.4
+	store := &mockStore{values: map[string]string{
+		"acknowledged_wizard_release": "",
+	}}
+	cfgSvc := config.NewService(store, nil, nil, nil, "", "2.0.4")
+
+	svc := &Service{
+		configService: cfgSvc,
+		stopChan:      make(chan struct{}),
+	}
+	svc.CheckForUpdates()
+
+	state := svc.GetState()
+	if state.UpdateAvailable {
+		t.Errorf("Expected Hub UpdateAvailable to be false on fresh install with latest hub version")
+	}
+	if state.WizardUpdateAvailable {
+		t.Errorf("Expected WizardUpdateAvailable to be false on fresh install (should adopt current v2.0.1 baseline)")
+	}
+	if state.AcknowledgedWizardRelease != "v2.0.1" {
+		t.Errorf("Expected AcknowledgedWizardRelease to be initialized to v2.0.1, got %s", state.AcknowledgedWizardRelease)
+	}
+
+	// Now simulate a newer Wizard release appearing on GitHub
+	currentReleases = append(currentReleases, struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Draft   bool   `json:"draft"`
+		PreRel  bool   `json:"prerelease"`
+	}{"wizard/v2.0.2", "http://github.com/wizard/v2.0.2", false, false})
+
+	svc.CheckForUpdates()
+	stateAfterNewRelease := svc.GetState()
+	if !stateAfterNewRelease.WizardUpdateAvailable {
+		t.Errorf("Expected WizardUpdateAvailable to be true after new wizard release v2.0.2 is published")
+	}
+	if stateAfterNewRelease.LatestWizardVersion != "v2.0.2" {
+		t.Errorf("Expected LatestWizardVersion to be v2.0.2, got %s", stateAfterNewRelease.LatestWizardVersion)
 	}
 }
