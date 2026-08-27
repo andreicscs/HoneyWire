@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/honeywire/hub/internal/models"
 	"github.com/honeywire/hub/internal/store"
 )
 
@@ -451,4 +452,155 @@ func TestOverallUptime_SensorDeployedMidBlock30D(t *testing.T) {
 	if uptime != 100.0 {
 		t.Errorf("Expected 100%% uptime, got %.2f%%", uptime)
 	}
+}
+
+type mockProjectionStore struct {
+	nodes        []store.SensorUptimeData
+	changes      []store.StatusChangeData
+	isSilencedFn func(nodeID, sensorID string) bool
+}
+
+func (m *mockProjectionStore) GetNodes() ([]models.Node, error) {
+	nodeMap := make(map[string][]models.NodeSensor)
+	for _, n := range m.nodes {
+		nodeMap[n.NodeID] = append(nodeMap[n.NodeID], models.NodeSensor{
+			ID:      n.SensorID,
+			Display: n.SensorID,
+			Name:    n.SensorID,
+		})
+	}
+	var res []models.Node
+	for nodeID, sensors := range nodeMap {
+		res = append(res, models.Node{
+			ID:               nodeID,
+			Alias:            nodeID,
+			InstalledSensors: sensors,
+		})
+	}
+	return res, nil
+}
+
+func (m *mockProjectionStore) GetSensorsForUptime(cutoffStr string) ([]store.SensorUptimeData, error) {
+	return m.nodes, nil
+}
+
+func (m *mockProjectionStore) GetStatusChangesSince(cutoffStr string) ([]store.StatusChangeData, error) {
+	return m.changes, nil
+}
+
+func (m *mockProjectionStore) IsSensorSilenced(nodeID, sensorID string) (bool, error) {
+	if m.isSilencedFn != nil {
+		return m.isSilencedFn(nodeID, sensorID), nil
+	}
+	return false, nil
+}
+
+func TestUptimeProjection_RetentionPurgeRegression(t *testing.T) {
+	now := time.Date(2026, 8, 27, 21, 0, 0, 0, time.UTC)
+	cutoff30D := now.Add(-30 * 24 * time.Hour)
+
+	sensors := []store.SensorUptimeData{
+		{NodeID: "node1", SensorID: "file-canary", FirstSeen: now.Add(-75 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", FirstSeen: now.Add(-80 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node2", SensorID: "network-scan", FirstSeen: now.Add(-85 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node2", SensorID: "icmp-canary", FirstSeen: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339)},
+	}
+
+	// 1. Full unpruned status changes across 90 days
+	unprunedChanges := []store.StatusChangeData{
+		// file-canary: stable online 75d ago
+		{NodeID: "node1", SensorID: "file-canary", Status: "online", Timestamp: now.Add(-75 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// tcp-tarpit: flapping across 30d cutoff
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "online", Timestamp: now.Add(-80 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "offline", Timestamp: now.Add(-50 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "online", Timestamp: now.Add(-35 * 24 * time.Hour).Format(time.RFC3339)}, // Active baseline at Day -30
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "offline", Timestamp: now.Add(-20 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "online", Timestamp: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// network-scan: offline before cutoff, recovered mid-window
+		{NodeID: "node2", SensorID: "network-scan", Status: "online", Timestamp: now.Add(-85 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node2", SensorID: "network-scan", Status: "offline", Timestamp: now.Add(-45 * 24 * time.Hour).Format(time.RFC3339)}, // Active baseline at Day -30
+		{NodeID: "node2", SensorID: "network-scan", Status: "online", Timestamp: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// icmp-canary: deployed 5d ago
+		{NodeID: "node2", SensorID: "icmp-canary", Status: "online", Timestamp: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339)},
+	}
+
+	// 2. Simulated Post-Sweep status changes (obsolete records pruned, baseline records preserved)
+	postSweepChanges := []store.StatusChangeData{
+		// file-canary: 75d online preserved (rn=1)
+		{NodeID: "node1", SensorID: "file-canary", Status: "online", Timestamp: now.Add(-75 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// tcp-tarpit: 80d & 50d pruned; 35d baseline + in-window preserved
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "online", Timestamp: now.Add(-35 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "offline", Timestamp: now.Add(-20 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node1", SensorID: "tcp-tarpit", Status: "online", Timestamp: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// network-scan: 85d pruned; 45d baseline + in-window preserved
+		{NodeID: "node2", SensorID: "network-scan", Status: "offline", Timestamp: now.Add(-45 * 24 * time.Hour).Format(time.RFC3339)},
+		{NodeID: "node2", SensorID: "network-scan", Status: "online", Timestamp: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339)},
+
+		// icmp-canary: 5d in-window preserved
+		{NodeID: "node2", SensorID: "icmp-canary", Status: "online", Timestamp: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339)},
+	}
+
+	timeframes := []string{"30D", "7D", "24H"}
+	for _, tf := range timeframes {
+		t.Run("Timeframe_"+tf, func(t *testing.T) {
+			projUnpruned := NewProjector(&mockProjectionStore{nodes: sensors, changes: unprunedChanges})
+			resPre, err := projUnpruned.BuildUptimeProjection(FilterCriteria{Timeframe: tf, Now: now})
+			if err != nil {
+				t.Fatalf("Failed to build unpruned projection for %s: %v", tf, err)
+			}
+
+			projPostSweep := NewProjector(&mockProjectionStore{nodes: sensors, changes: postSweepChanges})
+			resPost, err := projPostSweep.BuildUptimeProjection(FilterCriteria{Timeframe: tf, Now: now})
+			if err != nil {
+				t.Fatalf("Failed to build post-sweep projection for %s: %v", tf, err)
+			}
+
+			if resPre.Summary.OverallUptime != resPost.Summary.OverallUptime {
+				t.Errorf("[%s] Overall uptime mismatch: pre-sweep=%.2f%% vs post-sweep=%.2f%%",
+					tf, resPre.Summary.OverallUptime, resPost.Summary.OverallUptime)
+			}
+
+			if len(resPre.Groups) != len(resPost.Groups) {
+				t.Fatalf("[%s] Group count mismatch: pre=%d vs post=%d", tf, len(resPre.Groups), len(resPost.Groups))
+			}
+
+			for gIdx := range resPre.Groups {
+				gPre := resPre.Groups[gIdx]
+				gPost := resPost.Groups[gIdx]
+
+				for sIdx := range gPre.Sensors {
+					sPre := gPre.Sensors[sIdx]
+					sPost := gPost.Sensors[sIdx]
+
+					if sPre.SensorID != sPost.SensorID {
+						t.Errorf("[%s] Sensor ID mismatch at index %d", tf, sIdx)
+					}
+
+					for bIdx := range sPre.Blocks {
+						bPre := sPre.Blocks[bIdx]
+						bPost := sPost.Blocks[bIdx]
+
+						if bPre.Status != bPost.Status {
+							t.Errorf("[%s][%s] Block %d status mismatch: pre=%s vs post=%s (label=%s)",
+								tf, sPre.SensorID, bIdx, bPre.Status, bPost.Status, bPre.Label)
+						}
+						if bPre.Label != bPost.Label {
+							t.Errorf("[%s][%s] Block %d label mismatch: pre=%s vs post=%s",
+								tf, sPre.SensorID, bIdx, bPre.Label, bPost.Label)
+						}
+						if bPre.TimeLabel != bPost.TimeLabel {
+							t.Errorf("[%s][%s] Block %d timeLabel mismatch: pre=%s vs post=%s",
+								tf, sPre.SensorID, bIdx, bPre.TimeLabel, bPost.TimeLabel)
+						}
+					}
+				}
+			}
+		})
+	}
+	_ = cutoff30D
 }
