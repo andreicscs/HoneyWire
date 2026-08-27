@@ -3,7 +3,7 @@ module github.com/honeywire/wizard
 go 1.25.0
 
 require (
-	github.com/docker/docker v28.5.2+incompatible
+	github.com/docker/docker v27.1.2+incompatible
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
