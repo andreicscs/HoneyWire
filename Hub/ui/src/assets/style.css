@@ -67,16 +67,16 @@
   --success-bg: oklch(95% 0.035 150);
   --success-border: oklch(84% 0.07 150);
 
-  --highlight-bg: oklch(95.5% 0.025 250);
-  --highlight-border: oklch(80% 0.1 250);
+  --highlight-bg: oklch(99.5% 0.003 250);
+  --highlight-border: oklch(90% 0.01 250);
   --highlight-text: oklch(35% 0.14 250);
   --highlight-ring: oklch(55% 0.18 250 / 0.25);
 
   --select-solid-bg: oklch(18% 0.025 250);
   --select-solid-text: oklch(98% 0 0);
-  --select-group-bg: oklch(99% 0.003 250);
+  --select-group-bg: oklch(96% 0.003 250);
   --select-group-border: oklch(74% 0.03 250);
-  --select-row-bg: oklch(78% 0.035 250);
+  --select-row-bg: oklch(99% 0.003 250);
   --select-row-border: oklch(68% 0.04 250);
 
   /* --- 4. Typography --- */
