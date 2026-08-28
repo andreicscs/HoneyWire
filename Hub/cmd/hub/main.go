@@ -72,7 +72,7 @@ func main() {
 	sensorHandler := api.NewSensorHandler(sensorSvc, composeService)
 	eventsHandler := api.NewEventHandler(eventSvc, cfg)
 	analyticsHandler := api.NewAnalyticsHandler(dbStore)
-	updaterSvc := updater.NewService(configService)
+	updaterSvc := updater.NewService(configService, catalogService)
 	configHandler := api.NewConfigHandler(configService, cfg, updaterSvc)
 	composeHandler := api.NewComposeHandler(composeService)
 
@@ -93,7 +93,6 @@ func main() {
 	}
 
 	// 1. Start External Workers
-	go sensorSvc.StartHealthMonitor(rootCtx)
 	go wsService.StartChartSyncBroadcaster(rootCtx)
 	go authService.StartWorkers(rootCtx)
 	go siemService.StartWorker(rootCtx)

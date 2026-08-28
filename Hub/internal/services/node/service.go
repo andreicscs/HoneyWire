@@ -107,7 +107,7 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 
 	if s.catalog != nil {
 		for i := range nodes {
-			for _, sensor := range nodes[i].InstalledSensors {
+			for j, sensor := range nodes[i].InstalledSensors {
 				latest, err := s.catalog.GetLatestCompatibleVersion(sensor.ID, models.HubVersion) 
 				if err == nil && latest != "" {
 					deployedVer := strings.TrimSpace(sensor.DeployedVersion)
@@ -121,8 +121,8 @@ func (s *Service) GetNodes() ([]models.Node, error) {
 					}
 
 					if deployedVer != "" && semver.Compare(deployedVer, latestVer) < 0 {
+						nodes[i].InstalledSensors[j].UpdateAvailable = true
 						nodes[i].HasUpdateAvailable = true
-						break
 					}
 				}
 			}

@@ -197,6 +197,19 @@ func (h *ConfigHandler) GetSystemUpdates(w http.ResponseWriter, r *http.Request)
 	SendJSON(w, http.StatusOK, h.updater.GetState())
 }
 
+// CheckForUpdatesManual forces an on-demand update check for Hub, Wizard, and Sensors
+func (h *ConfigHandler) CheckForUpdatesManual(w http.ResponseWriter, r *http.Request) {
+	if h.updater != nil {
+		if err := h.updater.CheckForUpdates(); err != nil {
+			RespondError(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		SendJSON(w, http.StatusOK, h.updater.GetState())
+		return
+	}
+	RespondError(w, "Updater service unavailable", http.StatusServiceUnavailable)
+}
+
 // AcknowledgeWizardRelease records that the admin has dismissed or acknowledged a wizard release version
 func (h *ConfigHandler) AcknowledgeWizardRelease(w http.ResponseWriter, r *http.Request) {
 	var req struct {

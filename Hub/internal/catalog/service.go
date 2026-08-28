@@ -89,6 +89,7 @@ func (s *Service) RefreshIndex() error {
 		return err
 	}
 
+
 	s.mu.Lock()
 	var oldJSON, newJSON []byte
 	if s.indexCache != nil {
@@ -140,7 +141,9 @@ func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubVersion 
 
 	if idx != nil {
 		for _, sensor := range idx.Sensors {
-			if sensor.ID == sensorID {
+			cleanSensorID := strings.TrimPrefix(sensor.ID, "hw-sensor-")
+			cleanTargetID := strings.TrimPrefix(sensorID, "hw-sensor-")
+			if sensor.ID == sensorID || cleanSensorID == cleanTargetID {
 				for i := len(sensor.Versions) - 1; i >= 0; i-- {
 					reqVer := strings.TrimSpace(sensor.Versions[i].V)
 					if !strings.HasPrefix(reqVer, "v") {
@@ -160,6 +163,5 @@ func (s *Service) GetLatestCompatibleVersion(sensorID string, currentHubVersion 
 		}
 	}
 
-	// [TEST MODE] Fallback mock version 2.2.0 if not explicitly defined
-	return "2.2.0", nil
+	return "", fmt.Errorf("sensor %s not found in catalog", sensorID)
 }
