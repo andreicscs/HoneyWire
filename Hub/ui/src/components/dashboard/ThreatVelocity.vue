@@ -191,13 +191,11 @@ watch(
     fetchContextualProjection
 )
 
-// TRIGGER 2: Global Invalidation (WebSocket says data is stale)
+// TRIGGER 2: Global Invalidation (WebSocket or store mutation says data is stale)
 watch(
     lastVelocityInvalidation,
     () => {
-        if (!viewingArchive.value) {
-            fetchContextualProjection();
-        }
+        fetchContextualProjection()
     }
 )
 
