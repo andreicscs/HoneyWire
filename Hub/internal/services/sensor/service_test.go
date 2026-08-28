@@ -2,7 +2,6 @@ package sensor
 
 import (
 	"testing"
-	"time"
 )
 
 type mockStore struct {
@@ -22,10 +21,6 @@ func (m *mockStore) MarkSensorOffline(nodeID, sensorID, offlineTime string) erro
 
 func (m *mockStore) UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error {
 	return nil
-}
-
-func (m *mockStore) GetTransitionedOfflineNodes(offlineThreshold time.Duration, lastCheck time.Time) (map[string]bool, error) {
-	return nil, nil
 }
 
 func (m *mockStore) GetSensorLastHeartbeat(nodeID, sensorID string) (string, error) {

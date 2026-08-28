@@ -128,7 +128,7 @@ func (s *Service) ClearEvents(dryrun bool, ip string) (int, error) {
 }
 
 func (s *Service) StartRetentionWorker(ctx context.Context) {
-	log.Println("[Event] Worker started.")
+	log.Println("[Retention] Worker started.")
 
 	// Wake up every hour to check retention
 	ticker := time.NewTicker(1 * time.Hour)
@@ -137,7 +137,7 @@ func (s *Service) StartRetentionWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("[Event] Worker stopped.")
+			log.Println("[Retention] Worker stopped.")
 			return
 		case <-ticker.C:
 			archiveStr, _ := s.store.GetConfigValue("auto_archive_days")

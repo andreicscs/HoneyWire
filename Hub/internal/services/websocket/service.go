@@ -125,6 +125,7 @@ func (s *Service) Broadcast(msgType string, payload interface{}) {
 }
 
 func (s *Service) StartChartSyncBroadcaster(ctx context.Context) {
+	log.Println("[WebSocket] Worker started.")
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 

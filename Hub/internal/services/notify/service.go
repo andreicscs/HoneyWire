@@ -84,7 +84,11 @@ type WebhookPayload struct {
 	Type     string
 	URL      string
 	Title    string
-	Message  string
+	Trigger  string
+	SensorID string
+	Source   string
+	Target   string
+	Time     string
 	Severity string
 	QueuedAt time.Time
 }
@@ -176,24 +180,15 @@ func (s *Service) Dispatch(e models.Event) {
 	// Unified title: "Threat detected on <node>"
 	title := fmt.Sprintf("Threat detected on %s", nodeAlias)
 
-	// Structured fields for embed-aware clients (Discord, Slack, Gotify, ntfy).
-	// Keep it terse — one fact per line, no emoji noise.
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("**Trigger:** %s\n", e.EventTrigger))
-	b.WriteString(fmt.Sprintf("**Sensor:** %s\n", e.SensorID))
-	if e.Source != "" {
-		b.WriteString(fmt.Sprintf("**Source:** %s\n", e.Source))
-	}
-	if e.Target != "" {
-		b.WriteString(fmt.Sprintf("**Target:** %s\n", e.Target))
-	}
-	b.WriteString(fmt.Sprintf("**Time:** %s", time.Now().UTC().Format("2006-01-02 15:04:05 UTC")))
-
 	payload := WebhookPayload{
 		Type:     webhookType,
 		URL:      webhookURL,
 		Title:    title,
-		Message:  b.String(),
+		Trigger:  e.EventTrigger,
+		SensorID: e.SensorID,
+		Source:   e.Source,
+		Target:   e.Target,
+		Time:     time.Now().UTC().Format("2006-01-02 15:04:05 UTC"),
 		Severity: e.Severity,
 		QueuedAt: time.Now(),
 	}
@@ -275,6 +270,7 @@ func (s *Service) drainQueue() {
 		select {
 		case <-timeout:
 			log.Printf("[Notify] Drain timeout reached. Dropped %d remaining alerts.", len(s.webhookQueue))
+			log.Println("[Notify] Worker stopped.")
 			return
 		case payload := <-s.webhookQueue:
 			// Best-effort send: no retries during shutdown, but we respect HTTP lifecycles
@@ -290,6 +286,7 @@ func (s *Service) drainQueue() {
 			time.Sleep(500 * time.Millisecond)
 		default:
 			log.Printf("[Notify] Queue completely drained. Flushed %d alerts.", count)
+			log.Println("[Notify] Worker stopped.")
 			return
 		}
 	}
@@ -301,71 +298,96 @@ func (s *Service) drainQueue() {
 
 func (s *Service) executeSend(payload WebhookPayload) (*http.Response, error) {
 	switch strings.ToLower(payload.Type) {
-	case "discord", "slack":
-		return s.sendDiscordSlack(payload.URL, payload.Title, payload.Message, payload.Severity)
+	case "discord":
+		return s.sendDiscord(payload)
+	case "slack":
+		return s.sendSlack(payload)
 	case "gotify":
-		return s.sendGotify(payload.URL, payload.Title, payload.Message, payload.Severity)
+		return s.sendGotify(payload)
 	case "ntfy":
 		fallthrough
 	default:
-		return s.sendNtfy(payload.URL, payload.Title, payload.Message, payload.Severity)
+		return s.sendNtfy(payload)
 	}
 }
 
-func (s *Service) sendGotify(webhookURL, title, message, severity string) (*http.Response, error) {
+func (s *Service) sendGotify(payload WebhookPayload) (*http.Response, error) {
 	priorities := map[string]int{
 		"info": 1, "low": 3, "medium": 5, "high": 8, "critical": 10,
 	}
-	priority, ok := priorities[strings.ToLower(severity)]
+	priority, ok := priorities[strings.ToLower(payload.Severity)]
 	if !ok {
 		priority = 5
 	}
 
-	payload := map[string]interface{}{
-		"title":    title,   // now "Threat detected on <node>"
-		"message":  message,
+	msg := plainTextMessage(payload)
+	reqPayload := map[string]interface{}{
+		"title":    payload.Title,
+		"message":  msg,
 		"priority": priority,
 	}
-	body, _ := json.Marshal(payload)
+	body, _ := json.Marshal(reqPayload)
 
-	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", payload.URL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	return s.client.Do(req)
 }
 
-func (s *Service) sendNtfy(webhookURL, title, message, severity string) (*http.Response, error) {
+func (s *Service) sendNtfy(payload WebhookPayload) (*http.Response, error) {
 	priorities := map[string]string{
 		"info": "1", "low": "2", "medium": "3", "high": "4", "critical": "5",
 	}
-	priority, ok := priorities[strings.ToLower(severity)]
+	priority, ok := priorities[strings.ToLower(payload.Severity)]
 	if !ok {
 		priority = "3"
 	}
 
-	req, _ := http.NewRequest("POST", webhookURL, strings.NewReader(message))
-	req.Header.Set("Title", title)
+	msg := plainTextMessage(payload)
+	req, _ := http.NewRequest("POST", payload.URL, strings.NewReader(msg))
+	req.Header.Set("Title", payload.Title)
 	req.Header.Set("Priority", priority)
-	req.Header.Set("Tags", ntfyTags(severity))
+	req.Header.Set("Tags", ntfyTags(payload.Severity))
 	return s.client.Do(req)
 }
 
-func (s *Service) sendDiscordSlack(webhookURL, title, message, severity string) (*http.Response, error) {
-	payload := map[string]interface{}{
-		"username":   "HoneyWire",
+func (s *Service) sendDiscord(payload WebhookPayload) (*http.Response, error) {
+	msg := discordMessage(payload)
+	reqPayload := map[string]interface{}{
+		"username": "HoneyWire",
 		"embeds": []map[string]interface{}{
 			{
-				"title":       title,
-				"description": message,
-				"color":       severityColor(severity),
+				"title":       payload.Title,
+				"description": msg,
+				"color":       severityColor(payload.Severity),
 				"footer": map[string]string{
-					"text": fmt.Sprintf("Severity: %s", strings.ToUpper(severity)),
+					"text": fmt.Sprintf("Severity: %s", strings.ToUpper(payload.Severity)),
 				},
 			},
 		},
 	}
-	body, _ := json.Marshal(payload)
+	body, _ := json.Marshal(reqPayload)
 
-	req, _ := http.NewRequest("POST", webhookURL, bytes.NewBuffer(body))
+	req, _ := http.NewRequest("POST", payload.URL, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	return s.client.Do(req)
+}
+
+func (s *Service) sendSlack(payload WebhookPayload) (*http.Response, error) {
+	msg := slackMessage(payload)
+	reqPayload := map[string]interface{}{
+		"text": payload.Title,
+		"attachments": []map[string]interface{}{
+			{
+				"color":  severityColorHex(payload.Severity),
+				"title":  payload.Title,
+				"text":   msg,
+				"footer": fmt.Sprintf("Severity: %s", strings.ToUpper(payload.Severity)),
+			},
+		},
+	}
+	body, _ := json.Marshal(reqPayload)
+
+	req, _ := http.NewRequest("POST", payload.URL, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	return s.client.Do(req)
 }
@@ -374,7 +396,49 @@ func (s *Service) sendDiscordSlack(webhookURL, title, message, severity string) 
 // FORMATTING HELPERS
 // ============================================================================
 
-// severityColor returns a decimal embed color for Discord/Slack per severity.
+func plainTextMessage(p WebhookPayload) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Trigger: %s\n", p.Trigger))
+	b.WriteString(fmt.Sprintf("Sensor: %s\n", p.SensorID))
+	if p.Source != "" {
+		b.WriteString(fmt.Sprintf("Source: %s\n", p.Source))
+	}
+	if p.Target != "" {
+		b.WriteString(fmt.Sprintf("Target: %s\n", p.Target))
+	}
+	b.WriteString(fmt.Sprintf("Time: %s", p.Time))
+	return b.String()
+}
+
+func discordMessage(p WebhookPayload) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("**Trigger:** %s\n", p.Trigger))
+	b.WriteString(fmt.Sprintf("**Sensor:** %s\n", p.SensorID))
+	if p.Source != "" {
+		b.WriteString(fmt.Sprintf("**Source:** %s\n", p.Source))
+	}
+	if p.Target != "" {
+		b.WriteString(fmt.Sprintf("**Target:** %s\n", p.Target))
+	}
+	b.WriteString(fmt.Sprintf("**Time:** %s", p.Time))
+	return b.String()
+}
+
+func slackMessage(p WebhookPayload) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("*Trigger:* %s\n", p.Trigger))
+	b.WriteString(fmt.Sprintf("*Sensor:* %s\n", p.SensorID))
+	if p.Source != "" {
+		b.WriteString(fmt.Sprintf("*Source:* %s\n", p.Source))
+	}
+	if p.Target != "" {
+		b.WriteString(fmt.Sprintf("*Target:* %s\n", p.Target))
+	}
+	b.WriteString(fmt.Sprintf("*Time:* %s", p.Time))
+	return b.String()
+}
+
+// severityColor returns a decimal embed color for Discord per severity.
 func severityColor(severity string) int {
 	switch strings.ToLower(severity) {
 	case "critical":
@@ -387,6 +451,22 @@ func severityColor(severity string) int {
 		return 0x378ADD // blue
 	default:
 		return 0x888780 // gray
+	}
+}
+
+// severityColorHex returns a hex color string for Slack attachments per severity.
+func severityColorHex(severity string) string {
+	switch strings.ToLower(severity) {
+	case "critical":
+		return "#E24B4A"
+	case "high":
+		return "#D85A30"
+	case "medium":
+		return "#BA7517"
+	case "low":
+		return "#378ADD"
+	default:
+		return "#888780"
 	}
 }
 

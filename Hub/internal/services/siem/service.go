@@ -278,6 +278,7 @@ func (s *Service) drainQueue(conn net.Conn) {
 		select {
 		case <-timeout:
 			log.Printf("[SIEM] Flush cutoff reached. Aborted %d buffered telemetry items.", len(s.eventQueue))
+			log.Println("[SIEM] Worker stopped.")
 			return
 		case event := <-s.eventQueue:
 			if conn != nil {
@@ -289,6 +290,7 @@ func (s *Service) drainQueue(conn net.Conn) {
 			}
 		default:
 			log.Printf("[SIEM] Telemetry stream fully synchronized. Flushed %d remaining logs.", count)
+			log.Println("[SIEM] Worker stopped.")
 			return
 		}
 	}

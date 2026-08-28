@@ -1,7 +1,6 @@
 package sensor
 
 import (
-	"context"
 	"errors"
 	"log"
 	"time"
@@ -12,7 +11,6 @@ type Store interface {
 	ProcessHeartbeat(nodeID, sensorID, configRev, nowStr string) (bool, error)
 	MarkSensorOffline(nodeID, sensorID, offlineTime string) error
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
-	GetTransitionedOfflineNodes(offlineThreshold time.Duration, lastCheck time.Time) (map[string]bool, error)
 	GetSensorLastHeartbeat(nodeID, sensorID string) (string, error)
 	GetSensorLatestStatus(nodeID, sensorID string) (string, error)
 	InsertStatusChange(nodeID, sensorID, status, timestamp string) error
@@ -73,38 +71,6 @@ func (s *Service) ProcessHeartbeat(nodeID, sensorID, configRev string) error {
 	})
 
 	return nil
-}
-
-func (s *Service) StartHealthMonitor(ctx context.Context) {
-	log.Println("[Sensor] Worker started.")
-
-	tickerPeriod := 30 * time.Second
-	ticker := time.NewTicker(tickerPeriod)
-	defer ticker.Stop()
-
-	// Offset lastCheck by the ticker period so the first run catches recent drops
-	lastCheck := time.Now().UTC().Add(-tickerPeriod)
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("[Sensor] Worker stopped.")
-			return
-		case t := <-ticker.C:
-			offlineThreshold := 60 * time.Second
-			updatedNodeIDs, err := s.store.GetTransitionedOfflineNodes(offlineThreshold, lastCheck)
-
-			if err == nil {
-				for nodeID := range updatedNodeIDs {
-					s.broadcaster.Broadcast("UPDATE_NODE", map[string]interface{}{
-						"id":              nodeID,
-						"trigger_refresh": true,
-					})
-				}
-			}
-			lastCheck = t.UTC()
-		}
-	}
 }
 
 // ProcessOffline graceful forces a sensor into an offline state

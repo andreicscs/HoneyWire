@@ -24,6 +24,7 @@ func NewStateMonitor(db *sql.DB, broadcaster Broadcaster) *StateMonitor {
 }
 
 func (s *StateMonitor) Start(ctx context.Context) {
+	log.Println("[StateMonitor] Worker started.")
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
@@ -89,7 +90,7 @@ func (s *StateMonitor) monitor() {
 			continue
 		}
 
-		s.broadcaster.Broadcast("NODE_UPDATED", map[string]interface{}{
+		s.broadcaster.Broadcast("UPDATE_NODE", map[string]interface{}{
 			"id":              nodeID,
 			"trigger_refresh": true,
 		})
