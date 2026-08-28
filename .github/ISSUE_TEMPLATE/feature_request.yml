@@ -1,0 +1,73 @@
+name: "Feature Request"
+description: "Propose a new feature, workflow enhancement, or architectural improvement for HoneyWire."
+title: "[Feature]: "
+labels: ["enhancement", "needs-discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve HoneyWire! Please outline your idea or proposal below.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target Component
+      description: Which part of the HoneyWire ecosystem does this feature target?
+      options:
+        - "Hub Backend (API, SQLite, Projections, Services)"
+        - "Hub UI (Dashboards, Settings, Visualizations)"
+        - "Wizard CLI (Automation, IaC, TUI, Apply)"
+        - "Sensors (Official / Community)"
+        - "Infrastructure as Code (Terraform, Ansible, Cloud-Init)"
+        - "Alerting & Integrations (Slack, Discord, SIEM, Webhooks)"
+        - "SDKs (Go / Python)"
+        - "Documentation / Developer Tooling"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement / Motivation
+      description: Is your feature request related to a problem or limitation? Explain what pain point you are trying to solve.
+      placeholder: "A clear and concise description of the problem (e.g., 'I am always frustrated when...')"
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution & Workflow
+      description: Describe your proposed feature, API changes, or operational workflow.
+      placeholder: "Explain how you envision this feature working in practice..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions, workarounds, or features you've considered.
+      placeholder: "List any other approaches or tools you considered..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context or Mockups
+      description: Add any screenshots, CLI mockups, API payload examples, or architecture diagrams.
+      placeholder: "Paste mockups, JSON payloads, or diagrams here..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Contribution Readiness
+      options:
+        - label: "I have searched existing issues and discussions to verify this has not been requested before."
+          required: true
+        - label: "I would be interested in contributing code, tests, or documentation for this feature."
+          required: false

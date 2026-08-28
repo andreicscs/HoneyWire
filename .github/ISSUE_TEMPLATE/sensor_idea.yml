@@ -1,0 +1,81 @@
+name: "Decoy Sensor Idea"
+description: "Propose a new deception sensor, honeypot service, canary token, or decoy protocol."
+title: "[Sensor Idea]: "
+labels: ["sensor-idea", "deception-engineering"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a high-impact deception sensor or canary service? HoneyWire is built around modular, containerized decoy sensors. Use this template to propose a new sensor for the ecosystem!
+
+  - type: input
+    id: sensor_name
+    attributes:
+      label: Proposed Sensor Name & Protocol
+      description: The name and target protocol or service for this decoy.
+      placeholder: "e.g., Redis Decoy, MySQL Tripwire, LLM Prompt Canary, Modbus PLC Decoy"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interaction_level
+    attributes:
+      label: Emulation & Interaction Level
+      description: How deeply does this sensor interact with the attacker?
+      options:
+        - "Low Interaction (Immediate protocol handshake banner, then tarpit/disconnect)"
+        - "Medium Interaction (Emulated login prompts, simulated error states, synthetic responses)"
+        - "High Interaction (Isolated sandbox execution, command logging)"
+        - "Canary Token / File-Based (Static traps, credential honeytokens, database triggers)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: threat_value
+    attributes:
+      label: Deception Value & Threat Vector
+      description: What threat actor behavior, exploit, or MITRE ATT&CK technique does this sensor detect?
+      placeholder: "e.g., Catches lateral movement across internal subnets, detects unauthenticated Redis RCE attempts (T1190), traps SSH brute-forcers..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: trigger_telemetry
+    attributes:
+      label: Trigger Conditions & Telemetry Payload
+      description: What specific interaction constitutes an alert, and what contextual metadata should be forwarded to the Hub?
+      placeholder: |
+        - Trigger: Any TCP SYN connection on port 6379, or unauthorized AUTH command
+        - Event Type: redis_auth_attempt
+        - Severity: high
+        - Payload: Source IP, attempted password/command, client banner
+    validations:
+      required: true
+
+  - type: textarea
+    id: sandbox_security
+    attributes:
+      label: Security & Sandboxing Constraints
+      description: What minimal capabilities or network privileges are required? (Remember: All HoneyWire sensors must drop all Linux capabilities and run as unprivileged user 1000:1000).
+      placeholder: "e.g., Requires NET_BIND_SERVICE to bind port 22; no host volume mounts needed; read-only root filesystem."
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References & Prior Art
+      description: Links to relevant RFCs, open-source libraries, or real-world attack signatures.
+      placeholder: "Links to documentation, standard protocol specs, or reference honeypot projects..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: Contribution Readiness
+      options:
+        - label: "I have reviewed HoneyWire sensor contribution guidelines in CONTRIBUTING.md."
+          required: true
+        - label: "I would be interested in developing or testing this sensor using the Go/Python SDK."
+          required: false

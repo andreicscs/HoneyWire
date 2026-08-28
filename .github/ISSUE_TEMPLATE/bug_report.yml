@@ -1,0 +1,100 @@
+name: "Bug Report"
+description: "Report a bug, crash, or unexpected behavior in HoneyWire."
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please provide as much detail as possible to help us reproduce and resolve the problem.
+        
+        > **Security Vulnerabilities:** If you have discovered a potential security vulnerability, please do NOT create a public issue. Review our [Security Policy](https://github.com/AndReicscs/HoneyWire/security/policy) for private disclosure instructions.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Select the HoneyWire component where the issue occurs.
+      options:
+        - "Hub Backend (API, SQLite, Projections, Services)"
+        - "Hub UI (Vue 3 Frontend, Dashboards, Settings)"
+        - "Wizard CLI (TUI, Deployment, Discovery, Apply)"
+        - "Sensor: TCP Tarpit"
+        - "Sensor: Network Scan Detector"
+        - "Sensor: Web Router Decoy"
+        - "Sensor: File Canary"
+        - "Sensor: ICMP Canary"
+        - "SDKs (Go / Python)"
+        - "Documentation / Installation Scripts"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: HoneyWire Version
+      description: Specify the version or commit hash (e.g., Hub v2.1.0, Wizard v2.0.1, Docker tag).
+      placeholder: "e.g., Hub v2.1.0, Wizard v2.0.1"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment & OS
+      description: Details about the host OS, Docker version, container runtime, or cloud provider.
+      placeholder: "e.g., Ubuntu 24.04 LTS, Docker 27.0.3, Linux x86_64, Proxmox VM"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: "Explain what went wrong and what you observed..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Clear, step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Navigate to '...'
+        2. Click on '....'
+        3. Run command '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: "What should have happened instead?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs, Console Output, or Screenshots
+      description: Paste relevant terminal logs, browser DevTools console output, or stack traces (sanitize sensitive tokens/passwords first).
+      render: shell
+      placeholder: "Paste logs or command output here..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-Submission Checklist
+      options:
+        - label: "I have searched existing GitHub issues and confirmed this is not a duplicate."
+          required: true
+        - label: "I have sanitized any private IP addresses, passwords, and API keys from the logs."
+          required: true

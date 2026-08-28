@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "HoneyWire Documentation"
+    url: "https://docs.honeywire.dev"
+    about: "Read our comprehensive architecture, operations, and sensor development guides."
+  - name: "Security Vulnerability Disclosure"
+    url: "https://github.com/AndReicscs/HoneyWire/security/policy"
+    about: "Privately report security vulnerabilities in HoneyWire."
