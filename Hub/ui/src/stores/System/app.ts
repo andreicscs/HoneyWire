@@ -141,6 +141,24 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  const checkSystemUpdatesManual = async (): Promise<{ success: boolean; data?: any; error?: string }> => {
+    try {
+      const res = await api.post('/api/v2/system/updates/check')
+      const up = (await res.json()) as any
+      state.value.updateAvailable = up.update_available || false
+      state.value.latestVersion = up.latest_version || null
+      state.value.releaseNotesUrl = up.release_notes_url || null
+      state.value.wizardUpdateAvailable = up.wizard_update_available || false
+      state.value.latestWizardVersion = up.latest_wizard_version || null
+      state.value.wizardReleaseNotesUrl = up.wizard_release_notes_url || null
+      state.value.acknowledgedWizardRelease = up.acknowledged_wizard_release || null
+      return { success: true, data: up }
+    } catch (err: any) {
+      console.error('Failed to trigger manual update check:', err)
+      return { success: false, error: err.message || 'Failed to check for updates' }
+    }
+  }
+
   const fetchSystemState = async (): Promise<{ success: boolean; status?: number }> => {
     try {
       const [stateRes] = await Promise.all([
@@ -341,6 +359,6 @@ export const useAppStore = defineStore('app', () => {
     toggleTheme, toggleSidebar, toggleArchive, setVelocityTimeframe,
     toggleArmed, changePassword, factoryReset, login, logout, completeSetup,
     acknowledgeWizardUpdate,
-    initAppStore, fetchSystemState, fetchSystemUpdates, enableDebugSetup
+    initAppStore, fetchSystemState, fetchSystemUpdates, checkSystemUpdatesManual, enableDebugSetup
   }
 })

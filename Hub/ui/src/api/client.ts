@@ -11,7 +11,18 @@ export class ApiError extends Error {
 const handleResponse = async (res: Response): Promise<Response> => {
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new ApiError(text || `HTTP ${res.status}`, res.status)
+    let message = text
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed.error === 'string') {
+        message = parsed.error
+      } else if (parsed && typeof parsed.message === 'string') {
+        message = parsed.message
+      }
+    } catch {
+      // Not JSON, fallback to raw text
+    }
+    throw new ApiError(message || `HTTP ${res.status}`, res.status)
   }
   return res
 }

@@ -36,8 +36,6 @@ const clearLogs = async () => {
             if (!response.ok) throw new Error(`Server error: ${response.status}`)
             
             eventsStore.purgeEvents()
-            
-            alert("Database purged successfully.")
         }
     } catch (error) {
         console.error("Failed to purge events:", error)

@@ -61,6 +61,11 @@
   --archive-hover: oklch(92% 0.055 80);
   --archive-border: oklch(84% 0.09 80);
 
+  --warning-main: oklch(65% 0.18 50);
+  --warning-text: oklch(35% 0.14 50);
+  --warning-bg: oklch(96% 0.035 50);
+  --warning-border: oklch(84% 0.09 50);
+
   --success-main: oklch(55% 0.16 150);
   --success-selected: oklch(92% 0.05 150);
   --success-text: oklch(38% 0.14 150);
@@ -183,6 +188,11 @@
   --archive-bg: oklch(48% 0.1 85 / 0.25);
   --archive-hover: oklch(15% 0.16 85 / 0.2);
   --archive-border: oklch(50% 0.15 85 / 0.3);
+
+  --warning-main: oklch(75% 0.18 50);
+  --warning-text: oklch(85% 0.14 50);
+  --warning-bg: oklch(48% 0.18 50 / 0.22);
+  --warning-border: oklch(55% 0.18 50 / 0.45);
  
   --success-main: oklch(65% 0.15 150);
   --success-selected: oklch(60% 0.15 150 / 0.3);
@@ -264,6 +274,13 @@
   --color-update-hover: var(--update-hover);
   --color-update-text: var(--update-text);
   --color-update-bg: var(--update-bg);
+  --color-update-border: var(--update-border);
+
+  /* Warning Actions (High Severity Orange) */
+  --color-warning-main: var(--warning-main);
+  --color-warning-text: var(--warning-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
  
   /* Archive Actions */
   --color-archive-text: var(--archive-text);
