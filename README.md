@@ -32,7 +32,7 @@
 - [Quick Start Guide](#-quick-start-guide)
 - [Security Notes](#security-notes)
 - [Tech Stack](#tech-stack)
-- [Roadmap & Development](#-roadmap--development)
+- [Roadmap & Development](#roadmap-development)
 - [Versioning and API Reference](#versioning-and-api-reference)
 
 ## Overview
@@ -169,7 +169,8 @@ Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to
 * **Infrastructure:** Docker, Docker Compose v5.0.0+
 
 
-## 🗺️ Roadmap & Development
+<a id="roadmap-development"></a>
+## Roadmap & Development
 
 HoneyWire is actively evolving towards a complete GitOps-driven enterprise deception platform. 
 
