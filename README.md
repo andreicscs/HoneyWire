@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://honeywire.dev">
+  <a href="https://honeywire.dev" target="_blank" rel="noopener noreferrer">
     <img src="Hub/ui/public/favicon.svg" alt="HoneyWire Logo" width="150" />
   </a>
 </p>
