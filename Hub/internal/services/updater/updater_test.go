@@ -2,6 +2,7 @@ package updater
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,6 +34,19 @@ func (m *mockStore) UpdateConfigValue(key, value string) error {
 func (m *mockStore) FactoryReset() error { return nil }
 func (m *mockStore) FactoryResetDryRun() (map[string]int, error) { return nil, nil }
 
+type mockCatalog struct {
+	refreshCount int
+	shouldError  bool
+}
+
+func (m *mockCatalog) RefreshIndex() error {
+	m.refreshCount++
+	if m.shouldError {
+		return errors.New("simulated network error")
+	}
+	return nil
+}
+
 func TestCheckForUpdatesSemver(t *testing.T) {
 	releases := []struct {
 		TagName string `json:"tag_name"`
@@ -63,12 +77,18 @@ func TestCheckForUpdatesSemver(t *testing.T) {
 		"acknowledged_wizard_release": "v2.0.0",
 	}}
 	cfgSvc := config.NewService(store, nil, nil, nil, "", "2.0.0")
+	catMock := &mockCatalog{}
 
 	svc := &Service{
 		configService: cfgSvc,
+		catalog:       catMock,
 		stopChan:      make(chan struct{}),
 	}
 	svc.CheckForUpdates()
+
+	if catMock.refreshCount != 1 {
+		t.Errorf("Expected catalog.RefreshIndex to be called 1 time, got %d", catMock.refreshCount)
+	}
 
 	state := svc.GetState()
 	if !state.UpdateAvailable {
@@ -125,9 +145,11 @@ func TestCheckForUpdates_NoFalsePositiveOnStartup(t *testing.T) {
 		"acknowledged_wizard_release": "",
 	}}
 	cfgSvc := config.NewService(store, nil, nil, nil, "", "2.0.4")
+	catMock := &mockCatalog{}
 
 	svc := &Service{
 		configService: cfgSvc,
+		catalog:       catMock,
 		stopChan:      make(chan struct{}),
 	}
 	svc.CheckForUpdates()
@@ -158,5 +180,33 @@ func TestCheckForUpdates_NoFalsePositiveOnStartup(t *testing.T) {
 	}
 	if stateAfterNewRelease.LatestWizardVersion != "v2.0.2" {
 		t.Errorf("Expected LatestWizardVersion to be v2.0.2, got %s", stateAfterNewRelease.LatestWizardVersion)
+	}
+}
+
+func TestCheckForUpdates_CatalogRefreshErrorGraceful(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode([]struct{}{})
+	}))
+	defer ts.Close()
+
+	origURL := githubAPIURL
+	githubAPIURL = ts.URL
+	defer func() { githubAPIURL = origURL }()
+
+	store := &mockStore{values: map[string]string{}}
+	cfgSvc := config.NewService(store, nil, nil, nil, "", "2.1.0")
+	catMock := &mockCatalog{shouldError: true}
+
+	svc := &Service{
+		configService: cfgSvc,
+		catalog:       catMock,
+		stopChan:      make(chan struct{}),
+	}
+	// Should not panic even if catalog refresh returns an error
+	svc.CheckForUpdates()
+
+	if catMock.refreshCount != 1 {
+		t.Errorf("Expected catalog.RefreshIndex to be called once despite error")
 	}
 }
