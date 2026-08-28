@@ -193,7 +193,7 @@ const formatTime = (timestamp: string) => {
                 </h3>
                 <div v-show="!viewingArchive" class="hidden sm:flex items-center gap-2">
                     <span class="w-1.5 h-1.5 rounded-full bg-success-main animate-pulse shadow-[0_0_8px_var(--color-success-main)]"></span>
-                    <span class="text-sm font-medium tracking-wide text-text-m">Live</span>
+                    <span class="text-sm tracking-wide text-text-m">Live</span>
                 </div>
             </div>
             
@@ -216,7 +216,7 @@ const formatTime = (timestamp: string) => {
 
         <div class="overflow-x-auto overflow-y-auto custom-scroll max-h-[600px] lg:max-h-[700px] flex-1 after:content-[''] after:block after:h-4 after:shrink-0">
             <table class="min-w-full text-left border-separate border-spacing-0">
-                <thead class="text-base font-medium text-text-m sticky top-0 bg-bg-surface z-30 shadow-[0_1px_0_0_var(--color-border-default)] select-none">
+                <thead class="text-base text-text-m sticky top-0 bg-bg-surface z-30 shadow-[0_1px_0_0_var(--color-border-default)] select-none">
                     <tr>
                         <th class="px-3 py-3 w-8"></th>
                         <th @click="toggleSort('severity')" class="px-3 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by threat severity">

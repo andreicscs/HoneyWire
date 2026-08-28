@@ -51,7 +51,7 @@ const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
             <div v-else class="text-sm text-text-m italic">No events recorded.</div>
         </div>
 
-        <!-- Recent Activity — mini event table -->
+        <!-- Recent Activity - mini event table -->
         <div class="bg-bg-surface border border-border-default rounded-lg flex flex-col overflow-hidden shadow-sm">
             <div class="px-4 py-3 border-b border-border-default flex items-center justify-between bg-bg-surface shrink-0">
                 <h3 class="text-base font-semibold text-text-h">Recent Activity</h3>
