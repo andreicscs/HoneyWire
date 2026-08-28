@@ -73,11 +73,14 @@ func (s *Service) fetchStrictCatalogManifests(currentHubVersion string) ([]model
 		return nil, fmt.Errorf("registry_url is not configured in database")
 	}
 
-	if err := s.catalog.RefreshIndex(); err != nil {
-		// Suppressed log spam when registry is down
+	index := s.catalog.GetIndex()
+	if index == nil {
+		if err := s.catalog.RefreshIndex(); err != nil {
+			// Suppressed log spam when registry is down
+		}
+		index = s.catalog.GetIndex()
 	}
 
-	index := s.catalog.GetIndex()
 	if index == nil {
 		return nil, fmt.Errorf("registry unreachable and no local index cache available")
 	}
