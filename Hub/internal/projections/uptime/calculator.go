@@ -3,16 +3,116 @@ package uptime
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/honeywire/hub/internal/store"
 )
+
+// Canonical uptime block status vocabulary
+const (
+	StatusUp       = "up"
+	StatusDown     = "down"
+	StatusDegraded = "degraded"
+	StatusPending  = "pending"
+	StatusNoData   = "nodata"
+)
+
+// IsLiveOnline normalizes live status string checks into a boolean
+func IsLiveOnline(status string) bool {
+	switch strings.ToLower(status) {
+	case "up", "online", "alive":
+		return true
+	default:
+		return false
+	}
+}
+
+// IsLiveOffline checks if a live status represents an offline state
+func IsLiveOffline(status string) bool {
+	switch strings.ToLower(status) {
+	case "down", "offline":
+		return true
+	default:
+		return false
+	}
+}
+
+// IsLivePending checks if a live status represents a pending state
+func IsLivePending(status string) bool {
+	return strings.ToLower(status) == "pending"
+}
 
 // UptimeCalculationParams holds parameters needed for uptime calculations
 type UptimeCalculationParams struct {
 	NumBlocks int
 	Delta     time.Duration
 	Cutoff    time.Time
+}
+
+// SensorBaselineMeta holds baseline timestamps and operational monitoring boundaries
+type SensorBaselineMeta struct {
+	FirstSeen        time.Time
+	OperationalStart time.Time
+	HasPriorChange   bool
+	EarliestChange   time.Time
+	EarliestOnline   time.Time
+}
+
+// ResolveSensorBaseline extracts baseline timestamps and determines the operational start boundary
+func ResolveSensorBaseline(firstSeenStr string, changes []store.StatusChangeData, cutoff time.Time) SensorBaselineMeta {
+	firstSeen, _ := time.Parse(time.RFC3339, firstSeenStr)
+	meta := SensorBaselineMeta{
+		FirstSeen:        firstSeen,
+		OperationalStart: firstSeen,
+	}
+
+	if len(changes) == 0 {
+		return meta
+	}
+
+	for _, c := range changes {
+		t, err := time.Parse(time.RFC3339, c.Timestamp)
+		if err != nil {
+			continue
+		}
+		if meta.EarliestChange.IsZero() || t.Before(meta.EarliestChange) {
+			meta.EarliestChange = t
+		}
+		if c.Status == "online" && (meta.EarliestOnline.IsZero() || t.Before(meta.EarliestOnline)) {
+			meta.EarliestOnline = t
+		}
+		if !t.After(cutoff) {
+			meta.HasPriorChange = true
+		}
+	}
+
+	// If no status transition existed prior to cutoff, operational start begins at the first online check-in.
+	if !meta.HasPriorChange && !meta.EarliestOnline.IsZero() && meta.EarliestOnline.After(meta.OperationalStart) {
+		meta.OperationalStart = meta.EarliestOnline
+	}
+
+	return meta
+}
+
+// IsNoDataBlock evaluates whether a block represents an unrecorded telemetry period or pre-deployment window
+func IsNoDataBlock(blockEnd time.Time, meta SensorBaselineMeta, hasChanges bool, liveStatus string) bool {
+	// 1. Block ended before the sensor was created / deployed
+	if !blockEnd.After(meta.FirstSeen) {
+		return true
+	}
+
+	// 2. Zero-guessing rule: If no baseline exists prior to cutoff, blocks before the first recorded transition are No Data
+	if !meta.HasPriorChange && hasChanges && !blockEnd.After(meta.EarliestChange) {
+		return true
+	}
+
+	// 3. Sensor has zero transitions recorded and is not currently online
+	if !hasChanges && !IsLiveOnline(liveStatus) {
+		return true
+	}
+
+	return false
 }
 
 // CalculateParams determines the calculation parameters based on timeframe
@@ -92,7 +192,7 @@ func BuildUptimeHistory(
 		}
 
 		if !hasPriorChange {
-			if len(sensorChanges) == 0 && sensorLiveStatusMap[key] == "up" {
+			if len(sensorChanges) == 0 && IsLiveOnline(sensorLiveStatusMap[key]) {
 				isOnline = true
 			}
 		}
@@ -165,7 +265,7 @@ func BuildUptimeHistory(
 	for _, s := range sensors {
 		key := s.NodeID + ":" + s.SensorID
 		if len(changesBySensor[key]) == 0 {
-			if sensorLiveStatusMap[key] == "up" {
+			if IsLiveOnline(sensorLiveStatusMap[key]) {
 				for i := 0; i < params.NumBlocks; i++ {
 					blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 					blockEnd := blockStart.Add(params.Delta)
@@ -185,25 +285,27 @@ func BuildUptimeHistory(
 
 // BlockStatus represents the computed status of a time block
 type BlockStatus struct {
-	Status string // "up", "down", "degraded", "nodata"
-	Label  string // Human-readable explanation
+	Status   string  // "up", "down", "degraded", "nodata"
+	Label    string  // Human-readable explanation
+	Duration float64 // Effective seconds this block covers (bounded by operationalStart/now)
+	Ratio    float64 // Effective uptime ratio used to derive Status (0 for down/nodata)
 }
 
 // CalculateBlockStatus determines the uptime status for a single time block
 func CalculateBlockStatus(
-	blockStart, blockEnd, now, firstSeen time.Time,
+	blockStart, blockEnd, now, operationalStart time.Time,
 	uptimeSeconds float64,
 	params UptimeCalculationParams,
 	blockIndex int,
 	isLiveOffline bool,
 ) BlockStatus {
-	if !blockEnd.After(firstSeen) {
-		return BlockStatus{Status: "nodata", Label: "No Data (Not Deployed Yet)"}
+	if !blockEnd.After(operationalStart) {
+		return BlockStatus{Status: StatusNoData, Label: "No Data (Not Deployed Yet)"}
 	}
 
 	effectiveStart := blockStart
-	if firstSeen.After(effectiveStart) {
-		effectiveStart = firstSeen
+	if operationalStart.After(effectiveStart) {
+		effectiveStart = operationalStart
 	}
 
 	effectiveEnd := blockEnd
@@ -213,21 +315,24 @@ func CalculateBlockStatus(
 
 	blockDuration := effectiveEnd.Sub(effectiveStart).Seconds()
 	if blockDuration <= 0 {
-		return BlockStatus{Status: "nodata", Label: "No Data"}
+		return BlockStatus{Status: StatusNoData, Label: "No Data"}
 	}
 
 	if blockIndex == params.NumBlocks-1 && isLiveOffline {
-		return BlockStatus{Status: "down", Label: "Offline"}
+		return BlockStatus{Status: StatusDown, Label: "Offline", Duration: blockDuration, Ratio: 0}
 	}
 
 	ratio := uptimeSeconds / blockDuration
+	if ratio > 1.0 {
+		ratio = 1.0
+	}
 
 	if ratio >= 0.99 {
-		return BlockStatus{Status: "up", Label: "Online"}
+		return BlockStatus{Status: StatusUp, Label: "Online", Duration: blockDuration, Ratio: ratio}
 	} else if ratio > 0 {
-		return BlockStatus{Status: "degraded", Label: fmt.Sprintf("Degraded (%.1f%% uptime)", ratio*100)}
+		return BlockStatus{Status: StatusDegraded, Label: fmt.Sprintf("Degraded (%.1f%% uptime)", ratio*100), Duration: blockDuration, Ratio: ratio}
 	}
-	return BlockStatus{Status: "down", Label: "Offline"}
+	return BlockStatus{Status: StatusDown, Label: "Offline", Duration: blockDuration, Ratio: 0}
 }
 
 // GenerateBlocks creates the heatmap blocks for a sensor
@@ -240,24 +345,11 @@ func GenerateBlocks(
 	now time.Time,
 	liveStatus string,
 ) []UptimeBlock {
-	firstSeenParsed, _ := time.Parse(time.RFC3339, sensorData.FirstSeen)
 	blocks := make([]UptimeBlock, params.NumBlocks)
-
-	hasPriorChange := false
-	var earliestChange time.Time
-	if len(sensorChanges) > 0 {
-		for _, c := range sensorChanges {
-			t, err := time.Parse(time.RFC3339, c.Timestamp)
-			if err == nil {
-				if earliestChange.IsZero() || t.Before(earliestChange) {
-					earliestChange = t
-				}
-				if !t.After(params.Cutoff) {
-					hasPriorChange = true
-				}
-			}
-		}
-	}
+	meta := ResolveSensorBaseline(sensorData.FirstSeen, sensorChanges, params.Cutoff)
+	hasChanges := len(sensorChanges) > 0
+	isPending := IsLivePending(liveStatus)
+	isOffline := IsLiveOffline(liveStatus)
 
 	for i := 0; i < params.NumBlocks; i++ {
 		blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
@@ -265,16 +357,16 @@ func GenerateBlocks(
 		stepsAgo := params.NumBlocks - 1 - i
 		timeLabel := formatTimeLabel(stepsAgo, params.Delta, timeframe)
 
-		if liveStatus == "pending" {
-			if !blockEnd.After(firstSeenParsed) {
+		if isPending {
+			if !blockEnd.After(meta.FirstSeen) {
 				blocks[i] = UptimeBlock{
-					Status:    "nodata",
+					Status:    StatusNoData,
 					Label:     "No Data (Not Deployed Yet)",
 					TimeLabel: timeLabel,
 				}
 			} else {
 				blocks[i] = UptimeBlock{
-					Status:    "pending",
+					Status:    StatusPending,
 					Label:     "Awaiting Initial Check-in",
 					TimeLabel: timeLabel,
 				}
@@ -282,37 +374,20 @@ func GenerateBlocks(
 			continue
 		}
 
-		if !blockEnd.After(firstSeenParsed) {
+		if IsNoDataBlock(blockEnd, meta, hasChanges, liveStatus) {
+			label := "No Data"
+			if !blockEnd.After(meta.FirstSeen) {
+				label = "No Data (Not Deployed Yet)"
+			}
 			blocks[i] = UptimeBlock{
-				Status:    "nodata",
-				Label:     "No Data (Not Deployed Yet)",
+				Status:    StatusNoData,
+				Label:     label,
 				TimeLabel: timeLabel,
 			}
 			continue
 		}
 
-		// Zero-guessing rule: If no baseline exists prior to cutoff, blocks before the first recorded transition are "No Data"
-		if !hasPriorChange && len(sensorChanges) > 0 && !blockEnd.After(earliestChange) {
-			blocks[i] = UptimeBlock{
-				Status:    "nodata",
-				Label:     "No Data",
-				TimeLabel: timeLabel,
-			}
-			continue
-		}
-
-		// If sensor has zero transitions recorded and is not live online, mark as no data
-		if len(sensorChanges) == 0 && liveStatus != "up" && liveStatus != "online" {
-			blocks[i] = UptimeBlock{
-				Status:    "nodata",
-				Label:     "No Data",
-				TimeLabel: timeLabel,
-			}
-			continue
-		}
-
-		isLiveOffline := liveStatus == "down"
-		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, history[i], params, i, isLiveOffline)
+		blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, meta.OperationalStart, history[i], params, i, isOffline)
 		blocks[i] = UptimeBlock{
 			Status:    blockStatus.Status,
 			Label:     blockStatus.Label,
@@ -344,23 +419,23 @@ func formatTimeLabel(stepsAgo int, delta time.Duration, timeframe string) string
 // ResolveWorstStatus determines the worst status among a list of statuses
 func ResolveWorstStatus(statuses []string) string {
 	for _, status := range statuses {
-		if status == "down" {
-			return "down"
+		if status == StatusDown {
+			return StatusDown
 		}
 	}
 	for _, status := range statuses {
-		if status == "degraded" {
-			return "degraded"
+		if status == StatusDegraded {
+			return StatusDegraded
 		}
 	}
 	for _, status := range statuses {
-		if status == "up" {
-			return "up"
+		if status == StatusUp {
+			return StatusUp
 		}
 	}
 	for _, status := range statuses {
-		if status == "pending" {
-			return "pending"
+		if status == StatusPending {
+			return StatusPending
 		}
 	}
 	return ""
@@ -379,8 +454,7 @@ func CalculateOverallUptime(
 		return 100.0
 	}
 
-	totalBlocks := 0
-	upBlocks := 0
+	var totalSeconds, upSeconds float64
 
 	for _, sensor := range sensors {
 		historyKey := sensor.NodeID + ":" + sensor.SensorID
@@ -390,63 +464,36 @@ func CalculateOverallUptime(
 		}
 
 		liveStatus := sensorLiveStatusMap[historyKey]
-		if liveStatus == "pending" {
+		if IsLivePending(liveStatus) {
 			continue // Pending sensors don't count against overall uptime
 		}
 
-		firstSeenParsed, _ := time.Parse(time.RFC3339, sensor.FirstSeen)
 		sensorChanges := changesBySensor[historyKey]
-
-		hasPriorChange := false
-		var earliestChange time.Time
-		if len(sensorChanges) > 0 {
-			for _, c := range sensorChanges {
-				t, err := time.Parse(time.RFC3339, c.Timestamp)
-				if err == nil {
-					if earliestChange.IsZero() || t.Before(earliestChange) {
-						earliestChange = t
-					}
-					if !t.After(params.Cutoff) {
-						hasPriorChange = true
-					}
-				}
-			}
-		}
-
-		isLiveOffline := liveStatus == "down"
+		meta := ResolveSensorBaseline(sensor.FirstSeen, sensorChanges, params.Cutoff)
+		hasChanges := len(sensorChanges) > 0
+		isOffline := IsLiveOffline(liveStatus)
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 			blockEnd := blockStart.Add(params.Delta)
 
-			if !blockEnd.After(firstSeenParsed) {
+			if IsNoDataBlock(blockEnd, meta, hasChanges, liveStatus) {
 				continue
 			}
 
-			if !hasPriorChange && len(sensorChanges) > 0 && !blockEnd.After(earliestChange) {
-				continue // No data
-			}
-
-			if len(sensorChanges) == 0 && liveStatus != "up" && liveStatus != "online" {
-				continue // No data
-			}
-
-			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, sensorHistory[i], params, i, isLiveOffline)
-			if blockStatus.Status == "nodata" || blockStatus.Status == "pending" {
+			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, meta.OperationalStart, sensorHistory[i], params, i, isOffline)
+			if blockStatus.Status == StatusNoData || blockStatus.Status == StatusPending || blockStatus.Duration <= 0 {
 				continue
 			}
 
-			totalBlocks++
-			if blockStatus.Status == "up" {
-				upBlocks++
-			}
+			totalSeconds += blockStatus.Duration
+			upSeconds += blockStatus.Duration * blockStatus.Ratio
 		}
 	}
 
-	if totalBlocks == 0 {
+	if totalSeconds == 0 {
 		return 100.0
 	}
 
-	percentage := (float64(upBlocks) / float64(totalBlocks)) * 100.0
-	return percentage
+	return (upSeconds / totalSeconds) * 100.0
 }

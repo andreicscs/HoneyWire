@@ -345,6 +345,24 @@ func TestCalculateOverallUptime(t *testing.T) {
 			t.Errorf("Expected 100%% uptime, got %f", uptime)
 		}
 	})
+
+	t.Run("DegradedWeightedRatio", func(t *testing.T) {
+		sensors := []store.SensorUptimeData{{NodeID: "n1", SensorID: "s1", FirstSeen: params.Cutoff.Format(time.RFC3339)}}
+		history := map[string][]float64{
+			"n1:s1": make([]float64, 24),
+		}
+		// 90% uptime across all 24 blocks (3240 seconds online per 3600-second hour)
+		for i := 0; i < 24; i++ {
+			history["n1:s1"][i] = 3240
+		}
+		liveMap := map[string]string{"n1:s1": "up"}
+
+		uptime := CalculateOverallUptime(sensors, nil, history, params, now, liveMap)
+		// Should be 90.0%, NOT 0.0%!
+		if fmt.Sprintf("%.1f", uptime) != "90.0" {
+			t.Errorf("Expected 90.0%% uptime for degraded sensor, got %.2f%%", uptime)
+		}
+	})
 }
 
 func TestOverallUptime_AllGreenButNot100(t *testing.T) {
@@ -452,45 +470,78 @@ func TestOverallUptime_MultiSensorDailyBlocks(t *testing.T) {
 	}
 }
 
-func TestOverallUptime_SensorDeployedMidBlock30D(t *testing.T) {
-	// 1 sensor, deployed 25 days ago (mid-block for 30D timeframe), always online.
-	// The deployment block should be "up" and overall should be 100%.
-	now := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
-	params := CalculateParams("30D", now)
+func TestGenerateBlocks_NewlyInstalledSensorOnline(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 30, 0, 0, time.UTC)
 
-	// Deployed 25.5 days ago (noon)
-	firstSeen := now.Add(-25*24*time.Hour - 12*time.Hour)
-
-	sensors := []store.SensorUptimeData{
-		{NodeID: "n1", SensorID: "s1", FirstSeen: firstSeen.Format(time.RFC3339)},
+	// Sensor row was created at 12:00 (firstSeen)
+	firstSeen := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	sensor := store.SensorUptimeData{
+		NodeID:    "node-1",
+		SensorID:  "ssh-tarpit",
+		FirstSeen: firstSeen.Format(time.RFC3339),
 	}
 
+	// Container boots and first checks in at 12:04:00 (4 minutes after creation)
+	onlineTime := time.Date(2026, 8, 28, 12, 4, 0, 0, time.UTC)
 	changes := []store.StatusChangeData{
-		{NodeID: "n1", SensorID: "s1", Status: "online", Timestamp: firstSeen.Format(time.RFC3339)},
+		{
+			NodeID:    "node-1",
+			SensorID:  "ssh-tarpit",
+			Status:    "online",
+			Timestamp: onlineTime.Format(time.RFC3339),
+		},
 	}
 
-	liveMap := map[string]string{"n1:s1": "up"}
-	history := BuildUptimeHistory(sensors, changes, params, now, liveMap)
+	liveMap := map[string]string{"node-1:ssh-tarpit": "up"}
+	changesBySensor := map[string][]store.StatusChangeData{"node-1:ssh-tarpit": changes}
 
-	key := "n1:s1"
-	
-	notUpCount := 0
-	for i := 0; i < params.NumBlocks; i++ {
-		blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
-		blockEnd := blockStart.Add(params.Delta)
-		bs := CalculateBlockStatus(blockStart, blockEnd, now, firstSeen, history[key][i], params, i, false)
-		if bs.Status != "up" && bs.Status != "nodata" {
-			t.Logf("Block %d: blockStart=%v uptimeSeconds=%.0f status=%s label=%s",
-				i, blockStart.Format("2006-01-02 15:04"), history[key][i], bs.Status, bs.Label)
-			notUpCount++
+	// Test 1: 1H Timeframe (2-minute blocks)
+	params1H := CalculateParams("1H", now)
+	history1H := BuildUptimeHistory([]store.SensorUptimeData{sensor}, changes, params1H, now, liveMap)
+	blocks1H := GenerateBlocks(sensor, changes, history1H["node-1:ssh-tarpit"], params1H, "1H", now, "up")
+
+	// Verify that the deployment block (12:04-12:06) is "up" (NOT degraded!)
+	for _, b := range blocks1H {
+		if b.Status == "degraded" {
+			t.Errorf("1H block should not be degraded for newly installed sensor: %+v", b)
 		}
 	}
 
-	changesBySensor := map[string][]store.StatusChangeData{"n1:s1": changes}
-	uptime := CalculateOverallUptime(sensors, changesBySensor, history, params, now, liveMap)
-	t.Logf("Overall uptime: %.2f%% (notUpBlocks=%d)", uptime, notUpCount)
-	if uptime != 100.0 {
-		t.Errorf("Expected 100%% uptime, got %.2f%%", uptime)
+	uptime1H := CalculateOverallUptime([]store.SensorUptimeData{sensor}, changesBySensor, history1H, params1H, now, liveMap)
+	if uptime1H != 100.0 {
+		t.Errorf("1H overall uptime expected 100%%, got %.2f%%", uptime1H)
+	}
+
+	// Test 2: 24H Timeframe (1-hour blocks)
+	params24H := CalculateParams("24H", now)
+	history24H := BuildUptimeHistory([]store.SensorUptimeData{sensor}, changes, params24H, now, liveMap)
+	blocks24H := GenerateBlocks(sensor, changes, history24H["node-1:ssh-tarpit"], params24H, "24H", now, "up")
+
+	for _, b := range blocks24H {
+		if b.Status == "degraded" {
+			t.Errorf("24H block should not be degraded for newly installed sensor: %+v", b)
+		}
+	}
+
+	uptime24H := CalculateOverallUptime([]store.SensorUptimeData{sensor}, changesBySensor, history24H, params24H, now, liveMap)
+	if uptime24H != 100.0 {
+		t.Errorf("24H overall uptime expected 100%%, got %.2f%%", uptime24H)
+	}
+
+	// Test 3: 30D Timeframe (daily blocks)
+	params30D := CalculateParams("30D", now)
+	history30D := BuildUptimeHistory([]store.SensorUptimeData{sensor}, changes, params30D, now, liveMap)
+	blocks30D := GenerateBlocks(sensor, changes, history30D["node-1:ssh-tarpit"], params30D, "30D", now, "up")
+
+	for _, b := range blocks30D {
+		if b.Status == "degraded" {
+			t.Errorf("30D block should not be degraded for newly installed sensor: %+v", b)
+		}
+	}
+
+	uptime30D := CalculateOverallUptime([]store.SensorUptimeData{sensor}, changesBySensor, history30D, params30D, now, liveMap)
+	if uptime30D != 100.0 {
+		t.Errorf("30D overall uptime expected 100%%, got %.2f%%", uptime30D)
 	}
 }
 
