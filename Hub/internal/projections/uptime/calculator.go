@@ -92,14 +92,8 @@ func BuildUptimeHistory(
 		}
 
 		if !hasPriorChange {
-			if len(sensorChanges) > 0 {
-				if sensorChanges[0].Status == "offline" {
-					isOnline = true
-				}
-			} else {
-				if sensorLiveStatusMap[key] == "up" {
-					isOnline = true
-				}
+			if len(sensorChanges) == 0 && sensorLiveStatusMap[key] == "up" {
+				isOnline = true
 			}
 		}
 
@@ -239,6 +233,7 @@ func CalculateBlockStatus(
 // GenerateBlocks creates the heatmap blocks for a sensor
 func GenerateBlocks(
 	sensorData store.SensorUptimeData,
+	sensorChanges []store.StatusChangeData,
 	history []float64,
 	params UptimeCalculationParams,
 	timeframe string,
@@ -247,6 +242,22 @@ func GenerateBlocks(
 ) []UptimeBlock {
 	firstSeenParsed, _ := time.Parse(time.RFC3339, sensorData.FirstSeen)
 	blocks := make([]UptimeBlock, params.NumBlocks)
+
+	hasPriorChange := false
+	var earliestChange time.Time
+	if len(sensorChanges) > 0 {
+		for _, c := range sensorChanges {
+			t, err := time.Parse(time.RFC3339, c.Timestamp)
+			if err == nil {
+				if earliestChange.IsZero() || t.Before(earliestChange) {
+					earliestChange = t
+				}
+				if !t.After(params.Cutoff) {
+					hasPriorChange = true
+				}
+			}
+		}
+	}
 
 	for i := 0; i < params.NumBlocks; i++ {
 		blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
@@ -267,6 +278,35 @@ func GenerateBlocks(
 					Label:     "Awaiting Initial Check-in",
 					TimeLabel: timeLabel,
 				}
+			}
+			continue
+		}
+
+		if !blockEnd.After(firstSeenParsed) {
+			blocks[i] = UptimeBlock{
+				Status:    "nodata",
+				Label:     "No Data (Not Deployed Yet)",
+				TimeLabel: timeLabel,
+			}
+			continue
+		}
+
+		// Zero-guessing rule: If no baseline exists prior to cutoff, blocks before the first recorded transition are "No Data"
+		if !hasPriorChange && len(sensorChanges) > 0 && !blockEnd.After(earliestChange) {
+			blocks[i] = UptimeBlock{
+				Status:    "nodata",
+				Label:     "No Data",
+				TimeLabel: timeLabel,
+			}
+			continue
+		}
+
+		// If sensor has zero transitions recorded and is not live online, mark as no data
+		if len(sensorChanges) == 0 && liveStatus != "up" && liveStatus != "online" {
+			blocks[i] = UptimeBlock{
+				Status:    "nodata",
+				Label:     "No Data",
+				TimeLabel: timeLabel,
 			}
 			continue
 		}
@@ -327,7 +367,14 @@ func ResolveWorstStatus(statuses []string) string {
 }
 
 // CalculateOverallUptime computes the fleet-wide uptime percentage
-func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string][]float64, params UptimeCalculationParams, now time.Time, sensorLiveStatusMap map[string]string) float64 {
+func CalculateOverallUptime(
+	sensors []store.SensorUptimeData,
+	changesBySensor map[string][]store.StatusChangeData,
+	history map[string][]float64,
+	params UptimeCalculationParams,
+	now time.Time,
+	sensorLiveStatusMap map[string]string,
+) float64 {
 	if len(sensors) == 0 {
 		return 100.0
 	}
@@ -348,11 +395,41 @@ func CalculateOverallUptime(sensors []store.SensorUptimeData, history map[string
 		}
 
 		firstSeenParsed, _ := time.Parse(time.RFC3339, sensor.FirstSeen)
+		sensorChanges := changesBySensor[historyKey]
+
+		hasPriorChange := false
+		var earliestChange time.Time
+		if len(sensorChanges) > 0 {
+			for _, c := range sensorChanges {
+				t, err := time.Parse(time.RFC3339, c.Timestamp)
+				if err == nil {
+					if earliestChange.IsZero() || t.Before(earliestChange) {
+						earliestChange = t
+					}
+					if !t.After(params.Cutoff) {
+						hasPriorChange = true
+					}
+				}
+			}
+		}
+
 		isLiveOffline := liveStatus == "down"
 
 		for i := 0; i < params.NumBlocks; i++ {
 			blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 			blockEnd := blockStart.Add(params.Delta)
+
+			if !blockEnd.After(firstSeenParsed) {
+				continue
+			}
+
+			if !hasPriorChange && len(sensorChanges) > 0 && !blockEnd.After(earliestChange) {
+				continue // No data
+			}
+
+			if len(sensorChanges) == 0 && liveStatus != "up" && liveStatus != "online" {
+				continue // No data
+			}
 
 			blockStatus := CalculateBlockStatus(blockStart, blockEnd, now, firstSeenParsed, sensorHistory[i], params, i, isLiveOffline)
 			if blockStatus.Status == "nodata" || blockStatus.Status == "pending" {

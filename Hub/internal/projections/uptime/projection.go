@@ -65,9 +65,16 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 	// 4. Build uptime history
 	history := BuildUptimeHistory(sensors, changes, params, criteria.Now, sensorLiveStatusMap)
 
+	// Group changes by sensor
+	rawChangesBySensor := make(map[string][]store.StatusChangeData)
+	for _, c := range changes {
+		key := c.NodeID + ":" + c.SensorID
+		rawChangesBySensor[key] = append(rawChangesBySensor[key], c)
+	}
+
 	// 5. Group sensors by NodeID and build DTOs
 	groupsMap := make(map[string]*UptimeGroup)
-	var allStatuses []string
+	groupStatusesMap := make(map[string][]string)
 
 	for _, sensor := range sensors {
 		nodeID := sensor.NodeID
@@ -86,15 +93,17 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 			}
 		}
 
-		// Build heatmap blocks for this sensor
 		sensorHistory := history[historyKey]
 		if sensorHistory == nil {
 			sensorHistory = make([]float64, params.NumBlocks)
 		}
 
 		liveStatus := sensorLiveStatusMap[historyKey]
-
-		blocks := GenerateBlocks(sensor, sensorHistory, params, criteria.Timeframe, criteria.Now, liveStatus)
+		sensorChanges := rawChangesBySensor[historyKey]
+		blocks := GenerateBlocks(sensor, sensorChanges, sensorHistory, params, criteria.Timeframe, criteria.Now, liveStatus)
+		for _, block := range blocks {
+			groupStatusesMap[nodeID] = append(groupStatusesMap[nodeID], block.Status)
+		}
 
 		// Determine sensor status from the most recent block or live status
 		sensorStatus := sensorLiveStatusMap[historyKey]
@@ -110,20 +119,12 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 			}
 		}
 
-		// Collect statuses for worst-status calculation
-		blockStatuses := make([]string, len(blocks))
-		for i, block := range blocks {
-			blockStatuses[i] = block.Status
-		}
-		allStatuses = append(allStatuses, blockStatuses...)
-
 		// Check if sensor is silenced
 		isSilenced, _ := p.Store.IsSensorSilenced(nodeID, sensor.SensorID)
 
-		// Build sensor DTO
 		sensorDTO := UptimeSensor{
 			SensorID:    sensor.SensorID,
-			DisplayName: sensor.SensorID, // Use SensorID as display name, can be enhanced later
+			DisplayName: sensor.SensorID,
 			Status:      sensorStatus,
 			IsSilenced:  isSilenced,
 			Blocks:      blocks,
@@ -134,13 +135,7 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 
 	// 6. Calculate worst status per group
 	for _, group := range groupsMap {
-		groupStatuses := make([]string, 0)
-		for _, sensor := range group.Sensors {
-			for _, block := range sensor.Blocks {
-				groupStatuses = append(groupStatuses, block.Status)
-			}
-		}
-		group.WorstStatus = ResolveWorstStatus(groupStatuses)
+		group.WorstStatus = ResolveWorstStatus(groupStatusesMap[group.NodeID])
 	}
 
 	// 7. Convert map to sorted slice
@@ -153,7 +148,7 @@ func (p *Projector) BuildUptimeProjection(criteria FilterCriteria) (*UptimeRespo
 	sortGroups(groups)
 
 	// 8. Calculate overall uptime
-	overallUptime := CalculateOverallUptime(sensors, history, params, criteria.Now, sensorLiveStatusMap)
+	overallUptime := CalculateOverallUptime(sensors, rawChangesBySensor, history, params, criteria.Now, sensorLiveStatusMap)
 
 	// 9. Build response
 	response := &UptimeResponse{

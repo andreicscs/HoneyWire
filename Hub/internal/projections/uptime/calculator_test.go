@@ -247,7 +247,7 @@ func TestGenerateBlocks(t *testing.T) {
 		sensor := store.SensorUptimeData{FirstSeen: firstSeen.Format(time.RFC3339)}
 		history := []float64{0, 0, 0}
 
-		blocks := GenerateBlocks(sensor, history, params, "24H", now, "pending")
+		blocks := GenerateBlocks(sensor, nil, history, params, "24H", now, "pending")
 
 		// 09:00 - 10:00 -> nodata (before deployment)
 		if blocks[0].Status != "nodata" {
@@ -262,6 +262,44 @@ func TestGenerateBlocks(t *testing.T) {
 			t.Errorf("Block 2 expected pending, got %s", blocks[2].Status)
 		}
 	})
+}
+
+func TestGenerateBlocks_ZeroGuessworkNodata(t *testing.T) {
+	now := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	params := CalculateParams("30D", now) // 30 daily blocks, cutoff = 2026-07-29
+
+	// Sensor deployed 48 days ago
+	firstSeen := now.Add(-48 * 24 * time.Hour)
+	sensor := store.SensorUptimeData{
+		NodeID:    "node1",
+		SensorID:  "icmp-canary",
+		FirstSeen: firstSeen.Format(time.RFC3339),
+	}
+
+	// Only recorded change in the entire window is "offline" 2 days ago (2026-08-26)
+	changes := []store.StatusChangeData{
+		{
+			NodeID:    "node1",
+			SensorID:  "icmp-canary",
+			Status:    "offline",
+			Timestamp: now.Add(-2 * 24 * time.Hour).Format(time.RFC3339),
+		},
+	}
+
+	history := make([]float64, params.NumBlocks) // 0 uptime
+	blocks := GenerateBlocks(sensor, changes, history, params, "30D", now, "down")
+
+	// Days 0 to 27 (prior to August 26 change) MUST be nodata (N/A) because no baseline exists
+	for i := 0; i < 27; i++ {
+		if blocks[i].Status != "nodata" {
+			t.Errorf("Block %d expected 'nodata', got '%s'", i, blocks[i].Status)
+		}
+	}
+
+	// Day 28 onwards (after offline change) MUST be down
+	if blocks[28].Status != "down" {
+		t.Errorf("Block 28 expected 'down', got '%s'", blocks[28].Status)
+	}
 }
 
 func TestResolveWorstStatus(t *testing.T) {
@@ -302,7 +340,7 @@ func TestCalculateOverallUptime(t *testing.T) {
 		}
 		liveMap := map[string]string{"n1:s1": "up"}
 
-		uptime := CalculateOverallUptime(sensors, history, params, now, liveMap)
+		uptime := CalculateOverallUptime(sensors, nil, history, params, now, liveMap)
 		if uptime != 100.0 {
 			t.Errorf("Expected 100%% uptime, got %f", uptime)
 		}
@@ -336,6 +374,7 @@ func TestOverallUptime_AllGreenButNot100(t *testing.T) {
 	t.Logf("History: %v", history[key])
 	t.Logf("Params: NumBlocks=%d, Delta=%v, Cutoff=%v", params.NumBlocks, params.Delta, params.Cutoff)
 
+	changesBySensor := map[string][]store.StatusChangeData{"n1:s1": changes}
 	for i := 0; i < params.NumBlocks; i++ {
 		blockStart := params.Cutoff.Add(time.Duration(i) * params.Delta)
 		blockEnd := blockStart.Add(params.Delta)
@@ -344,7 +383,7 @@ func TestOverallUptime_AllGreenButNot100(t *testing.T) {
 			i, blockStart.Format("2006-01-02 15:04"), history[key][i], bs.Status, bs.Label)
 	}
 
-	uptime := CalculateOverallUptime(sensors, history, params, now, liveMap)
+	uptime := CalculateOverallUptime(sensors, changesBySensor, history, params, now, liveMap)
 	t.Logf("Overall uptime: %.2f%%", uptime)
 	if uptime != 100.0 {
 		t.Errorf("Expected 100%% uptime (all blocks green), got %.2f%%", uptime)
@@ -363,7 +402,7 @@ func TestOverallUptime_NoChangesInWindow(t *testing.T) {
 		{NodeID: "n1", SensorID: "s1", FirstSeen: firstSeen.Format(time.RFC3339)},
 	}
 
-	// NO changes in the window — the sensor was continuously online
+	// NO changes in the window - the sensor was continuously online
 	changes := []store.StatusChangeData{}
 
 	liveMap := map[string]string{"n1:s1": "up"}
@@ -381,7 +420,7 @@ func TestOverallUptime_NoChangesInWindow(t *testing.T) {
 			i, blockStart.Format("2006-01-02 15:04"), history[key][i], bs.Status)
 	}
 
-	uptime := CalculateOverallUptime(sensors, history, params, now, liveMap)
+	uptime := CalculateOverallUptime(sensors, nil, history, params, now, liveMap)
 	t.Logf("Overall uptime: %.2f%%", uptime)
 	if uptime != 100.0 {
 		t.Errorf("Expected 100%% uptime, got %.2f%%", uptime)
@@ -406,7 +445,7 @@ func TestOverallUptime_MultiSensorDailyBlocks(t *testing.T) {
 	changes := []store.StatusChangeData{}
 	history := BuildUptimeHistory(sensors, changes, params, now, liveMap)
 
-	uptime := CalculateOverallUptime(sensors, history, params, now, liveMap)
+	uptime := CalculateOverallUptime(sensors, nil, history, params, now, liveMap)
 	t.Logf("Overall uptime (10 sensors, all up): %.2f%%", uptime)
 	if uptime != 100.0 {
 		t.Errorf("Expected 100%% uptime, got %.2f%%", uptime)
@@ -447,7 +486,8 @@ func TestOverallUptime_SensorDeployedMidBlock30D(t *testing.T) {
 		}
 	}
 
-	uptime := CalculateOverallUptime(sensors, history, params, now, liveMap)
+	changesBySensor := map[string][]store.StatusChangeData{"n1:s1": changes}
+	uptime := CalculateOverallUptime(sensors, changesBySensor, history, params, now, liveMap)
 	t.Logf("Overall uptime: %.2f%% (notUpBlocks=%d)", uptime, notUpCount)
 	if uptime != 100.0 {
 		t.Errorf("Expected 100%% uptime, got %.2f%%", uptime)
