@@ -218,13 +218,17 @@ const recentActivity = computed(() => {
 // --- SENSOR CATALOG ---
 
 onMounted(async () => {
-  isManifestLoading.value = true
-  try {
-    await fleetStore.fetchManifests()
-  } catch (error) {
-    console.error(error)
-    fetchError.value = true
-  } finally {
+  if (fleetStore.manifests.length === 0) {
+    isManifestLoading.value = true
+    try {
+      await fleetStore.fetchManifests()
+    } catch (error) {
+      console.error(error)
+      fetchError.value = true
+    } finally {
+      isManifestLoading.value = false
+    }
+  } else {
     isManifestLoading.value = false
   }
 })

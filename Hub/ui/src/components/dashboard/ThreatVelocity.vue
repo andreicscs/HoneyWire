@@ -165,7 +165,10 @@ onMounted(async () => {
         initChart()
         updateTheme()
         if (projection.value?.generatedAt) {
-            updateData() // Draw immediately if data arrived before mount
+            updateData() // Draw immediately from store cache
+            scheduleNextRollover()
+        } else {
+            fetchContextualProjection()
         }
     }
     
@@ -185,8 +188,7 @@ onMounted(async () => {
 // TRIGGER 1: Context Changes (User clicks filters)
 watch(
     [velocityTimeframe, () => selectedNode.value?.id, () => selectedSensor.value?.sensorId, viewingArchive],
-    fetchContextualProjection,
-    { immediate: true }
+    fetchContextualProjection
 )
 
 // TRIGGER 2: Global Invalidation (WebSocket says data is stale)

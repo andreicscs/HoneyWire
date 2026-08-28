@@ -14,30 +14,42 @@ const fleetStore = useFleetStore()
 const router = useRouter()
 
 // --- MANIFEST CATALOG ---
-const isManifestLoading = ref(true)
-const manifestData = ref<any[]>([])
+const isManifestLoading = ref(fleetStore.manifests.length === 0)
+const manifestData = ref<any[]>(fleetStore.manifests)
 
-// --- PARALLEL LOAD ---
-const isInitialLoading = ref(true)
+// --- CACHE-FIRST LOAD ---
+const isInitialLoading = ref(fleetStore.nodes.length === 0)
 const showSkeleton = ref(false)
 
 onMounted(async () => {
-    const skeletonTimer = setTimeout(() => {
-        if (isInitialLoading.value) showSkeleton.value = true
-    }, 350)
-
-    fleetStore.fetchManifests().then(manifests => {
-        manifestData.value = manifests
-    }).catch(err => {
-        console.error('Failed to load manifests', err)
-    }).finally(() => {
+    // If manifests are missing from store, fetch them
+    if (fleetStore.manifests.length === 0) {
+        fleetStore.fetchManifests().then(manifests => {
+            manifestData.value = manifests
+        }).catch(err => {
+            console.error('Failed to load manifests', err)
+        }).finally(() => {
+            isManifestLoading.value = false
+        })
+    } else {
+        manifestData.value = fleetStore.manifests
         isManifestLoading.value = false
-    })
+    }
 
-    try {
-        await fleetStore.fetchFleet()
-    } finally {
-        clearTimeout(skeletonTimer)
+    // If fleet nodes are not yet in store, fetch them with skeleton fallback
+    if (fleetStore.nodes.length === 0) {
+        const skeletonTimer = setTimeout(() => {
+            if (isInitialLoading.value) showSkeleton.value = true
+        }, 350)
+
+        try {
+            await fleetStore.fetchFleet()
+        } finally {
+            clearTimeout(skeletonTimer)
+            isInitialLoading.value = false
+            showSkeleton.value = false
+        }
+    } else {
         isInitialLoading.value = false
         showSkeleton.value = false
     }

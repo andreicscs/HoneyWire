@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import Chart from 'chart.js/auto'
 import { useEventsStore } from '../../stores/Events/events'
@@ -73,16 +73,19 @@ const updateTheme = () => {
     applyChartTheme(chartInstance);
 }
 
-onMounted(() => {
+onMounted(async () => {
+    await nextTick()
     if (chartCanvas.value) {
         chartInstance = new Chart(chartCanvas.value, {
             type: 'doughnut',
             data: {
                 labels: ['critical', 'high', 'medium', 'low', 'info'],
                 datasets: [{
-                    data: [0,0,0,0,0],
+                    data: [0, 0, 0, 0, 0],
                     backgroundColor: getChartColors(),
-                    borderWidth: 0, spacing: 4, borderRadius: 2
+                    borderWidth: 0,
+                    spacing: 4,
+                    borderRadius: 2
                 }]
             },
             options: { 
@@ -108,7 +111,11 @@ onMounted(() => {
             }
         });
         updateTheme();
-        updateData();
+        if (severityProjection.value) {
+            updateData();
+        } else {
+            eventsStore.fetchSeverityProjection('alltime', selectedNode.value?.id || null, selectedSensor.value?.sensorId || null);
+        }
     }
 
     themeObserver = new MutationObserver((mutations) => {
@@ -128,8 +135,7 @@ watch(
     () => [selectedNode.value?.id, selectedSensor.value?.sensorId, appStore.viewingArchive],
     ([nodeId, sensorId]: any[]) => {
         eventsStore.fetchSeverityProjection('alltime', nodeId || null, sensorId || null)
-    },
-    { immediate: true }
+    }
 )
 
 watch(
