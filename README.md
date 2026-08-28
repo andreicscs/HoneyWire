@@ -32,6 +32,7 @@
 - [Quick Start Guide](#-quick-start-guide)
 - [Security Notes](#security-notes)
 - [Tech Stack](#tech-stack)
+- [Roadmap & Development](#-roadmap--development)
 - [Versioning and API Reference](#versioning-and-api-reference)
 
 ## Overview
@@ -166,6 +167,14 @@ Run `honeywire firedrill` to make the HoneyWires send a mock event to the hub to
 * **Backend:** Go 1.25, `net/http` (Standard Library), SQLite (ModernC Pure Go Driver)
 * **Frontend:** Vue 3 (Composition API), TailwindCSS, Chart.js
 * **Infrastructure:** Docker, Docker Compose v5.0.0+
+
+
+## 🗺️ Roadmap & Development
+
+HoneyWire is actively evolving towards a complete GitOps-driven enterprise deception platform. 
+
+* **[View the Public Roadmap](https://github.com/users/andreicscs/projects/5)** to see what we are currently building (v2.2.0 features, v3.0.0 IaC overhaul, and upcoming SIEM benchmarks).
+* **Want to influence the roadmap?** We rely heavily on community feedback. Head over to our **[GitHub Discussions](https://github.com/andreicscs/HoneyWire/discussions/14)** to vote on upcoming features, propose new decoy types, or share how you use HoneyWire in your lab.
 
 
 ## Versioning and API Reference
