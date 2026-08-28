@@ -67,7 +67,7 @@ func (s *StateMonitor) monitor() {
 			SELECT status 
 			FROM sensor_status_changes 
 			WHERE node_id = ? AND sensor_id = ? 
-			ORDER BY timestamp DESC 
+			ORDER BY timestamp DESC, id DESC 
 			LIMIT 1
 		`, nodeID, sensorID).Scan(&lastStatus)
 

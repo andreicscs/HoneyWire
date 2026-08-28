@@ -98,8 +98,9 @@ func (s *SQLiteStore) GetSensorsForUptime(nowStr string) ([]SensorUptimeData, er
 	rows, err := s.DB.Query(`
 		SELECT ns.node_id, ns.sensor_id, n.last_heartbeat, 
 		       COALESCE(
-		           (SELECT timestamp FROM sensor_status_changes WHERE node_id = ns.node_id AND sensor_id = ns.sensor_id ORDER BY timestamp ASC LIMIT 1), 
-		           ns.created_at
+		           NULLIF(ns.created_at, ''),
+		           NULLIF(n.created_at, ''),
+		           (SELECT timestamp FROM sensor_status_changes WHERE node_id = ns.node_id AND sensor_id = ns.sensor_id ORDER BY timestamp ASC LIMIT 1)
 		       ) as first_seen
 		FROM node_sensors ns
 		JOIN nodes n ON ns.node_id = n.id
@@ -227,5 +228,23 @@ func (s *SQLiteStore) GetSensorLastHeartbeat(nodeID, sensorID string) (string, e
 		return "", nil
 	}
 	return lastHeartbeat.String, nil
+}
+
+func (s *SQLiteStore) GetSensorLatestStatus(nodeID, sensorID string) (string, error) {
+	var status sql.NullString
+	err := s.DB.QueryRow(`
+		SELECT status 
+		FROM sensor_status_changes 
+		WHERE node_id = ? AND sensor_id = ? 
+		ORDER BY timestamp DESC, id DESC 
+		LIMIT 1
+	`, nodeID, sensorID).Scan(&status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return status.String, nil
 }
 

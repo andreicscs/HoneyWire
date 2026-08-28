@@ -14,6 +14,7 @@ type Store interface {
 	UpdateSensorSilence(nodeID, sensorID string, silenceVal int) error
 	GetTransitionedOfflineNodes(offlineThreshold time.Duration, lastCheck time.Time) (map[string]bool, error)
 	GetSensorLastHeartbeat(nodeID, sensorID string) (string, error)
+	GetSensorLatestStatus(nodeID, sensorID string) (string, error)
 	InsertStatusChange(nodeID, sensorID, status, timestamp string) error
 }
 
@@ -40,18 +41,14 @@ func NewService(store Store, broadcaster Broadcaster) *Service {
 func (s *Service) ProcessHeartbeat(nodeID, sensorID, configRev string) error {
 	nowStr := time.Now().UTC().Format(time.RFC3339)
 
-	lastHeartbeatStr, err := s.store.GetSensorLastHeartbeat(nodeID, sensorID)
+	latestStatus, err := s.store.GetSensorLatestStatus(nodeID, sensorID)
 	if err != nil {
-		log.Printf("[ERROR] Failed to fetch last heartbeat for node %s sensor %s: %v", nodeID, sensorID, err)
+		log.Printf("[ERROR] Failed to fetch latest status for node %s sensor %s: %v", nodeID, sensorID, err)
 	}
 
-	isOffline := true
-	if lastHeartbeatStr != "" {
-		lastHeartbeat, err := time.Parse(time.RFC3339, lastHeartbeatStr)
-		if err == nil && time.Since(lastHeartbeat) <= 60*time.Second {
-			isOffline = false
-		}
-	}
+	// If the recorded state in sensor_status_changes is not "online",
+	// this incoming heartbeat marks an online transition.
+	isOffline := (latestStatus != "online")
 
 	_, err = s.store.ProcessHeartbeat(nodeID, sensorID, configRev, nowStr)
 	if err != nil {
