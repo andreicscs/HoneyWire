@@ -8,6 +8,8 @@ import { useConfigStore } from '../stores/Config/config.ts'
 import type { FleetNode } from '../stores/Fleet/fleet.ts'
 import { api } from '../api/client.ts'
 
+import { getUIDefault } from '../utils/getUIDefault.ts'
+
 import NodeDetailHeader from '../components/nodedetails/NodeDetailHeader.vue'
 import NodeStatWidgets from '../components/nodedetails/NodeStatWidgets.vue'
 import NodeSensorGrid from '../components/nodedetails/NodeSensorGrid.vue'
@@ -15,6 +17,7 @@ import NodeCatalogGrid from '../components/nodedetails/NodeCatalogGrid.vue'
 import NodeKeyModal from '../components/nodedetails/NodeKeyModal.vue'
 import NodeSyncModal from '../components/nodedetails/NodeSyncModal.vue'
 import NodeSensorModal from '../components/nodedetails/NodeSensorModal.vue'
+import { nodeDetailsStyles } from './nodeDetailsStyles.ts'
 
 const fleetStore = useFleetStore()
 const eventsStore = useEventsStore()
@@ -61,17 +64,7 @@ const syncCommand = computed(() => {
     return `honeywire apply`
 })
 
-// --- ENV VAR HELPERS ---
-const getUIDefault = (def: any) => {
-  if (def === undefined || def === null) return ''
-  const strDef = String(def)
-  if (!strDef.includes('{{')) return strDef
-  const elseMatch = strDef.match(/\{\{\s*else\s*\}\}(.*?)\{\{\s*end\s*\}\}/)
-  if (elseMatch) return elseMatch[1].trim()
-  const funcMatch = strDef.match(/\{\{\s*[a-zA-Z]+\s+([0-9]+)\s*\}\}/)
-  if (funcMatch) return funcMatch[1].trim()
-  return ''
-}
+// --- ENV VAR HELPERS (shared UI default resolution lives in utils) ---
 
 // --- SENSOR ACTIONS (delegated to store) ---
 
@@ -239,20 +232,32 @@ watch(() => node.value?.hasPendingConfig, (newVal) => {
   }
 })
 
+// --- SENSOR MODAL ENV VARS (shared by open + edit flows) ---
+
+const buildInitialEnvVars = (
+  manifest: any,
+  apiKey: string | null | undefined,
+  overrides: Record<string, any> = {}
+): Record<string, any> => {
+  const envVars: Record<string, any> = {
+    HW_HUB_ENDPOINT: configStore.config.hubEndpoint || window.location.origin,
+    HW_HUB_KEY: apiKey || '<YOUR_HW_NODE_KEY>',
+  }
+
+  manifest?.deployment?.env_vars?.forEach((env: any) => {
+    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY'].includes(env.name)) {
+      envVars[env.name] = getUIDefault(env.default)
+    }
+  })
+
+  return { ...envVars, ...overrides }
+}
+
 const openSensor = (sensor: any) => {
-  const apiKey = node.value?.apiKey
   selectedSensor.value = sensor
   isEditingSensor.value = false
   editingSensorId.value = null
-  initialEnvVars.value = {}
-  initialEnvVars.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
-  initialEnvVars.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
-
-  sensor.deployment?.env_vars?.forEach((env: any) => {
-    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY'].includes(env.name)) {
-      initialEnvVars.value[env.name] = getUIDefault(env.default)
-    }
-  })
+  initialEnvVars.value = buildInitialEnvVars(sensor, node.value?.apiKey)
   document.body.style.overflow = 'hidden'
   showSensorModal.value = true
 }
@@ -278,22 +283,7 @@ const editSensor = async (installedSensor: any) => {
   selectedSensor.value = manifest
   isEditingSensor.value = true
   editingSensorId.value = installedSensor.sensorId
-  initialEnvVars.value = {}
-  initialEnvVars.value['HW_HUB_ENDPOINT'] = configStore.config.hubEndpoint || window.location.origin
-  initialEnvVars.value['HW_HUB_KEY'] = apiKey || '<YOUR_HW_NODE_KEY>'
-  
-  manifest.deployment?.env_vars?.forEach((env: any) => {
-    if (!['HW_HUB_ENDPOINT', 'HW_HUB_KEY'].includes(env.name)) {
-      initialEnvVars.value[env.name] = getUIDefault(env.default)
-    }
-  })
-  
-  if (installedSensor.envVars) {
-      Object.keys(installedSensor.envVars).forEach(key => {
-          initialEnvVars.value[key] = installedSensor.envVars[key]
-      })
-  }
-  
+  initialEnvVars.value = buildInitialEnvVars(manifest, apiKey, installedSensor.envVars || {})
   document.body.style.overflow = 'hidden'
   showSensorModal.value = true
 }
@@ -309,16 +299,16 @@ const closeSensor = () => {
 </script>
 
 <template>
-    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
+    <div :class="nodeDetailsStyles.pageRoot" data-testid="node-details-page">
         
-        <div class="mt-4 sm:mt-6 mb-4 shrink-0">
-            <button @click="fleetStore.clearSelection(); router.push('/fleet')" class="flex items-center gap-1.5 text-sm font-medium text-text-m hover:text-text-h transition-colors outline-none w-max">
+        <div :class="nodeDetailsStyles.backRow">
+            <button @click="fleetStore.clearSelection(); router.push('/fleet')" data-testid="back-to-fleet" :class="nodeDetailsStyles.backButton">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 Back to Fleet
             </button>
         </div>
 
-        <div v-if="node" class="bg-bg-base border border-border-default rounded-lg p-5 sm:p-6 mb-8 shrink-0 shadow-sm flex flex-col gap-6">
+        <div v-if="node" data-testid="node-card" :class="nodeDetailsStyles.nodeCard">
             <NodeDetailHeader 
                 :node="node" 
                 :last-event-time="lastEventTime"

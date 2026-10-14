@@ -13,8 +13,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# hub binary
+# hub binary (root-level build output only)
+# NOTE: with `core.ignorecase=true` (macOS default) `/hub` also matches the
+# `/Hub` source directory, so it must be re-included explicitly.
 /hub
+!/Hub/
 /Hub/hub
 /hub.exe
 /Hub/hub.exe

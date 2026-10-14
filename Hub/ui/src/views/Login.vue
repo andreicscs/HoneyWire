@@ -3,11 +3,9 @@ import { ref } from 'vue'
 import { useAppStore } from '../stores/System/app'
 import BaseInput from '../components/ui/forms/BaseInput.vue'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
-import BaseCard from '../components/ui/layout/BaseCard.vue'
-import BaseAlert from '../components/ui/feedback/BaseAlert.vue'
-import PageHeader from '../components/ui/layout/PageHeader.vue'
-import ThemeToggle from '../components/ui/branding/ThemeToggle.vue'
-import BaseLogo from '../components/ui/branding/BaseLogo.vue'
+import AuthLayout from '../components/auth/AuthLayout.vue'
+import AuthAlert from '../components/auth/AuthAlert.vue'
+import { authStyles } from './authStyles.ts'
 
 const emit = defineEmits(['login-success', 'toggle-theme'])
 const appStore = useAppStore()
@@ -21,9 +19,9 @@ const doLogin = async () => {
     loading.value = true
     error.value = false
     rateLimited.value = false
-    
+
     const result = await appStore.login(password.value)
-    
+
     if (result.success) {
         emit('login-success')
     } else if (result.status === 429) {
@@ -33,83 +31,41 @@ const doLogin = async () => {
         error.value = true
         password.value = ''
     }
-    
+
     loading.value = false
 }
 </script>
 
 <template>
-    <div class="h-screen flex flex-col items-center justify-center bg-bg-base p-6 relative transition-colors duration-normal">
-        
-        <div class="absolute top-6 right-6">
-            <ThemeToggle @toggle="$emit('toggle-theme')" />
-        </div>
+    <AuthLayout @toggle-theme="$emit('toggle-theme')">
+        <form @submit.prevent="doLogin" :class="authStyles.formTight">
+            <BaseInput
+                v-model="password"
+                data-testid="login-password"
+                label="Authentication Key"
+                type="password"
+                placeholder="••••••••••••"
+                required
+                autofocus
+            />
 
-        <div class="w-full max-w-sm z-10">
-            
-            <div class="mb-10">
-                <BaseLogo />
-                <PageHeader 
-                    center 
-                    title="HoneyWire Sentinel" 
-                    description="Authorized personnel only." 
-                />
-            </div>
+            <BaseButton
+                variant="primary"
+                type="submit"
+                data-testid="login-submit"
+                :disabled="loading || rateLimited"
+                class="w-full h-11"
+            >
+                {{ loading ? 'Authenticating...' : 'Sign in' }}
+            </BaseButton>
+        </form>
 
-            <BaseCard class="relative overflow-hidden transition-all duration-normal">
-                <div class="absolute top-0 left-0 right-0 h-1 opacity-90" style="background: linear-gradient(to right, var(--sev-info), var(--sev-low), var(--sev-medium), var(--sev-high), var(--sev-critical))"></div>
-
-                <form @submit.prevent="doLogin" class="mt-2 space-y-6">
-                    <BaseInput 
-                        v-model="password" 
-                        label="Authentication Key" 
-                        type="password" 
-                        placeholder="••••••••••••" 
-                        required 
-                        autofocus
-                    />
-                    
-                    <BaseButton 
-                        variant="primary" 
-                        type="submit" 
-                        :disabled="loading || rateLimited"
-                        class="w-full h-11"
-                    >
-                        {{ loading ? 'Authenticating...' : 'Sign in' }}
-                    </BaseButton>
-                </form>
-
-                <Transition
-                    enter-active-class="transition duration-300 ease-out"
-                    enter-from-class="transform -translate-y-2 opacity-0"
-                    enter-to-class="transform translate-y-0 opacity-100"
-                    leave-active-class="transition duration-200 ease-in"
-                    leave-from-class="transform translate-y-0 opacity-100"
-                    leave-to-class="transform -translate-y-2 opacity-0"
-                >
-                    <div v-if="error" class="mt-6">
-                        <BaseAlert variant="danger" message="Access Denied: Invalid Key" />
-                    </div>
-                </Transition>
-
-                <Transition
-                    enter-active-class="transition duration-300 ease-out"
-                    enter-from-class="transform -translate-y-2 opacity-0"
-                    enter-to-class="transform translate-y-0 opacity-100"
-                    leave-active-class="transition duration-200 ease-in"
-                    leave-from-class="transform translate-y-0 opacity-100"
-                    leave-to-class="transform -translate-y-2 opacity-0"
-                >
-                    <div v-if="rateLimited" class="mt-6">
-                        <BaseAlert 
-                            variant="danger" 
-                            :message="'Too many attempts.\nPlease try again in 15 minutes.'"
-                            class="whitespace-pre-line"
-                        />
-                    </div>
-                </Transition>
-            </BaseCard>
-            
-        </div>
-    </div>
+        <AuthAlert :show="error" message="Access Denied: Invalid Key" testid="login-error" />
+        <AuthAlert
+            :show="rateLimited"
+            :message="'Too many attempts.\nPlease try again in 15 minutes.'"
+            alert-class="whitespace-pre-line"
+            testid="login-rate-limited"
+        />
+    </AuthLayout>
 </template>

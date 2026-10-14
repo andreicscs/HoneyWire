@@ -9,6 +9,7 @@ import { getComputedRgb } from '../../utils/theme'
 import { baseTooltipConfig, applyChartTheme } from '../../utils/chartConfig'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
+import { chartWidgetStyles } from './dashboardWidgetsStyles.ts'
 
 const eventsStore = useEventsStore()
 const fleetStore = useFleetStore()
@@ -161,21 +162,20 @@ const legendItems = [
     <BaseWidget>
         <template #header>
             <div>
-                <h3 class="text-base font-medium text-text-h">Severity Distribution</h3>
+                <h3 :class="chartWidgetStyles.title">Severity Distribution</h3>
                 <div class="flex items-center gap-4 mt-1">
                     <p class="text-sm text-text-m">Active Threat Breakdown</p>
                 </div>
             </div>
         </template>
         
-        <div class="flex-1 relative mt-2 min-h-0 w-full">
+        <div :class="chartWidgetStyles.body">
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
-            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                <span class="text-3xl transition-colors leading-none"
-                      :class="(severityProjection?.total || 0) === 0 ? 'text-success-main' : 'text-critical'">
+            <div :class="chartWidgetStyles.centerOverlay">
+                <span :class="[chartWidgetStyles.centerTotal, (severityProjection?.total || 0) === 0 ? 'text-success-main' : 'text-critical']">
                     {{ severityProjection?.total || 0 }}
                 </span>
-                <span class="text-sm text-text-m mt-1 leading-none">Events</span>
+                <span :class="chartWidgetStyles.centerLabel">Events</span>
             </div>
         </div>
 

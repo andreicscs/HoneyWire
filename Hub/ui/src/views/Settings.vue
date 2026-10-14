@@ -1,21 +1,22 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { useAppStore } from '../stores/System/app'
 import { useConfigStore } from '../stores/Config/config'
-import { useFleetStore } from '../stores/Fleet/fleet'
 import BaseButton from '../components/ui/forms/BaseButton.vue'
-import BaseInput from '../components/ui/forms/BaseInput.vue'
-import BaseModal from '../components/ui/feedback/BaseModal.vue'
 import PageHeader from '../components/ui/layout/PageHeader.vue'
-import BaseCard from '../components/ui/layout/BaseCard.vue'
-import BaseDivider from '../components/ui/layout/BaseDivider.vue'
 import BaseVerticalNav from '../components/ui/navigation/BaseVerticalNav.vue'
-import BaseRadioGroup from '../components/ui/forms/BaseRadioGroup.vue'
-import BaseNumberStepper from '../components/ui/forms/BaseNumberStepper.vue'
+import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import SettingsDataTab from '../components/settings/SettingsDataTab.vue'
+import SettingsAlertsTab from '../components/settings/SettingsAlertsTab.vue'
+import SettingsSiemTab from '../components/settings/SettingsSiemTab.vue'
+import SettingsSecurityTab from '../components/settings/SettingsSecurityTab.vue'
+import SettingsPasswordModal from '../components/settings/SettingsPasswordModal.vue'
+import SettingsResetModal from '../components/settings/SettingsResetModal.vue'
+import {
+    settingsLayout,
+    settingsHeader,
+} from './settingsStyles.ts'
 
-const appStore = useAppStore()
 const configStore = useConfigStore()
-const fleetStore = useFleetStore()
 const activeTab = ref('general')
 
 const settingTabs = [
@@ -93,480 +94,69 @@ const saveSettings = async () => {
     }
 }
 
-const isCheckingUpdates = ref(false)
-const updateCheckFeedback = ref(null)
-let feedbackTimeout = null
-
-const checkForUpdatesManual = async () => {
-    if (isCheckingUpdates.value) return
-    isCheckingUpdates.value = true
-    if (feedbackTimeout) clearTimeout(feedbackTimeout)
-    updateCheckFeedback.value = null
-
-    const [result] = await Promise.all([
-        appStore.checkSystemUpdatesManual().then(async res => {
-            if (res && res.success) {
-                await fleetStore.fetchFleet()
-            }
-            return res
-        }),
-        new Promise(resolve => setTimeout(resolve, 600))
-    ])
-    isCheckingUpdates.value = false
-
-    if (result && result.success) {
-        if (result.data?.warning) {
-            updateCheckFeedback.value = {
-                type: 'warning',
-                message: result.data.warning
-            }
-        } else {
-            const hasHubUpdate = appStore.updateAvailable
-            const hasWizardUpdate = appStore.wizardUpdateAvailable
-            const hasSensorUpdate = fleetStore.hasUpdatesAvailable
-
-            if (hasHubUpdate && hasWizardUpdate && hasSensorUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: 'New updates available for Hub, Wizard, and Fleet Sensors!'
-                }
-            } else if (hasHubUpdate && hasWizardUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: `New Hub (${appStore.latestVersion}) and Wizard CLI (${appStore.latestWizardVersion}) available!`
-                }
-            } else if (hasHubUpdate && hasSensorUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: `New Hub (${appStore.latestVersion}) and Fleet Sensor updates available!`
-                }
-            } else if (hasWizardUpdate && hasSensorUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: `New Wizard CLI (${appStore.latestWizardVersion}) and Fleet Sensor updates available!`
-                }
-            } else if (hasHubUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: `New Hub version ${appStore.latestVersion} available!`
-                }
-            } else if (hasWizardUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: `New Wizard CLI version ${appStore.latestWizardVersion} available!`
-                }
-            } else if (hasSensorUpdate) {
-                updateCheckFeedback.value = {
-                    type: 'info',
-                    message: 'New sensor updates available for your fleet!'
-                }
-            } else {
-                updateCheckFeedback.value = {
-                    type: 'success',
-                    message: 'All system and sensor updates are up to date.'
-                }
-            }
-        }
-    } else {
-        updateCheckFeedback.value = {
-            type: 'error',
-            message: (result && result.error) || 'Unable to check updates. Please try again.'
-        }
-    }
-
-    feedbackTimeout = setTimeout(() => {
-        updateCheckFeedback.value = null
-    }, 5000)
-}
-
-const toggleSeverity = (sev) => {
-    const index = settings.value.webhookEvents.indexOf(sev)
-    if (index === -1) {
-        settings.value.webhookEvents.push(sev)
-    } else {
-        settings.value.webhookEvents.splice(index, 1)
-    }
-}
-
-const getSeverityStyle = (sev, isActive) => {
-    if (!isActive) {
-        return { 
-            backgroundColor: 'var(--bg-inset)', 
-            borderColor: 'var(--border-default)', 
-            color: 'var(--text-muted)' 
-        };
-    }
-    const color = `var(--sev-${sev.toLowerCase()})`;
-    return {
-        backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)`,
-        borderColor: `color-mix(in srgb, ${color} 50%, transparent)`,
-        color: color
-    };
-}
-
-// --- SECURITY MODALS (ephemeral UI + store delegation) ---
+// --- SECURITY MODALS (open state only; form state lives in the modal components) ---
 
 const showPasswordModal = ref(false)
-const pwdData = ref({ current: '', new: '', confirmNew: '' })
-const pwdError = ref('')
-const pwdLoading = ref(false)
-
 const showResetModal = ref(false)
-const resetPassword = ref('')
-const resetError = ref('')
-const resetLoading = ref(false)
-
-const submitPasswordChange = async () => {
-    if (!pwdData.value.current || !pwdData.value.new || !pwdData.value.confirmNew) {
-        pwdError.value = "All fields are required."
-        return
-    }
-    if (pwdData.value.new !== pwdData.value.confirmNew) {
-        pwdError.value = "New passwords do not match."
-        return
-    }
-    pwdLoading.value = true
-    pwdError.value = ''
-
-    const result = await appStore.changePassword(pwdData.value.current, pwdData.value.new)
-
-    pwdLoading.value = false
-    if (result.success) {
-        window.location.reload()
-    } else {
-        pwdError.value = result.error
-    }
-}
-
-const submitFactoryReset = async () => {
-    if (!resetPassword.value) {
-        resetError.value = "Master password is required."
-        return
-    }
-    resetLoading.value = true
-    resetError.value = ''
-
-    // Step 1: Dry run
-    const dryRunResult = await appStore.factoryReset(resetPassword.value, true)
-    
-    if (!dryRunResult.success) {
-        resetLoading.value = false
-        resetError.value = dryRunResult.error || "Dry run failed."
-        return
-    }
-
-    resetLoading.value = false
-    const stats = dryRunResult.stats
-
-    if (confirm(`Confirm Factory Reset?\n\nThis will permanently delete:\n- ${stats.events} Security Events\n- ${stats.sensor_heartbeats} Sensor Heartbeats\n- ${stats.node_sensors} Deployed Sensors\n- ${stats.nodes} Nodes\n\nThis action cannot be undone.`)) {
-        resetLoading.value = true
-        const result = await appStore.factoryReset(resetPassword.value, false)
-        resetLoading.value = false
-        
-        if (result.success) {
-            window.location.reload()
-        } else {
-            resetError.value = result.error || "Reset failed."
-        }
-    }
-}
 </script>
 
 <template>
-    <div class="h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 pt-4 sm:pt-6 transition-colors duration-200">
+    <div :class="settingsLayout.pageRoot" data-testid="settings-page">
         
         <PageHeader title="System Settings" description="Manage Hub configuration, retention policies, and push notifications.">
             <template #actions>
-                <span v-if="saveMessage && isError" class="text-xs text-danger-main hidden sm:block">
+                <span v-if="saveMessage && isError" :class="settingsHeader.saveError">
                     {{ saveMessage }}
                 </span>
 
-                <span v-else-if="saveMessage && !isError" class="text-xs text-success-main hidden sm:block">
+                <span v-else-if="saveMessage && !isError" :class="settingsHeader.saveSuccess">
                     {{ saveMessage }}
                 </span>
 
-                <span v-else-if="hasUnsavedChanges" class="text-xs  text-medium animate-pulse hidden sm:flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-medium inline-block"></span> Unsaved changes
+                <span v-else-if="hasUnsavedChanges" :class="settingsHeader.unsavedHint">
+                    <span :class="settingsHeader.unsavedDot"></span> Unsaved changes
                 </span>
 
-                <BaseButton variant="primary" :disabled="isSaving || !hasUnsavedChanges" @click="saveSettings">
+                <BaseButton variant="primary" data-testid="settings-save-button" :disabled="isSaving || !hasUnsavedChanges" @click="saveSettings">
                     {{ isSaving ? 'Saving...' : 'Save Changes' }}
                 </BaseButton>
             </template>
         </PageHeader>
         
-        <div class="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
+        <div :class="settingsLayout.contentRow">
             
             <BaseVerticalNav v-model="activeTab" :tabs="settingTabs" />
 
-            <div class="flex-1 overflow-y-auto custom-scroll pr-2 space-y-6 after:content-[''] after:block after:h-24 after:shrink-0">
+            <div :class="settingsLayout.scrollRegion" data-testid="settings-scroll-region">
                 
                 <div v-show="activeTab === 'general'">
-                    <BaseCard title="Network Configuration">
-                        <div class="max-w-md space-y-4">
-                            <BaseInput 
-                                v-model="settings.hubEndpoint" 
-                                label="Hub Endpoint URL" 
-                                description="The publicly accessible URL or IP where sensors will send their telemetry." 
-                            />
-                            
-                            <BaseInput 
-                                v-model="settings.registryUrl" 
-                                label="Sensor Registry URL" 
-                                description="The public registry URL from which to download sensor updates." 
-                            />
-                            
-                            <div v-if="(settings.hubEndpoint && settings.hubEndpoint.startsWith('http://')) || (settings.registryUrl && settings.registryUrl.startsWith('http://'))" class="flex items-start gap-2 text-danger-text bg-danger-bg p-3 rounded-md border border-danger-border mt-4">
-                                <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                <div class="text-sm">
-                                    <p class="font-medium">Unsafe Protocol Detected</p>
-                                    <p class="mt-0.5 opacity-90">Using HTTP allows unencrypted man-in-the-middle attacks. It is highly recommended to use HTTPS for all URLs to protect sensor telemetry and manifests.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </BaseCard>
-
-                    <BaseCard title="System Updates" class="mt-6">
-                        <div class="max-w-md space-y-4">
-                            <BaseNumberStepper 
-                                v-model="settings.updateCheckIntervalHours" 
-                                label="Update Check Interval (Hours)" 
-                                :min="0" :max="720"
-                                description="How often the hub checks for updates. Set to 0 to disable automatic checks." 
-                            />
-
-                            <div class="pt-3 border-t border-border-default/60 flex flex-col gap-2.5">
-                                <div class="flex items-center justify-between gap-4 max-w-md">
-                                    <div class="flex-1 min-w-0 pr-2">
-                                        <label class="block text-xs text-text-h mb-1">Manual Check</label>
-                                        <p class="text-xs text-text-m leading-normal">Check for Hub, Wizard, and Sensor updates on demand.</p>
-                                    </div>
-                                    <button 
-                                        type="button"
-                                        :disabled="isCheckingUpdates"
-                                        @click="checkForUpdatesManual"
-                                        class="w-[112px] justify-center text-sm tracking-wider py-1.5 rounded-md transition-all border outline-none select-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-secondary-hover hover:text-text-h shadow-sm cursor-pointer flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                                    >
-                                        <svg v-if="isCheckingUpdates" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        <svg v-else class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        <span>{{ isCheckingUpdates ? 'Checking...' : 'Check now' }}</span>
-                                    </button>
-                                </div>
-
-                                <div v-if="updateCheckFeedback" :class="[
-                                    'w-fit inline-flex items-center gap-2 py-1.5 px-3 rounded-md text-xs border transition-all mt-0.5',
-                                    updateCheckFeedback.type === 'success' ? 'bg-success-bg text-success-text border-success-border' :
-                                    updateCheckFeedback.type === 'info' ? 'bg-update-bg text-update-main border-update-border' :
-                                    updateCheckFeedback.type === 'warning' ? 'bg-warning-bg text-warning-text border-warning-border' :
-                                    'bg-danger-bg text-danger-text border-danger-border'
-                                ]">
-                                    <svg v-if="updateCheckFeedback.type === 'success'" class="w-3.5 h-3.5 shrink-0 text-success-main" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                                    <svg v-else-if="updateCheckFeedback.type === 'info'" class="w-3.5 h-3.5 shrink-0 text-update-main" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    <svg v-else-if="updateCheckFeedback.type === 'warning'" class="w-3.5 h-3.5 shrink-0 text-warning-main" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                    <svg v-else class="w-3.5 h-3.5 shrink-0 text-danger-main" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                    <span class="text-xs leading-normal">{{ updateCheckFeedback.message }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </BaseCard>
-
-                    <BaseCard title="Event Filtering" class="mt-6">
-                        <div class="max-w-md">
-                            <BaseInput 
-                                v-model="settings.whitelistedSources" 
-                                label="Whitelisted Event Sources" 
-                                description="Comma-separated list of IPs or source names to ignore. Events originating from these sources will be completely dropped and not logged." 
-                                placeholder="e.g. 192.168.1.1, vulnerability_scanner"
-                            />
-                        </div>
-                    </BaseCard>
+                    <SettingsGeneralTab v-model="settings" />
                 </div>
 
                 <div v-show="activeTab === 'data'">
-                    <BaseCard title="Database Retention Policies">
-                        <div class="space-y-6">
-                            <div>
-                                <h3 class="text-sm text-text-m font-medium mb-4">Events Data</h3>
-                                <div class="space-y-4">
-                                    <BaseNumberStepper 
-                                        v-model="settings.autoArchiveDays" 
-                                        label="Auto-Archive Events" 
-                                        description="Move events from the Live Queue to the Archive automatically."
-                                        :min="0" :max="365" 
-                                        :suffix="settings.autoArchiveDays === 1 ? 'Day' : 'Days'"
-                                        :class="settings.autoArchiveDays === 0 ? '[&_input]:!text-disabled-text' : ''"
-                                    />
-                                    <BaseNumberStepper 
-                                        v-model="settings.autoPurgeDays" 
-                                        label="Auto-Purge Archive" 
-                                        description="Permanently delete archived events from the SQLite database." 
-                                        :min="0" :max="365" 
-                                        :suffix="settings.autoPurgeDays === 1 ? 'Day' : 'Days'"
-                                        :class="settings.autoPurgeDays === 0 ? '[&_input]:!text-disabled-text' : ''"
-                                    />
-                                </div>
-                            </div>
-                            
-                            <BaseDivider />
-                            
-                            <div>
-                                <h3 class="text-sm text-text-m font-medium mb-4">Uptime Data</h3>
-                                <BaseNumberStepper 
-                                    v-model="settings.autoPurgeHeartbeatsDays" 
-                                    label="Auto-Purge Uptime Data" 
-                                    description="Permanently delete historical uptime state changes from the database." 
-                                    :min="0" :max="365" 
-                                    :suffix="settings.autoPurgeHeartbeatsDays === 1 ? 'Day' : 'Days'"
-                                    :class="settings.autoPurgeHeartbeatsDays === 0 ? '[&_input]:!text-disabled-text' : ''"
-                                />
-                            </div>
-                        </div>
-                    </BaseCard>
+                    <SettingsDataTab v-model="settings" />
                 </div>
 
                 <div v-show="activeTab === 'alerts'">
-                    <BaseCard title="Push Notifications">
-                        <BaseRadioGroup 
-                            v-model="settings.webhookType" 
-                            label="Service Provider" 
-                            :options="['ntfy', 'gotify', 'discord', 'slack']" 
-                        />
-                        
-                        <BaseDivider />
-                        
-                        <div class="max-w-xl">
-                            <BaseInput 
-                                v-model="settings.webhookUrl" 
-                                label="Target URL" 
-                                type="url"
-                                placeholder="https://..."
-                                :description="
-                                    settings.webhookType === 'gotify' ? 'Enter your Gotify server URL and append the App Token (e.g., https://gotify.domain.com/message?token=XYZ).' : 
-                                    settings.webhookType === 'ntfy' ? 'Enter your self-hosted or public Ntfy topic URL (e.g., https://ntfy.sh/my_alerts).' : 
-                                    `Paste the incoming Webhook URL provided by ${settings.webhookType === 'discord' ? 'Discord' : 'Slack'}.`
-                                " 
-                            />
-                        </div>
-                        
-                        <BaseDivider />
-                        
-                        <div>
-                            <label class="block text-sm  tracking-wider  text-text-m mb-2">Trigger Severities</label>
-                            <div class="flex flex-wrap gap-2.5">
-                                <button v-for="sev in ['critical', 'high', 'medium', 'low', 'info']" :key="sev"
-                                        @click="toggleSeverity(sev)"
-                                        class="text-sm   tracking-wider px-3.5 py-1.5 rounded-md transition-all border outline-none select-none hover:opacity-80"
-                                        :style="getSeverityStyle(sev, settings.webhookEvents.includes(sev))">
-                                    {{ sev }}
-                                </button>
-                            </div>
-                        </div>
-                    </BaseCard>
+                    <SettingsAlertsTab v-model="settings" />
                 </div>
 
                 <div v-show="activeTab === 'siem'">
-                    <BaseCard title="SIEM Forwarding">
-                        <div class="max-w-xl">
-                            <BaseInput 
-                                v-model="settings.siemAddress" 
-                                label="Server Address" 
-                                placeholder="host:port"
-                                description="Forward syslog events to your SIEM (e.g., elk.example.com:514)." 
-                            />
-                        </div>
-                        
-                        <BaseDivider />
-                        
-                        <BaseRadioGroup 
-                            v-model="settings.siemProtocol" 
-                            label="Protocol" 
-                            :options="['tcp', 'udp']" 
-                            description="Events are sent in RFC5424 syslog format. Leave blank to disable SIEM forwarding."
-                        />
-                    </BaseCard>
+                    <SettingsSiemTab v-model="settings" />
                 </div>
 
-                <div v-show="activeTab === 'security'" class="space-y-6">
-                    <BaseCard title="Authentication">
-                        <p class="text-sm text-text-m mb-4 max-w-2xl">Update the master password used to access this dashboard. You will be logged out immediately upon changing this.</p>
-                        <BaseButton variant="secondary" @click="pwdData = {current:'', new:'', confirmNew:''}; pwdError = ''; showPasswordModal = true">
-                            Change Master Password
-                        </BaseButton>
-                    </BaseCard>
-
-                    <BaseCard danger>
-                        <template #icon>
-                            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        </template>
-                        <template #default>
-                            <h3 class="text-base  text-danger-text -mt-10 mb-4 ml-7">Danger Zone</h3>
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-bg-surface border border-danger-border p-5 rounded-lg shadow-sm transition-colors">
-                                <div>
-                                    <h4 class="text-base  text-text-h">Factory Reset</h4>
-                                    <p class="text-xs text-text-m mt-1 max-w-xl">Wipes all configuration, logs, and authentication keys. The application will restart in setup mode.</p>
-                                </div>
-                                <BaseButton variant="danger" @click="resetPassword = ''; resetError = ''; showResetModal = true" class="shrink-0">
-                                    Reset System
-                                </BaseButton>
-                            </div>
-                        </template>
-                    </BaseCard>
+                <div v-show="activeTab === 'security'">
+                    <SettingsSecurityTab
+                        @change-password="showPasswordModal = true"
+                        @reset-system="showResetModal = true"
+                    />
                 </div>
 
             </div>
         </div>
 
-        <BaseModal :show="showPasswordModal" title="Update Password" @close="showPasswordModal = false">
-            <template #icon>
-                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"></path></svg>
-            </template>
-            <form @submit.prevent="submitPasswordChange" class="space-y-4">
-            <BaseInput v-model="pwdData.current" label="Current Password" type="password" required autofocus />
-                <BaseInput v-model="pwdData.new" label="New Password" type="password" required />
-                <BaseInput v-model="pwdData.confirmNew" label="Confirm New Password" type="password" required />
-                
-                <div v-if="pwdError" class="text-xs  text-danger-text bg-danger-bg p-2.5 rounded-md border border-danger-border">{{ pwdError }}</div>
-                
-                <div class="pt-4 flex justify-end gap-3">
-                    <BaseButton variant="ghost" @click="showPasswordModal = false">Cancel</BaseButton>
-                    <BaseButton variant="primary" type="submit" :disabled="pwdLoading">
-                        {{ pwdLoading ? 'Updating...' : 'Update Password' }}
-                    </BaseButton>
-                </div>
-            </form>
-        </BaseModal>
-
-        <BaseModal :show="showResetModal" title="Confirm Factory Reset" danger @close="showResetModal = false">
-            <template #icon>
-                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            </template>
-            <p class="text-sm text-text-m mb-5">This action is irreversible. All events, sensors, and configurations will be permanently deleted. Enter your master password to confirm.</p>
-            
-            <form @submit.prevent="submitFactoryReset" class="space-y-4">
-                <BaseInput 
-                    v-model="resetPassword" 
-                    type="password" 
-                    placeholder="Master Password" 
-                    required 
-                    autofocus
-                    inputClass="!border-danger-border !focus:border-danger-main"
-                />
-                
-                <div v-if="resetError" class="text-xs  text-danger-text bg-danger-bg p-2.5 rounded-md border border-danger-border text-center">{{ resetError }}</div>
-                
-                <div class="pt-4 flex justify-end gap-3">
-                    <BaseButton variant="ghost" @click="showResetModal = false; resetPassword = ''; resetError = ''">Cancel</BaseButton>
-                    <BaseButton variant="danger" type="submit" :disabled="resetLoading">
-                        {{ resetLoading ? 'Processing...' : 'Destroy Data' }}
-                    </BaseButton>
-                </div>
-            </form>
-        </BaseModal>
+        <SettingsPasswordModal :show="showPasswordModal" @close="showPasswordModal = false" />
+        <SettingsResetModal :show="showResetModal" @close="showResetModal = false" />
 
     </div>
 </template>

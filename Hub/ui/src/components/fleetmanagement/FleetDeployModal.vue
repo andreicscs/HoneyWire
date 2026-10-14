@@ -7,6 +7,7 @@ import { useClipboard } from '../../utils/useClipboard.js'
 import { useFleetStore } from '../../stores/Fleet/fleet.ts'
 import { useConfigStore } from '../../stores/Config/config.ts'
 import { useAppStore } from '../../stores/System/app.ts'
+import { fleetDeployStyles } from './fleetmanagementStyles.ts'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -61,33 +62,33 @@ watch(() => createdNodeId.value, (newId) => {
 
 <template>
     <BaseModal :show="show" @close="close" title="Deploy New Node">
-        <form v-if="step === 1" @submit.prevent="submit" class="space-y-5">
-            <p class="text-sm text-text-m leading-normal">
+        <form v-if="step === 1" @submit.prevent="submit" :class="fleetDeployStyles.formStack">
+            <p :class="fleetDeployStyles.intro">
                 Create a logical node in the hub before installing the agent on your server.
             </p>
             
             <div>
-                <label class="block text-sm font-medium text-text-h mb-1.5">Node Alias</label>
-                <BaseInput v-model="form.alias" placeholder="e.g., AWS-East-Gateway" autofocus />
+                <label :class="fleetDeployStyles.fieldLabel">Node Alias</label>
+                <BaseInput v-model="form.alias" data-testid="deploy-alias-input" placeholder="e.g., AWS-East-Gateway" autofocus />
             </div>
 
-            <div class="flex justify-end gap-3 pt-5 border-t border-border-default mt-6">
+            <div :class="fleetDeployStyles.formFooter">
                 <BaseButton variant="ghost" @click="close">Cancel</BaseButton>
                 <BaseButton variant="primary" type="submit" :disabled="!form.alias">Create Node</BaseButton>
             </div>
         </form>
 
-        <div v-else class="space-y-6">
-            <div class="flex items-center gap-3 text-success-text bg-success-bg border border-success-border p-3.5 rounded-md">
+        <div v-else :class="fleetDeployStyles.successStack">
+            <div :class="fleetDeployStyles.successBanner">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span class="text-sm font-medium">Node created successfully.</span>
             </div>
 
             <div>
-                <div class="flex items-center justify-between mb-1.5">
+                <div :class="fleetDeployStyles.cmdHeadRow">
                     <div class="flex items-center gap-2">
-                        <label class="block text-sm font-medium text-text-h">Wizard Installation Command</label>
-                        <span v-if="appStore.latestWizardVersion" class="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-secondary-main text-text-m border border-secondary-border">
+                        <label :class="fleetDeployStyles.fieldLabel">Wizard Installation Command</label>
+                        <span v-if="appStore.latestWizardVersion" :class="fleetDeployStyles.versionBadge">
                             {{ appStore.latestWizardVersion }}
                         </span>
                     </div>
@@ -99,11 +100,11 @@ watch(() => createdNodeId.value, (newId) => {
                         </span>
                     </BaseButton>
                 </div>
-                <code class="block w-full p-4 bg-bg-inset/50 border border-border-default rounded-md text-sm font-mono text-text-h whitespace-pre-wrap break-all leading-normal select-all">curl -fsSL https://get.honeywire.dev | bash -s -- --link {{ hubUrl }} --api-key {{ nodeKey }}</code>
+                <code :class="fleetDeployStyles.cmdCode">curl -fsSL https://get.honeywire.dev | bash -s -- --link {{ hubUrl }} --api-key {{ nodeKey }}</code>
             </div>
 
             <div>
-                <div class="flex items-center justify-between mb-1.5">
+                <div :class="fleetDeployStyles.cmdHeadRow">
                     <label class="block text-sm font-medium text-text-m">Node API Key</label>
                     <BaseButton variant="ghost" class="!py-1 !px-2 !text-xs transition-colors" :class="copiedStates['modal-key'] ? '!text-success-main hover:!text-success-main' : ''" @click="handleCopy('modal-key', nodeKey)">
                         <span class="flex items-center gap-1.5">
@@ -114,12 +115,12 @@ watch(() => createdNodeId.value, (newId) => {
                     </BaseButton>
                 </div>
                 <div class="flex items-center gap-2">
-                    <code class="flex-1 block px-3 py-2.5 bg-bg-inset/50 border border-border-default rounded-md text-sm font-mono text-text-m truncate select-all">{{ nodeKey }}</code>
+                    <code :class="fleetDeployStyles.keyCode">{{ nodeKey }}</code>
                 </div>
-                <p class="text-sm text-success-main font-medium mt-2">You can view this key again in the node details.</p>
+                <p :class="fleetDeployStyles.keyHint">You can view this key again in the node details.</p>
             </div>
 
-            <div class="flex justify-end pt-5 border-t border-border-default mt-6">
+            <div :class="fleetDeployStyles.doneFooter">
                 <BaseButton variant="secondary" @click="close">Done</BaseButton>
             </div>
         </div>

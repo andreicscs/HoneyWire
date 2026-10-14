@@ -8,6 +8,8 @@ import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseStatusDot from '../ui/feedback/BaseStatusDot.vue'
 import BaseMeatballMenu from '../ui/navigation/BaseMeatballMenu.vue'
 import { formatSensorId } from '../../utils/formatSensorId'
+import { nodeMenuStyles } from '../nodedetails/nodedetailsStyles.ts'
+import { chartWidgetStyles, uptimeStyles, uptimeBlockColors } from './dashboardWidgetsStyles.ts'
 
 
 const fleetStore = useFleetStore()
@@ -124,14 +126,16 @@ const legendItems = [
     { label: 'Down', colorClass: 'bg-critical' },
     { label: 'Pending / N/A', colorClass: 'bg-bg-inset' }
 ]
+
+const uptimeBlockClass = (status: string) => uptimeBlockColors[status] ?? uptimeBlockColors.pending
 </script>
 
 <template>
     <BaseWidget>
         <template #header>
-            <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
+            <div :class="chartWidgetStyles.headRow">
                 <div>
-                    <h3 class="text-base font-medium text-text-h">Fleet Uptime</h3>
+                    <h3 :class="chartWidgetStyles.title">Fleet Uptime</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
                         <span class="text-sm text-text-m">Fleet Overall:</span>
                         <span class="text-sm transition-colors duration-normal" 
@@ -148,20 +152,19 @@ const legendItems = [
             </div>
         </template>
 
-        <div class="flex-1 relative mt-2 min-h-0 w-full">
-            <div ref="scrollArea" @scroll.passive="checkScroll" class="absolute top-0 left-0 right-0 bottom-0 overflow-y-auto custom-scroll pr-3 pb-10">
+        <div :class="chartWidgetStyles.body">
+            <div ref="scrollArea" @scroll.passive="checkScroll" :class="uptimeStyles.scrollArea">
                 
-                <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" class="absolute inset-0 flex items-center justify-center text-center text-base text-text-m z-20">No fleet data available.</div>
+                <div v-show="!uptimeData?.groups || uptimeData.groups.length === 0" :class="uptimeStyles.emptyOverlay">No fleet data available.</div>
                 
                 <div v-for="group in hydratedUptimeGroups" :key="group.nodeId" :id="'group-' + group.nodeId"
-                    class="transition-all duration-normal rounded-lg p-0.5 mb-0.5 border"
-                    :class="{
-                        'border-select-group-border bg-select-group-bg': selectedNode?.id === group.nodeId && !selectedSensor,
-                        'border-transparent': selectedNode?.id !== group.nodeId || selectedSensor,
-                        'opacity-50': (selectedNode || selectedSensor) && selectedNode?.id !== group.nodeId
-                    }">
+                    :class="[uptimeStyles.groupBox,
+                        selectedNode?.id === group.nodeId && !selectedSensor ? uptimeStyles.groupSelected : uptimeStyles.groupPlain,
+                        (selectedNode || selectedSensor) && selectedNode?.id !== group.nodeId ? uptimeStyles.groupDimmed : ''
+                    ]">
                      
                     <div class="px-1.5 mb-1 flex items-center gap-2 group/header"
+                        data-testid="uptime-group" :data-node-id="group.nodeId"
                         :class="group.nodeId !== 'unassigned' ? 'cursor-pointer' : ''"
                         @click="group.nodeId !== 'unassigned' ? fleetStore.selectTarget(group.nodeId) : null">
                                             
@@ -174,13 +177,11 @@ const legendItems = [
                     </div>
                      
                     <div v-for="sensor in group.sensors" :key="sensor.nodeId + '-' + sensor.sensorId" :id="'row-' + sensor.nodeId + '-' + sensor.sensorId" 
-                        class="flex items-center w-full transition-all duration-normal px-1.5 h-7 rounded-md border"
-                        :class="{
-                            'opacity-50': selectedSensor && (selectedSensor?.sensorId !== sensor.sensorId || selectedNode?.id !== sensor.nodeId),
-                            'bg-select-row-bg border-select-row-border shadow-sm': selectedSensor?.sensorId === sensor.sensorId && selectedNode?.id === sensor.nodeId,
-                            'border-transparent': !selectedSensor || (selectedSensor?.sensorId !== sensor.sensorId || selectedNode?.id !== sensor.nodeId),
-                            'has-warnings': sensor.worstStatus !== null
-                        }"
+                        :class="[uptimeStyles.sensorRow,
+                            selectedSensor && (selectedSensor?.sensorId !== sensor.sensorId || selectedNode?.id !== sensor.nodeId) ? uptimeStyles.sensorDimmed : '',
+                            selectedSensor?.sensorId === sensor.sensorId && selectedNode?.id === sensor.nodeId ? uptimeStyles.sensorSelected : uptimeStyles.sensorPlain,
+                            sensor.worstStatus !== null ? 'has-warnings' : ''
+                        ]"
                         :data-worst-status="sensor.worstStatus"
                         >
                          
@@ -188,8 +189,8 @@ const legendItems = [
                             
                             <BaseMeatballMenu :id="`${sensor.nodeId}|${sensor.sensorId}`">
                                 <button @click="handleSilence(sensor.nodeId, sensor.sensorId, sensor.isSilenced)" 
-                                        class="w-full text-left px-3 py-2 text-sm text-text-m font-medium flex items-center gap-2 hover:bg-secondary-hover transition-colors group"
-                                        :class="sensor.isSilenced ? 'text-archive-text' : 'text-text-l hover:text-text-h'">
+                                        data-testid="uptime-menu-silence"
+                                        :class="[nodeMenuStyles.item, sensor.isSilenced ? 'text-archive-text' : 'text-text-l hover:text-text-h']">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:rotate-12 group-active:-rotate-12 origin-top" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path v-if="!sensor.isSilenced" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
                                         <path v-if="sensor.isSilenced" d="M13.73 21a2 2 0 01-3.46 0m-3.9-3.9a2.032 2.032 0 01-2.37.5L4 17h12.59l3.12 3.12M3 3l18 18M18 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341c-.5.186-.967.447-1.385.772"/>
@@ -198,7 +199,8 @@ const legendItems = [
                                 </button>
                                 
                                 <button @click="handleForget(sensor.nodeId, sensor.sensorId)" 
-                                        class="w-full text-left px-3 py-2 text-sm font-medium text-danger-text flex items-center gap-2 hover:bg-danger-bg transition-colors group border-t border-border-default mt-1 pt-2">
+                                        data-testid="uptime-menu-forget"
+                                        :class="nodeMenuStyles.itemDanger">
                                     <svg class="w-3.5 h-3.5 transition-transform duration-normal group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6M10 11v6M14 11v6" />
                                         <path class="origin-bottom-right transition-transform duration-normal group-hover:-rotate-[15deg] group-hover:-translate-y-0.5" d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
@@ -210,6 +212,7 @@ const legendItems = [
                             <BaseStatusDot :status="sensor.liveStatus" />
                             
                             <button @click="fleetStore.selectTarget(sensor.nodeId, sensor.sensorId)"
+                                data-testid="uptime-sensor" :data-sensor-id="sensor.sensorId"
                                 class="font-mono text-left transition-colors cursor-pointer rounded flex items-center gap-1.5 max-w-[calc(100%-28px)] text-sm"
                                 :class="selectedSensor?.sensorId === sensor.sensorId && selectedNode?.id === sensor.nodeId ? 'text-text-h font-bold' : 'text-text-m font-medium hover:text-text-h'"
                                 :title="`Node: ${group.nodeAlias || group.nodeId}`">
@@ -223,13 +226,7 @@ const legendItems = [
 
                         <div class="flex-1 flex justify-end items-center gap-[2px] overflow-hidden flex-nowrap pl-2">
                             <div v-for="(block, i) in sensor.blocks" :key="i"
-                                 class="flex-1 max-w-[8px] min-h-[20px] min-w-[2px] h-5 rounded-[2px] transition-opacity duration-[var(--duration-fast)] hover:opacity-70 cursor-default"
-                                 :class="{
-                                     'bg-success-main': block.status === 'up', 
-                                     'bg-critical': block.status === 'down', 
-                                     'bg-high': block.status === 'degraded', 
-                                     'bg-bg-inset': block.status === 'nodata' || block.status === 'pending'
-                                 }"
+                                 :class="[uptimeStyles.blockBase, uptimeBlockClass(block.status)]"
                                  :title="`${block.timeLabel} - ${block.label}`">
                             </div>
                         </div>

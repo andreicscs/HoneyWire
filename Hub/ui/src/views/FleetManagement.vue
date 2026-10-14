@@ -9,6 +9,7 @@ import BaseButton from '../components/ui/forms/BaseButton.vue'
 import FleetSkeleton from '../components/fleetmanagement/FleetSkeleton.vue'
 import FleetDeployModal from '../components/fleetmanagement/FleetDeployModal.vue'
 import FleetNodeWidget from '../components/fleetmanagement/FleetNodeWidget.vue'
+import { fleetStyles, FLEET_SKELETON_DELAY_MS } from './fleetStyles.ts'
 
 const fleetStore = useFleetStore()
 const router = useRouter()
@@ -22,6 +23,13 @@ const isInitialLoading = ref(fleetStore.nodes.length === 0)
 const showSkeleton = ref(false)
 
 onMounted(async () => {
+    loadManifests()
+    await loadFleet()
+})
+
+// --- CACHE-FIRST LOADERS ---
+
+function loadManifests() {
     // If manifests are missing from store, fetch them
     if (fleetStore.manifests.length === 0) {
         fleetStore.fetchManifests().then(manifests => {
@@ -35,12 +43,14 @@ onMounted(async () => {
         manifestData.value = fleetStore.manifests
         isManifestLoading.value = false
     }
+}
 
+async function loadFleet() {
     // If fleet nodes are not yet in store, fetch them with skeleton fallback
     if (fleetStore.nodes.length === 0) {
         const skeletonTimer = setTimeout(() => {
             if (isInitialLoading.value) showSkeleton.value = true
-        }, 350)
+        }, FLEET_SKELETON_DELAY_MS)
 
         try {
             await fleetStore.fetchFleet()
@@ -53,7 +63,7 @@ onMounted(async () => {
         isInitialLoading.value = false
         showSkeleton.value = false
     }
-})
+}
 
 // --- DEPLOY MODAL ---
 const showDeployModal = ref(false)
@@ -103,9 +113,9 @@ const handleOpenNodeDetail = (nodeId: string) => {
 </script>
 
 <template>
-    <div class="min-h-full flex flex-col max-w-[1600px] w-full mx-auto px-2 sm:px-4 lg:px-6 py-4 sm:py-6">
+    <div :class="fleetStyles.pageRoot" data-testid="fleet-page">
 
-        <div class="flex items-center justify-between shrink-0">
+        <div :class="fleetStyles.headerRow">
              <PageHeader 
                 title="Fleet Overview" 
                 description="Monitor the health and status of your deployed HoneyWire nodes across all environments. Click on a node for detailed insights and management options."
@@ -113,8 +123,8 @@ const handleOpenNodeDetail = (nodeId: string) => {
             
             <BaseButton 
                 variant="primary" 
-                class="gap-2 text-sm transition-all relative" 
-                :class="{ 'animate-bounce-subtle ring-4 ring-primary-main/30 ring-offset-2 ring-offset-bg shadow-lg': isFirstStartup }"
+                data-testid="deploy-node-button"
+                :class="[fleetStyles.deployButton, { [fleetStyles.deployAttention]: isFirstStartup }]"
                 @click="showDeployModal = true"
             >
                 <span v-if="isFirstStartup" class="absolute -top-2 -right-2 flex h-4 w-4"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-main opacity-75"></span><span class="relative inline-flex rounded-full h-4 w-4 bg-primary-main"></span></span>
@@ -127,11 +137,11 @@ const handleOpenNodeDetail = (nodeId: string) => {
 
         <FleetSkeleton v-if="showSkeleton" />
 
-        <div v-else-if="!isInitialLoading && fleetStore.enrichedNodes.length === 0" class="flex-1 flex items-center justify-center text-center text-base text-text-m py-20">
+        <div v-else-if="!isInitialLoading && fleetStore.enrichedNodes.length === 0" data-testid="fleet-empty" :class="fleetStyles.emptyState">
             No nodes deployed.
         </div>
 
-        <div v-else-if="!isInitialLoading" class="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-max">
+        <div v-else-if="!isInitialLoading" data-testid="fleet-grid" :class="fleetStyles.nodeGrid">
             
             <FleetNodeWidget 
                 v-for="node in fleetStore.enrichedNodes" 

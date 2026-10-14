@@ -5,6 +5,9 @@ import { useAppStore } from '../../stores/System/app.ts'
 import { useEventsStore } from '../../stores/Events/events.ts'
 import { useFleetStore } from '../../stores/Fleet/fleet.ts'
 import { formatSensorId } from '../../utils/formatSensorId'
+import { formatEventType } from '../../utils/formatEventType'
+import EventSortHeader from './EventSortHeader.vue'
+import { eventTableStyles } from './dashboardWidgetsStyles.ts'
 
 
 const appStore = useAppStore()
@@ -49,6 +52,9 @@ const toggleSort = (col: string) => {
     else { sortCol.value = col; sortDesc.value = ['timestamp', 'severity'].includes(col) }
 }
 
+const rowBorderClass = (eventId: string) =>
+    expandedRows.value.has(eventId) ? eventTableStyles.rowBorderOpen : eventTableStyles.rowBorderClosed
+
 const toggleRow = async (id: string) => {
     const newSet = new Set(expandedRows.value)
     const isExpanding = !newSet.has(id)
@@ -67,11 +73,6 @@ const toggleRow = async (id: string) => {
         const detailsRow = document.getElementById(`details-${id}`)
         if (detailsRow) detailsRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-}
-
-const isDownArrow = (col: string) => {
-    if (sortCol.value !== col) return true; 
-    return ['timestamp', 'severity'].includes(col) ? sortDesc.value : !sortDesc.value;
 }
 
 const sortedEvents = computed(() => {
@@ -132,7 +133,6 @@ const handleArchiveEvent = async (eventId: string) => {
 }
 
 // Formatters
-const formatEventType = (type: string) => type ? type.replace(/_/g, ' ') : ''
 const formatString = (str: string | number) => str ? String(str).replace(/_/g, ' ') : ''
 const formatJson = (val: any) => {
     if (val === null) return 'null'
@@ -184,9 +184,9 @@ const formatTime = (timestamp: string) => {
 </script>
 
 <template>
-    <div class="bg-bg-surface border border-border-default rounded-lg overflow-hidden flex flex-col shadow-sm w-full relative z-0">
+    <div :class="eventTableStyles.card">
         
-        <div class="pl-5 pr-4 py-3 border-b border-border-default flex justify-between items-center bg-bg-surface shrink-0">
+        <div :class="eventTableStyles.headBar">
             <div class="flex items-center gap-3">
                 <h3 class="text-base font-medium text-text-h">
                     {{ viewingArchive ? 'Archived Events' : 'Active Threat Queue' }}
@@ -202,61 +202,33 @@ const formatTime = (timestamp: string) => {
                         type="button"
                         title="Export JSON"
                         aria-label="Export all events as JSON"
-                        class="p-1.5 rounded-md text-text-m transition-colors outline-none hover:bg-secondary-hover hover:text-text-h active:scale-95">
+                        :class="eventTableStyles.exportButton">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 </button>
                 <button v-show="!viewingArchive && displayEvents.length > 0" @click="handleArchiveAll"
                         type="button"
                         aria-label="Archive all active events"
-                        class="px-2.5 py-1 rounded-md text-base transition-colors shadow-sm border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border active:scale-95">
+                        :class="eventTableStyles.archiveAllButton">
                     Archive All
                 </button>
             </div>
         </div>
 
-        <div class="overflow-x-auto overflow-y-auto custom-scroll max-h-[600px] lg:max-h-[700px] flex-1 after:content-[''] after:block after:h-4 after:shrink-0">
+        <div :class="eventTableStyles.tableScroll">
             <table class="min-w-full text-left border-separate border-spacing-0">
-                <thead class="text-base text-text-m sticky top-0 bg-bg-surface z-30 shadow-[0_1px_0_0_var(--color-border-default)] select-none">
+                <thead :class="eventTableStyles.tableHead">
                     <tr>
                         <th class="px-3 py-3 w-8"></th>
-                        <th @click="toggleSort('severity')" class="px-3 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by threat severity">
-                            <div class="flex items-center gap-1.5">Threat
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'severity' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('severity') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
-                        <th @click="toggleSort('eventTrigger')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by event trigger type">
-                            <div class="flex items-center gap-1.5">Event Trigger
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'eventTrigger' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('eventTrigger') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
-                        <th @click="toggleSort('source')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by source">
-                            <div class="flex items-center gap-1.5">Source
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'source' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('source') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
-                        <th @click="toggleSort('target')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by target">
-                            <div class="flex items-center gap-1.5">Target
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'target' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('target') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
+                        <EventSortHeader label="Threat" sort-key="severity" aria-label="Sort by threat severity" pad-class="px-3 py-3" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
+                        <EventSortHeader label="Event Trigger" sort-key="eventTrigger" aria-label="Sort by event trigger type" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
+                        <EventSortHeader label="Source" sort-key="source" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
+                        <EventSortHeader label="Target" sort-key="target" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
                         
-                        <th @click="toggleSort('sensorId')" class="px-4 py-3 cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by sensor id">
-                            <div class="flex items-center gap-1.5">Sensor
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'sensorId' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('sensorId') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
+                        <EventSortHeader label="Sensor" sort-key="sensorId" aria-label="Sort by sensor id" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
 
-                        <th @click="toggleSort('nodeId')" class="px-4 py-3 text-right cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by node">
-                            <div class="flex items-center justify-end gap-1.5">Node
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'nodeId' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('nodeId') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
+                        <EventSortHeader label="Node" sort-key="nodeId" align="right" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
 
-                        <th @click="toggleSort('timestamp')" class="px-5 py-3 text-right cursor-pointer hover:text-text-h transition-colors group" role="button" tabindex="0" aria-label="Sort by timestamp">
-                            <div class="flex items-center justify-end gap-1.5">Time
-                                <svg class="w-3 h-3 transition-transform duration-normal" :class="[sortCol === 'timestamp' ? 'opacity-100 text-highlight-border' : 'opacity-0 group-hover:opacity-50 text-text-m', isDownArrow('timestamp') ? 'rotate-180' : '']" viewBox="0 0 384 512" fill="currentColor"><path d="M214.6 41.4c-12.5-12.5-32.8-12.5-45.3 0l-160 160c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L160 141.2V448c0 17.7 14.3 32 32 32s32-14.3 32-32V141.2L329.4 246.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-160-160z"></path></svg>
-                            </div>
-                        </th>
+                        <EventSortHeader label="Time" sort-key="timestamp" aria-label="Sort by timestamp" align="right" pad-class="px-5 py-3" :sort-col="sortCol" :sort-desc="sortDesc" @toggle="toggleSort" />
                         <th v-if="!viewingArchive" class="px-4 py-3 w-16"></th>
                     </tr>
                 </thead>
@@ -267,17 +239,16 @@ const formatTime = (timestamp: string) => {
                     </tr>
                     
                     <template v-for="event in paginatedEvents" :key="event.id">
-                        <tr class="hover:bg-secondary-hover cursor-pointer transition-colors duration-[var(--duration-fast)] relative z-0 group"
-                            :class="[ 'bleed-' + event.severity.toLowerCase(), expandedRows.has(event.id) ? 'bg-bg-base' : '' ]"
+                        <tr data-testid="event-row" :data-event-id="event.id" :class="[eventTableStyles.rowBase, 'bleed-' + event.severity.toLowerCase(), expandedRows.has(event.id) ? eventTableStyles.rowExpanded : '']"
                             @click="toggleRow(event.id)">
                             
                             <td class="px-3 py-3 border-l-[3px] text-text-m transition-all duration-[var(--duration-fast)]" 
-                                :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'"
+                                :class="rowBorderClass(event.id)"
                                 :style="{ borderLeftColor: event.severity ? `var(--color-${event.severity.toLowerCase()})` : 'transparent' }">
                                 <svg class="w-4 h-4 transition-transform duration-normal" :class="expandedRows.has(event.id) ? 'rotate-90 text-text-h' : 'group-hover:text-text-h'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </td>
 
-                            <td class="px-3 py-3 flex items-center gap-3" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'">
+                            <td class="px-3 py-3 flex items-center gap-3" :class="rowBorderClass(event.id)">
                                 <div v-show="!event.isRead" class="w-1.5 h-1.5 rounded-full bg-danger-main shrink-0 animate-pulse"></div>
                                 <span class="px-2 py-0.5 rounded border text-base bg-bg-surface whitespace-nowrap capitalize" 
                                       :style="{ borderColor: `var(--color-${event.severity.toLowerCase()})`, color: `var(--color-${event.severity.toLowerCase()})` }">
@@ -285,22 +256,22 @@ const formatTime = (timestamp: string) => {
                                 </span>
                             </td>
                             
-                            <td class="px-4 py-3 text-base font-base text-text-h capitalize max-w-[140px] md:max-w-[200px] lg:max-w-md xl:max-w-2xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="formatEventType(event.eventTrigger)">{{ formatEventType(event.eventTrigger) }}</td>
+                            <td class="px-4 py-3 text-base font-base text-text-h capitalize max-w-[140px] md:max-w-[200px] lg:max-w-md xl:max-w-2xl 2xl:max-w-none truncate" :class="rowBorderClass(event.id)" :title="formatEventType(event.eventTrigger)">{{ formatEventType(event.eventTrigger) }}</td>
                             
-                            <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.source">{{ event.source }}</td>
-                            <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.target">{{ event.target }}</td>
+                            <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="rowBorderClass(event.id)" :title="event.source">{{ event.source }}</td>
+                            <td class="px-4 py-3 text-base text-text-m font-mono max-w-[120px] md:max-w-[180px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="rowBorderClass(event.id)" :title="event.target">{{ event.target }}</td>
                             
-                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.sensorId">{{ formatSensorId(event.sensorId) }}</td>
+                            <td class="px-4 py-3 text-base text-text-h font-mono max-w-[140px] md:max-w-[200px] lg:max-w-sm xl:max-w-xl 2xl:max-w-none truncate" :class="rowBorderClass(event.id)" :title="event.sensorId">{{ formatSensorId(event.sensorId) }}</td>
                             
-                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono w-[160px] min-w-[160px] max-w-[160px] truncate" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.nodeId || 'Unassigned'">{{ getNodeAlias(event.nodeId) }}</td>
+                            <td class="px-4 py-3 text-base font-medium text-right text-text-h font-mono w-[160px] min-w-[160px] max-w-[160px] truncate" :class="rowBorderClass(event.id)" :title="event.nodeId || 'Unassigned'">{{ getNodeAlias(event.nodeId) }}</td>
                             
-                            <td class="px-5 py-3 text-base text-right text-text-m font-mono whitespace-nowrap" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
+                            <td class="px-5 py-3 text-base text-right text-text-m font-mono whitespace-nowrap" :class="rowBorderClass(event.id)" :title="event.timestamp">{{ formatTime(event.timestamp) }}</td>
                             
-                            <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="expandedRows.has(event.id) ? 'border-b border-transparent' : 'border-b border-border-default'">
+                            <td v-if="!viewingArchive" class="px-4 py-2 text-right w-16" :class="rowBorderClass(event.id)">
                                 <button @click.stop="handleArchiveEvent(event.id)"                                     
                                         type="button"
                                         aria-label="Archive this event"                                        
-                                        class="flex items-center justify-center w-6 h-6 ml-auto rounded-md transition-all duration-[var(--duration-fast)] shadow-sm active:scale-95 border outline-none bg-secondary-main text-secondary-text border-secondary-border hover:bg-archive-bg hover:text-archive-text hover:border-archive-border"
+                                        :class="eventTableStyles.archiveRowButton"
                                         title="Archive Event">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
@@ -309,7 +280,7 @@ const formatTime = (timestamp: string) => {
                             </td>
                         </tr>
 
-                       <tr v-if="expandedRows.has(event.id)" :id="'details-' + event.id">
+                       <tr v-if="expandedRows.has(event.id)" :id="'details-' + event.id" data-testid="event-details">
                             <td :colspan="viewingArchive ? 8 : 9" class="p-0 border-b border-border-default bg-bg-base">
                                 <div class="pl-11 pr-5 pb-5 pt-2">
                                     
@@ -371,16 +342,16 @@ const formatTime = (timestamp: string) => {
             </table>
         </div>
 
-        <div v-if="sortedEvents.length > itemsPerPage" class="flex items-center justify-between border-t border-border-default bg-bg-surface px-4 py-3 sm:px-5 shrink-0">
+        <div v-if="sortedEvents.length > itemsPerPage" :class="eventTableStyles.pageBar">
             <div class="flex flex-1 justify-between sm:hidden">
                 <button @click="prevPage" :disabled="currentPage === 1"
                         type="button"
-                        class="relative inline-flex items-center rounded-md border border-border-default bg-bg-surface px-4 py-2 text-base text-text-h hover:bg-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        :class="eventTableStyles.pageButtonMobile">
                     Previous
                 </button>
                 <button @click="nextPage" :disabled="currentPage === totalPages"
                         type="button"
-                        class="relative ml-3 inline-flex items-center rounded-md border border-border-default bg-bg-surface px-4 py-2 text-base text-text-h hover:bg-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                        :class="[eventTableStyles.pageButtonMobile, 'ml-3']">
                     Next
                 </button>
             </div>
@@ -393,7 +364,7 @@ const formatTime = (timestamp: string) => {
                 <div>
                     <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                         <button @click="prevPage" :disabled="currentPage === 1" 
-                                class="relative inline-flex items-center rounded-l-md px-2 py-1.5 border border-border-default bg-bg-surface text-text-m hover:bg-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:z-20 outline-none">
+                                :class="[eventTableStyles.pageArrow, 'rounded-l-md']">
                             <span class="sr-only">Previous</span>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" /></svg>
                         </button>
@@ -403,13 +374,12 @@ const formatTime = (timestamp: string) => {
                                 ...
                             </span>
                             <button v-else @click="goToPage(page)"
-                                    class="relative inline-flex items-center px-3.5 py-1.5 text-base border border-border-default transition-colors focus:z-20 outline-none"
-                                    :class="currentPage === page ? 'z-10 bg-primary-selected text-primary-text shadow-inner border-primary-selected' : 'bg-bg-surface text-text-m hover:bg-secondary-hover hover:text-text-h'">
+                                    :class="[eventTableStyles.pageNumber, currentPage === page ? eventTableStyles.pageActive : eventTableStyles.pageInactive]">
                                 {{ page }}
                             </button>
                         </template>
                         <button @click="nextPage" :disabled="currentPage === totalPages" 
-                                class="relative inline-flex items-center rounded-r-md px-2 py-1.5 border border-border-default bg-bg-surface text-text-m hover:bg-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:z-20 outline-none">
+                                :class="[eventTableStyles.pageArrow, 'rounded-r-md']">
                             <span class="sr-only">Next</span>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />

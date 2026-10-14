@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
       vue(),
       tailwindcss(),
     ],
+    test: {
+      environment: 'jsdom',
+      include: ['src/**/*.spec.ts'],
+    },
     server: {
       proxy: {
         '/api': {

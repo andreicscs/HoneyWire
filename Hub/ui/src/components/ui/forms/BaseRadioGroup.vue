@@ -17,6 +17,7 @@ defineEmits(['update:modelValue'])
             <button v-for="opt in options" :key="opt"
                 @click="$emit('update:modelValue', opt)"
                 type="button"
+                :data-selected="modelValue === opt"
                 class="px-3.5 py-1.5 rounded-md text-base border transition-all duration-fast flex items-center justify-center outline-none"
                 :class="modelValue === opt 
                     ? 'bg-primary-selected text-primary-text border-primary-selected shadow-sm' 

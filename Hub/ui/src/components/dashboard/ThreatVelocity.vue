@@ -10,6 +10,7 @@ import { baseTooltipConfig } from '../../utils/chartConfig'
 import BaseTimeFilter from '../ui/forms/BaseTimeFilter.vue'
 import BaseLegend from '../ui/feedback/BaseLegend.vue'
 import BaseWidget from '../ui/layout/BaseWidget.vue'
+import { chartWidgetStyles } from './dashboardWidgetsStyles.ts'
 
 const appStore = useAppStore()
 const eventsStore = useEventsStore()
@@ -228,9 +229,9 @@ const legendItems = [
 <template>
     <BaseWidget>
         <template #header>
-            <div class="flex justify-between items-start h-14 relative z-10 shrink-0 w-full">
+            <div :class="chartWidgetStyles.headRow">
                 <div>
-                    <h3 class="text-base font-medium text-text-h">Events Velocity</h3>
+                    <h3 :class="chartWidgetStyles.title">Events Velocity</h3>
                     <div class="flex items-center gap-2 mt-1 leading-none">
                         <span class="text-sm transition-colors" :class="(projection?.recentEventCount || 0) > 0 ? 'text-critical' : 'text-success-main'">
                             {{ projection?.recentEventCount || 0 }}
@@ -246,7 +247,7 @@ const legendItems = [
             </div>
         </template>
 
-        <div class="flex-1 relative mt-2 min-h-0 w-full">
+        <div :class="chartWidgetStyles.body">
             <div v-if="(!projection || projection.recentEventCount === 0) && !isFetchingThreatVelocityProjection" class="absolute inset-0 flex items-center justify-center text-center text-base text-text-m z-20">
                 Awaiting telemetry...
             </div>
